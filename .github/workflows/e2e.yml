@@ -26,8 +26,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Run E2E in Docker Compose
-        run: make test-e2e
+        run: task test-e2e
 
       - name: Upload E2E reports
         if: always()

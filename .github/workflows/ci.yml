@@ -24,5 +24,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Run unit tests in Docker
-        run: make test-unit
+        run: task test-unit
