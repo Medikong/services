@@ -29,16 +29,30 @@ make test-e2e
 
 ## 이미지 빌드와 푸시
 
-기본 registry는 로컬 lab registry인 `10.10.10.10:5000`입니다.
+`service` repo는 Dockerfile과 image build/push 명령을 소유합니다. Kubernetes 배포 선언은 `gitops` repo가 관리하므로, 여기서는 registry와 tag를 인자로 받아 이미지만 준비합니다.
+
+Python 서비스 이미지는 단일 바이너리 산출물이 아니라 운영 의존성만 담은 `/opt/venv` 기반 멀티 스테이지 이미지로 구성합니다.
+
+기본 `app-images-*` registry는 VM lab registry인 `10.10.10.10:5000`입니다.
 
 ```bash
 make app-images-build IMAGE_TAG=dev-split-smoke
 make app-images-push IMAGE_TAG=dev-split-smoke
 ```
 
-외부 registry로 바꿀 때는 `IMAGE_REGISTRY`, 필요하면 `IMAGE_NAMESPACE`를 지정합니다.
+Docker Desktop 로컬 개발 루프에서는 VM registry를 쓰지 않고 Docker Desktop용 local registry를 지정합니다. 기본 alias는 `localhost:5001`과 `dev` tag를 사용합니다.
 
 ```bash
+make dev-images-build
+make dev-images-push
+```
+
+registry, namespace, tag는 명시적으로 바꿀 수 있습니다.
+
+```bash
+make app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev
+make app-images-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev
+DEV_IMAGE_REGISTRY=localhost:5001 DEV_IMAGE_TAG=dev make dev-images-push
 IMAGE_REGISTRY=ghcr.io IMAGE_NAMESPACE=owner/service make app-images-push IMAGE_TAG=dev
 ```
 

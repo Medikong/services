@@ -25,6 +25,9 @@ LOCAL_REGISTRY_PORT ?= 5000
 IMAGE_REGISTRY ?= $(LOCAL_REGISTRY_HOST):$(LOCAL_REGISTRY_PORT)
 IMAGE_NAMESPACE ?=
 IMAGE_TAG ?= latest
+DEV_IMAGE_REGISTRY ?= localhost:5001
+DEV_IMAGE_NAMESPACE ?=
+DEV_IMAGE_TAG ?= dev
 IMAGE_REPOSITORY_PREFIX := $(IMAGE_REGISTRY)
 ifneq ($(strip $(IMAGE_NAMESPACE)),)
 IMAGE_REPOSITORY_PREFIX := $(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)
@@ -40,31 +43,34 @@ APP_SERVICES := \
 SERVICE_DIRS := $(addprefix services/,$(APP_SERVICES))
 DASHBOARD_SERVICE ?= dashboard
 
-.PHONY: help list install test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down app-images-build app-images-push
+.PHONY: help list install test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down app-images-build app-images-push dev-images-build dev-images-push
 
 help:
 	@printf '%s\n' 'Medical Platform service commands'
 	@printf '%s\n' ''
-	@printf '%s\n' '기본'
-	@printf '  %-30s %s\n' 'make install' 'Python venv를 만들고 서비스 의존성을 설치합니다.'
+	@printf '%s\n' 'Setup'
+	@printf '  %-30s %s\n' 'make install' 'Create a Python venv and install service dependencies.'
 	@printf '%s\n' ''
-	@printf '%s\n' '테스트'
-	@printf '  %-30s %s\n' 'make test-unit' 'Docker Python 러너에서 FastAPI 서비스 pytest를 실행합니다.'
-	@printf '  %-30s %s\n' 'make test' 'make test-unit과 같은 기본 테스트입니다.'
-	@printf '  %-30s %s\n' 'make test-all' '단위 테스트와 Docker Compose E2E 테스트를 실행합니다.'
-	@printf '  %-30s %s\n' 'make test-e2e' 'Docker Compose에서 PostgreSQL/MongoDB/Kafka 기반 E2E 시나리오를 실행합니다.'
-	@printf '  %-30s %s\n' 'make e2e-up' 'E2E Docker Compose stack을 시작합니다.'
-	@printf '  %-30s %s\n' 'make e2e-wait' 'Docker curl 컨테이너로 E2E 서비스 준비 상태를 확인합니다.'
-	@printf '  %-30s %s\n' 'make e2e-newman' 'Docker Newman 컨테이너로 E2E collection을 실행합니다.'
-	@printf '  %-30s %s\n' 'make e2e-down' 'E2E Docker Compose stack을 정리합니다.'
+	@printf '%s\n' 'Tests'
+	@printf '  %-30s %s\n' 'make test-unit' 'Run FastAPI service pytest in the Docker Python runner.'
+	@printf '  %-30s %s\n' 'make test' 'Run the default test target, same as make test-unit.'
+	@printf '  %-30s %s\n' 'make test-all' 'Run unit tests and Docker Compose E2E tests.'
+	@printf '  %-30s %s\n' 'make test-e2e' 'Run PostgreSQL/MongoDB/Kafka E2E scenarios with Docker Compose.'
+	@printf '  %-30s %s\n' 'make e2e-up' 'Start the E2E Docker Compose stack.'
+	@printf '  %-30s %s\n' 'make e2e-wait' 'Wait for E2E services with the Docker curl container.'
+	@printf '  %-30s %s\n' 'make e2e-newman' 'Run the E2E collection with the Docker Newman container.'
+	@printf '  %-30s %s\n' 'make e2e-down' 'Stop and remove the E2E Docker Compose stack.'
 	@printf '%s\n' ''
-	@printf '%s\n' '이미지'
-	@printf '  %-30s %s\n' 'make app-images-build' '서비스와 dashboard Docker 이미지를 빌드합니다.'
-	@printf '  %-30s %s\n' 'make app-images-push' '이미지를 빌드한 뒤 registry로 push합니다.'
+	@printf '%s\n' 'Images'
+	@printf '  %-30s %s\n' 'make app-images-build' 'Build service and dashboard Docker images.'
+	@printf '  %-30s %s\n' 'make app-images-push' 'Build images and push them to the registry.'
+	@printf '  %-30s %s\n' 'make dev-images-build' 'Build Docker Desktop dev images with DEV_IMAGE_* variables.'
+	@printf '  %-30s %s\n' 'make dev-images-push' 'Push Docker Desktop dev images with DEV_IMAGE_* variables.'
 	@printf '%s\n' ''
-	@printf '%s\n' '이미지 변수 예시'
-	@printf '  %-30s %s\n' 'IMAGE_TAG=dev make app-images-build' '기본 local registry에 dev 태그로 빌드합니다.'
-	@printf '  %-30s %s\n' 'IMAGE_REGISTRY=ghcr.io IMAGE_NAMESPACE=org/repo make app-images-push' '외부 registry로 push합니다.'
+	@printf '%s\n' 'Image variable examples'
+	@printf '  %-30s %s\n' 'IMAGE_TAG=dev make app-images-build' 'Build with the dev tag for the default local registry.'
+	@printf '  %-30s %s\n' 'DEV_IMAGE_TAG=dev make dev-images-push' 'Build and push to the Docker Desktop dev registry.'
+	@printf '  %-30s %s\n' 'IMAGE_REGISTRY=ghcr.io IMAGE_NAMESPACE=org/repo make app-images-push' 'Push to an external registry.'
 
 list: help
 
@@ -78,10 +84,15 @@ install:
 	$(VENV_PYTHON) -m pip install --upgrade pip; \
 	$(VENV_PYTHON) -m pip install \
 		-r services/auth-service/requirements.txt \
+		-r services/auth-service/requirements-test.txt \
 		-r services/patient-service/requirements.txt \
+		-r services/patient-service/requirements-test.txt \
 		-r services/appointment-service/requirements.txt \
+		-r services/appointment-service/requirements-test.txt \
 		-r services/prescription-service/requirements.txt \
-		-r services/notification-service/requirements.txt; \
+		-r services/prescription-service/requirements-test.txt \
+		-r services/notification-service/requirements.txt \
+		-r services/notification-service/requirements-test.txt; \
 	printf '%s\n' 'Python venv is ready at $(VENV_DIR).'
 
 test-runner-build:
@@ -132,6 +143,14 @@ e2e-down:
 
 app-images-build:
 	@set -euo pipefail; \
+	if [ -z "$(strip $(IMAGE_REGISTRY))" ]; then \
+		printf '%s\n' 'IMAGE_REGISTRY is required, for example: make app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2; \
+		exit 2; \
+	fi; \
+	if [ -z "$(strip $(IMAGE_TAG))" ]; then \
+		printf '%s\n' 'IMAGE_TAG is required, for example: make app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2; \
+		exit 2; \
+	fi; \
 	for service in $(APP_SERVICES); do \
 		printf 'building %s/%s:%s\n' '$(IMAGE_REPOSITORY_PREFIX)' "$$service" '$(IMAGE_TAG)'; \
 		docker build -t "$(IMAGE_REPOSITORY_PREFIX)/$$service:$(IMAGE_TAG)" "services/$$service"; \
@@ -145,3 +164,9 @@ app-images-push: app-images-build
 		printf 'pushing %s/%s:%s\n' '$(IMAGE_REPOSITORY_PREFIX)' "$$service" '$(IMAGE_TAG)'; \
 		docker push "$(IMAGE_REPOSITORY_PREFIX)/$$service:$(IMAGE_TAG)"; \
 	done
+
+dev-images-build:
+	$(MAKE) app-images-build IMAGE_REGISTRY="$(DEV_IMAGE_REGISTRY)" IMAGE_NAMESPACE="$(DEV_IMAGE_NAMESPACE)" IMAGE_TAG="$(DEV_IMAGE_TAG)"
+
+dev-images-push:
+	$(MAKE) app-images-push IMAGE_REGISTRY="$(DEV_IMAGE_REGISTRY)" IMAGE_NAMESPACE="$(DEV_IMAGE_NAMESPACE)" IMAGE_TAG="$(DEV_IMAGE_TAG)"
