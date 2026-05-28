@@ -1,0 +1,28 @@
+post:
+  summary: Refresh access token
+  operationId: refreshToken
+  parameters:
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/Idempotency-Key
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/RefreshTokenRequest
+  responses:
+    "200":
+      description: Auth tokens refreshed.
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/AuthResponse
+    "400":
+      $ref: ../../../common/components.yaml#/components/responses/BadRequest
+    "401":
+      $ref: ../../../common/components.yaml#/components/responses/Unauthorized
+    "422":
+      $ref: ../../../common/components.yaml#/components/responses/UnprocessableEntity
+    "500":
+      $ref: ../../../common/components.yaml#/components/responses/InternalServerError

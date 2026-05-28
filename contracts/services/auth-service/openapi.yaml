@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: auth-service API
+  version: 0.1.0
+  description: Medikong auth-service contract draft.
+
+servers:
+  - url: http://localhost:8081
+    description: local
+
+security: []
+
+paths:
+  /auth/login:
+    $ref: ./paths/auth_login.yaml
+  /auth/refresh:
+    $ref: ./paths/auth_refresh.yaml
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          examples:
+            - user@example.com
+        password:
+          type: string
+          format: password
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+    AuthTokens:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - tokenType
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - Bearer
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Access token lifetime in seconds.
+    AuthUser:
+      type: object
+      required:
+        - id
+        - username
+        - roles
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    AuthResponse:
+      type: object
+      required:
+        - tokens
+        - user
+      properties:
+        tokens:
+          $ref: "#/components/schemas/AuthTokens"
+        user:
+          $ref: "#/components/schemas/AuthUser"

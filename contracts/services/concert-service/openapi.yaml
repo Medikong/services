@@ -1,0 +1,153 @@
+openapi: 3.1.0
+info:
+  title: concert-service API
+  version: 0.1.0
+  description: Medikong concert-service contract draft.
+
+servers:
+  - url: http://localhost:8082
+    description: local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /concerts:
+    $ref: ./paths/concerts.yaml
+  /concerts/{id}:
+    $ref: ./paths/concerts_{id}.yaml
+  /concerts/{id}/performances:
+    $ref: ./paths/concerts_{id}_performances.yaml
+  /performances/{id}/seats:
+    $ref: ./paths/performances_{id}_seats.yaml
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
+
+  schemas:
+    Concert:
+      type: object
+      required:
+        - id
+        - title
+        - venue
+        - startsAt
+        - status
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        venue:
+          $ref: "#/components/schemas/Venue"
+        startsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - scheduled
+            - open
+            - closed
+            - canceled
+    Venue:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+    Performance:
+      type: object
+      required:
+        - id
+        - concertId
+        - venueId
+        - startsAt
+        - status
+      properties:
+        id:
+          type: string
+        concertId:
+          type: string
+        venueId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - scheduled
+            - open
+            - closed
+            - canceled
+    Seat:
+      type: object
+      required:
+        - id
+        - performanceId
+        - section
+        - row
+        - number
+        - status
+      properties:
+        id:
+          type: string
+        performanceId:
+          type: string
+        section:
+          type: string
+        row:
+          type: string
+        number:
+          type: string
+        status:
+          type: string
+          enum:
+            - available
+            - locked
+            - reserved
+    ConcertListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Concert"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    PerformanceListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Performance"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    SeatListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Seat"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo

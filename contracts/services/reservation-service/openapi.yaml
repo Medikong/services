@@ -1,0 +1,103 @@
+openapi: 3.1.0
+info:
+  title: reservation-service API
+  version: 0.1.0
+  description: Medikong reservation-service contract draft.
+
+servers:
+  - url: http://localhost:8083
+    description: local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /reservations:
+    $ref: ./paths/reservations.yaml
+  /reservations/me:
+    $ref: ./paths/reservations_me.yaml
+  /reservations/{id}:
+    $ref: ./paths/reservations_{id}.yaml
+  /reservations/{id}/cancel:
+    $ref: ./paths/reservations_{id}_cancel.yaml
+  /reservations/{id}/expire:
+    $ref: ./paths/reservations_{id}_expire.yaml
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
+
+  schemas:
+    CreateReservationRequest:
+      type: object
+      required:
+        - performanceId
+        - seatId
+      properties:
+        performanceId:
+          type: string
+          examples:
+            - perf-20260528-001
+        seatId:
+          type: string
+          examples:
+            - seat-A-01
+    Reservation:
+      type: object
+      required:
+        - id
+        - userId
+        - performanceId
+        - seatId
+        - status
+        - expiresAt
+        - createdAt
+      properties:
+        id:
+          type: string
+          examples:
+            - rsv-01HV6W8ZK2J2J9N9S4V7T3F0CA
+        userId:
+          type: string
+          examples:
+            - user-001
+        performanceId:
+          type: string
+          examples:
+            - perf-20260528-001
+        seatId:
+          type: string
+          examples:
+            - seat-A-01
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - canceled
+            - expired
+          examples:
+            - pending
+        expiresAt:
+          type: string
+          format: date-time
+          examples:
+            - "2026-05-28T10:20:30Z"
+        createdAt:
+          type: string
+          format: date-time
+          examples:
+            - "2026-05-28T10:15:30Z"
+    ReservationListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reservation"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo

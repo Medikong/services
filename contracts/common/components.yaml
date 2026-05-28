@@ -1,0 +1,164 @@
+openapi: 3.1.0
+info:
+  title: Medikong Common OpenAPI Components
+  version: 0.1.0
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    X-Request-Id:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Request correlation id. If absent, the server may generate one.
+    X-Trace-Id:
+      name: X-Trace-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional distributed tracing id.
+    Idempotency-Key:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: Idempotency key for create or command requests.
+    limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum number of items to return.
+    cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Cursor from the previous page response.
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Resource id.
+    paymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Payment id.
+    ticketId:
+      name: ticketId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Ticket id.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - requestId
+        - occurredAt
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              examples:
+                - reservation.conflict
+            message:
+              type: string
+              examples:
+                - Seat is already reserved.
+            details:
+              type: object
+              additionalProperties: true
+        requestId:
+          type: string
+          examples:
+            - req-01HV6W8ZK2J2J9N9S4V7T3F0CA
+        occurredAt:
+          type: string
+          format: date-time
+          examples:
+            - "2026-05-28T10:15:30Z"
+    PageInfo:
+      type: object
+      required:
+        - hasNext
+      properties:
+        nextCursor:
+          type:
+            - string
+            - "null"
+        hasNext:
+          type: boolean
+
+  responses:
+    BadRequest:
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Authenticated user is not allowed to access the resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Request conflicts with the current resource state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Request is syntactically valid but violates domain rules.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

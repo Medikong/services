@@ -1,0 +1,21 @@
+get:
+  summary: List notifications
+  operationId: listNotifications
+  parameters:
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/limit
+    - $ref: ../../../common/components.yaml#/components/parameters/cursor
+  responses:
+    "200":
+      description: Notification list.
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/NotificationListResponse
+    "400":
+      $ref: ../../../common/components.yaml#/components/responses/BadRequest
+    "401":
+      $ref: ../../../common/components.yaml#/components/responses/Unauthorized
+    "500":
+      $ref: ../../../common/components.yaml#/components/responses/InternalServerError

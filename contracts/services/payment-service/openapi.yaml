@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: payment-service API
+  version: 0.1.0
+  description: Medikong payment-service contract draft.
+
+servers:
+  - url: http://localhost:8084
+    description: local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /payments:
+    $ref: ./paths/payments.yaml
+  /payments/{paymentId}:
+    $ref: ./paths/payments_{paymentId}.yaml
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
+
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required:
+        - reservationId
+        - amount
+        - method
+      properties:
+        reservationId:
+          type: string
+        amount:
+          type: integer
+          minimum: 0
+        method:
+          type: string
+          enum:
+            - card
+            - transfer
+            - mock
+        simulation:
+          type: string
+          enum:
+            - approve
+            - fail
+            - delay
+          default: approve
+    Payment:
+      type: object
+      required:
+        - id
+        - reservationId
+        - amount
+        - method
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+        reservationId:
+          type: string
+        amount:
+          type: integer
+          minimum: 0
+        method:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - failed
+            - delayed
+        approvedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time

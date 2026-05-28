@@ -1,0 +1,22 @@
+get:
+  summary: Get payment
+  operationId: getPayment
+  parameters:
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id
+    - $ref: ../../../common/components.yaml#/components/parameters/paymentId
+  responses:
+    "200":
+      description: Payment detail.
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Payment
+    "401":
+      $ref: ../../../common/components.yaml#/components/responses/Unauthorized
+    "403":
+      $ref: ../../../common/components.yaml#/components/responses/Forbidden
+    "404":
+      $ref: ../../../common/components.yaml#/components/responses/NotFound
+    "500":
+      $ref: ../../../common/components.yaml#/components/responses/InternalServerError

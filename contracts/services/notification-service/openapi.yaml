@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: notification-service API
+  version: 0.1.0
+  description: Medikong notification-service contract draft.
+
+servers:
+  - url: http://localhost:8086
+    description: local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /notifications:
+    $ref: ./paths/notifications.yaml
+  /notifications/{id}:
+    $ref: ./paths/notifications_{id}.yaml
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
+
+  schemas:
+    Notification:
+      type: object
+      required:
+        - id
+        - userId
+        - type
+        - message
+        - eventId
+        - createdAt
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+          enum:
+            - reservation
+            - payment
+            - ticket
+        message:
+          type: string
+        eventId:
+          type: string
+        readAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    NotificationListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
