@@ -2,8 +2,8 @@ import asyncio
 import json
 from aiokafka import AIOKafkaConsumer
 from app.config import settings
-from app.database import get_db
-from app.services.notification_service import handle_business_event
+from app.database import SessionLocal
+from app.services.ticket_service import handle_payment_approved
 
 
 async def consume_events(stop_event: asyncio.Event) -> None:
@@ -11,11 +11,7 @@ async def consume_events(stop_event: asyncio.Event) -> None:
         return
 
     consumer = AIOKafkaConsumer(
-        settings.reservation_created_topic,
-        settings.reservation_expired_topic,
         settings.payment_approved_topic,
-        settings.payment_failed_topic,
-        settings.ticket_issued_topic,
         bootstrap_servers=settings.kafka_bootstrap_servers,
         group_id=settings.kafka_group_id,
         value_deserializer=lambda value: json.loads(value.decode("utf-8")),
@@ -24,8 +20,11 @@ async def consume_events(stop_event: asyncio.Event) -> None:
     await consumer.start()
     try:
         async for message in consumer:
-            db = get_db()
-            await handle_business_event(db, message.value)
+            db = SessionLocal()
+            try:
+                await handle_payment_approved(db, message.value)
+            finally:
+                db.close()
             if stop_event.is_set():
                 break
     finally:

@@ -1,17 +1,20 @@
 import asyncio
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+
 from fastapi import FastAPI
+from app import models
 from app.config import settings
 from app.consumers.kafka_consumer import consume_events
-from app.database import connect_db, close_db
+from app.database import engine
 from app.observability import setup_request_logging
-from app.routers import notifications
+from app.routers import tickets
+
+models.Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    await connect_db()
     app.state.consumer_stop_event = asyncio.Event()
     app.state.consumer_task = asyncio.create_task(
         consume_events(app.state.consumer_stop_event)
@@ -21,33 +24,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         app.state.consumer_stop_event.set()
         app.state.consumer_task.cancel()
-        close_db()
 
 
 app = FastAPI(title=settings.service_name, lifespan=lifespan)
 setup_request_logging(app, settings.service_name)
-app.include_router(notifications.router)
+app.include_router(tickets.router)
 
 
-# 기존 health 엔드포인트 유지
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
 
 
-# Kubernetes liveness probe
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
 
 
-# Kubernetes readiness probe
 @app.get("/readyz")
 def readyz() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
 
 
-# Prometheus 메트릭 (observability.py에서 설정)
 @app.get("/metrics")
 def metrics() -> dict[str, str]:
     return {"status": "ok"}

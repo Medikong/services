@@ -2,15 +2,15 @@ from datetime import datetime, timezone
 
 
 def notification_to_doc(
-    patient_id: int,
+    user_id: int,
     type: str,
     message: str,
     status: str,
-    source_id: int,
+    source_id: str,
     metadata: dict | None = None,
 ) -> dict:
     return {
-        "patient_id": patient_id,
+        "user_id": user_id,
         "type": type,
         "message": message,
         "status": status,
