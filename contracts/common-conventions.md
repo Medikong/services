@@ -18,15 +18,15 @@
 
 `auth-service`의 access token은 `HS256` JWT로 발급한다. 서비스 계약에서 공통 claim 구조는 `common/components.yaml#/components/schemas/JwtAccessTokenClaims`를 기준으로 한다.
 
-- `iss`: 발급자. 기본값은 role에 따라 `staff`, `patient`, `doctor`이며 환경 변수로 바뀔 수 있다.
+- `iss`: 발급자. 기본값은 role에 따라 `user`, `provider`, `admin`이며 환경 변수로 바뀔 수 있다.
 - `sub`: 사용자 id를 문자열로 넣는다.
 - `email`: 로그인 식별자이다.
-- `role`: `STAFF`, `PATIENT`, `DOCTOR` 중 하나이다.
+- `role`: `USER`, `PROVIDER`, `ADMIN` 중 하나이다. 사용자 예매 API, 공연 공급자 API, 플랫폼 운영자 API의 접근 통제는 이 claim을 기준으로 한다.
 - `iat`: 발급 시각 Unix epoch seconds이다.
 - `exp`: 만료 시각 Unix epoch seconds이다.
 - `jti`: access token 폐기에 사용하는 token id이다.
-- `patientId`: 환자 계정이면 포함한다.
-- `doctorId`: 의사 계정이면 포함한다.
+- `providerId`: 공연 공급자 계정이면 포함한다.
+- `adminId`: 플랫폼 운영자 계정이면 포함한다.
 
 `Authorization` 헤더는 `Bearer <accessToken>` 형식만 허용한다. refresh token은 JWT가 아니라 임의 문자열이며, 서버는 해시를 저장한다.
 

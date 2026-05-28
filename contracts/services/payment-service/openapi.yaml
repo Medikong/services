@@ -16,6 +16,10 @@ paths:
     $ref: ./paths/payments.yaml
   /payments/{paymentId}:
     $ref: ./paths/payments_{paymentId}.yaml
+  /provider/concerts/{concertId}/settlement-basis:
+    $ref: ./paths/provider_concerts_{concertId}_settlement-basis.yaml
+  /admin/concerts/{concertId}/settlement-basis:
+    $ref: ./paths/admin_concerts_{concertId}_settlement-basis.yaml
 
 components:
   securitySchemes:
@@ -80,5 +84,38 @@ components:
             - "null"
           format: date-time
         createdAt:
+          type: string
+          format: date-time
+    SettlementBasisResponse:
+      type: object
+      required:
+        - concertId
+        - grossAmount
+        - refundAmount
+        - netAmount
+        - ticketCount
+        - calculatedAt
+      properties:
+        concertId:
+          type: string
+        grossAmount:
+          type: integer
+          minimum: 0
+        refundAmount:
+          type: integer
+          minimum: 0
+        netAmount:
+          type: integer
+          minimum: 0
+        ticketCount:
+          type: integer
+          minimum: 0
+        platformFeeAmount:
+          type: integer
+          minimum: 0
+        providerSettlementAmount:
+          type: integer
+          minimum: 0
+        calculatedAt:
           type: string
           format: date-time

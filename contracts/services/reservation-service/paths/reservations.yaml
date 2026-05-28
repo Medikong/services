@@ -1,4 +1,6 @@
 post:
+  tags:
+    - User API
   summary: Create reservation
   operationId: createReservation
   parameters:

@@ -1,4 +1,6 @@
 post:
+  tags:
+    - User API
   summary: Expire reservation
   operationId: expireReservation
   parameters:

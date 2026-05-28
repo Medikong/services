@@ -1,4 +1,6 @@
 get:
+  tags:
+    - User API
   summary: List my reservations
   operationId: listMyReservations
   parameters:

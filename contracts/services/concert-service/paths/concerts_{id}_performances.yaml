@@ -1,4 +1,6 @@
 get:
+  tags:
+    - User API
   summary: List concert performances
   operationId: listConcertPerformances
   parameters:

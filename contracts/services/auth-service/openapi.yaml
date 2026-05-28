@@ -31,7 +31,7 @@ components:
         email:
           type: string
           examples:
-            - patient
+            - user@example.com
         password:
           type: string
           format: password
@@ -53,25 +53,27 @@ components:
         - createdAt
       properties:
         id:
-          type: integer
+          type: string
         email:
           type: string
           examples:
-            - patient
+            - user@example.com
         displayName:
           type: string
           examples:
             - Lee Seoyeon
         role:
           $ref: ../../common/components.yaml#/components/schemas/UserRole
-        patientId:
+        providerId:
           type:
-            - integer
+            - string
             - "null"
-        doctorId:
+          description: Present when the authenticated user belongs to a concert provider.
+        adminId:
           type:
-            - integer
+            - string
             - "null"
+          description: Present when the authenticated user belongs to platform operations.
         isActive:
           type: boolean
         createdAt:
@@ -89,7 +91,7 @@ components:
       properties:
         accessToken:
           type: string
-          description: HS256 JWT matching the common JwtAccessTokenClaims payload contract.
+          description: HS256 JWT matching the common JwtAccessTokenClaims payload contract, including the USER, PROVIDER, or ADMIN role claim.
         refreshToken:
           type: string
           description: Opaque refresh token string.

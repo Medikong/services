@@ -58,6 +58,34 @@ components:
       schema:
         type: string
       description: Resource id.
+    concertId:
+      name: concertId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Concert id.
+    showtimeId:
+      name: showtimeId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Showtime id.
+    requestId:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Review request id.
+    logId:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Operation log id.
     paymentId:
       name: paymentId
       in: path
@@ -77,10 +105,10 @@ components:
     UserRole:
       type: string
       enum:
-        - STAFF
-        - PATIENT
-        - DOCTOR
-      description: Authenticated user role used by auth-service JWT payloads.
+        - USER
+        - PROVIDER
+        - ADMIN
+      description: Authenticated ticketing role used by auth-service JWT payloads.
     JwtAccessTokenClaims:
       type: object
       required:
@@ -94,9 +122,9 @@ components:
       properties:
         iss:
           type: string
-          description: Token issuer. Defaults are staff, patient, and doctor unless overridden by auth-service settings.
+          description: Token issuer. Defaults are user, provider, and admin unless overridden by auth-service settings.
           examples:
-            - patient
+            - user
         sub:
           type: string
           description: Auth user id encoded as a string.
@@ -105,7 +133,7 @@ components:
         email:
           type: string
           examples:
-            - patient
+            - user@example.com
         role:
           $ref: "#/components/schemas/UserRole"
         iat:
@@ -122,20 +150,20 @@ components:
           type: string
           format: uuid
           description: Token id used for access-token revocation.
-        patientId:
+        providerId:
           type:
-            - integer
+            - string
             - "null"
-          description: Present when the authenticated user is linked to a patient.
+          description: Present when the authenticated user is linked to a concert provider.
           examples:
-            - 1
-        doctorId:
+            - provider-001
+        adminId:
           type:
-            - integer
+            - string
             - "null"
-          description: Present when the authenticated user is linked to a doctor.
+          description: Present when the authenticated user is linked to platform operations.
           examples:
-            - 10
+            - admin-001
     ErrorResponse:
       type: object
       required:

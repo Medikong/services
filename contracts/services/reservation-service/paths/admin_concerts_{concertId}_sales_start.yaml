@@ -1,20 +1,22 @@
 post:
   tags:
-    - User API
-  summary: Cancel reservation
-  operationId: cancelReservation
+    - Admin API
+  summary: Admin start concert sales
+  operationId: adminStartConcertSales
   parameters:
     - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
     - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id
     - $ref: ../../../common/components.yaml#/components/parameters/Idempotency-Key
-    - $ref: ../../../common/components.yaml#/components/parameters/id
+    - $ref: ../../../common/components.yaml#/components/parameters/concertId
   responses:
     "200":
-      description: Reservation canceled.
+      description: Concert sales started.
       content:
         application/json:
           schema:
-            $ref: ../openapi.yaml#/components/schemas/Reservation
+            $ref: ../openapi.yaml#/components/schemas/SalesCommandResponse
+    "400":
+      $ref: ../../../common/components.yaml#/components/responses/BadRequest
     "401":
       $ref: ../../../common/components.yaml#/components/responses/Unauthorized
     "403":

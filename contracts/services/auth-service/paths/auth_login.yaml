@@ -1,6 +1,8 @@
 post:
-  summary: Login
-  operationId: login
+  tags:
+    - Auth API
+  summary: User login
+  operationId: authLogin
   parameters:
     - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
     - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id

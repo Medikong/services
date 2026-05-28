@@ -22,6 +22,22 @@ paths:
     $ref: ./paths/reservations_{id}_cancel.yaml
   /reservations/{id}/expire:
     $ref: ./paths/reservations_{id}_expire.yaml
+  /provider/concerts/{concertId}/sales:
+    $ref: ./paths/provider_concerts_{concertId}_sales.yaml
+  /provider/showtimes/{showtimeId}/sales:
+    $ref: ./paths/provider_showtimes_{showtimeId}_sales.yaml
+  /admin/concerts/{concertId}/sales/start:
+    $ref: ./paths/admin_concerts_{concertId}_sales_start.yaml
+  /admin/concerts/{concertId}/sales/pause:
+    $ref: ./paths/admin_concerts_{concertId}_sales_pause.yaml
+  /admin/concerts/{concertId}/sales/resume:
+    $ref: ./paths/admin_concerts_{concertId}_sales_resume.yaml
+  /admin/concerts/{concertId}/sales:
+    $ref: ./paths/admin_concerts_{concertId}_sales.yaml
+  /admin/concerts/{concertId}/queue-policy:
+    $ref: ./paths/admin_concerts_{concertId}_queue-policy.yaml
+  /admin/concerts/{concertId}/traffic-policy:
+    $ref: ./paths/admin_concerts_{concertId}_traffic-policy.yaml
 
 components:
   securitySchemes:
@@ -101,3 +117,145 @@ components:
             $ref: "#/components/schemas/Reservation"
         page:
           $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    SalesSummaryResponse:
+      type: object
+      required:
+        - concertId
+        - salesStatus
+        - totalSeats
+        - soldSeats
+        - reservedSeats
+        - grossAmount
+        - updatedAt
+      properties:
+        concertId:
+          type: string
+        salesStatus:
+          type: string
+          enum:
+            - ready
+            - open
+            - paused
+            - closed
+        totalSeats:
+          type: integer
+          minimum: 0
+        soldSeats:
+          type: integer
+          minimum: 0
+        reservedSeats:
+          type: integer
+          minimum: 0
+        grossAmount:
+          type: integer
+          minimum: 0
+        updatedAt:
+          type: string
+          format: date-time
+    ShowtimeSalesResponse:
+      type: object
+      required:
+        - showtimeId
+        - totalSeats
+        - availableSeats
+        - soldSeats
+        - reservedSeats
+        - grossAmount
+        - updatedAt
+      properties:
+        showtimeId:
+          type: string
+        totalSeats:
+          type: integer
+          minimum: 0
+        availableSeats:
+          type: integer
+          minimum: 0
+        soldSeats:
+          type: integer
+          minimum: 0
+        reservedSeats:
+          type: integer
+          minimum: 0
+        grossAmount:
+          type: integer
+          minimum: 0
+        updatedAt:
+          type: string
+          format: date-time
+    SalesCommandResponse:
+      type: object
+      required:
+        - concertId
+        - salesStatus
+        - changedAt
+      properties:
+        concertId:
+          type: string
+        salesStatus:
+          type: string
+          enum:
+            - ready
+            - open
+            - paused
+            - closed
+        changedAt:
+          type: string
+          format: date-time
+    QueuePolicyUpdateRequest:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+        maxEntrantsPerMinute:
+          type: integer
+          minimum: 1
+        waitingRoomUrl:
+          type: string
+          format: uri
+    QueuePolicyResponse:
+      type: object
+      required:
+        - concertId
+        - enabled
+      properties:
+        concertId:
+          type: string
+        enabled:
+          type: boolean
+        maxEntrantsPerMinute:
+          type: integer
+          minimum: 1
+        waitingRoomUrl:
+          type: string
+          format: uri
+    TrafficPolicyUpdateRequest:
+      type: object
+      required:
+        - macroProtectionEnabled
+      properties:
+        macroProtectionEnabled:
+          type: boolean
+        maxRequestsPerUserPerMinute:
+          type: integer
+          minimum: 1
+        blockSuspiciousTraffic:
+          type: boolean
+          default: true
+    TrafficPolicyResponse:
+      type: object
+      required:
+        - concertId
+        - macroProtectionEnabled
+      properties:
+        concertId:
+          type: string
+        macroProtectionEnabled:
+          type: boolean
+        maxRequestsPerUserPerMinute:
+          type: integer
+          minimum: 1
+        blockSuspiciousTraffic:
+          type: boolean

@@ -1,6 +1,8 @@
 post:
+  tags:
+    - Auth API
   summary: Refresh access token
-  operationId: refreshToken
+  operationId: authRefreshToken
   parameters:
     - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
     - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id

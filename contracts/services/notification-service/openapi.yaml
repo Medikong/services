@@ -16,6 +16,10 @@ paths:
     $ref: ./paths/notifications.yaml
   /notifications/{id}:
     $ref: ./paths/notifications_{id}.yaml
+  /admin/operation-logs:
+    $ref: ./paths/admin_operation-logs.yaml
+  /admin/operation-logs/{logId}:
+    $ref: ./paths/admin_operation-logs_{logId}.yaml
 
 components:
   securitySchemes:
@@ -65,5 +69,52 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Notification"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    OperationLog:
+      type: object
+      required:
+        - id
+        - actorId
+        - actorRole
+        - action
+        - resourceType
+        - resourceId
+        - occurredAt
+      properties:
+        id:
+          type: string
+        actorId:
+          type: string
+        actorRole:
+          $ref: ../../common/components.yaml#/components/schemas/UserRole
+        action:
+          type: string
+          examples:
+            - concert.sale.pause
+        resourceType:
+          type: string
+          examples:
+            - concert
+        resourceId:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        occurredAt:
+          type: string
+          format: date-time
+    OperationLogListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationLog"
         page:
           $ref: ../../common/components.yaml#/components/schemas/PageInfo

@@ -20,6 +20,48 @@ paths:
     $ref: ./paths/concerts_{id}_performances.yaml
   /performances/{id}/seats:
     $ref: ./paths/performances_{id}_seats.yaml
+  /provider/concerts:
+    $ref: ./paths/provider_concerts.yaml
+  /provider/concerts/{concertId}:
+    $ref: ./paths/provider_concerts_{concertId}.yaml
+  /provider/venues:
+    $ref: ./paths/provider_venues.yaml
+  /provider/concerts/{concertId}/showtimes:
+    $ref: ./paths/provider_concerts_{concertId}_showtimes.yaml
+  /provider/showtimes/{showtimeId}:
+    $ref: ./paths/provider_showtimes_{showtimeId}.yaml
+  /provider/showtimes/{showtimeId}/seat-map:
+    $ref: ./paths/provider_showtimes_{showtimeId}_seat-map.yaml
+  /provider/showtimes/{showtimeId}/seat-inventory:
+    $ref: ./paths/provider_showtimes_{showtimeId}_seat-inventory.yaml
+  /provider/showtimes/{showtimeId}/seat-grades:
+    $ref: ./paths/provider_showtimes_{showtimeId}_seat-grades.yaml
+  /provider/showtimes/{showtimeId}/hold-seat-requests:
+    $ref: ./paths/provider_showtimes_{showtimeId}_hold-seat-requests.yaml
+  /provider/concerts/{concertId}/sale-policy:
+    $ref: ./paths/provider_concerts_{concertId}_sale-policy.yaml
+  /provider/concerts/{concertId}/open-request:
+    $ref: ./paths/provider_concerts_{concertId}_open-request.yaml
+  /provider/concerts/{concertId}/review-status:
+    $ref: ./paths/provider_concerts_{concertId}_review-status.yaml
+  /admin/concert-requests:
+    $ref: ./paths/admin_concert-requests.yaml
+  /admin/concert-requests/{requestId}:
+    $ref: ./paths/admin_concert-requests_{requestId}.yaml
+  /admin/concert-requests/{requestId}/approve:
+    $ref: ./paths/admin_concert-requests_{requestId}_approve.yaml
+  /admin/concert-requests/{requestId}/reject:
+    $ref: ./paths/admin_concert-requests_{requestId}_reject.yaml
+  /admin/concerts/{concertId}/open-schedule:
+    $ref: ./paths/admin_concerts_{concertId}_open-schedule.yaml
+  /admin/concerts/{concertId}/sale-policy:
+    $ref: ./paths/admin_concerts_{concertId}_sale-policy.yaml
+  /admin/concerts/{concertId}/sale-policy/approve:
+    $ref: ./paths/admin_concerts_{concertId}_sale-policy_approve.yaml
+  /admin/concerts/{concertId}/sale-policy/reject:
+    $ref: ./paths/admin_concerts_{concertId}_sale-policy_reject.yaml
+  /admin/concerts/{concertId}/canceled-seat-reopen-policy:
+    $ref: ./paths/admin_concerts_{concertId}_canceled-seat-reopen-policy.yaml
 
 components:
   securitySchemes:
@@ -151,3 +193,511 @@ components:
             $ref: "#/components/schemas/Seat"
         page:
           $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    ConcertDraft:
+      type: object
+      required:
+        - id
+        - providerId
+        - title
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+        providerId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        posterUrl:
+          type: string
+          format: uri
+        ageRating:
+          type: string
+        runningMinutes:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - draft
+            - submitted
+            - approved
+            - rejected
+            - scheduled
+            - open
+            - canceled
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ConcertDraftCreateRequest:
+      type: object
+      required:
+        - title
+        - ageRating
+        - runningMinutes
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        posterUrl:
+          type: string
+          format: uri
+        ageRating:
+          type: string
+        runningMinutes:
+          type: integer
+          minimum: 1
+    ConcertUpdateRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        posterUrl:
+          type: string
+          format: uri
+        ageRating:
+          type: string
+        runningMinutes:
+          type: integer
+          minimum: 1
+    VenueCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        totalSeats:
+          type: integer
+          minimum: 0
+    VenueListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Venue"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    Showtime:
+      type: object
+      required:
+        - id
+        - concertId
+        - venueId
+        - startsAt
+        - status
+      properties:
+        id:
+          type: string
+        concertId:
+          type: string
+        venueId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - draft
+            - ready
+            - open
+            - closed
+            - canceled
+    ShowtimeCreateRequest:
+      type: object
+      required:
+        - venueId
+        - startsAt
+      properties:
+        venueId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+    ShowtimeUpdateRequest:
+      type: object
+      minProperties: 1
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - draft
+            - ready
+            - open
+            - closed
+            - canceled
+    SeatMapRequest:
+      type: object
+      required:
+        - sections
+      properties:
+        sections:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - rows
+            properties:
+              name:
+                type: string
+              rows:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - name
+                    - seatNumbers
+                  properties:
+                    name:
+                      type: string
+                    seatNumbers:
+                      type: array
+                      items:
+                        type: string
+    SeatInventoryUpdateRequest:
+      type: object
+      required:
+        - seats
+      properties:
+        seats:
+          type: array
+          items:
+            type: object
+            required:
+              - seatId
+              - status
+            properties:
+              seatId:
+                type: string
+              status:
+                type: string
+                enum:
+                  - sellable
+                  - blocked
+                  - hold
+              reason:
+                type: string
+    SeatGrade:
+      type: object
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: integer
+          minimum: 0
+        color:
+          type: string
+    SeatGradeCreateRequest:
+      type: object
+      required:
+        - grades
+      properties:
+        grades:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeatGrade"
+    HoldSeatRequest:
+      type: object
+      required:
+        - id
+        - showtimeId
+        - type
+        - seatIds
+        - status
+      properties:
+        id:
+          type: string
+        showtimeId:
+          type: string
+        type:
+          type: string
+          enum:
+            - invitation
+            - staff
+            - reserved
+            - accessible
+        seatIds:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum:
+            - requested
+            - approved
+            - rejected
+    HoldSeatRequestCreateRequest:
+      type: object
+      required:
+        - type
+        - seatIds
+      properties:
+        type:
+          type: string
+          enum:
+            - invitation
+            - staff
+            - reserved
+            - accessible
+        seatIds:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+    SalePolicy:
+      type: object
+      required:
+        - concertId
+        - maxTicketsPerUser
+        - refundPolicy
+        - status
+      properties:
+        concertId:
+          type: string
+        presaleEnabled:
+          type: boolean
+          default: false
+        fanclubVerificationRequired:
+          type: boolean
+          default: false
+        maxTicketsPerUser:
+          type: integer
+          minimum: 1
+        refundPolicy:
+          type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - submitted
+            - approved
+            - rejected
+    SalePolicyUpdateRequest:
+      type: object
+      required:
+        - maxTicketsPerUser
+        - refundPolicy
+      properties:
+        presaleEnabled:
+          type: boolean
+        fanclubVerificationRequired:
+          type: boolean
+        maxTicketsPerUser:
+          type: integer
+          minimum: 1
+        refundPolicy:
+          type: string
+    OpenRequest:
+      type: object
+      required:
+        - id
+        - concertId
+        - requestedOpenAt
+        - status
+      properties:
+        id:
+          type: string
+        concertId:
+          type: string
+        requestedOpenAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - requested
+            - approved
+            - rejected
+        message:
+          type: string
+    OpenRequestCreateRequest:
+      type: object
+      required:
+        - requestedOpenAt
+      properties:
+        requestedOpenAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+    ReviewStatusResponse:
+      type: object
+      required:
+        - concertId
+        - concertStatus
+        - salePolicyStatus
+        - openRequestStatus
+      properties:
+        concertId:
+          type: string
+        concertStatus:
+          type: string
+        salePolicyStatus:
+          type: string
+        openRequestStatus:
+          type: string
+        lastReviewedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        reason:
+          type: string
+    ConcertReviewRequest:
+      type: object
+      required:
+        - id
+        - concertId
+        - providerId
+        - type
+        - status
+        - submittedAt
+      properties:
+        id:
+          type: string
+        concertId:
+          type: string
+        providerId:
+          type: string
+        type:
+          type: string
+          enum:
+            - concert
+            - sale_policy
+            - open_request
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - rejected
+        submittedAt:
+          type: string
+          format: date-time
+        concert:
+          $ref: "#/components/schemas/ConcertDraft"
+        salePolicy:
+          $ref: "#/components/schemas/SalePolicy"
+        openRequest:
+          $ref: "#/components/schemas/OpenRequest"
+    ConcertReviewRequestListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConcertReviewRequest"
+        page:
+          $ref: ../../common/components.yaml#/components/schemas/PageInfo
+    ApprovalCommand:
+      type: object
+      properties:
+        comment:
+          type: string
+    RejectCommand:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+    OpenScheduleUpdateRequest:
+      type: object
+      required:
+        - opensAt
+      properties:
+        opensAt:
+          type: string
+          format: date-time
+        comment:
+          type: string
+    OpenScheduleResponse:
+      type: object
+      required:
+        - concertId
+        - opensAt
+        - status
+      properties:
+        concertId:
+          type: string
+        opensAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - scheduled
+            - approved
+            - rejected
+    CanceledSeatReopenPolicyRequest:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+        reopenDelaySeconds:
+          type: integer
+          minimum: 0
+        batchSize:
+          type: integer
+          minimum: 1
+        comment:
+          type: string
+    CanceledSeatReopenPolicyResponse:
+      type: object
+      required:
+        - concertId
+        - enabled
+      properties:
+        concertId:
+          type: string
+        enabled:
+          type: boolean
+        reopenDelaySeconds:
+          type: integer
+          minimum: 0
+        batchSize:
+          type: integer
+          minimum: 1

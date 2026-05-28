@@ -1,20 +1,28 @@
-post:
+patch:
   tags:
-    - User API
-  summary: Cancel reservation
-  operationId: cancelReservation
+    - Provider API
+  summary: Provider update showtime
+  operationId: providerUpdateShowtime
   parameters:
     - $ref: ../../../common/components.yaml#/components/parameters/X-Request-Id
     - $ref: ../../../common/components.yaml#/components/parameters/X-Trace-Id
     - $ref: ../../../common/components.yaml#/components/parameters/Idempotency-Key
-    - $ref: ../../../common/components.yaml#/components/parameters/id
+    - $ref: ../../../common/components.yaml#/components/parameters/showtimeId
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/ShowtimeUpdateRequest
   responses:
     "200":
-      description: Reservation canceled.
+      description: Showtime updated.
       content:
         application/json:
           schema:
-            $ref: ../openapi.yaml#/components/schemas/Reservation
+            $ref: ../openapi.yaml#/components/schemas/Showtime
+    "400":
+      $ref: ../../../common/components.yaml#/components/responses/BadRequest
     "401":
       $ref: ../../../common/components.yaml#/components/responses/Unauthorized
     "403":
@@ -23,5 +31,7 @@ post:
       $ref: ../../../common/components.yaml#/components/responses/NotFound
     "409":
       $ref: ../../../common/components.yaml#/components/responses/Conflict
+    "422":
+      $ref: ../../../common/components.yaml#/components/responses/UnprocessableEntity
     "500":
       $ref: ../../../common/components.yaml#/components/responses/InternalServerError
