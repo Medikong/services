@@ -12,6 +12,12 @@ security:
   - BearerAuth: []
 
 paths:
+  /healthz:
+    $ref: ./paths/healthz.yaml
+  /readyz:
+    $ref: ./paths/readyz.yaml
+  /metrics:
+    $ref: ./paths/metrics.yaml
   /reservations:
     $ref: ./paths/reservations.yaml
   /reservations/me:

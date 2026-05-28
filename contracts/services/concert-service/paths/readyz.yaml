@@ -1,0 +1,17 @@
+get:
+  summary: Readiness check
+  operationId: readyz
+  security: []
+  responses:
+    "200":
+      description: Service is ready to receive traffic.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../common/components.yaml#/components/schemas/ReadinessResponse
+    "503":
+      description: Service is not ready to receive traffic.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../common/components.yaml#/components/schemas/ReadinessResponse

@@ -12,6 +12,11 @@
 - `SQLAlchemy`
 - `psycopg`
 - `PostgreSQL`
+- `Prometheus`
+- `prometheus-client`
+- `py-spy`
+- `pyinstrument`
+- `tracemalloc`
 - `pytest`
 - `FastAPI TestClient`
 - `Docker`
