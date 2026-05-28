@@ -181,19 +181,37 @@ tasks:
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
-        for service in {{.APP_IMAGE_SERVICES}}; do
+        build_image() {
+          service="$1"
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           case "${service}" in
             concert-service|reservation-service)
               docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
+            "${dashboard}")
+              docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
+              ;;
             *)
               docker build -t "${image_prefix}/${service}:${image_tag}" "services/${service}"
               ;;
           esac
+        }
+        pids=""
+        for service in {{.APP_IMAGE_SERVICES}}; do
+          build_image "${service}" &
+          pids="${pids} $!"
         done
-        printf 'building %s/%s:%s\n' "${image_prefix}" "${dashboard}" "${image_tag}"
-        docker build -t "${image_prefix}/${dashboard}:${image_tag}" "${dashboard}"
+        build_image "${dashboard}" &
+        pids="${pids} $!"
+        failed=0
+        for pid in ${pids}; do
+          if ! wait "${pid}"; then
+            failed=1
+          fi
+        done
+        if [ "${failed}" -ne 0 ]; then
+          exit 1
+        fi
 
   app-images-push:
     desc: Build images and push them to the registry.
@@ -210,10 +228,124 @@ tasks:
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
+        pids=""
         for service in {{.APP_IMAGE_SERVICES}} ${dashboard}; do
-          printf 'pushing %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
-          docker push "${image_prefix}/${service}:${image_tag}"
+          (
+            printf 'pushing %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
+            docker push "${image_prefix}/${service}:${image_tag}"
+          ) &
+          pids="${pids} $!"
         done
+        failed=0
+        for pid in ${pids}; do
+          if ! wait "${pid}"; then
+            failed=1
+          fi
+        done
+        if [ "${failed}" -ne 0 ]; then
+          exit 1
+        fi
+
+  app-image-build:
+    desc: Build one service or dashboard Docker image with SERVICE=<image-name>.
+    cmds:
+      - |
+        set -eu
+        requested='{{default "" .SERVICE}}'
+        image_registry='{{.IMAGE_REGISTRY}}'
+        image_namespace='{{.IMAGE_NAMESPACE}}'
+        image_tag='{{.IMAGE_TAG}}'
+        dashboard='{{.DASHBOARD_SERVICE}}'
+        if [ -z "${requested}" ]; then
+          printf '%s\n' 'SERVICE is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          exit 2
+        fi
+        if [ -z "${image_registry}" ]; then
+          printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          exit 2
+        fi
+        if [ -z "${image_tag}" ]; then
+          printf '%s\n' 'IMAGE_TAG is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          exit 2
+        fi
+        normalize_service() {
+          raw="$1"
+          if [ "${raw}" = "${dashboard}" ]; then
+            printf '%s\n' "${raw}"
+            return 0
+          fi
+          for candidate in {{.APP_IMAGE_SERVICES}}; do
+            if [ "${raw}" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+            if [ "${raw}-service" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+          done
+          return 1
+        }
+        if ! service="$(normalize_service "${requested}")"; then
+          printf 'Unknown SERVICE=%s (expected one of: {{.APP_IMAGE_SERVICES}} %s).\n' "${requested}" "${dashboard}" >&2
+          exit 2
+        fi
+        image_prefix="${image_registry}"
+        if [ -n "${image_namespace}" ]; then
+          image_prefix="${image_registry%/}/${image_namespace#/}"
+        fi
+        printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
+        case "${service}" in
+          concert-service|reservation-service)
+            docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+            ;;
+          "${dashboard}")
+            docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
+            ;;
+          *)
+            docker build -t "${image_prefix}/${service}:${image_tag}" "services/${service}"
+            ;;
+        esac
+
+  app-image-push:
+    desc: Build and push one service or dashboard Docker image with SERVICE=<image-name>.
+    cmds:
+      - task app-image-build SERVICE={{.SERVICE}} IMAGE_REGISTRY={{.IMAGE_REGISTRY}} IMAGE_NAMESPACE={{.IMAGE_NAMESPACE}} IMAGE_TAG={{.IMAGE_TAG}}
+      - |
+        set -eu
+        requested='{{default "" .SERVICE}}'
+        image_registry='{{.IMAGE_REGISTRY}}'
+        image_namespace='{{.IMAGE_NAMESPACE}}'
+        image_tag='{{.IMAGE_TAG}}'
+        dashboard='{{.DASHBOARD_SERVICE}}'
+        normalize_service() {
+          raw="$1"
+          if [ "${raw}" = "${dashboard}" ]; then
+            printf '%s\n' "${raw}"
+            return 0
+          fi
+          for candidate in {{.APP_IMAGE_SERVICES}}; do
+            if [ "${raw}" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+            if [ "${raw}-service" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+          done
+          return 1
+        }
+        if ! service="$(normalize_service "${requested}")"; then
+          printf 'Unknown SERVICE=%s (expected one of: {{.APP_IMAGE_SERVICES}} %s).\n' "${requested}" "${dashboard}" >&2
+          exit 2
+        fi
+        image_prefix="${image_registry}"
+        if [ -n "${image_namespace}" ]; then
+          image_prefix="${image_registry%/}/${image_namespace#/}"
+        fi
+        printf 'pushing %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
+        docker push "${image_prefix}/${service}:${image_tag}"
 
   dev-images-build:
     desc: Build Docker Desktop dev images with DEV_IMAGE_* variables.
