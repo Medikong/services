@@ -514,6 +514,7 @@ dependencies = [
     { name = "prometheus-client" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
+    { name = "server" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -530,8 +531,32 @@ requires-dist = [
     { name = "prometheus-client", specifier = "==0.23.1" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.2" },
     { name = "pydantic-settings", specifier = "==2.12.0" },
+    { name = "server", editable = "../../packages/server" },
     { name = "sqlalchemy", specifier = "==2.0.45" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.38.0" },
+]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "pytest", specifier = "==9.0.2" },
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+source = { editable = "../../packages/server" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "prometheus-client" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = "==0.124.0" },
+    { name = "prometheus-client", specifier = "==0.23.1" },
+    { name = "sqlalchemy", specifier = "==2.0.45" },
 ]
 
 [package.metadata.requires-dev]

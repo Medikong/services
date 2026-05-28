@@ -51,7 +51,10 @@ def test_readyz_returns_503_when_a_check_fails(monkeypatch: MonkeyPatch) -> None
     monkeypatch.setattr(
         app_main,
         "_readiness_checks",
-        lambda: {"config": "ok", "database": "failed: OperationalError"},
+        lambda: {
+            "config": lambda: "ok",
+            "database": lambda: "failed: OperationalError",
+        },
     )
     client = TestClient(create_app())
 
