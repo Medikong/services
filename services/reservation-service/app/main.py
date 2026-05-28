@@ -7,8 +7,9 @@ from server.operational import (
 )
 
 from app.config import settings
-from app.database import engine
+from app.database import engine, init_db
 from app.exceptions import register_exception_handlers
+from app.routers import router as reservation_router
 
 
 def _readiness_checks() -> dict[str, ReadinessCheck]:
@@ -24,6 +25,7 @@ def _readiness_checks() -> dict[str, ReadinessCheck]:
 
 
 def create_app() -> FastAPI:
+    init_db()
     app = FastAPI(title=settings.service_name)
     register_exception_handlers(app)
     register_operational_handlers(
@@ -35,6 +37,8 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.service_name}
+
+    app.include_router(reservation_router)
 
     return app
 

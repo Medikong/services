@@ -1,1 +1,3 @@
-"""API schemas for the reservation service."""
+from app.schemas.reservations import *
+from app.schemas.sales import *
+from app.schemas.policies import *
