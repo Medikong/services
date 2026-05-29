@@ -3,27 +3,20 @@ version: "3"
 vars:
   VENV_DIR: '{{default ".venv" .VENV_DIR}}'
   VENV_BOOTSTRAP_PYTHON: '{{default "python3.13" .VENV_BOOTSTRAP_PYTHON}}'
-  TEST_RUNNER_IMAGE: '{{default "medical-platform-python-test-runner:local" .TEST_RUNNER_IMAGE}}'
-  PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
-  DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
-  E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
-  E2E_COMPOSE_PROJECT: '{{default "medical-platform-e2e" .E2E_COMPOSE_PROJECT}}'
-  E2E_NETWORK: '{{default "medical-platform-e2e_default" .E2E_NETWORK}}'
-  CURL_IMAGE: '{{default "curlimages/curl:8.7.1" .CURL_IMAGE}}'
-  NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
-  E2E_PATIENT_SERVICE_URL: '{{default "http://patient-service:8081" .E2E_PATIENT_SERVICE_URL}}'
-  E2E_APPOINTMENT_SERVICE_URL: '{{default "http://appointment-service:8082" .E2E_APPOINTMENT_SERVICE_URL}}'
-  E2E_PRESCRIPTION_SERVICE_URL: '{{default "http://prescription-service:8083" .E2E_PRESCRIPTION_SERVICE_URL}}'
-  E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
   IMAGE_REGISTRY: '{{default "10.10.10.10:5000" .IMAGE_REGISTRY}}'
   IMAGE_NAMESPACE: '{{default "" .IMAGE_NAMESPACE}}'
   IMAGE_TAG: '{{default "latest" .IMAGE_TAG}}'
   DEV_IMAGE_REGISTRY: '{{default "localhost:5001" .DEV_IMAGE_REGISTRY}}'
   DEV_IMAGE_NAMESPACE: '{{default "" .DEV_IMAGE_NAMESPACE}}'
   DEV_IMAGE_TAG: '{{default "dev" .DEV_IMAGE_TAG}}'
-  APP_SERVICES: auth-service patient-service appointment-service prescription-service notification-service payment-service
+  APP_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
   APP_IMAGE_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
   DASHBOARD_SERVICE: '{{default "dashboard" .DASHBOARD_SERVICE}}'
+
+includes:
+  tests:
+    taskfile: ./tests/Taskfile.yml
+    dir: .
 
 tasks:
   default:
@@ -76,89 +69,55 @@ tasks:
   test-runner-build:
     desc: Build the Docker Python test runner image.
     cmds:
-      - docker build -f tests/docker/Dockerfile -t {{.TEST_RUNNER_IMAGE}} .
+      - task: tests:test-runner-build
+
+  test-service:
+    desc: Run one service pytest in the Docker Python runner with SERVICE=<service-name>.
+    cmds:
+      - task: tests:test-service
+        vars:
+          SERVICE: '{{default "" .SERVICE}}'
 
   test-unit:
-    desc: Run FastAPI service pytest in the Docker Python runner.
-    deps:
-      - test-runner-build
+    desc: Run all managed service pytest suites in the Docker Python runner.
     cmds:
-      - |
-        set -e
-        for service in {{.APP_SERVICES}}; do
-          printf '%s\n' "Running pytest for services/${service}"
-          docker run --rm \
-            -v "$(pwd -P)":/workspace \
-            -w /workspace/services/${service} \
-            {{.TEST_RUNNER_IMAGE}} \
-            sh -c 'PYTHONPATH=. python -m pytest {{.PYTEST_ARGS}}'
-        done
+      - task: tests:test-unit
 
   test:
     desc: Run the default test target.
-    deps:
-      - test-unit
+    cmds:
+      - task: tests:test-unit
 
   test-all:
     desc: Run unit tests and Docker Compose E2E tests.
     cmds:
-      - task test-unit
-      - task test-e2e
+      - task: tests:test-unit
+      - task: tests:test-e2e
 
   test-e2e:
     desc: Run PostgreSQL/MongoDB/Kafka E2E scenarios with Docker Compose.
     cmds:
-      - |
-        set -e
-        compose_cmd='{{.DOCKER_COMPOSE}}'
-        project='{{.E2E_COMPOSE_PROJECT}}'
-        file='{{.E2E_COMPOSE_FILE}}'
-        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT INT TERM
-        task e2e-up
-        task e2e-wait
-        task e2e-newman
+      - task: tests:test-e2e
 
   e2e-up:
     desc: Start the E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f {{.E2E_COMPOSE_FILE}} up -d --build'
+      - task: tests:e2e-up
 
   e2e-wait:
     desc: Wait for E2E services with the Docker curl container.
     cmds:
-      - |
-        docker run --rm --network {{.E2E_NETWORK}} \
-          -v "$(pwd -P)/tests/e2e/scripts":/scripts:ro \
-          -e E2E_PATIENT_SERVICE_URL="{{.E2E_PATIENT_SERVICE_URL}}" \
-          -e E2E_APPOINTMENT_SERVICE_URL="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
-          -e E2E_PRESCRIPTION_SERVICE_URL="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
-          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-          -e E2E_WAIT_TIMEOUT_SECONDS \
-          -e E2E_WAIT_SLEEP_SECONDS \
-          {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
+      - task: tests:e2e-wait
 
   e2e-newman:
     desc: Run the E2E collection with the Docker Newman container.
     cmds:
-      - mkdir -p tests/e2e/newman/reports
-      - |
-        docker run --rm --network {{.E2E_NETWORK}} \
-          -v "$(pwd -P)/tests/e2e":/etc/newman \
-          -w /etc/newman \
-          {{.NEWMAN_IMAGE}} run postman/medical-platform.postman_collection.json \
-          -e newman/docker.postman_environment.json \
-          --env-var patientServiceUrl="{{.E2E_PATIENT_SERVICE_URL}}" \
-          --env-var appointmentServiceUrl="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
-          --env-var prescriptionServiceUrl="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
-          --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-          --reporters cli,junit \
-          --delay-request 1000 \
-          --reporter-junit-export newman/reports/e2e.xml
+      - task: tests:e2e-newman
 
   e2e-down:
     desc: Stop and remove the E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f {{.E2E_COMPOSE_FILE}} down -v --remove-orphans'
+      - task: tests:e2e-down
 
   app-images-build:
     desc: Build service and dashboard Docker images.

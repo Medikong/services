@@ -8,7 +8,7 @@
 
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
-| 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `patient-service`, `appointment-service`, `prescription-service`, `notification-service` |
+| 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `concert-service`, `notification-service`, `payment-service`, `reservation-service`, `ticket-service` |
 | E2E 테스트 | Docker Compose, PostgreSQL, MongoDB, Kafka, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 환자 생성, 예약 확정, 이벤트 발행/소비, 알림 저장, 처방 발행 흐름 |
 | Gateway E2E | 별도 future scope | Kong/JWT/Ingress 라우팅과 MetalLB 노출 검증 |
 
@@ -30,13 +30,15 @@ tests/
       wait-for-services.sh
 ```
 
-서비스별 pytest는 각 서비스 디렉터리 안의 `tests/`에 둔다.
+서비스별 pytest는 각 서비스 디렉터리 안의 `tests/`에 둔다. 테스트 실행 Task 본문은 `tests/Taskfile.yml`에 두고, 루트 `Taskfile.yml`은 같은 명령 이름으로 위임한다.
 
 ```text
-services/patient-service/tests/
-services/appointment-service/tests/
-services/prescription-service/tests/
+services/auth-service/tests/
+services/concert-service/tests/
 services/notification-service/tests/
+services/payment-service/tests/
+services/reservation-service/tests/
+services/ticket-service/tests/
 ```
 
 ## 로컬 단위 테스트
@@ -45,6 +47,13 @@ services/notification-service/tests/
 
 ```bash
 task test-unit
+```
+
+단일 서비스만 확인할 때는 서비스 전체 이름이나 짧은 이름을 사용할 수 있다.
+
+```bash
+task test-service SERVICE=auth-service
+task test-service SERVICE=auth
 ```
 
 ## E2E 테스트 흐름
@@ -89,9 +98,9 @@ task e2e-down
 
 ## CI
 
-`.github/workflows/ci.yml`은 `task test-unit`을 실행해 Docker Python 테스트 러너에서 서비스 pytest를 실행한다.
+`.github/workflows/ci.yml`은 PR 변경 경로를 기준으로 서비스별 matrix를 만든 뒤 `task test-service SERVICE=<service>`를 실행한다. `services/<service>/**` 변경은 해당 서비스만 실행하고, `tests/**`, `packages/**`, `Taskfile.yml`, `.github/workflows/ci.yml` 변경은 6개 서비스 전체를 실행한다. `contracts/**`만 변경된 경우에는 서비스 테스트 없이 no-op 성공 job으로 끝난다.
 
-`.github/workflows/e2e.yml`은 push, PR, 수동 실행에서 `task test-e2e`를 실행한다. GitHub runner 안에서 Docker Compose 기반 PostgreSQL/MongoDB/Kafka E2E stack과 Newman을 함께 실행한다.
+`.github/workflows/e2e.yml`은 `main` push와 수동 실행에서만 `task test-e2e`를 실행한다. GitHub runner 안에서 Docker Compose 기반 PostgreSQL/MongoDB/Kafka E2E stack과 Newman을 함께 실행한다.
 
 Kong/JWT/Ingress 검증은 기본 E2E와 분리한다. 이후 필요해지면 `task test-gateway-e2e` 같은 별도 타깃에서 MetalLB IP 또는 Ingress 주소, JWT 생성, Gateway 라우팅 검증을 다룬다.
 

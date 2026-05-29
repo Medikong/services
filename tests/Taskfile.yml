@@ -1,0 +1,124 @@
+version: "3"
+
+vars:
+  ROOT_DIR: '{{.TASKFILE_DIR}}/..'
+  TEST_RUNNER_IMAGE: '{{default "medical-platform-python-test-runner:local" .TEST_RUNNER_IMAGE}}'
+  PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
+  TEST_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
+  DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
+  E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
+  E2E_COMPOSE_PROJECT: '{{default "medical-platform-e2e" .E2E_COMPOSE_PROJECT}}'
+  E2E_NETWORK: '{{default "medical-platform-e2e_default" .E2E_NETWORK}}'
+  CURL_IMAGE: '{{default "curlimages/curl:8.7.1" .CURL_IMAGE}}'
+  NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
+  E2E_PATIENT_SERVICE_URL: '{{default "http://patient-service:8081" .E2E_PATIENT_SERVICE_URL}}'
+  E2E_APPOINTMENT_SERVICE_URL: '{{default "http://appointment-service:8082" .E2E_APPOINTMENT_SERVICE_URL}}'
+  E2E_PRESCRIPTION_SERVICE_URL: '{{default "http://prescription-service:8083" .E2E_PRESCRIPTION_SERVICE_URL}}'
+  E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
+
+tasks:
+  test-runner-build:
+    cmds:
+      - docker build -f "{{.ROOT_DIR}}/tests/docker/Dockerfile" -t {{.TEST_RUNNER_IMAGE}} "{{.ROOT_DIR}}"
+
+  test-service:
+    deps:
+      - test-runner-build
+    cmds:
+      - |
+        set -eu
+        requested='{{default "" .SERVICE}}'
+        if [ -z "${requested}" ]; then
+          printf '%s\n' 'SERVICE is required, for example: task test-service SERVICE=auth-service' >&2
+          exit 2
+        fi
+        normalize_service() {
+          case "$1" in
+            auth|auth-service) printf '%s\n' 'auth-service' ;;
+            concert|concert-service) printf '%s\n' 'concert-service' ;;
+            notification|notification-service) printf '%s\n' 'notification-service' ;;
+            payment|payment-service) printf '%s\n' 'payment-service' ;;
+            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
+            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
+            *) return 1 ;;
+          esac
+        }
+        if ! service="$(normalize_service "${requested}")"; then
+          printf 'Unknown SERVICE=%s (expected one of: {{.TEST_SERVICES}}).\n' "${requested}" >&2
+          exit 2
+        fi
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        printf '%s\n' "Running pytest for services/${service}"
+        docker run --rm \
+          -v "${repo_root}":/workspace \
+          -w "/workspace/services/${service}" \
+          {{.TEST_RUNNER_IMAGE}} \
+          sh -c "PYTHONPATH=. /opt/test-envs/${service}/bin/python -m pytest {{.PYTEST_ARGS}}"
+
+  test-unit:
+    deps:
+      - test-runner-build
+    cmds:
+      - |
+        set -eu
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        for service in {{.TEST_SERVICES}}; do
+          printf '%s\n' "Running pytest for services/${service}"
+          docker run --rm \
+            -v "${repo_root}":/workspace \
+            -w "/workspace/services/${service}" \
+            {{.TEST_RUNNER_IMAGE}} \
+            sh -c "PYTHONPATH=. /opt/test-envs/${service}/bin/python -m pytest {{.PYTEST_ARGS}}"
+        done
+
+  test-e2e:
+    cmds:
+      - |
+        set -e
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        project='{{.E2E_COMPOSE_PROJECT}}'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT INT TERM
+        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-up
+        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-wait
+        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-newman
+
+  e2e-up:
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build'
+
+  e2e-wait:
+    cmds:
+      - |
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        docker run --rm --network {{.E2E_NETWORK}} \
+          -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
+          -e E2E_PATIENT_SERVICE_URL="{{.E2E_PATIENT_SERVICE_URL}}" \
+          -e E2E_APPOINTMENT_SERVICE_URL="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
+          -e E2E_PRESCRIPTION_SERVICE_URL="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
+          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
+          -e E2E_WAIT_TIMEOUT_SECONDS \
+          -e E2E_WAIT_SLEEP_SECONDS \
+          {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
+
+  e2e-newman:
+    cmds:
+      - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
+      - |
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        docker run --rm --network {{.E2E_NETWORK}} \
+          -v "${repo_root}/tests/e2e":/etc/newman \
+          -w /etc/newman \
+          {{.NEWMAN_IMAGE}} run postman/medical-platform.postman_collection.json \
+          -e newman/docker.postman_environment.json \
+          --env-var patientServiceUrl="{{.E2E_PATIENT_SERVICE_URL}}" \
+          --env-var appointmentServiceUrl="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
+          --env-var prescriptionServiceUrl="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
+          --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
+          --reporters cli,junit \
+          --delay-request 1000 \
+          --reporter-junit-export newman/reports/e2e.xml
+
+  e2e-down:
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
