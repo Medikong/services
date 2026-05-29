@@ -6,6 +6,7 @@ from app.main import create_app
 
 
 def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
+    """예약 생성, 중복 예약 충돌, 목록 조회, 취소 후 만료 실패 흐름을 API 레벨에서 검증한다."""
     client = TestClient(create_app())
     suffix = uuid4().hex[:8]
     concert_id = f"concert-api-flow-{suffix}"
@@ -34,6 +35,7 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
 
 
 def test_sales_and_policy_admin_flow() -> None:
+    """판매 상태 변경과 대기열/트래픽 정책 갱신 API 흐름을 검증한다."""
     client = TestClient(create_app())
     concert_id = f"concert-sales-api-{uuid4().hex[:8]}"
 
@@ -57,6 +59,7 @@ def test_sales_and_policy_admin_flow() -> None:
 
 
 def test_error_response_uses_common_shape() -> None:
+    """예약 서비스 오류 응답이 공통 에러 형식을 따르는지 검증한다."""
     client = TestClient(create_app())
 
     response = client.get("/reservations/missing-rsv", headers={"X-Request-Id": "req-reservation"})
