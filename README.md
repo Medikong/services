@@ -1,37 +1,46 @@
-# MediKong Services
+# MediKong Ticketing Services
 
-FastAPI 기반 의료 MSA 서비스와 정적 dashboard를 개발하고 검증하는 repo입니다.
+공연 티켓 예매 플랫폼의 마이크로서비스를 개발하고 검증하는 repo입니다.
 
-이 repo의 책임은 서비스 개발, 단위 테스트, Docker Compose E2E 테스트, Docker image build, registry push까지입니다. Kubernetes 배포 선언, Argo CD, Terraform, Ansible, Vagrant, 클러스터 운영 파일은 이 repo에 두지 않습니다.
+이 repo는 서비스 코드, OpenAPI 계약, 단위 테스트, 서비스 이미지 빌드와 registry push를 소유합니다. Kubernetes 배포 선언, Argo CD, Terraform, Ansible, Vagrant, 클러스터 운영 파일은 각 전용 repo에서 관리합니다.
 
 ## 구성
 
 | 경로 | 내용 |
 | --- | --- |
-| `services/auth-service/` | 로그인, JWT 발급, 감사 로그 |
-| `services/patient-service/` | 환자 정보와 의료 요약 |
-| `services/appointment-service/` | 예약 요청, 확정, 취소와 예약 이벤트 발행 |
-| `services/prescription-service/` | 처방 발행, 조회와 처방 이벤트 발행 |
+| `services/auth-service/` | 로그인, JWT 발급, refresh token, 감사 로그 |
+| `services/concert-service/` | 공연, 회차, 좌석 재고 조회 |
+| `services/reservation-service/` | 좌석 예약, 예약 만료, 예약 이벤트 발행 |
+| `services/payment-service/` | 결제 요청, 승인/실패 처리, 결제 이벤트 발행 |
+| `services/ticket-service/` | 결제 승인 이벤트 기반 티켓 발급 |
 | `services/notification-service/` | Kafka 이벤트 기반 알림 저장 |
+| `contracts/` | 서비스별 OpenAPI 문서와 공통 API/JWT 계약 |
 | `dashboard/` | 서비스 동작을 확인하는 정적 화면 |
-| `tests/` | Docker pytest runner와 Docker Compose E2E 테스트 |
+| `tests/` | 단위 테스트 러너와 테스트 보조 파일 |
+
+## 서비스 흐름
+
+1. 사용자는 `auth-service`에서 로그인하고 JWT를 발급받습니다.
+2. `concert-service`는 공연/회차/좌석 정보를 제공합니다.
+3. `reservation-service`는 좌석 예약을 생성하고 예약 이벤트를 발행합니다.
+4. `payment-service`는 예약 결제를 처리하고 결제 승인/실패 이벤트를 발행합니다.
+5. `ticket-service`는 결제 승인 이벤트를 소비해 티켓을 발급합니다.
+6. `notification-service`는 주요 도메인 이벤트를 소비해 알림 이력을 저장합니다.
 
 ## 테스트
 
-로컬에는 Docker, Docker Compose, Task가 필요합니다. Python과 Newman은 컨테이너 안에서 실행합니다.
+로컬에는 Docker, Docker Compose, Task가 필요합니다. Python 테스트는 컨테이너 기반 테스트 러너에서 실행합니다.
 
 ```bash
 task test-unit
-task test-e2e
+task test-service SERVICE=auth-service
 ```
 
-`task test-unit`은 `tests/docker/Dockerfile`로 테스트 러너 이미지를 만든 뒤 각 서비스의 pytest를 실행합니다. `task test-e2e`는 PostgreSQL, MongoDB, Kafka, FastAPI 서비스를 Docker Compose로 올리고 Newman collection을 실행합니다.
+`task test-unit`은 `tests/docker/Dockerfile`로 테스트 러너 이미지를 만든 뒤 티켓 예매 서비스의 pytest를 실행합니다. E2E 테스트는 별도 담당 범위에서 관리합니다.
 
 ## 이미지 빌드와 푸시
 
 `service` repo는 Dockerfile과 image build/push 명령을 소유합니다. Kubernetes 배포 선언은 `gitops` repo가 관리하므로, 여기서는 registry와 tag를 인자로 받아 이미지만 준비합니다.
-
-Python 서비스 이미지는 단일 바이너리 산출물이 아니라 운영 의존성만 담은 `/opt/venv` 기반 멀티 스테이지 이미지로 구성합니다.
 
 기본 `app-images-*` registry는 VM lab registry인 `10.10.10.10:5000`입니다.
 
@@ -64,5 +73,3 @@ task app-images-push IMAGE_REGISTRY=ghcr.io IMAGE_NAMESPACE=owner/service IMAGE_
 - Argo CD Application과 GitOps sync
 - Terraform, Ansible, Vagrant, kubeadm cluster 운영
 - registry bootstrap, VM bootstrap, cluster apply
-
-자세한 테스트 흐름은 `tests/README.md`를 참고합니다.
