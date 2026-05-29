@@ -7,7 +7,7 @@
 ## 기본 방향
 
 - 테스트와 이미지 빌드는 분리한다.
-- 단위 테스트는 `.github/workflows/ci.yml`, 이미지 빌드 검증은 `.github/workflows/image-build.yml`이 각각 독립 workflow로 실행한다.
+- 단위 테스트는 `.github/workflows/service-tests.yml`, 이미지 빌드 검증은 `.github/workflows/image-build.yml`이 각각 독립 workflow로 실행한다.
 - 테스트 실패는 코드 동작 검증 실패로 본다.
 - 이미지 빌드 실패는 Dockerfile, build context, 운영 의존성 조립 실패로 본다.
 - GitHub Actions 화면에서도 테스트 workflow와 이미지 빌드 workflow를 별도 피드백으로 다룬다.

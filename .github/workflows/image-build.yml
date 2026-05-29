@@ -1,7 +1,7 @@
 name: Image Build
 
 # 이 workflow는 PR/브랜치 push에서 Docker image build 가능 여부만 검증한다.
-# 단위 테스트 결과는 CI workflow가 따로 담당하고, 이 workflow는 registry push를 하지 않는다.
+# 단위 테스트 결과는 Service Tests workflow가 따로 담당하고, 이 workflow는 registry push를 하지 않는다.
 
 on:
   push:

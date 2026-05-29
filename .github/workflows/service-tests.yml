@@ -1,4 +1,4 @@
-name: CI
+name: Service Tests
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: service-tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
               - 'tests/**'
               - 'packages/**'
               - 'Taskfile.yml'
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/service-tests.yml'
 
       - name: Build test matrix
         id: matrix

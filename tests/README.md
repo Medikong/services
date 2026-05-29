@@ -106,9 +106,9 @@ task e2e-down
 
 ## CI
 
-`.github/workflows/ci.yml`은 PR 변경 경로를 기준으로 테스트 대상만 만든다. 테스트 job은 `task test-services SERVICES="<services>"`를 한 번 실행하고, Docker image 빌드 검증은 별도 workflow인 `.github/workflows/image-build.yml`이 독립적으로 담당한다. 두 workflow는 분리되어 있어 이미지 빌드 화면에서 단위 테스트 결과를 함께 보지 않는다.
+`.github/workflows/service-tests.yml`은 PR 변경 경로를 기준으로 테스트 대상만 만든다. 테스트 job은 `task test-services SERVICES="<services>"`를 한 번 실행하고, Docker image 빌드 검증은 별도 workflow인 `.github/workflows/image-build.yml`이 독립적으로 담당한다. 두 workflow는 분리되어 있어 이미지 빌드 화면에서 단위 테스트 결과를 함께 보지 않는다.
 
-`services/<service>/**` 변경은 해당 서비스 테스트와 해당 이미지를 선택한다. `tests/**` 변경은 CI workflow의 전체 서비스 테스트만 실행하며, `packages/**`와 `Taskfile.yml` 변경은 테스트와 이미지 빌드 양쪽에서 전체 대상을 선택한다. `.github/workflows/image-build.yml` 또는 `.github/workflows/image-publish.yml` 변경은 image build workflow에서 전체 이미지 빌드를 실행한다. `contracts/**`나 문서만 변경된 PR은 서비스 테스트와 이미지 빌드 모두 no-op 성공 job으로 끝난다. `main` push의 registry publish는 `.github/workflows/image-publish.yml`이 담당한다.
+`services/<service>/**` 변경은 해당 서비스 테스트와 해당 이미지를 선택한다. `tests/**` 변경은 Service Tests workflow의 전체 서비스 테스트만 실행하며, `packages/**`와 `Taskfile.yml` 변경은 테스트와 이미지 빌드 양쪽에서 전체 대상을 선택한다. `.github/workflows/image-build.yml` 또는 `.github/workflows/image-publish.yml` 변경은 image build workflow에서 전체 이미지 빌드를 실행한다. `contracts/**`나 문서만 변경된 PR은 서비스 테스트와 이미지 빌드 모두 no-op 성공 job으로 끝난다. `main` push의 registry publish는 `.github/workflows/image-publish.yml`이 담당한다.
 
 `.github/workflows/image-publish.yml`은 `main` push 또는 수동 실행에서 GitHub Actions runner 안의 `registry:2`를 현재 publish registry인 `localhost:5000`으로 띄운다. 각 image는 commit SHA tag로 `task app-image-build SERVICE=<image> IMAGE_REGISTRY=localhost:5000 IMAGE_TAG=<commit-sha>`를 실행한 뒤 push하고, registry digest를 수집해 `image-publish-deploy-plan` artifact와 workflow summary에 남긴다. 나중에 영속 registry를 연결할 때는 registry URL과 인증 단계만 교체한다. 이 산출물은 후속 `gitops` repo image tag/digest 업데이트의 입력 계획이며, 현재 단계에서는 Kubernetes 배포 선언 수정이나 Argo CD sync를 수행하지 않는다.
 
