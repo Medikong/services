@@ -102,29 +102,11 @@ tasks:
       - task: tests:test-e2e
 
   test-e2e:
-    desc: Run PostgreSQL/MongoDB/Kafka E2E scenarios with Docker Compose.
+    desc: Run Docker Compose E2E tests. Optionally set SCENARIO=<scenario-name>.
     cmds:
       - task: tests:test-e2e
-
-  e2e-up:
-    desc: Start the E2E Docker Compose stack.
-    cmds:
-      - task: tests:e2e-up
-
-  e2e-wait:
-    desc: Wait for E2E services with the Docker curl container.
-    cmds:
-      - task: tests:e2e-wait
-
-  e2e-newman:
-    desc: Run the E2E collection with the Docker Newman container.
-    cmds:
-      - task: tests:e2e-newman
-
-  e2e-down:
-    desc: Stop and remove the E2E Docker Compose stack.
-    cmds:
-      - task: tests:e2e-down
+        vars:
+          SCENARIO: '{{default "" .SCENARIO}}'
 
   app-images-build:
     desc: Build service and dashboard Docker images.

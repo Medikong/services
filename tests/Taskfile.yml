@@ -9,13 +9,19 @@ vars:
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "medical-platform-e2e" .E2E_COMPOSE_PROJECT}}'
+  E2E_COMPOSE_SERVICES: '{{default "" .E2E_COMPOSE_SERVICES}}'
   E2E_NETWORK: '{{default "medical-platform-e2e_default" .E2E_NETWORK}}'
   CURL_IMAGE: '{{default "curlimages/curl:8.7.1" .CURL_IMAGE}}'
   NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
+  E2E_WAIT_SERVICES: '{{default "patient-service appointment-service prescription-service notification-service" .E2E_WAIT_SERVICES}}'
   E2E_PATIENT_SERVICE_URL: '{{default "http://patient-service:8081" .E2E_PATIENT_SERVICE_URL}}'
+  E2E_CONCERT_SERVICE_URL: '{{default "http://concert-service:8082" .E2E_CONCERT_SERVICE_URL}}'
+  E2E_RESERVATION_SERVICE_URL: '{{default "http://reservation-service:8083" .E2E_RESERVATION_SERVICE_URL}}'
   E2E_APPOINTMENT_SERVICE_URL: '{{default "http://appointment-service:8082" .E2E_APPOINTMENT_SERVICE_URL}}'
   E2E_PRESCRIPTION_SERVICE_URL: '{{default "http://prescription-service:8083" .E2E_PRESCRIPTION_SERVICE_URL}}'
   E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
+  E2E_SCENARIO: '{{default "postman/medical-platform.postman_collection.json" .E2E_SCENARIO}}'
+  E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
 
 tasks:
   test-runner-build:
@@ -121,50 +127,75 @@ tasks:
     cmds:
       - |
         set -e
+        scenario='{{default "" .SCENARIO}}'
+        compose_services='{{.E2E_COMPOSE_SERVICES}}'
+        wait_services='{{.E2E_WAIT_SERVICES}}'
+        collection='{{.E2E_SCENARIO}}'
+        report_name='{{.E2E_REPORT_NAME}}'
+        if [ -n "${scenario}" ]; then
+          scenario="${scenario#scenarios/}"
+          scenario="${scenario%.postman_collection.json}"
+          case "${scenario}" in
+            01-concert-seat-setup)
+              compose_services="postgres concert-service"
+              wait_services="concert-service"
+              ;;
+            02-reservation-create)
+              compose_services="postgres reservation-service"
+              wait_services="reservation-service"
+              ;;
+            medical-platform|postman/medical-platform)
+              scenario="postman/medical-platform.postman_collection.json"
+              compose_services=""
+              wait_services="patient-service appointment-service prescription-service notification-service"
+              ;;
+            *)
+              printf 'Unknown E2E SCENARIO=%s (expected: 01-concert-seat-setup, 02-reservation-create).\n' "${scenario}" >&2
+              exit 2
+              ;;
+          esac
+          collection="${scenario}"
+          report_name="${scenario##*/}"
+          report_name="${report_name%.postman_collection.json}"
+        fi
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}'
         file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
-        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT INT TERM
-        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-up
-        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-wait
-        task -t "{{.TASKFILE_DIR}}/Taskfile.yml" e2e-newman
-
-  e2e-up:
-    cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build'
-
-  e2e-wait:
-    cmds:
-      - |
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        case "${collection}" in
+          */*) newman_collection="${collection}" ;;
+          *) newman_collection="scenarios/${collection}.postman_collection.json" ;;
+        esac
+        if [ ! -f "${repo_root}/tests/e2e/${newman_collection}" ]; then
+          printf 'E2E scenario not found: %s\n' "${repo_root}/tests/e2e/${newman_collection}" >&2
+          exit 2
+        fi
+        mkdir -p "${repo_root}/tests/e2e/newman/reports"
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build ${compose_services}
         docker run --rm --network {{.E2E_NETWORK}} \
           -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
           -e E2E_PATIENT_SERVICE_URL="{{.E2E_PATIENT_SERVICE_URL}}" \
+          -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
+          -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
           -e E2E_APPOINTMENT_SERVICE_URL="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
           -e E2E_PRESCRIPTION_SERVICE_URL="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
           -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
+          -e E2E_WAIT_SERVICES="${wait_services}" \
           -e E2E_WAIT_TIMEOUT_SECONDS \
           -e E2E_WAIT_SLEEP_SECONDS \
           {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
-
-  e2e-newman:
-    cmds:
-      - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
-      - |
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         docker run --rm --network {{.E2E_NETWORK}} \
           -v "${repo_root}/tests/e2e":/etc/newman \
           -w /etc/newman \
-          {{.NEWMAN_IMAGE}} run postman/medical-platform.postman_collection.json \
+          {{.NEWMAN_IMAGE}} run "${newman_collection}" \
           -e newman/docker.postman_environment.json \
           --env-var patientServiceUrl="{{.E2E_PATIENT_SERVICE_URL}}" \
+          --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
+          --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
           --env-var appointmentServiceUrl="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
           --env-var prescriptionServiceUrl="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
           --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
           --reporters cli,junit \
           --delay-request 1000 \
-          --reporter-junit-export newman/reports/e2e.xml
-
-  e2e-down:
-    cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
+          --reporter-junit-export "newman/reports/${report_name}.xml"

@@ -20,6 +20,9 @@ tests/
     Dockerfile
   e2e/
     docker-compose.yml
+    scenarios/
+      01-concert-seat-setup.postman_collection.json
+      02-reservation-create.postman_collection.json
     postman/
       medical-platform.postman_collection.json
     postgres-init/
@@ -95,13 +98,11 @@ task test-e2e
 
 `tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
 
-수동으로 stack을 살펴보려면 다음 명령을 사용한다.
+첫 티켓팅 E2E 시나리오는 공연, 회차, 좌석 준비를 하나의 검증 단위로 분리해 실행한다.
 
 ```bash
-task e2e-up
-task e2e-wait
-task e2e-newman
-task e2e-down
+task test-e2e SCENARIO=01-concert-seat-setup
+task test-e2e SCENARIO=02-reservation-create
 ```
 
 ## CI
