@@ -1,0 +1,73 @@
+name: Image Build
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: JSON array of image names to build.
+        required: true
+        type: string
+      image_registry:
+        description: Registry prefix used for the local build tag.
+        required: true
+        type: string
+      image_namespace:
+        description: Optional image namespace between registry and image name.
+        required: false
+        type: string
+        default: ""
+      image_tag:
+        description: Image tag to apply during the build.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Image build (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(inputs.images) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          repo-token: ${{ github.token }}
+
+      - name: Build Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          task app-image-build \
+            SERVICE="${{ matrix.image }}" \
+            IMAGE_REGISTRY="${{ inputs.image_registry }}" \
+            IMAGE_NAMESPACE="${{ inputs.image_namespace }}" \
+            IMAGE_TAG="${{ inputs.image_tag }}"
+
+      - name: Append image build summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_prefix="${{ inputs.image_registry }}"
+          image_namespace="${{ inputs.image_namespace }}"
+          if [ -n "${image_namespace}" ]; then
+            image_prefix="${image_prefix%/}/${image_namespace#/}"
+          fi
+          image="${image_prefix}/${{ matrix.image }}:${{ inputs.image_tag }}"
+          if docker image inspect "${image}" >/tmp/image-inspect.json 2>/dev/null; then
+            image_id="$(jq -r '.[0].Id' /tmp/image-inspect.json)"
+            {
+              printf '### Docker image build\n\n'
+              printf '- image: `%s`\n' "${image}"
+              printf '- local image id: `%s`\n' "${image_id}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi

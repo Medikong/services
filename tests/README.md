@@ -106,7 +106,11 @@ task e2e-down
 
 ## CI
 
-`.github/workflows/ci.yml`은 PR 변경 경로를 기준으로 테스트할 서비스 목록을 만든 뒤 `task test-services SERVICES="<services>"`를 한 번 실행한다. 테스트 러너 이미지는 한 번 빌드하고, 선택된 서비스 pytest 컨테이너는 병렬로 실행한다. `services/<service>/**` 변경은 해당 서비스만 실행하고, `tests/**`, `packages/**`, `Taskfile.yml`, `.github/workflows/ci.yml` 변경은 6개 서비스 전체를 실행한다. `contracts/**`만 변경된 경우에는 서비스 테스트 없이 no-op 성공 job으로 끝난다.
+`.github/workflows/ci.yml`은 PR 변경 경로를 기준으로 테스트 대상과 Docker image 빌드 대상을 따로 만든다. 테스트 job은 `task test-services SERVICES="<services>"`를 한 번 실행하고, 이미지 빌드 job은 `.github/workflows/image-build.yml` 재사용 workflow를 호출한다. 재사용 workflow는 선택된 image matrix마다 `task app-image-build SERVICE=<image> IMAGE_REGISTRY=ci.local IMAGE_TAG=<commit-sha>`를 실행한다. 두 job은 분리되어 있어 테스트 실패와 Dockerfile/build context 실패가 별도 피드백으로 보인다.
+
+`services/<service>/**` 변경은 해당 서비스 테스트와 이미지를 선택하고, `dashboard/**` 변경은 `dashboard` 이미지만 선택한다. `tests/**` 변경은 전체 서비스 테스트만 실행하며, `packages/**`, `Taskfile.yml`, `.github/workflows/ci.yml` 변경은 전체 서비스 테스트와 전체 이미지 빌드를 실행한다. `.github/workflows/image-build.yml` 또는 `.github/workflows/image-publish.yml` 변경은 전체 이미지 빌드를 실행한다. `contracts/**`나 문서만 변경된 PR은 서비스 테스트와 이미지 빌드 모두 no-op 성공 job으로 끝난다. `main` push의 registry publish는 `.github/workflows/image-publish.yml`이 담당한다.
+
+`.github/workflows/image-publish.yml`은 `main` push 또는 수동 실행에서 GitHub Actions runner 안의 `registry:2`를 현재 publish registry인 `localhost:5000`으로 띄운다. 각 image는 commit SHA tag로 `task app-image-build SERVICE=<image> IMAGE_REGISTRY=localhost:5000 IMAGE_TAG=<commit-sha>`를 실행한 뒤 push하고, registry digest를 수집해 `image-publish-deploy-plan` artifact와 workflow summary에 남긴다. 나중에 영속 registry를 연결할 때는 registry URL과 인증 단계만 교체한다. 이 산출물은 후속 `gitops` repo image tag/digest 업데이트의 입력 계획이며, 현재 단계에서는 Kubernetes 배포 선언 수정이나 Argo CD sync를 수행하지 않는다.
 
 CI는 단위 테스트 성공/실패와 관계없이 `unit-test-reports` artifact를 업로드한다. artifact 안의 `tests/tmp/reports/unit/<service>/summary.json`에는 서비스명, 성공/실패 상태, exit code, 시작/종료 시각, 실행 시간과 테스트 메트릭이 기록된다. GitHub Actions summary에는 `tests/tmp/reports/unit/summary.md`의 전체 단위 테스트 표가 표시된다.
 

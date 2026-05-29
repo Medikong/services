@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - main
   pull_request:
     branches:
       - main
@@ -17,11 +19,13 @@ concurrency:
 
 jobs:
   detect-services:
-    name: Detect service test scope
+    name: Detect CI scopes
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.matrix.outputs.services }}
-      count: ${{ steps.matrix.outputs.count }}
+      test_services: ${{ steps.matrix.outputs.test_services }}
+      test_count: ${{ steps.matrix.outputs.test_count }}
+      images: ${{ steps.matrix.outputs.images }}
+      image_count: ${{ steps.matrix.outputs.image_count }}
 
     steps:
       - name: Checkout repository
@@ -46,32 +50,63 @@ jobs:
               - 'services/reservation-service/**'
             ticket-service:
               - 'services/ticket-service/**'
-            common:
+            dashboard:
+              - 'dashboard/**'
+            test-common:
               - 'tests/**'
               - 'packages/**'
               - 'Taskfile.yml'
               - '.github/workflows/ci.yml'
+            image-common:
+              - 'packages/**'
+              - 'Taskfile.yml'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/image-build.yml'
+              - '.github/workflows/image-publish.yml'
 
-      - name: Build test matrix
+      - name: Build test and image matrices
         id: matrix
         shell: bash
         run: |
           set -euo pipefail
-          all_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs.common }}" = "true" ]; then
-            services="${all_services}"
+          all_test_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service","dashboard"]'
+          changed='${{ steps.changes.outputs.changes }}'
+          service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+          image_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service","dashboard"]'
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['test-common'] }}" = "true" ]; then
+            test_services="${all_test_services}"
           else
-            services="$(jq -c '[.[] | select(. != "common")]' <<<'${{ steps.changes.outputs.changes }}')"
+            test_services="$(jq -c --argjson allowed "${service_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
           fi
-          count="$(jq 'length' <<<"${services}")"
-          printf 'services=%s\n' "${services}" >> "${GITHUB_OUTPUT}"
-          printf 'count=%s\n' "${count}" >> "${GITHUB_OUTPUT}"
-          printf 'Selected services: %s\n' "${services}"
+
+          full_image_build=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            full_image_build=true
+          elif [ "${{ steps.changes.outputs['image-common'] }}" = "true" ]; then
+            full_image_build=true
+          fi
+
+          if [ "${full_image_build}" = "true" ]; then
+            images="${all_images}"
+          else
+            images="$(jq -c --argjson allowed "${image_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
+          fi
+
+          test_count="$(jq 'length' <<<"${test_services}")"
+          image_count="$(jq 'length' <<<"${images}")"
+          printf 'test_services=%s\n' "${test_services}" >> "${GITHUB_OUTPUT}"
+          printf 'test_count=%s\n' "${test_count}" >> "${GITHUB_OUTPUT}"
+          printf 'images=%s\n' "${images}" >> "${GITHUB_OUTPUT}"
+          printf 'image_count=%s\n' "${image_count}" >> "${GITHUB_OUTPUT}"
+          printf 'Selected test services: %s\n' "${test_services}"
+          printf 'Selected images: %s\n' "${images}"
 
   service-unit:
     name: Service unit tests
     needs: detect-services
-    if: needs.detect-services.outputs.count != '0'
+    if: needs.detect-services.outputs.test_count != '0'
     runs-on: ubuntu-latest
 
     steps:
@@ -88,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           services="$(jq -r 'join(" ")' <<'JSON'
-          ${{ needs.detect-services.outputs.services }}
+          ${{ needs.detect-services.outputs.test_services }}
           JSON
           )"
           task test-services SERVICES="${services}"
@@ -112,9 +147,29 @@ jobs:
   no-service-unit:
     name: No service unit tests
     needs: detect-services
-    if: needs.detect-services.outputs.count == '0'
+    if: needs.detect-services.outputs.test_count == '0'
     runs-on: ubuntu-latest
 
     steps:
       - name: Report no-op
         run: echo "No managed service unit tests selected for this change."
+
+  image-build:
+    name: Image build
+    needs: detect-services
+    if: needs.detect-services.outputs.image_count != '0'
+    uses: ./.github/workflows/image-build.yml
+    with:
+      images: ${{ needs.detect-services.outputs.images }}
+      image_registry: ci.local
+      image_tag: ${{ github.sha }}
+
+  no-image-build:
+    name: No image build
+    needs: detect-services
+    if: needs.detect-services.outputs.image_count == '0'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Report no-op
+        run: echo "No Docker images selected for this change."

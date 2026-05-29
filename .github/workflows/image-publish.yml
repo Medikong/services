@@ -1,0 +1,235 @@
+name: Image Publish
+
+# 이 workflow는 `main` 반영 또는 수동 실행 때 이미지 publish 정식 단계를 수행한다.
+# 처리 흐름: 이미지 목록 결정 -> registry 준비 -> 이미지 빌드 -> 이미지 push -> digest 수집 -> deploy-plan artifact 생성.
+# 현재 registry는 runner 내부의 `localhost:5000`이며, 영속 registry로 바꿀 때는 registry 주소와 인증 단계만 교체한다.
+# Kubernetes 배포 선언 수정, GitOps repo 변경, Argo CD sync는 여기서 실행하지 않고 배포 계획만 남긴다.
+# TODO(레지스트리): 영속 registry를 붙일 때 `localhost:5000`을 ECR/GHCR URL로 교체하고 로그인/OIDC 인증 단계를 추가한다.
+# TODO(GitOps): 별도 GitOps 업데이트 단계에서 `deploy-plan.json`을 읽어 manifest/values 변경 PR을 만들고 Argo CD sync와 연결한다.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image:
+        description: publish할 이미지
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - auth-service
+          - concert-service
+          - reservation-service
+          - payment-service
+          - ticket-service
+          - notification-service
+          - dashboard
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REGISTRY: localhost:5000
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  select-images:
+    name: 이미지 선택
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.matrix.outputs.images }}
+      image_count: ${{ steps.matrix.outputs.image_count }}
+
+    steps:
+      - name: 이미지 matrix 생성
+        id: matrix
+        shell: bash
+        env:
+          REQUESTED_IMAGE: ${{ github.event.inputs.image || 'all' }}
+        run: |
+          set -euo pipefail
+          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service","dashboard"]'
+
+          images="$(jq -c --arg requested "${REQUESTED_IMAGE}" '
+            if $requested == "all" then
+              .
+            else
+              map(select(. == $requested))
+            end
+          ' <<<"${all_images}")"
+          image_count="$(jq 'length' <<<"${images}")"
+
+          if [ "${image_count}" = "0" ]; then
+            printf '알 수 없는 이미지 선택값입니다: %s\n' "${REQUESTED_IMAGE}" >&2
+            exit 2
+          fi
+
+          printf 'images=%s\n' "${images}" >> "${GITHUB_OUTPUT}"
+          printf 'image_count=%s\n' "${image_count}" >> "${GITHUB_OUTPUT}"
+          printf '선택된 이미지: %s\n' "${images}"
+
+  publish:
+    name: 이미지 publish (${{ matrix.image }})
+    needs: select-images
+    if: needs.select-images.outputs.image_count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(needs.select-images.outputs.images) }}
+
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+
+    steps:
+      - name: 소스 내려받기
+        uses: actions/checkout@v4
+
+      - name: Task 설치
+        uses: go-task/setup-task@v2
+        with:
+          repo-token: ${{ github.token }}
+
+      - name: registry 준비 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl -fsS "http://${IMAGE_REGISTRY}/v2/" >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          printf 'registry가 준비되지 않았습니다: %s\n' "${IMAGE_REGISTRY}" >&2
+          exit 1
+
+      - name: Docker 이미지 빌드
+        shell: bash
+        run: |
+          set -euo pipefail
+          task app-image-build \
+            SERVICE="${{ matrix.image }}" \
+            IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+            IMAGE_TAG="${IMAGE_TAG}"
+
+      - name: Docker 이미지 push
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_ref="${IMAGE_REGISTRY}/${{ matrix.image }}:${IMAGE_TAG}"
+          docker push "${image_ref}"
+
+      - name: digest 수집 및 deploy plan 작성
+        id: deploy-plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ matrix.image }}"
+          image_ref="${IMAGE_REGISTRY}/${image}:${IMAGE_TAG}"
+
+          repo_digest="$(docker image inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "${image_ref}" | head -n 1 || true)"
+          digest=""
+          digest_source=""
+          if [ -n "${repo_digest}" ]; then
+            digest="${repo_digest##*@}"
+            digest_source="RepoDigests"
+          else
+            digest="$(curl -fsSI \
+              -H 'Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json' \
+              "http://${IMAGE_REGISTRY}/v2/${image}/manifests/${IMAGE_TAG}" \
+              | awk -F': ' 'tolower($1) == "docker-content-digest" { gsub("\r", "", $2); print $2; exit }')"
+            digest_source="registry-head"
+          fi
+
+          if [ -z "${digest}" ]; then
+            printf 'push된 이미지 digest를 확인할 수 없습니다: %s\n' "${image_ref}" >&2
+            exit 1
+          fi
+
+          mkdir -p deploy-plan
+          jq -n \
+            --arg image "${image}" \
+            --arg tag "${IMAGE_TAG}" \
+            --arg image_ref "${image_ref}" \
+            --arg digest "${digest}" \
+            --arg digest_ref "${IMAGE_REGISTRY}/${image}@${digest}" \
+            --arg digest_source "${digest_source}" \
+            --arg source_sha "${GITHUB_SHA}" \
+            '{
+              image: $image,
+              tag: $tag,
+              image_ref: $image_ref,
+              digest: $digest,
+              digest_ref: $digest_ref,
+              digest_source: $digest_source,
+              source_sha: $source_sha,
+              gitops_action: "plan-only"
+            }' > "deploy-plan/${image}.json"
+
+          {
+            printf '### 이미지 publish\n\n'
+            printf '- 이미지: `%s`\n' "${image}"
+            printf '- 태그 참조: `%s`\n' "${image_ref}"
+            printf '- digest 참조: `%s`\n' "${IMAGE_REGISTRY}/${image}@${digest}"
+            printf '- digest 출처: `%s`\n' "${digest_source}"
+            printf '- GitOps 작업: `plan-only`\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: 이미지별 deploy plan 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-plan-${{ matrix.image }}
+          path: deploy-plan/${{ matrix.image }}.json
+          if-no-files-found: error
+
+  deploy-plan:
+    name: deploy plan 조립
+    needs:
+      - select-images
+      - publish
+    if: needs.select-images.outputs.image_count != '0'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 이미지별 deploy plan 다운로드
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deploy-plan-*
+          path: deploy-plan
+          merge-multiple: true
+
+      - name: 통합 deploy plan 작성
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -s 'sort_by(.image)' deploy-plan/*.json > deploy-plan.json
+
+          {
+            printf '# 이미지 publish deploy plan\n\n'
+            printf '- 소스 commit: `%s`\n' "${GITHUB_SHA}"
+            printf '- registry: `%s`\n' "${IMAGE_REGISTRY}"
+            printf '- GitOps 작업: `plan-only`\n\n'
+            printf '| 이미지 | 태그 참조 | digest 참조 |\n'
+            printf '| --- | --- | --- |\n'
+            jq -r '.[] | "| `\(.image)` | `\(.image_ref)` | `\(.digest_ref)` |"' deploy-plan.json
+          } > deploy-plan.md
+
+          cat deploy-plan.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: 통합 deploy plan 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-publish-deploy-plan
+          path: |
+            deploy-plan.json
+            deploy-plan.md
+          if-no-files-found: error
