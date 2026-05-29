@@ -57,6 +57,21 @@ services:
       timeout: 5s
       retries: 20
 
+  concert-service:
+    build:
+      context: ../..
+      dockerfile: services/concert-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/concert_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/health').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   patient-service:
     build:
       context: ../../services/patient-service

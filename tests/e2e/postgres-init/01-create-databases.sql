@@ -1,4 +1,5 @@
 CREATE DATABASE auth_service;
+CREATE DATABASE concert_service;
 CREATE DATABASE patient_service;
 CREATE DATABASE appointment_service;
 CREATE DATABASE prescription_service;

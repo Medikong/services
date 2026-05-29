@@ -1,0 +1,208 @@
+{
+  "info": {
+    "_postman_id": "a3f5e67c-564b-43d0-b6ac-1a07a6d6d5c8",
+    "name": "01 Concert Seat Setup",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create venue",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"E2E Main Hall {{$timestamp}}\",\"address\":\"Seoul\",\"totalSeats\":2}"
+        },
+        "url": "{{concertServiceUrl}}/provider/venues"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('venue is created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('string');",
+              "  pm.environment.set('venueId', body.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create concert draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Provider-Id",
+            "value": "provider-e2e"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"E2E Spring Live {{$timestamp}}\",\"ageRating\":\"ALL\",\"runningMinutes\":120}"
+        },
+        "url": "{{concertServiceUrl}}/provider/concerts"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('concert draft is created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('string');",
+              "  pm.expect(body.providerId).to.eql('provider-e2e');",
+              "  pm.environment.set('concertId', body.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create showtime",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();",
+              "pm.environment.set('concertStartsAt', startsAt);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('showtime is created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('string');",
+              "  pm.expect(body.concertId).to.eql(pm.environment.get('concertId'));",
+              "  pm.expect(body.venueId).to.eql(pm.environment.get('venueId'));",
+              "  pm.environment.set('showtimeId', body.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"venueId\":\"{{venueId}}\",\"startsAt\":\"{{concertStartsAt}}\"}"
+        },
+        "url": "{{concertServiceUrl}}/provider/concerts/{{concertId}}/showtimes"
+      }
+    },
+    {
+      "name": "Upload seat map",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"sections\":[{\"name\":\"A\",\"rows\":[{\"name\":\"1\",\"seatNumbers\":[\"1\",\"2\"]}]}]}"
+        },
+        "url": "{{concertServiceUrl}}/provider/showtimes/{{showtimeId}}/seat-map"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('seat map is uploaded', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List public performances",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{concertServiceUrl}}/concerts/{{concertId}}/performances"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('public performances include the showtime', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.items).to.be.an('array').that.is.not.empty;",
+              "  const performance = body.items.find((item) => item.id === pm.environment.get('showtimeId'));",
+              "  pm.expect(performance).to.not.equal(undefined);",
+              "  pm.expect(performance.concertId).to.eql(pm.environment.get('concertId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List public seats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{concertServiceUrl}}/performances/{{showtimeId}}/seats"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('public seats are available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.items).to.be.an('array').with.lengthOf(2);",
+              "  const firstSeat = body.items.find((item) => item.section === 'A' && item.row === '1' && item.number === '1');",
+              "  pm.expect(firstSeat).to.not.equal(undefined);",
+              "  pm.expect(firstSeat.status).to.eql('available');",
+              "  pm.environment.set('seatId', firstSeat.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
