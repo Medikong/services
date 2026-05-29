@@ -22,7 +22,6 @@ PR에서는 변경된 서비스만 이미지 빌드한다.
 - `services/payment-service/**` 변경: `payment-service` 이미지 빌드
 - `services/ticket-service/**` 변경: `ticket-service` 이미지 빌드
 - `services/notification-service/**` 변경: `notification-service` 이미지 빌드
-- `dashboard/**` 변경: `dashboard` 이미지 빌드
 
 공통 경로 변경은 안전하게 전체 이미지 빌드로 처리한다.
 

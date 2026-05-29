@@ -25,7 +25,6 @@ on:
           - payment-service
           - ticket-service
           - notification-service
-          - dashboard
 
 permissions:
   contents: read
@@ -54,7 +53,7 @@ jobs:
           REQUESTED_IMAGE: ${{ github.event.inputs.image || 'all' }}
         run: |
           set -euo pipefail
-          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service","dashboard"]'
+          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
 
           images="$(jq -c --arg requested "${REQUESTED_IMAGE}" '
             if $requested == "all" then
@@ -177,11 +176,11 @@ jobs:
 
           {
             printf '### 이미지 publish\n\n'
-            printf '- 이미지: `%s`\n' "${image}"
-            printf '- 태그 참조: `%s`\n' "${image_ref}"
-            printf '- digest 참조: `%s`\n' "${IMAGE_REGISTRY}/${image}@${digest}"
-            printf '- digest 출처: `%s`\n' "${digest_source}"
-            printf '- GitOps 작업: `plan-only`\n'
+            printf -- '- 이미지: `%s`\n' "${image}"
+            printf -- '- 태그 참조: `%s`\n' "${image_ref}"
+            printf -- '- digest 참조: `%s`\n' "${IMAGE_REGISTRY}/${image}@${digest}"
+            printf -- '- digest 출처: `%s`\n' "${digest_source}"
+            printf -- '- GitOps 작업: `plan-only`\n'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: 이미지별 deploy plan 업로드
@@ -215,9 +214,9 @@ jobs:
 
           {
             printf '# 이미지 publish deploy plan\n\n'
-            printf '- 소스 commit: `%s`\n' "${GITHUB_SHA}"
-            printf '- registry: `%s`\n' "${IMAGE_REGISTRY}"
-            printf '- GitOps 작업: `plan-only`\n\n'
+            printf -- '- 소스 commit: `%s`\n' "${GITHUB_SHA}"
+            printf -- '- registry: `%s`\n' "${IMAGE_REGISTRY}"
+            printf -- '- GitOps 작업: `plan-only`\n\n'
             printf '| 이미지 | 태그 참조 | digest 참조 |\n'
             printf '| --- | --- | --- |\n'
             jq -r '.[] | "| `\(.image)` | `\(.image_ref)` | `\(.digest_ref)` |"' deploy-plan.json

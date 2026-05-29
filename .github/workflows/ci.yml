@@ -50,8 +50,6 @@ jobs:
               - 'services/reservation-service/**'
             ticket-service:
               - 'services/ticket-service/**'
-            dashboard:
-              - 'dashboard/**'
             test-common:
               - 'tests/**'
               - 'packages/**'
@@ -70,10 +68,10 @@ jobs:
         run: |
           set -euo pipefail
           all_test_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service","dashboard"]'
+          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
           changed='${{ steps.changes.outputs.changes }}'
           service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-          image_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service","dashboard"]'
+          image_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['test-common'] }}" = "true" ]; then
             test_services="${all_test_services}"

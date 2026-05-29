@@ -67,7 +67,7 @@ jobs:
             image_id="$(jq -r '.[0].Id' /tmp/image-inspect.json)"
             {
               printf '### Docker image build\n\n'
-              printf '- image: `%s`\n' "${image}"
-              printf '- local image id: `%s`\n' "${image_id}"
+              printf -- '- image: `%s`\n' "${image}"
+              printf -- '- local image id: `%s`\n' "${image_id}"
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
