@@ -2,13 +2,13 @@
   "info": {
     "_postman_id": "a3f5e67c-564b-43d0-b6ac-1a07a6d6d5c8",
     "name": "01 Concert Seat Setup",
-    "description": "Validates the front-most concert setup flow: provider venue, concert, showtime, seat map upload, and public performance/seat lookup. Stores concertId, showtimeId, and seatId for later reservation scenarios.",
+    "description": "공연 예매 흐름의 가장 앞단 데이터 준비를 검증한다. 공급자 공연장, 공연, 회차, 좌석맵을 만들고 공개 공연/좌석 조회까지 확인한 뒤 이후 예약 시나리오가 사용할 concertId, showtimeId, seatId를 저장한다.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Create venue",
-      "description": "Creates a provider venue that the concert showtime can reference.",
+      "description": "공연 회차가 참조할 공급자 공연장을 생성한다.",
       "request": {
         "method": "POST",
         "header": [
@@ -42,7 +42,7 @@
     },
     {
       "name": "Create concert draft",
-      "description": "Creates the provider-owned concert draft and stores concertId.",
+      "description": "공급자가 소유한 공연 초안을 생성하고 concertId를 저장한다.",
       "request": {
         "method": "POST",
         "header": [
@@ -81,7 +81,7 @@
     },
     {
       "name": "Create showtime",
-      "description": "Creates the concrete performance time for the concert and stores showtimeId.",
+      "description": "공연의 실제 회차 시간을 생성하고 showtimeId를 저장한다.",
       "event": [
         {
           "listen": "prerequest",
@@ -127,7 +127,7 @@
     },
     {
       "name": "Upload seat map",
-      "description": "Uploads the seat map for the showtime. The following public seat lookup stores the first seatId.",
+      "description": "회차에 좌석맵을 업로드한다. 이어지는 공개 좌석 조회에서 첫 번째 seatId를 저장한다.",
       "request": {
         "method": "POST",
         "header": [
@@ -158,7 +158,7 @@
     },
     {
       "name": "List public performances",
-      "description": "Verifies that the prepared showtime is exposed through the public concert performance lookup.",
+      "description": "준비한 회차가 공개 공연 회차 조회에 노출되는지 검증한다.",
       "request": {
         "method": "GET",
         "header": [],
@@ -185,7 +185,7 @@
     },
     {
       "name": "List public seats",
-      "description": "Verifies that public seat lookup returns the uploaded seats for the showtime and stores seatId.",
+      "description": "공개 좌석 조회가 업로드한 좌석을 반환하는지 검증하고 seatId를 저장한다.",
       "request": {
         "method": "GET",
         "header": [],

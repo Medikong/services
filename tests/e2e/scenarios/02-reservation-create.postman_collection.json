@@ -2,13 +2,13 @@
   "info": {
     "_postman_id": "b1efed55-9028-4497-a779-d01aaebc5e20",
     "name": "02 Reservation Create",
-    "description": "Validates the reservation-service create path from a client-facing scenario: prepare reservation identifiers, open sales, create a reservation, and confirm it appears in the user's reservation list.",
+    "description": "클라이언트 관점의 예약 생성 흐름을 검증한다. 예약에 필요한 식별자를 준비하고 판매를 연 뒤 예약을 생성하고 사용자 예약 목록에 노출되는지 확인한다.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Prepare reservation inputs",
-      "description": "Ensures the reservation scenario has concertId, showtimeId, seatId, and userId values available.",
+      "description": "예약 시나리오에 필요한 concertId, showtimeId, seatId, userId 값을 준비한다.",
       "event": [
         {
           "listen": "prerequest",
@@ -51,7 +51,7 @@
     },
     {
       "name": "Start sales",
-      "description": "Opens sales for the concert so the reservation request can be accepted.",
+      "description": "예약 요청을 받을 수 있도록 공연 판매를 연다.",
       "request": {
         "method": "POST",
         "header": [],
@@ -76,7 +76,7 @@
     },
     {
       "name": "Create reservation",
-      "description": "Creates a pending reservation for one seat and stores reservationId.",
+      "description": "좌석 하나에 대해 대기 상태 예약을 생성하고 reservationId를 저장한다.",
       "request": {
         "method": "POST",
         "header": [
@@ -119,7 +119,7 @@
     },
     {
       "name": "List my reservations",
-      "description": "Confirms the created reservation is visible from the user's reservation list.",
+      "description": "생성한 예약이 사용자 예약 목록에 노출되는지 확인한다.",
       "request": {
         "method": "GET",
         "header": [
