@@ -22,6 +22,7 @@ def db_session() -> Session:
 
 
 def test_reservation_state_transitions_and_duplicate_conflict(db_session: Session) -> None:
+    """예약 생성, 중복 좌석 충돌, 취소 상태 전이를 검증한다."""
     command_service = ReservationCommandService(db_session)
     request = schemas.CreateReservationRequest(
         concertId="concert-service-flow",
@@ -40,6 +41,7 @@ def test_reservation_state_transitions_and_duplicate_conflict(db_session: Sessio
 
 
 def test_sales_state_transitions_and_policies(db_session: Session) -> None:
+    """판매 상태 전이와 예약 정책 갱신 흐름을 검증한다."""
     sales_service = SalesService(db_session)
     policy_service = ReservationPolicyService(db_session)
 
@@ -53,6 +55,7 @@ def test_sales_state_transitions_and_policies(db_session: Session) -> None:
 
 
 def test_query_service_returns_user_reservations(db_session: Session) -> None:
+    """사용자 예약 목록 조회가 생성된 예약을 반환하는지 검증한다."""
     ReservationCommandService(db_session).create_reservation(
         "user-query",
         schemas.CreateReservationRequest(concertId="concert-query", performanceId="perf-query", seatId="A-1"),

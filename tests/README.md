@@ -9,7 +9,7 @@
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
 | 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `concert-service`, `notification-service`, `payment-service`, `reservation-service`, `ticket-service` |
-| E2E 테스트 | Docker Compose, PostgreSQL, MongoDB, Kafka, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 환자 생성, 예약 확정, 이벤트 발행/소비, 알림 저장, 처방 발행 흐름 |
+| E2E 테스트 | Docker Compose, PostgreSQL, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 공연/회차/좌석 준비와 예매 생성 baseline 흐름 |
 | Gateway E2E | 별도 future scope | Kong/JWT/Ingress 라우팅과 MetalLB 노출 검증 |
 
 ## 폴더 구조
@@ -20,8 +20,9 @@ tests/
     Dockerfile
   e2e/
     docker-compose.yml
-    postman/
-      medical-platform.postman_collection.json
+    scenarios/
+      01-concert-seat-setup.postman_collection.json
+      02-reservation-create.postman_collection.json
     postgres-init/
       01-create-databases.sql
     newman/
@@ -66,15 +67,12 @@ task test-services SERVICES="auth-service ticket-service"
 
 ## E2E 테스트 흐름
 
-Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 흐름을 검증한다. Kong/JWT/Ingress는 기본 `task test-e2e` 범위가 아니며, 서비스가 기대하는 `X-User-*` 헤더를 요청에 직접 넣는다.
+Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 티켓팅 baseline 흐름을 검증한다. Kong/JWT/Ingress는 기본 `task test-e2e` 범위가 아니며, Gateway 검증은 이후 별도 task에서 다룬다.
 
-1. `STAFF` 사용자 헤더로 `patient-service`의 `POST /patients`를 호출해 환자를 생성한다.
-2. `PATIENT` 사용자 헤더로 `appointment-service`의 `POST /appointments`를 호출해 예약을 요청한다.
-3. `DOCTOR` 사용자 헤더로 `POST /appointments/{appointmentId}/confirm`을 호출해 예약을 확정한다.
-4. 예약 확정 이벤트가 `appointment-confirmed` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
-5. `DOCTOR` 사용자 헤더로 `prescription-service`의 `POST /prescriptions`를 호출해 처방을 발행한다.
-6. 처방 발행 이벤트가 `prescription-issued` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
-7. `PATIENT` 사용자 헤더로 `GET /notifications`, `GET /prescriptions`를 호출해 본인 데이터가 조회되는지 확인한다.
+1. `concert-service`에서 공연장, 공연, 회차, 좌석맵을 생성한다.
+2. 공개 공연 회차와 좌석 조회가 정상 동작하는지 확인한다.
+3. `reservation-service`에서 판매를 시작한다.
+4. 좌석 예약을 생성하고 사용자 예약 목록에 노출되는지 확인한다.
 
 ## 로컬 E2E 실행
 
@@ -88,12 +86,17 @@ task test-e2e
 
 | 서비스 | 기본 URL |
 | --- | --- |
-| `patient-service` | `http://patient-service:8081` |
-| `appointment-service` | `http://appointment-service:8082` |
-| `prescription-service` | `http://prescription-service:8083` |
-| `notification-service` | `http://notification-service:8084` |
+| `concert-service` | `http://concert-service:8082` |
+| `reservation-service` | `http://reservation-service:8083` |
 
 `tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
+
+특정 시나리오만 실행하려면 다음 명령을 사용한다.
+
+```bash
+task test-e2e SCENARIO=01-concert-seat-setup
+task test-e2e SCENARIO=02-reservation-create
+```
 
 수동으로 stack을 살펴보려면 다음 명령을 사용한다.
 
@@ -127,7 +130,7 @@ Kong/JWT/Ingress 검증은 기본 E2E와 분리한다. 이후 필요해지면 `t
 | pytest import 실패 | `task test-unit`로 Docker 테스트 러너를 통해 실행했는지 확인 |
 | DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
 | Kafka 이벤트 검증 실패 | Compose `kafka:29092`, topic auto-create, `notification-service` consumer 로그 확인 |
-| Newman 401 | `X-User-Id`, `X-User-Role` 헤더 누락 여부 확인 |
-| Newman 403 | `X-Patient-Id`, `X-Doctor-Id`와 요청 데이터의 권한 관계 확인 |
+| Newman 401 | Gateway E2E가 아닌지, 서비스가 요구하는 인증 헤더가 누락됐는지 확인 |
+| Newman 403 | provider/admin path 권한 헤더와 요청 데이터의 권한 관계 확인 |
 | Newman 404 | 서비스 URL과 API path 확인 |
-| Newman readiness timeout | `docker compose -p medical-platform-e2e -f tests/e2e/docker-compose.yml ps`와 각 서비스 로그 확인 |
+| Newman readiness timeout | `docker compose -p ticketing-e2e -f tests/e2e/docker-compose.yml ps`와 각 서비스 로그 확인 |

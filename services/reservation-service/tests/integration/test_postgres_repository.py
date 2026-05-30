@@ -1,9 +1,10 @@
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -56,6 +57,7 @@ def _request(suffix: str, seat_id: str = "A-1") -> schemas.CreateReservationRequ
 
 
 def test_postgres_active_reservation_query_and_conflict(db_session: Session) -> None:
+    """Postgres에서 활성 예약 조회와 중복 좌석 예약 충돌 처리를 검증한다."""
     suffix = uuid4().hex[:8]
     request = _request(suffix)
     service = ReservationCommandService(db_session)
@@ -70,6 +72,7 @@ def test_postgres_active_reservation_query_and_conflict(db_session: Session) -> 
 
 
 def test_postgres_unique_active_seat_key_constraint(db_session: Session) -> None:
+    """같은 활성 좌석 키가 두 번 저장될 때 DB 유니크 제약이 막는지 검증한다."""
     suffix = uuid4().hex[:8]
     key = active_seat_key(f"perf-{suffix}", "A-1")
     expires_at = datetime.now(UTC) + timedelta(minutes=5)
@@ -112,6 +115,7 @@ def test_postgres_unique_active_seat_key_constraint(db_session: Session) -> None
 
 
 def test_postgres_allows_re_reservation_after_cancel_or_expire(db_session: Session) -> None:
+    """취소 또는 만료된 예약의 좌석을 다시 예약할 수 있는지 검증한다."""
     service = ReservationCommandService(db_session)
     cancel_request = _request(f"cancel-{uuid4().hex[:8]}")
     expire_request = _request(f"expire-{uuid4().hex[:8]}")
@@ -125,3 +129,38 @@ def test_postgres_allows_re_reservation_after_cancel_or_expire(db_session: Sessi
     assert after_cancel.status == "pending"
     assert expired.status == "expired"
     assert after_expire.status == "pending"
+
+
+def test_postgres_concurrent_reservations_allow_only_one_active_hold(db_session: Session) -> None:
+    """동시에 같은 좌석을 예약해도 활성 예약은 하나만 남는지 검증한다."""
+    suffix = uuid4().hex[:8]
+    request = _request(f"concurrent-{suffix}")
+    session_factory = sessionmaker(bind=db_session.get_bind())
+    attempts = 12
+
+    def create_hold(index: int) -> str:
+        session = session_factory()
+        try:
+            ReservationCommandService(session).create_reservation(f"user-concurrent-{index}", request)
+            return "created"
+        except ConflictError:
+            return "conflict"
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=attempts) as executor:
+        results = list(executor.map(create_hold, range(attempts)))
+
+    active_count = db_session.scalar(
+        select(func.count())
+        .select_from(model.Reservation)
+        .where(
+            model.Reservation.performance_id == request.performanceId,
+            model.Reservation.seat_id == request.seatId,
+            model.Reservation.status.in_(("pending", "paid")),
+        )
+    )
+
+    assert results.count("created") == 1
+    assert results.count("conflict") == attempts - 1
+    assert active_count == 1

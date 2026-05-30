@@ -1,10 +1,9 @@
 #!/bin/sh
 set -eu
 
-PATIENT_SERVICE_URL="${E2E_PATIENT_SERVICE_URL:-http://patient-service:8081}"
-APPOINTMENT_SERVICE_URL="${E2E_APPOINTMENT_SERVICE_URL:-http://appointment-service:8082}"
-PRESCRIPTION_SERVICE_URL="${E2E_PRESCRIPTION_SERVICE_URL:-http://prescription-service:8083}"
-NOTIFICATION_SERVICE_URL="${E2E_NOTIFICATION_SERVICE_URL:-http://notification-service:8084}"
+CONCERT_SERVICE_URL="${E2E_CONCERT_SERVICE_URL:-http://concert-service:8082}"
+RESERVATION_SERVICE_URL="${E2E_RESERVATION_SERVICE_URL:-http://reservation-service:8083}"
+WAIT_SERVICES="${E2E_WAIT_SERVICES:-concert-service reservation-service}"
 TIMEOUT_SECONDS="${E2E_WAIT_TIMEOUT_SECONDS:-180}"
 SLEEP_SECONDS="${E2E_WAIT_SLEEP_SECONDS:-5}"
 
@@ -31,11 +30,21 @@ check_health() {
   return 0
 }
 
+service_url() {
+  case "$1" in
+    concert-service) printf '%s\n' "$CONCERT_SERVICE_URL" ;;
+    reservation-service) printf '%s\n' "$RESERVATION_SERVICE_URL" ;;
+    *)
+      log "Unknown E2E service: $1"
+      return 1
+      ;;
+  esac
+}
+
 check_services() {
-  check_health "patient-service" "$PATIENT_SERVICE_URL" &&
-    check_health "appointment-service" "$APPOINTMENT_SERVICE_URL" &&
-    check_health "prescription-service" "$PRESCRIPTION_SERVICE_URL" &&
-    check_health "notification-service" "$NOTIFICATION_SERVICE_URL"
+  for service_name in $WAIT_SERVICES; do
+    check_health "$service_name" "$(service_url "$service_name")" || return 1
+  done
 }
 
 while true; do
@@ -46,10 +55,9 @@ while true; do
 
   if deadline_exceeded; then
     log "Timed out waiting for E2E services."
-    log "patient-service: $PATIENT_SERVICE_URL"
-    log "appointment-service: $APPOINTMENT_SERVICE_URL"
-    log "prescription-service: $PRESCRIPTION_SERVICE_URL"
-    log "notification-service: $NOTIFICATION_SERVICE_URL"
+    log "wait-services: $WAIT_SERVICES"
+    log "concert-service: $CONCERT_SERVICE_URL"
+    log "reservation-service: $RESERVATION_SERVICE_URL"
     exit 1
   fi
 

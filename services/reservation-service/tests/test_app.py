@@ -8,12 +8,14 @@ from app.main import create_app
 
 
 def test_create_app_returns_fastapi_app() -> None:
+    """앱 팩토리가 FastAPI 애플리케이션을 생성하는지 검증한다."""
     app = create_app()
 
     assert isinstance(app, FastAPI)
 
 
 def test_health_returns_service_status() -> None:
+    """기본 health 엔드포인트가 서비스 정상 상태를 반환하는지 검증한다."""
     client = TestClient(create_app())
 
     response = client.get("/health")
@@ -23,6 +25,7 @@ def test_health_returns_service_status() -> None:
 
 
 def test_healthz_returns_service_status() -> None:
+    """Kubernetes 스타일 healthz 엔드포인트가 서비스 정상 상태를 반환하는지 검증한다."""
     client = TestClient(create_app())
 
     response = client.get("/healthz")
@@ -32,6 +35,7 @@ def test_healthz_returns_service_status() -> None:
 
 
 def test_readyz_returns_readiness_checks() -> None:
+    """readyz 엔드포인트가 준비 상태와 개별 점검 결과를 반환하는지 검증한다."""
     client = TestClient(create_app())
 
     response = client.get("/readyz")
@@ -48,6 +52,7 @@ def test_readyz_returns_readiness_checks() -> None:
 
 
 def test_readyz_returns_503_when_a_check_fails(monkeypatch: MonkeyPatch) -> None:
+    """준비 상태 점검 중 하나가 실패하면 readyz가 503을 반환하는지 검증한다."""
     monkeypatch.setattr(
         app_main,
         "_readiness_checks",
@@ -72,6 +77,7 @@ def test_readyz_returns_503_when_a_check_fails(monkeypatch: MonkeyPatch) -> None
 
 
 def test_metrics_returns_prometheus_text() -> None:
+    """metrics 엔드포인트가 Prometheus 텍스트 형식 지표를 반환하는지 검증한다."""
     client = TestClient(create_app())
     client.get("/healthz")
 
@@ -83,6 +89,7 @@ def test_metrics_returns_prometheus_text() -> None:
 
 
 def test_settings_defaults(monkeypatch: MonkeyPatch) -> None:
+    """환경 변수가 없을 때 예약 서비스 기본 설정값이 적용되는지 검증한다."""
     monkeypatch.delenv("SERVICE_NAME", raising=False)
     monkeypatch.delenv("PORT", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
