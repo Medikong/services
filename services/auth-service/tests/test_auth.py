@@ -24,8 +24,6 @@ def test_login_me_logout_and_audit_logs() -> None:
     refresh_token = body["refreshToken"]
     assert body["user"]["role"] == "ADMIN"
     assert body["expiresIn"] == 900
-    assert "patientId" not in body["user"]
-    assert "doctorId" not in body["user"]
 
     headers = {"Authorization": f"Bearer {token}"}
     me_response = client.get("/auth/me", headers=headers)
@@ -78,8 +76,6 @@ def test_access_token_contains_ticketing_claim_contract() -> None:
     assert claims["email"] == "customer@example.com"
     assert claims["role"] == "CUSTOMER"
     assert {"iss", "sub", "email", "role", "iat", "exp", "jti"} <= set(claims)
-    assert "patientId" not in claims
-    assert "doctorId" not in claims
 
 
 def test_operational_endpoints() -> None:
@@ -115,4 +111,3 @@ def test_demo_accounts_are_exposed_for_frontend_login_shortcuts() -> None:
     body = response.json()
     assert {account["role"] for account in body} == {"CUSTOMER", "PROVIDER", "ADMIN"}
     assert any(account["email"] == "customer@example.com" for account in body)
-    assert all("patientId" not in account and "doctorId" not in account for account in body)

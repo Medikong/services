@@ -14,8 +14,6 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(300), nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(String(30), index=True, nullable=False)
-    patient_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    doctor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -1,7 +1,9 @@
-name: CI
+name: Service Tests
 
 on:
   push:
+    branches-ignore:
+      - main
   pull_request:
     branches:
       - main
@@ -12,7 +14,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: service-tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,8 +22,8 @@ jobs:
     name: Detect service test scope
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.matrix.outputs.services }}
-      count: ${{ steps.matrix.outputs.count }}
+      test_services: ${{ steps.matrix.outputs.test_services }}
+      test_count: ${{ steps.matrix.outputs.test_count }}
 
     steps:
       - name: Checkout repository
@@ -46,32 +48,36 @@ jobs:
               - 'services/reservation-service/**'
             ticket-service:
               - 'services/ticket-service/**'
-            common:
+            test-common:
               - 'tests/**'
               - 'packages/**'
               - 'Taskfile.yml'
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/service-tests.yml'
 
       - name: Build test matrix
         id: matrix
         shell: bash
         run: |
           set -euo pipefail
-          all_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs.common }}" = "true" ]; then
-            services="${all_services}"
+          all_test_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+          changed='${{ steps.changes.outputs.changes }}'
+          service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['test-common'] }}" = "true" ]; then
+            test_services="${all_test_services}"
           else
-            services="$(jq -c '[.[] | select(. != "common")]' <<<'${{ steps.changes.outputs.changes }}')"
+            test_services="$(jq -c --argjson allowed "${service_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
           fi
-          count="$(jq 'length' <<<"${services}")"
-          printf 'services=%s\n' "${services}" >> "${GITHUB_OUTPUT}"
-          printf 'count=%s\n' "${count}" >> "${GITHUB_OUTPUT}"
-          printf 'Selected services: %s\n' "${services}"
+
+          test_count="$(jq 'length' <<<"${test_services}")"
+          printf 'test_services=%s\n' "${test_services}" >> "${GITHUB_OUTPUT}"
+          printf 'test_count=%s\n' "${test_count}" >> "${GITHUB_OUTPUT}"
+          printf 'Selected test services: %s\n' "${test_services}"
 
   service-unit:
     name: Service unit tests
     needs: detect-services
-    if: needs.detect-services.outputs.count != '0'
+    if: needs.detect-services.outputs.test_count != '0'
     runs-on: ubuntu-latest
 
     steps:
@@ -88,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           services="$(jq -r 'join(" ")' <<'JSON'
-          ${{ needs.detect-services.outputs.services }}
+          ${{ needs.detect-services.outputs.test_services }}
           JSON
           )"
           task test-services SERVICES="${services}"
@@ -112,7 +118,7 @@ jobs:
   no-service-unit:
     name: No service unit tests
     needs: detect-services
-    if: needs.detect-services.outputs.count == '0'
+    if: needs.detect-services.outputs.test_count == '0'
     runs-on: ubuntu-latest
 
     steps:
