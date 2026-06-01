@@ -17,6 +17,8 @@ vars:
   E2E_PATIENT_SERVICE_URL: '{{default "http://patient-service:8081" .E2E_PATIENT_SERVICE_URL}}'
   E2E_CONCERT_SERVICE_URL: '{{default "http://concert-service:8082" .E2E_CONCERT_SERVICE_URL}}'
   E2E_RESERVATION_SERVICE_URL: '{{default "http://reservation-service:8083" .E2E_RESERVATION_SERVICE_URL}}'
+  E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8080" .E2E_PAYMENT_SERVICE_URL}}'
+  E2E_TICKET_SERVICE_URL: '{{default "http://ticket-service:8085" .E2E_TICKET_SERVICE_URL}}'
   E2E_APPOINTMENT_SERVICE_URL: '{{default "http://appointment-service:8082" .E2E_APPOINTMENT_SERVICE_URL}}'
   E2E_PRESCRIPTION_SERVICE_URL: '{{default "http://prescription-service:8083" .E2E_PRESCRIPTION_SERVICE_URL}}'
   E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
@@ -144,13 +146,17 @@ tasks:
               compose_services="postgres reservation-service"
               wait_services="reservation-service"
               ;;
+            03-ticket-issue)
+              compose_services="postgres kafka kafka-init ticket-service"
+              wait_services="ticket-service"
+              ;;
             medical-platform|postman/medical-platform)
               scenario="postman/medical-platform.postman_collection.json"
               compose_services=""
               wait_services="patient-service appointment-service prescription-service notification-service"
               ;;
             *)
-              printf 'Unknown E2E SCENARIO=%s (expected: 01-concert-seat-setup, 02-reservation-create).\n' "${scenario}" >&2
+              printf 'Unknown E2E SCENARIO=%s (expected: 01-concert-seat-setup, 02-reservation-create, 03-ticket-issue).\n' "${scenario}" >&2
               exit 2
               ;;
           esac
@@ -178,6 +184,8 @@ tasks:
           -e E2E_PATIENT_SERVICE_URL="{{.E2E_PATIENT_SERVICE_URL}}" \
           -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
           -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
+          -e E2E_PAYMENT_SERVICE_URL="{{.E2E_PAYMENT_SERVICE_URL}}" \
+          -e E2E_TICKET_SERVICE_URL="{{.E2E_TICKET_SERVICE_URL}}" \
           -e E2E_APPOINTMENT_SERVICE_URL="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
           -e E2E_PRESCRIPTION_SERVICE_URL="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
           -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
@@ -193,6 +201,8 @@ tasks:
           --env-var patientServiceUrl="{{.E2E_PATIENT_SERVICE_URL}}" \
           --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
           --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
+          --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
+          --env-var ticketServiceUrl="{{.E2E_TICKET_SERVICE_URL}}" \
           --env-var appointmentServiceUrl="{{.E2E_APPOINTMENT_SERVICE_URL}}" \
           --env-var prescriptionServiceUrl="{{.E2E_PRESCRIPTION_SERVICE_URL}}" \
           --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \

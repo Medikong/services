@@ -9,8 +9,10 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN python -m venv /opt/venv
 
-COPY requirements.txt .
+COPY packages/contracts ./packages/contracts
+COPY services/ticket-service/requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir ./packages/contracts \
     && python -m pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.12-slim AS runtime
@@ -22,7 +24,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:${PATH}"
 
 COPY --from=builder /opt/venv /opt/venv
-COPY app ./app
+COPY services/ticket-service/app ./app
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app \
     && chown -R app:app /app

@@ -48,6 +48,11 @@ services:
       - |
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic appointment-confirmed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic prescription-issued --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic reservation-created --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic reservation-expired --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment-approved --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment-failed --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic ticket-issued --partitions 1 --replication-factor 1
 
   notification-db:
     image: mongo:7
@@ -83,6 +88,49 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/health').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  payment-service:
+    build:
+      context: ../..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
+      JWT_SECRET: ticketing-dev-secret
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ticket-service:
+    build:
+      context: ../..
+      dockerfile: services/ticket-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/ticket_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AWS_REGION: ap-northeast-2
+      S3_BUCKET: ticketing-e2e
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/health').read()"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -147,8 +195,8 @@ services:
 
   notification-service:
     build:
-      context: ../../services/notification-service
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/notification-service/Dockerfile
     environment:
       MONGODB_URL: mongodb://notification-db:27017
       MONGODB_DB_NAME: notification_db

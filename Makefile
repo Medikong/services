@@ -91,6 +91,7 @@ install:
 	$(VENV_BOOTSTRAP_PYTHON) -m venv $(VENV_DIR); \
 	$(VENV_PYTHON) -m pip install --upgrade pip; \
 	$(VENV_PYTHON) -m pip install \
+		-e packages/contracts \
 		-r services/auth-service/requirements.txt \
 		-r services/auth-service/requirements-test.txt \
 		-r services/patient-service/requirements.txt \
@@ -100,7 +101,11 @@ install:
 		-r services/prescription-service/requirements.txt \
 		-r services/prescription-service/requirements-test.txt \
 		-r services/notification-service/requirements.txt \
-		-r services/notification-service/requirements-test.txt; \
+		-r services/notification-service/requirements-test.txt \
+		-r services/payment-service/requirements.txt \
+		-r services/payment-service/requirements-test.txt \
+		-r services/ticket-service/requirements.txt \
+		-r services/ticket-service/requirements-test.txt; \
 	printf '%s\n' 'Python venv is ready at $(VENV_DIR).'
 
 test-runner-build:
@@ -162,7 +167,7 @@ app-images-build:
 	for service in $(APP_IMAGE_SERVICES); do \
 		printf 'building %s/%s:%s\n' '$(IMAGE_REPOSITORY_PREFIX)' "$$service" '$(IMAGE_TAG)'; \
 		case "$$service" in \
-			concert-service|reservation-service) \
+			concert-service|reservation-service|payment-service|ticket-service|notification-service) \
 				docker build -f "services/$$service/Dockerfile" -t "$(IMAGE_REPOSITORY_PREFIX)/$$service:$(IMAGE_TAG)" . ;; \
 			*) \
 				docker build -t "$(IMAGE_REPOSITORY_PREFIX)/$$service:$(IMAGE_TAG)" "services/$$service" ;; \

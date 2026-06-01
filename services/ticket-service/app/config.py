@@ -1,5 +1,7 @@
 import os
 
+from contracts.events import PAYMENT_APPROVED_TOPIC, TICKET_ISSUED_TOPIC
+
 
 class Settings:
     service_name = "ticket-service"
@@ -8,10 +10,10 @@ class Settings:
     kafka_group_id = os.getenv("KAFKA_GROUP_ID", "ticket-service")
 
     # Consumer 토픽
-    payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", "payment-approved")
+    payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", PAYMENT_APPROVED_TOPIC)
 
     # Producer 토픽
-    ticket_issued_topic = os.getenv("TICKET_ISSUED_TOPIC", "ticket-issued")
+    ticket_issued_topic = os.getenv("TICKET_ISSUED_TOPIC", TICKET_ISSUED_TOPIC)
 
     # S3
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "")

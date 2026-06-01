@@ -1,10 +1,11 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class TicketIssueRequest(BaseModel):
     reservationId: str
-    userId: int
+    userId: str
     concertId: str
     seatId: str
 
@@ -14,23 +15,10 @@ class TicketResponse(BaseModel):
 
     id: int
     reservationId: str
-    userId: int
+    userId: str
     concertId: str
     seatId: str
     status: str
     qrUrl: str | None
     pdfUrl: str | None
     issuedAt: datetime
-
-
-class PaymentApprovedEvent(BaseModel):
-    eventId: str
-    eventType: str
-    userId: int
-    sourceId: str
-    reservationId: str
-    concertId: str
-    seatId: str
-    occurredAt: str
-    producer: str
-    correlationId: str | None = None

@@ -9,7 +9,7 @@ class Ticket(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     reservation_id: Mapped[str] = mapped_column(String(100), index=True, nullable=False, unique=True)
-    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
     concert_id: Mapped[str] = mapped_column(String(100), nullable=False)
     seat_id: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="ISSUED")
@@ -22,7 +22,7 @@ class Ticket(Base):
         return self.reservation_id
 
     @property
-    def userId(self) -> int:
+    def userId(self) -> str:
         return self.user_id
 
     @property

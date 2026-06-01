@@ -26,7 +26,7 @@ client = TestClient(app, raise_server_exceptions=True)
 
 # ── 이벤트 픽스처 ──────────────────────────────────────────────
 
-def reservation_created_event(user_id: int, source_id: str) -> dict:
+def reservation_created_event(user_id: str, source_id: str) -> dict:
     return {
         "eventId": "event-reservation-1",
         "eventType": "reservation-created",
@@ -39,7 +39,7 @@ def reservation_created_event(user_id: int, source_id: str) -> dict:
     }
 
 
-def reservation_expired_event(user_id: int, source_id: str) -> dict:
+def reservation_expired_event(user_id: str, source_id: str) -> dict:
     return {
         "eventId": "event-expired-1",
         "eventType": "reservation-expired",
@@ -51,7 +51,7 @@ def reservation_expired_event(user_id: int, source_id: str) -> dict:
     }
 
 
-def payment_approved_event(user_id: int, source_id: str) -> dict:
+def payment_approved_event(user_id: str, source_id: str) -> dict:
     return {
         "eventId": "event-payment-approved-1",
         "eventType": "payment-approved",
@@ -64,7 +64,7 @@ def payment_approved_event(user_id: int, source_id: str) -> dict:
     }
 
 
-def payment_failed_event(user_id: int, source_id: str) -> dict:
+def payment_failed_event(user_id: str, source_id: str) -> dict:
     return {
         "eventId": "event-payment-failed-1",
         "eventType": "payment-failed",
@@ -77,7 +77,7 @@ def payment_failed_event(user_id: int, source_id: str) -> dict:
     }
 
 
-def ticket_issued_event(user_id: int, source_id: str) -> dict:
+def ticket_issued_event(user_id: str, source_id: str) -> dict:
     return {
         "eventId": "event-ticket-1",
         "eventType": "ticket-issued",
@@ -90,7 +90,7 @@ def ticket_issued_event(user_id: int, source_id: str) -> dict:
     }
 
 
-def user_headers(user_id: int) -> dict[str, str]:
+def user_headers(user_id: int | str) -> dict[str, str]:
     return {"X-User-Id": str(user_id), "X-User-Role": "USER"}
 
 
@@ -100,10 +100,10 @@ def test_reservation_created_event_creates_notification() -> None:
     import asyncio
     db = database.client["notification_db"]
     notification = asyncio.get_event_loop().run_until_complete(
-        handle_business_event(db, reservation_created_event(user_id=1, source_id="reservation-1"))
+        handle_business_event(db, reservation_created_event(user_id="1", source_id="reservation-1"))
     )
 
-    assert notification["userId"] == 1
+    assert notification["userId"] == "1"
     assert notification["type"] == "reservation-created"
     assert "예매가 생성되었습니다" in notification["message"]
 
@@ -112,10 +112,10 @@ def test_reservation_expired_event_creates_notification() -> None:
     import asyncio
     db = database.client["notification_db"]
     notification = asyncio.get_event_loop().run_until_complete(
-        handle_business_event(db, reservation_expired_event(user_id=1, source_id="reservation-1"))
+        handle_business_event(db, reservation_expired_event(user_id="1", source_id="reservation-1"))
     )
 
-    assert notification["userId"] == 1
+    assert notification["userId"] == "1"
     assert notification["type"] == "reservation-expired"
     assert "만료" in notification["message"]
 
@@ -124,10 +124,10 @@ def test_payment_approved_event_creates_notification() -> None:
     import asyncio
     db = database.client["notification_db"]
     notification = asyncio.get_event_loop().run_until_complete(
-        handle_business_event(db, payment_approved_event(user_id=1, source_id="payment-1"))
+        handle_business_event(db, payment_approved_event(user_id="1", source_id="payment-1"))
     )
 
-    assert notification["userId"] == 1
+    assert notification["userId"] == "1"
     assert notification["type"] == "payment-approved"
     assert "결제가 완료되었습니다" in notification["message"]
 
@@ -136,10 +136,10 @@ def test_payment_failed_event_creates_notification() -> None:
     import asyncio
     db = database.client["notification_db"]
     notification = asyncio.get_event_loop().run_until_complete(
-        handle_business_event(db, payment_failed_event(user_id=1, source_id="payment-1"))
+        handle_business_event(db, payment_failed_event(user_id="1", source_id="payment-1"))
     )
 
-    assert notification["userId"] == 1
+    assert notification["userId"] == "1"
     assert notification["type"] == "payment-failed"
     assert "실패" in notification["message"]
 
@@ -148,10 +148,10 @@ def test_ticket_issued_event_creates_notification() -> None:
     import asyncio
     db = database.client["notification_db"]
     notification = asyncio.get_event_loop().run_until_complete(
-        handle_business_event(db, ticket_issued_event(user_id=1, source_id="ticket-1"))
+        handle_business_event(db, ticket_issued_event(user_id="1", source_id="ticket-1"))
     )
 
-    assert notification["userId"] == 1
+    assert notification["userId"] == "1"
     assert notification["type"] == "ticket-issued"
     assert "티켓이 발행되었습니다" in notification["message"]
 
@@ -161,10 +161,10 @@ def test_duplicate_event_id_returns_existing_notification() -> None:
     db = database.client["notification_db"]
     loop = asyncio.get_event_loop()
     first = loop.run_until_complete(
-        handle_business_event(db, reservation_created_event(user_id=1, source_id="reservation-1"))
+        handle_business_event(db, reservation_created_event(user_id="1", source_id="reservation-1"))
     )
     second = loop.run_until_complete(
-        handle_business_event(db, reservation_created_event(user_id=1, source_id="reservation-1"))
+        handle_business_event(db, reservation_created_event(user_id="1", source_id="reservation-1"))
     )
     count = loop.run_until_complete(db["notifications"].count_documents({}))
 
@@ -177,7 +177,7 @@ def test_user_can_list_only_own_notifications() -> None:
     response = client.get("/notifications", headers=user_headers(1))
 
     assert response.status_code == 200
-    assert all(item["userId"] == 1 for item in response.json())
+    assert all(item["userId"] == "1" for item in response.json())
 
 
 def test_user_cannot_read_other_user_notification() -> None:
@@ -185,7 +185,7 @@ def test_user_cannot_read_other_user_notification() -> None:
     db = database.client["notification_db"]
     loop = asyncio.get_event_loop()
     loop.run_until_complete(
-        handle_business_event(db, reservation_created_event(user_id=2, source_id="reservation-2"))
+        handle_business_event(db, reservation_created_event(user_id="2", source_id="reservation-2"))
     )
     notifications = loop.run_until_complete(db["notifications"].find().to_list(None))
     other_id = str(notifications[0]["_id"])
@@ -213,8 +213,8 @@ def _seed_notifications() -> None:
     db = database.client["notification_db"]
     loop = asyncio.get_event_loop()
     loop.run_until_complete(
-        handle_business_event(db, reservation_created_event(user_id=1, source_id="reservation-1"))
+        handle_business_event(db, reservation_created_event(user_id="1", source_id="reservation-1"))
     )
     loop.run_until_complete(
-        handle_business_event(db, payment_approved_event(user_id=2, source_id="payment-2"))
+        handle_business_event(db, payment_approved_event(user_id="2", source_id="payment-2"))
     )

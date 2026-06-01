@@ -10,7 +10,7 @@ class BusinessEvent(BaseModel):
     correlationId: str | None = None
 
     # 공통 payload
-    userId: int
+    userId: str
     sourceId: str
 
     # 이벤트별 선택 필드

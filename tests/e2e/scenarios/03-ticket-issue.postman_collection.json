@@ -1,0 +1,155 @@
+{
+  "info": {
+    "_postman_id": "9d267dd2-a591-41ca-aa38-6ded80400fb6",
+    "name": "03 Ticket Issue",
+    "description": "payment-service를 거치지 않고 ticket-service의 직접 티켓 발급과 사용자별 조회를 검증한다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Prepare ticket inputs",
+      "description": "티켓 발급에 필요한 reservationId, userId, concertId, seatId 값을 준비한다.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const suffix = String(Date.now());",
+              "pm.environment.set('ticketReservationId', `reservation-e2e-ticket-${suffix}`);",
+              "pm.environment.set('ticketUserId', 'user-e2e-ticket');",
+              "pm.environment.set('ticketConcertId', 'concert-e2e-ticket');",
+              "pm.environment.set('ticketSeatId', 'seat-e2e-ticket-A-1');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ticket inputs are prepared', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.environment.get('ticketReservationId')).to.be.a('string').that.is.not.empty;",
+              "  pm.expect(pm.environment.get('ticketUserId')).to.be.a('string').that.is.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{ticketServiceUrl}}/health"
+      }
+    },
+    {
+      "name": "Issue ticket directly",
+      "description": "내부 발급 API로 티켓을 만들고 ticketId를 저장한다.",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reservationId\":\"{{ticketReservationId}}\",\"userId\":\"{{ticketUserId}}\",\"concertId\":\"{{ticketConcertId}}\",\"seatId\":\"{{ticketSeatId}}\"}"
+        },
+        "url": "{{ticketServiceUrl}}/tickets/issue"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ticket is issued', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(body.reservationId).to.eql(pm.environment.get('ticketReservationId'));",
+              "  pm.expect(body.userId).to.eql(pm.environment.get('ticketUserId'));",
+              "  pm.expect(body.concertId).to.eql(pm.environment.get('ticketConcertId'));",
+              "  pm.expect(body.seatId).to.eql(pm.environment.get('ticketSeatId'));",
+              "  pm.expect(body.status).to.eql('ISSUED');",
+              "  pm.environment.set('ticketId', String(body.id));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get issued ticket as owner",
+      "description": "발급된 티켓을 같은 사용자 컨텍스트로 조회한다.",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{ticketUserId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "USER"
+          }
+        ],
+        "url": "{{ticketServiceUrl}}/tickets/{{ticketId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('owner can read issued ticket', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(String(body.id)).to.eql(pm.environment.get('ticketId'));",
+              "  pm.expect(body.userId).to.eql(pm.environment.get('ticketUserId'));",
+              "  pm.expect(body.reservationId).to.eql(pm.environment.get('ticketReservationId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Duplicate issue returns existing ticket",
+      "description": "같은 reservationId로 다시 발급해도 기존 티켓이 반환되는지 확인한다.",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"reservationId\":\"{{ticketReservationId}}\",\"userId\":\"{{ticketUserId}}\",\"concertId\":\"{{ticketConcertId}}\",\"seatId\":\"{{ticketSeatId}}\"}"
+        },
+        "url": "{{ticketServiceUrl}}/tickets/issue"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('duplicate issue is idempotent', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(String(body.id)).to.eql(pm.environment.get('ticketId'));",
+              "  pm.expect(body.reservationId).to.eql(pm.environment.get('ticketReservationId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

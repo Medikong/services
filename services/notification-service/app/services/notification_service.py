@@ -1,4 +1,11 @@
 from bson import ObjectId
+from contracts.events import (
+    PAYMENT_APPROVED_TOPIC,
+    PAYMENT_FAILED_TOPIC,
+    RESERVATION_CREATED_TOPIC,
+    RESERVATION_EXPIRED_TOPIC,
+    TICKET_ISSUED_TOPIC,
+)
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -69,28 +76,28 @@ async def handle_business_event(db: AsyncIOMotorDatabase, payload: dict) -> dict
 
 
 def _message_for_event(event: BusinessEvent) -> str:
-    if event.eventType == "reservation-created":
+    if event.eventType == RESERVATION_CREATED_TOPIC:
         return f"예매가 생성되었습니다. 예매 ID: {event.sourceId}"
-    if event.eventType == "reservation-expired":
+    if event.eventType == RESERVATION_EXPIRED_TOPIC:
         return f"결제 시간이 만료되어 예매가 취소되었습니다. 예매 ID: {event.sourceId}"
-    if event.eventType == "payment-approved":
+    if event.eventType == PAYMENT_APPROVED_TOPIC:
         return f"결제가 완료되었습니다. 결제 ID: {event.sourceId}"
-    if event.eventType == "payment-failed":
+    if event.eventType == PAYMENT_FAILED_TOPIC:
         return f"결제에 실패하였습니다. 결제 ID: {event.sourceId}"
-    if event.eventType == "ticket-issued":
+    if event.eventType == TICKET_ISSUED_TOPIC:
         return f"티켓이 발행되었습니다. 티켓 ID: {event.sourceId}"
     return f"새 알림이 도착했습니다. 이벤트: {event.eventType}"
 
 
 def _metadata_for_event(event: BusinessEvent) -> dict:
-    if event.eventType == "reservation-created":
+    if event.eventType == RESERVATION_CREATED_TOPIC:
         return {"reservation_id": event.sourceId, "concert_id": event.concertId}
-    if event.eventType == "reservation-expired":
+    if event.eventType == RESERVATION_EXPIRED_TOPIC:
         return {"reservation_id": event.sourceId}
-    if event.eventType == "payment-approved":
+    if event.eventType == PAYMENT_APPROVED_TOPIC:
         return {"payment_id": event.sourceId, "reservation_id": event.reservationId}
-    if event.eventType == "payment-failed":
+    if event.eventType == PAYMENT_FAILED_TOPIC:
         return {"payment_id": event.sourceId, "reservation_id": event.reservationId}
-    if event.eventType == "ticket-issued":
+    if event.eventType == TICKET_ISSUED_TOPIC:
         return {"ticket_id": event.sourceId, "reservation_id": event.reservationId}
     return {}

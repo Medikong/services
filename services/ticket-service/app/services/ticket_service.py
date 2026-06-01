@@ -3,12 +3,13 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from contracts.events import PaymentApprovedEvent, TicketIssuedEvent
 
 from app import kafka, s3
 from app.auth import UserContext
 from app.config import settings
 from app.models import ProcessedEvent, Ticket
-from app.schemas import PaymentApprovedEvent, TicketIssueRequest
+from app.schemas import TicketIssueRequest
 
 
 async def issue_ticket(db: Session, request: TicketIssueRequest) -> Ticket:
@@ -80,12 +81,14 @@ async def handle_payment_approved(db: Session, payload: dict) -> None:
 
 
 def _ticket_issued_event(ticket: Ticket) -> dict:
-    return {
-        "eventId": str(uuid4()),
-        "eventType": "ticket-issued",
-        "userId": ticket.user_id,
-        "sourceId": str(ticket.id),
-        "reservationId": ticket.reservation_id,
-        "occurredAt": datetime.now(UTC).isoformat(),
-        "producer": "ticket-service",
-    }
+    return TicketIssuedEvent(
+        eventId=str(uuid4()),
+        userId=ticket.user_id,
+        sourceId=str(ticket.id),
+        reservationId=ticket.reservation_id,
+        concertId=ticket.concert_id,
+        seatId=ticket.seat_id,
+        ticketId=str(ticket.id),
+        occurredAt=datetime.now(UTC),
+        producer=settings.service_name,
+    ).model_dump(mode="json")

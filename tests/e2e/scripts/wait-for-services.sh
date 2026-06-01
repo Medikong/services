@@ -4,6 +4,8 @@ set -eu
 PATIENT_SERVICE_URL="${E2E_PATIENT_SERVICE_URL:-http://patient-service:8081}"
 CONCERT_SERVICE_URL="${E2E_CONCERT_SERVICE_URL:-http://concert-service:8082}"
 RESERVATION_SERVICE_URL="${E2E_RESERVATION_SERVICE_URL:-http://reservation-service:8083}"
+PAYMENT_SERVICE_URL="${E2E_PAYMENT_SERVICE_URL:-http://payment-service:8080}"
+TICKET_SERVICE_URL="${E2E_TICKET_SERVICE_URL:-http://ticket-service:8085}"
 APPOINTMENT_SERVICE_URL="${E2E_APPOINTMENT_SERVICE_URL:-http://appointment-service:8082}"
 PRESCRIPTION_SERVICE_URL="${E2E_PRESCRIPTION_SERVICE_URL:-http://prescription-service:8083}"
 NOTIFICATION_SERVICE_URL="${E2E_NOTIFICATION_SERVICE_URL:-http://notification-service:8084}"
@@ -39,6 +41,8 @@ service_url() {
     patient-service) printf '%s\n' "$PATIENT_SERVICE_URL" ;;
     concert-service) printf '%s\n' "$CONCERT_SERVICE_URL" ;;
     reservation-service) printf '%s\n' "$RESERVATION_SERVICE_URL" ;;
+    payment-service) printf '%s\n' "$PAYMENT_SERVICE_URL" ;;
+    ticket-service) printf '%s\n' "$TICKET_SERVICE_URL" ;;
     appointment-service) printf '%s\n' "$APPOINTMENT_SERVICE_URL" ;;
     prescription-service) printf '%s\n' "$PRESCRIPTION_SERVICE_URL" ;;
     notification-service) printf '%s\n' "$NOTIFICATION_SERVICE_URL" ;;
@@ -67,6 +71,8 @@ while true; do
     log "patient-service: $PATIENT_SERVICE_URL"
     log "concert-service: $CONCERT_SERVICE_URL"
     log "reservation-service: $RESERVATION_SERVICE_URL"
+    log "payment-service: $PAYMENT_SERVICE_URL"
+    log "ticket-service: $TICKET_SERVICE_URL"
     log "appointment-service: $APPOINTMENT_SERVICE_URL"
     log "prescription-service: $PRESCRIPTION_SERVICE_URL"
     log "notification-service: $NOTIFICATION_SERVICE_URL"

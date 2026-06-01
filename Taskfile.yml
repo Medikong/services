@@ -52,6 +52,7 @@ tasks:
         fi
         "${venv_python}" -m pip install --upgrade pip
         "${venv_python}" -m pip install \
+          -e packages/contracts \
           -r services/auth-service/requirements.txt \
           -r services/auth-service/requirements-test.txt \
           -r services/patient-service/requirements.txt \
@@ -63,7 +64,9 @@ tasks:
           -r services/notification-service/requirements.txt \
           -r services/notification-service/requirements-test.txt \
           -r services/payment-service/requirements.txt \
-          -r services/payment-service/requirements-test.txt
+          -r services/payment-service/requirements-test.txt \
+          -r services/ticket-service/requirements.txt \
+          -r services/ticket-service/requirements-test.txt
         printf 'Python venv is ready at %s.\n' "${venv_dir}"
 
   test-runner-build:
@@ -133,7 +136,7 @@ tasks:
           service="$1"
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           case "${service}" in
-            concert-service|reservation-service)
+            concert-service|reservation-service|payment-service|ticket-service|notification-service)
               docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
             "${dashboard}")
@@ -244,7 +247,7 @@ tasks:
         fi
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         case "${service}" in
-          concert-service|reservation-service)
+          concert-service|reservation-service|payment-service|ticket-service|notification-service)
             docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
             ;;
           "${dashboard}")
