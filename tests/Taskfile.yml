@@ -14,9 +14,12 @@ vars:
   E2E_NETWORK: '{{default "ticketing-e2e_default" .E2E_NETWORK}}'
   CURL_IMAGE: '{{default "curlimages/curl:8.7.1" .CURL_IMAGE}}'
   NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
-  E2E_WAIT_SERVICES: '{{default "concert-service reservation-service" .E2E_WAIT_SERVICES}}'
+  E2E_WAIT_SERVICES: '{{default "concert-service reservation-service payment-service ticket-service notification-service" .E2E_WAIT_SERVICES}}'
   E2E_CONCERT_SERVICE_URL: '{{default "http://concert-service:8082" .E2E_CONCERT_SERVICE_URL}}'
   E2E_RESERVATION_SERVICE_URL: '{{default "http://reservation-service:8083" .E2E_RESERVATION_SERVICE_URL}}'
+  E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8080" .E2E_PAYMENT_SERVICE_URL}}'
+  E2E_TICKET_SERVICE_URL: '{{default "http://ticket-service:8085" .E2E_TICKET_SERVICE_URL}}'
+  E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
 
@@ -143,9 +146,9 @@ tasks:
         scenario_key="${scenario_key%.postman_collection.json}"
         case "${scenario_key}" in
           all|"")
-            compose_services="${compose_services:-postgres concert-service reservation-service}"
-            wait_services="${wait_services:-concert-service reservation-service}"
-            collections="01-concert-seat-setup 02-reservation-create"
+            compose_services="${compose_services:-postgres kafka kafka-init notification-db concert-service reservation-service payment-service ticket-service notification-service}"
+            wait_services="${wait_services:-concert-service reservation-service payment-service ticket-service notification-service}"
+            collections="01-concert-seat-setup 02-reservation-create 03-ticket-issue"
             ;;
           01-concert-seat-setup)
             compose_services="${compose_services:-postgres concert-service}"
@@ -157,8 +160,13 @@ tasks:
             wait_services="reservation-service"
             collections="02-reservation-create"
             ;;
+          03-ticket-issue)
+            compose_services="${compose_services:-postgres kafka kafka-init ticket-service}"
+            wait_services="ticket-service"
+            collections="03-ticket-issue"
+            ;;
           *)
-            printf 'Unknown E2E SCENARIO=%s (expected: all, 01-concert-seat-setup, 02-reservation-create).\n' "${scenario_key}" >&2
+            printf 'Unknown E2E SCENARIO=%s (expected: all, 01-concert-seat-setup, 02-reservation-create, 03-ticket-issue).\n' "${scenario_key}" >&2
             exit 2
             ;;
         esac
@@ -173,6 +181,9 @@ tasks:
           -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
           -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
           -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
+          -e E2E_PAYMENT_SERVICE_URL="{{.E2E_PAYMENT_SERVICE_URL}}" \
+          -e E2E_TICKET_SERVICE_URL="{{.E2E_TICKET_SERVICE_URL}}" \
+          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
           -e E2E_WAIT_SERVICES="${wait_services}" \
           -e E2E_WAIT_TIMEOUT_SECONDS \
           -e E2E_WAIT_SLEEP_SECONDS \
@@ -185,6 +196,9 @@ tasks:
             -e newman/docker.postman_environment.json \
             --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
             --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
+            --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
+            --env-var ticketServiceUrl="{{.E2E_TICKET_SERVICE_URL}}" \
+            --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
             --reporters cli,junit \
             --delay-request 1000 \
             --reporter-junit-export "newman/reports/${report_name}-${collection}.xml"
@@ -192,7 +206,7 @@ tasks:
 
   e2e-up:
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build postgres concert-service reservation-service'
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build postgres kafka kafka-init notification-db concert-service reservation-service payment-service ticket-service notification-service'
 
   e2e-wait:
     cmds:
@@ -202,6 +216,9 @@ tasks:
           -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
           -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
           -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
+          -e E2E_PAYMENT_SERVICE_URL="{{.E2E_PAYMENT_SERVICE_URL}}" \
+          -e E2E_TICKET_SERVICE_URL="{{.E2E_TICKET_SERVICE_URL}}" \
+          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
           -e E2E_WAIT_SERVICES="{{.E2E_WAIT_SERVICES}}" \
           -e E2E_WAIT_TIMEOUT_SECONDS \
           -e E2E_WAIT_SLEEP_SECONDS \
@@ -212,7 +229,7 @@ tasks:
       - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
       - |
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        for collection in 01-concert-seat-setup 02-reservation-create; do
+        for collection in 01-concert-seat-setup 02-reservation-create 03-ticket-issue; do
           docker run --rm --network {{.E2E_NETWORK}} \
             -v "${repo_root}/tests/e2e":/etc/newman \
             -w /etc/newman \
@@ -220,6 +237,9 @@ tasks:
             -e newman/docker.postman_environment.json \
             --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
             --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
+            --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
+            --env-var ticketServiceUrl="{{.E2E_TICKET_SERVICE_URL}}" \
+            --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
             --reporters cli,junit \
             --delay-request 1000 \
             --reporter-junit-export "newman/reports/{{.E2E_REPORT_NAME}}-${collection}.xml"

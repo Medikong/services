@@ -74,6 +74,9 @@ def test_issue_ticket_publishes_ticket_issued_event(monkeypatch: pytest.MonkeyPa
 
     assert published[0][0] == "ticket-issued"
     assert published[0][1]["eventType"] == "ticket-issued"
+    assert published[0][1]["ticketId"] == str(published[0][1]["sourceId"])
+    assert published[0][1]["concertId"] == "concert-1"
+    assert published[0][1]["seatId"] == "seat-A1"
 
 
 def test_user_can_get_own_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,7 +161,7 @@ def test_metrics_returns_prometheus_format() -> None:
 def ticket_issue_request() -> dict:
     return {
         "reservationId": "reservation-1",
-        "userId": 1,
+        "userId": "1",
         "concertId": "concert-1",
         "seatId": "seat-A1",
     }
@@ -168,18 +171,20 @@ def payment_approved_event() -> dict:
     return {
         "eventId": "event-payment-1",
         "eventType": "payment-approved",
-        "userId": 1,
+        "userId": "1",
         "sourceId": "payment-1",
         "reservationId": "reservation-1",
         "concertId": "concert-1",
         "seatId": "seat-A1",
+        "paymentId": "payment-1",
+        "amount": 50000,
         "occurredAt": "2026-05-13T10:00:00Z",
         "producer": "payment-service",
         "correlationId": "corr-1",
     }
 
 
-def user_headers(user_id: int) -> dict[str, str]:
+def user_headers(user_id: int | str) -> dict[str, str]:
     return {"X-User-Id": str(user_id), "X-User-Role": "USER"}
 
 

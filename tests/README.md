@@ -9,7 +9,7 @@
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
 | 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `concert-service`, `notification-service`, `payment-service`, `reservation-service`, `ticket-service` |
-| E2E 테스트 | Docker Compose, PostgreSQL, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 공연/회차/좌석 준비와 예매 생성 baseline 흐름 |
+| E2E 테스트 | Docker Compose, PostgreSQL, MongoDB, Kafka, Docker curl/Newman 컨테이너 | 시나리오 파일 단위로 티켓팅 서비스 DNS를 직접 호출해 검증 |
 | Gateway E2E | 별도 future scope | Kong/JWT/Ingress 라우팅과 MetalLB 노출 검증 |
 
 ## 폴더 구조
@@ -23,6 +23,7 @@ tests/
     scenarios/
       01-concert-seat-setup.postman_collection.json
       02-reservation-create.postman_collection.json
+      03-ticket-issue.postman_collection.json
     postgres-init/
       01-create-databases.sql
     newman/
@@ -67,12 +68,15 @@ task test-services SERVICES="auth-service ticket-service"
 
 ## E2E 테스트 흐름
 
-Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 티켓팅 baseline 흐름을 검증한다. Kong/JWT/Ingress는 기본 `task test-e2e` 범위가 아니며, Gateway 검증은 이후 별도 task에서 다룬다.
+Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 티켓팅 baseline 흐름을 검증한다. Kong/JWT/Ingress는 기본 `task test-e2e` 범위가 아니며, 서비스가 기대하는 내부 인증 헤더를 요청에 직접 넣는다.
 
 1. `concert-service`에서 공연장, 공연, 회차, 좌석맵을 생성한다.
 2. 공개 공연 회차와 좌석 조회가 정상 동작하는지 확인한다.
 3. `reservation-service`에서 판매를 시작한다.
 4. 좌석 예약을 생성하고 사용자 예약 목록에 노출되는지 확인한다.
+5. `ticket-service`에서 티켓 직접 발급과 중복 발급 idempotency를 확인한다.
+
+Kafka, 결제, 알림까지 이어지는 전체 이벤트 흐름은 `packages/contracts`의 이벤트 계약과 각 서비스 Kafka publisher/consumer를 기준으로 확장한다.
 
 ## 로컬 E2E 실행
 
@@ -88,6 +92,9 @@ task test-e2e
 | --- | --- |
 | `concert-service` | `http://concert-service:8082` |
 | `reservation-service` | `http://reservation-service:8083` |
+| `payment-service` | `http://payment-service:8080` |
+| `ticket-service` | `http://ticket-service:8085` |
+| `notification-service` | `http://notification-service:8084` |
 
 `tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
 
@@ -96,15 +103,7 @@ task test-e2e
 ```bash
 task test-e2e SCENARIO=01-concert-seat-setup
 task test-e2e SCENARIO=02-reservation-create
-```
-
-수동으로 stack을 살펴보려면 다음 명령을 사용한다.
-
-```bash
-task e2e-up
-task e2e-wait
-task e2e-newman
-task e2e-down
+task test-e2e SCENARIO=03-ticket-issue
 ```
 
 ## CI

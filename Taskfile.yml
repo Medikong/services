@@ -52,6 +52,7 @@ tasks:
         fi
         "${venv_python}" -m pip install --upgrade pip
         "${venv_python}" -m pip install \
+          -e packages/contracts \
           -r services/auth-service/requirements.txt \
           -r services/auth-service/requirements-test.txt \
           -r services/patient-service/requirements.txt \
@@ -63,7 +64,9 @@ tasks:
           -r services/notification-service/requirements.txt \
           -r services/notification-service/requirements-test.txt \
           -r services/payment-service/requirements.txt \
-          -r services/payment-service/requirements-test.txt
+          -r services/payment-service/requirements-test.txt \
+          -r services/ticket-service/requirements.txt \
+          -r services/ticket-service/requirements-test.txt
         printf 'Python venv is ready at %s.\n' "${venv_dir}"
 
   test-runner-build:
@@ -102,29 +105,11 @@ tasks:
       - task: tests:test-e2e
 
   test-e2e:
-    desc: Run PostgreSQL/MongoDB/Kafka E2E scenarios with Docker Compose.
+    desc: Run Docker Compose E2E tests. Optionally set SCENARIO=<scenario-name>.
     cmds:
       - task: tests:test-e2e
-
-  e2e-up:
-    desc: Start the E2E Docker Compose stack.
-    cmds:
-      - task: tests:e2e-up
-
-  e2e-wait:
-    desc: Wait for E2E services with the Docker curl container.
-    cmds:
-      - task: tests:e2e-wait
-
-  e2e-newman:
-    desc: Run the E2E collection with the Docker Newman container.
-    cmds:
-      - task: tests:e2e-newman
-
-  e2e-down:
-    desc: Stop and remove the E2E Docker Compose stack.
-    cmds:
-      - task: tests:e2e-down
+        vars:
+          SCENARIO: '{{default "" .SCENARIO}}'
 
   app-images-build:
     desc: Build service and dashboard Docker images.
@@ -151,7 +136,7 @@ tasks:
           service="$1"
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           case "${service}" in
-            concert-service|reservation-service)
+            concert-service|reservation-service|payment-service|ticket-service|notification-service)
               docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
             "${dashboard}")
@@ -262,7 +247,7 @@ tasks:
         fi
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         case "${service}" in
-          concert-service|reservation-service)
+          concert-service|reservation-service|payment-service|ticket-service|notification-service)
             docker build -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
             ;;
           "${dashboard}")

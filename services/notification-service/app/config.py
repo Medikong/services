@@ -1,5 +1,13 @@
 import os
 
+from contracts.events import (
+    PAYMENT_APPROVED_TOPIC,
+    PAYMENT_FAILED_TOPIC,
+    RESERVATION_CREATED_TOPIC,
+    RESERVATION_EXPIRED_TOPIC,
+    TICKET_ISSUED_TOPIC,
+)
+
 
 class Settings:
     service_name = "notification-service"
@@ -9,11 +17,11 @@ class Settings:
     kafka_group_id = os.getenv("KAFKA_GROUP_ID", "notification-service")
 
     # Kafka 토픽
-    reservation_created_topic = os.getenv("RESERVATION_CREATED_TOPIC", "reservation-created")
-    reservation_expired_topic = os.getenv("RESERVATION_EXPIRED_TOPIC", "reservation-expired")
-    payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", "payment-approved")
-    payment_failed_topic = os.getenv("PAYMENT_FAILED_TOPIC", "payment-failed")
-    ticket_issued_topic = os.getenv("TICKET_ISSUED_TOPIC", "ticket-issued")
+    reservation_created_topic = os.getenv("RESERVATION_CREATED_TOPIC", RESERVATION_CREATED_TOPIC)
+    reservation_expired_topic = os.getenv("RESERVATION_EXPIRED_TOPIC", RESERVATION_EXPIRED_TOPIC)
+    payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", PAYMENT_APPROVED_TOPIC)
+    payment_failed_topic = os.getenv("PAYMENT_FAILED_TOPIC", PAYMENT_FAILED_TOPIC)
+    ticket_issued_topic = os.getenv("TICKET_ISSUED_TOPIC", TICKET_ISSUED_TOPIC)
 
 
 settings = Settings()
