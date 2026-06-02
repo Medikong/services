@@ -159,7 +159,14 @@ def test_provider_and_admin_can_get_settlement_basis() -> None:
 def test_operational_endpoints_and_error_shape() -> None:
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").json()["checks"]["database"] == "ok"
-    assert "http_requests_total" in client.get("/metrics").text
+    metrics_response = client.get("/metrics")
+    assert metrics_response.status_code == 200
+    assert metrics_response.headers["content-type"].startswith("text/plain; version=0.0.4")
+    assert "http_requests_total" in metrics_response.text
+    assert 'service="payment-service"' in metrics_response.text
+    assert 'method="GET"' in metrics_response.text
+    assert 'path="/healthz"' in metrics_response.text
+    assert 'status="200"' in metrics_response.text
 
     response = client.get("/payments/pay-missing")
     assert response.status_code == 401

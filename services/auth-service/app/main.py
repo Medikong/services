@@ -30,7 +30,7 @@ with SessionLocal() as seed_db:
     seed_demo_users(seed_db)
 
 app = FastAPI(title=settings.service_name)
-setup_request_logging(app, settings.service_name)
+setup_request_logging(app, settings.observability_config())
 register_operational_handlers(
     app,
     service_name=settings.service_name,

@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title=settings.service_name, lifespan=lifespan)
-setup_request_logging(app, settings.service_name)
+setup_request_logging(app, settings.observability_config())
 register_operational_handlers(
     app,
     service_name=settings.service_name,

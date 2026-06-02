@@ -28,7 +28,7 @@ def _readiness_checks() -> dict[str, ReadinessCheck]:
 def create_app() -> FastAPI:
     init_db()
     app = FastAPI(title=settings.service_name)
-    setup_request_observability(app, settings.service_name)
+    setup_request_observability(app, settings.observability_config())
     register_exception_handlers(app)
     register_operational_handlers(
         app,

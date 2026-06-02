@@ -151,9 +151,17 @@ def test_readyz() -> None:
 
 
 def test_metrics_returns_prometheus_format() -> None:
+    client.get("/healthz")
+
     response = client.get("/metrics")
+
     assert response.status_code == 200
-    assert "python_info" in response.text
+    assert response.headers["content-type"].startswith("text/plain; version=0.0.4")
+    assert "http_requests_total" in response.text
+    assert 'service="ticket-service"' in response.text
+    assert 'method="GET"' in response.text
+    assert 'path="/healthz"' in response.text
+    assert 'status="200"' in response.text
 
 
 # ── 헬퍼 ──────────────────────────────────────────────────────

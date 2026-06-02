@@ -1,6 +1,7 @@
 import os
 
 from contracts.events import PAYMENT_APPROVED_TOPIC, TICKET_ISSUED_TOPIC
+from server.observability import ObservabilityConfig, observability_config_from_env
 
 
 class Settings:
@@ -20,6 +21,9 @@ class Settings:
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "")
     aws_region = os.getenv("AWS_REGION", "ap-northeast-2")
     s3_bucket = os.getenv("S3_BUCKET", "ticketing-tickets")
+
+    def observability_config(self) -> ObservabilityConfig:
+        return observability_config_from_env(self.service_name, env=os.environ)
 
 
 settings = Settings()

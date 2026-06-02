@@ -1,5 +1,7 @@
 import os
 
+from server.observability import ObservabilityConfig, observability_config_from_env
+
 
 class Settings:
     service_name = "payment-service"
@@ -10,6 +12,9 @@ class Settings:
     kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
     payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", "payment-approved")
     payment_failed_topic = os.getenv("PAYMENT_FAILED_TOPIC", "payment-failed")
+
+    def observability_config(self) -> ObservabilityConfig:
+        return observability_config_from_env(self.service_name, env=os.environ)
 
 
 settings = Settings()

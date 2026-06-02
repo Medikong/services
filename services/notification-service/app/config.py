@@ -7,6 +7,7 @@ from contracts.events import (
     RESERVATION_EXPIRED_TOPIC,
     TICKET_ISSUED_TOPIC,
 )
+from server.observability import ObservabilityConfig, observability_config_from_env
 
 
 class Settings:
@@ -22,6 +23,9 @@ class Settings:
     payment_approved_topic = os.getenv("PAYMENT_APPROVED_TOPIC", PAYMENT_APPROVED_TOPIC)
     payment_failed_topic = os.getenv("PAYMENT_FAILED_TOPIC", PAYMENT_FAILED_TOPIC)
     ticket_issued_topic = os.getenv("TICKET_ISSUED_TOPIC", TICKET_ISSUED_TOPIC)
+
+    def observability_config(self) -> ObservabilityConfig:
+        return observability_config_from_env(self.service_name, env=os.environ)
 
 
 settings = Settings()

@@ -20,7 +20,7 @@ from app.schemas import CreatePaymentRequest, PaymentResponse, SettlementBasisRe
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.service_name)
-setup_request_logging(app, settings.service_name)
+setup_request_logging(app, settings.observability_config())
 register_operational_handlers(
     app,
     service_name=settings.service_name,

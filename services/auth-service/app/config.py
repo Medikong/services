@@ -1,5 +1,7 @@
 import os
 
+from server.observability import ObservabilityConfig, observability_config_from_env
+
 
 class Settings:
     service_name = "auth-service"
@@ -11,6 +13,9 @@ class Settings:
     jwt_issuer = os.getenv("JWT_ISSUER", service_name)
     jwt_roles = {"CUSTOMER", "PROVIDER", "ADMIN"}
     expose_demo_accounts = os.getenv("AUTH_EXPOSE_DEMO_ACCOUNTS", "true").lower() == "true"
+
+    def observability_config(self) -> ObservabilityConfig:
+        return observability_config_from_env(self.service_name, env=os.environ)
 
 
 settings = Settings()
