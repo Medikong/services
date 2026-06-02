@@ -1,3 +1,5 @@
+import json
+import logging
 from typing import cast
 
 from fastapi import FastAPI
@@ -12,6 +14,7 @@ from server.operational import (
     required_settings_readiness_check,
     sqlalchemy_readiness_check,
 )
+from server.observability import setup_request_observability
 
 
 def test_register_operational_handlers_adds_healthz_readyz_and_metrics() -> None:
@@ -99,6 +102,53 @@ def test_metrics_configurator_can_register_service_specific_metrics() -> None:
     assert "ticketing_business_value 7.0" in response.text
 
 
+def test_request_observability_emits_single_line_json_log(caplog) -> None:
+    app = FastAPI()
+    setup_request_observability(app, "test-service")
+
+    @app.get("/items/{item_id}")
+    def get_item(item_id: str) -> dict[str, str]:
+        return {"itemId": item_id}
+
+    caplog.set_level(logging.INFO)
+    client = TestClient(app)
+
+    response = client.get("/items/item-1", headers={"X-Request-Id": "req-test"})
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "req-test"
+    log = _request_log(caplog.records)
+    assert log["service.name"] == "test-service"
+    assert log["severity"] == "INFO"
+    assert log["severity_text"] == "INFO"
+    assert log["request_id"] == "req-test"
+    assert log["trace_id"]
+    assert log["span_id"]
+    assert log["http.method"] == "GET"
+    assert log["http.route"] == "/items/{item_id}"
+    assert log["http.status_code"] == 200
+    assert isinstance(log["duration_ms"], int)
+
+
+def test_request_observability_logs_failed_request_fields(caplog) -> None:
+    app = FastAPI()
+    setup_request_observability(app, "test-service")
+    caplog.set_level(logging.INFO)
+    client = TestClient(app)
+
+    response = client.get("/missing", headers={"X-Request-Id": "req-missing"})
+
+    assert response.status_code == 404
+    log = _request_log(caplog.records)
+    assert log["request_id"] == "req-missing"
+    assert log["trace_id"]
+    assert log["span_id"]
+    assert log["service.name"] == "test-service"
+    assert log["severity"] == "INFO"
+    assert log["http.status_code"] == 404
+    assert isinstance(log["duration_ms"], int)
+
+
 def test_required_settings_readiness_check_reports_missing_values() -> None:
     check = required_settings_readiness_check({"service_name": "test-service", "database_url": ""})
 
@@ -119,3 +169,12 @@ def test_sqlalchemy_readiness_check_reports_sqlalchemy_errors() -> None:
     check = sqlalchemy_readiness_check(cast(Engine, FailingEngine()))
 
     assert check() == "failed: SQLAlchemyError"
+
+
+def _request_log(records: list[logging.LogRecord]) -> dict[str, object]:
+    for record in reversed(records):
+        if record.name == "test-service" and record.message.startswith("{"):
+            payload = json.loads(record.message)
+            if payload.get("event") == "http.request.completed":
+                return payload
+    raise AssertionError("request JSON log was not emitted")

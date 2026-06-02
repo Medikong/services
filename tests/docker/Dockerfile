@@ -30,6 +30,7 @@ RUN python -m pip install --no-cache-dir --root-user-action=ignore --upgrade pip
       "/opt/test-envs/${service}/bin/python" -m pip install --no-cache-dir --upgrade pip; \
       "/opt/test-envs/${service}/bin/python" -m pip install --no-cache-dir --root-user-action=ignore \
         ./packages/contracts \
+        ./packages/server \
         -r "services/${service}/requirements.txt" \
         -r "services/${service}/requirements-test.txt"; \
     } \

@@ -6,7 +6,7 @@ vars:
   PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
   TEST_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
-  PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
+  PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "ticketing-e2e" .E2E_COMPOSE_PROJECT}}'
