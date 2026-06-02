@@ -102,6 +102,44 @@ def test_metrics_configurator_can_register_service_specific_metrics() -> None:
     assert "ticketing_business_value 7.0" in response.text
 
 
+def test_operational_handlers_can_preserve_legacy_ready_status_without_checks() -> None:
+    app = FastAPI()
+    register_operational_handlers(
+        app,
+        service_name="test-service",
+        readiness_checks={},
+        readiness_success_status="ok",
+        readiness_failure_status="failed",
+        include_readiness_checks=False,
+    )
+    client = TestClient(app)
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "service": "test-service"}
+
+
+def test_operational_handlers_can_include_timestamp_for_existing_contracts() -> None:
+    app = FastAPI()
+    register_operational_handlers(
+        app,
+        service_name="test-service",
+        readiness_checks={"database": lambda: "ok"},
+        include_timestamp=True,
+    )
+    client = TestClient(app)
+
+    health_response = client.get("/healthz")
+    ready_response = client.get("/readyz")
+
+    assert health_response.status_code == 200
+    assert health_response.json()["timestamp"]
+    assert ready_response.status_code == 200
+    assert ready_response.json()["checks"] == {"database": "ok"}
+    assert ready_response.json()["timestamp"]
+
+
 def test_request_observability_emits_single_line_json_log(caplog) -> None:
     app = FastAPI()
     setup_request_observability(app, "test-service")

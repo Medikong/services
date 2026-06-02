@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from time import perf_counter
 
 from fastapi import FastAPI, Request, status
@@ -30,6 +31,10 @@ def register_operational_handlers(
     readiness_checks: Mapping[str, ReadinessCheck],
     configure_metrics: MetricsConfigurator | None = None,
     registry: CollectorRegistry | None = None,
+    include_timestamp: bool = False,
+    readiness_success_status: str = "ready",
+    readiness_failure_status: str = "not_ready",
+    include_readiness_checks: bool = True,
 ) -> CollectorRegistry:
     metrics_registry = registry or CollectorRegistry(auto_describe=True)
     configure_runtime_collectors(metrics_registry)
@@ -83,19 +88,25 @@ def register_operational_handlers(
             ).observe(duration)
 
     @app.get("/healthz")
-    def healthz() -> dict[str, str]:
-        return {"status": "ok", "service": service_name}
+    def healthz() -> dict[str, object]:
+        return _operational_payload(
+            status="ok",
+            service_name=service_name,
+            include_timestamp=include_timestamp,
+        )
 
     @app.get("/readyz")
     def readyz() -> JSONResponse:
         checks = _run_readiness_checks(readiness_checks)
         is_ready = all(result == "ok" for result in checks.values())
         service_ready.labels(service=service_name).set(1 if is_ready else 0)
-        payload: dict[str, object] = {
-            "status": "ready" if is_ready else "not_ready",
-            "service": service_name,
-            "checks": checks,
-        }
+        payload = _operational_payload(
+            status=readiness_success_status if is_ready else readiness_failure_status,
+            service_name=service_name,
+            include_timestamp=include_timestamp,
+        )
+        if include_readiness_checks:
+            payload["checks"] = checks
 
         if not is_ready:
             return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload)
@@ -151,3 +162,10 @@ def _run_readiness_checks(readiness_checks: Mapping[str, ReadinessCheck]) -> dic
         except Exception as exc:
             checks[name] = f"failed: {exc.__class__.__name__}"
     return checks
+
+
+def _operational_payload(*, status: str, service_name: str, include_timestamp: bool) -> dict[str, object]:
+    payload: dict[str, object] = {"status": status, "service": service_name}
+    if include_timestamp:
+        payload["timestamp"] = datetime.now(UTC).isoformat()
+    return payload

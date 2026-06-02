@@ -1,11 +1,10 @@
 from datetime import UTC, datetime
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from sqlalchemy import text
 from sqlalchemy.orm import Session
+from server.operational import register_operational_handlers, sqlalchemy_readiness_check
 
 from app import models
 from app.audit import record_audit
@@ -16,10 +15,8 @@ from app.observability import setup_request_logging
 from app.schemas import (
     AuditLogResponse,
     DemoAccountResponse,
-    HealthResponse,
     LoginRequest,
     LogoutRequest,
-    ReadinessResponse,
     RefreshTokenRequest,
     TokenResponse,
     UserResponse,
@@ -34,6 +31,12 @@ with SessionLocal() as seed_db:
 
 app = FastAPI(title=settings.service_name)
 setup_request_logging(app, settings.service_name)
+register_operational_handlers(
+    app,
+    service_name=settings.service_name,
+    readiness_checks={"database": sqlalchemy_readiness_check(engine)},
+    include_timestamp=True,
+)
 
 
 @app.exception_handler(HTTPException)
@@ -55,30 +58,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
-
-
-@app.get("/healthz", response_model=HealthResponse)
-def healthz() -> HealthResponse:
-    return HealthResponse(status="ok", service=settings.service_name, timestamp=datetime.now(UTC))
-
-
-@app.get("/readyz", response_model=ReadinessResponse)
-def readyz(db: Session = Depends(get_db)) -> ReadinessResponse:
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database is not ready") from exc
-    return ReadinessResponse(
-        status="ready",
-        service=settings.service_name,
-        checks={"database": "ok"},
-        timestamp=datetime.now(UTC),
-    )
-
-
-@app.get("/metrics")
-def metrics() -> Response:
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/auth/login", response_model=TokenResponse)

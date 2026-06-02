@@ -14,7 +14,6 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import Counter, Histogram
 
 
 REQUEST_ID_HEADER = "X-Request-Id"
@@ -22,17 +21,6 @@ request_id_context: ContextVar[str | None] = ContextVar("request_id", default=No
 _logging_configured = False
 _logging_instrumented = False
 _tracing_configured = False
-
-HTTP_REQUESTS_TOTAL = Counter(
-    "http_requests_total",
-    "Total HTTP requests.",
-    ["service", "method", "path", "status"],
-)
-HTTP_REQUEST_DURATION_SECONDS = Histogram(
-    "http_request_duration_seconds",
-    "HTTP request duration in seconds.",
-    ["service", "method", "path"],
-)
 
 
 def get_current_request_id() -> str | None:
@@ -79,17 +67,6 @@ def setup_request_observability(
             route = _route_template(request)
             duration_seconds = perf_counter() - started_at
             trace_id, span_id = _current_trace_context()
-            HTTP_REQUESTS_TOTAL.labels(
-                service=service_name,
-                method=request.method,
-                path=route,
-                status=str(status_code),
-            ).inc()
-            HTTP_REQUEST_DURATION_SECONDS.labels(
-                service=service_name,
-                method=request.method,
-                path=route,
-            ).observe(duration_seconds)
             logger.info(
                 "http.request.completed",
                 **{

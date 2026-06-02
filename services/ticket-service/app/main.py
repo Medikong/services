@@ -2,8 +2,8 @@ import asyncio
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI, Response
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from fastapi import FastAPI
+from server.operational import register_operational_handlers
 
 from app import models
 from app.config import settings
@@ -30,24 +30,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title=settings.service_name, lifespan=lifespan)
 setup_request_logging(app, settings.service_name)
+register_operational_handlers(
+    app,
+    service_name=settings.service_name,
+    readiness_checks={},
+    readiness_success_status="ok",
+    readiness_failure_status="failed",
+    include_readiness_checks=False,
+)
 app.include_router(tickets.router)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
-
-
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
-    return {"status": "ok", "service": settings.service_name}
-
-
-@app.get("/readyz")
-def readyz() -> dict[str, str]:
-    return {"status": "ok", "service": settings.service_name}
-
-
-@app.get("/metrics")
-def metrics() -> Response:
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
