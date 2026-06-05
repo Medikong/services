@@ -8,6 +8,8 @@ from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI, Request
 from starlette.responses import Response
 
+from middleware import get_current_client_action_id
+from middleware import get_current_request_id as get_runtime_request_id
 from observability.config import ObservabilityConfig
 from observability.tracing import current_trace_context
 
@@ -44,7 +46,9 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
 
     async def request_observability_middleware(request: Request, call_next):
         request_id = _request_id(request)
+        client_action_id = get_current_client_action_id()
         request.state.request_id = request_id
+        request.state.client_action_id = client_action_id
         request_id_token = request_id_context.set(request_id)
         started_at = perf_counter()
         status_code = 500
@@ -68,6 +72,7 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
                     "trace_id": trace_id,
                     "span_id": span_id,
                     "request_id": request_id,
+                    "client_action_id": client_action_id,
                     "http.method": request.method,
                     "http.route": route,
                     "http.status_code": status_code,
@@ -80,7 +85,13 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
 
 
 def _request_id(request: Request) -> str:
-    return correlation_id.get() or request.headers.get(REQUEST_ID_HEADER) or request.headers.get("x-request-id") or str(uuid4())
+    return (
+        get_runtime_request_id()
+        or correlation_id.get()
+        or request.headers.get(REQUEST_ID_HEADER)
+        or request.headers.get("x-request-id")
+        or str(uuid4())
+    )
 
 
 def _valid_request_id(request_id: str) -> bool:

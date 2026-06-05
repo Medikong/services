@@ -5,6 +5,16 @@ from server.operational import (
     required_settings_readiness_check,
     sqlalchemy_readiness_check,
 )
+from server.middleware import (
+    CLIENT_ACTION_ID_HEADER,
+    RequestContext,
+    RequestContextMiddleware,
+    ResponseHeadersMiddleware,
+    RuntimeRecoveryMiddleware,
+    get_current_client_action_id,
+    get_current_request_context,
+    install_runtime_middleware,
+)
 from server.observability import (
     OBSERVABILITY_ENV_KEYS,
     REQUEST_ID_HEADER,
@@ -22,9 +32,14 @@ from server.observability import (
 )
 
 __all__ = [
+    "CLIENT_ACTION_ID_HEADER",
     "OBSERVABILITY_ENV_KEYS",
     "REQUEST_ID_HEADER",
     "RequestIdMiddleware",
+    "RequestContext",
+    "RequestContextMiddleware",
+    "ResponseHeadersMiddleware",
+    "RuntimeRecoveryMiddleware",
     "ObservabilityConfig",
     "ReadinessCheck",
     "configure_process_logging",
@@ -33,8 +48,11 @@ __all__ = [
     "configure_runtime_collectors",
     "configure_tracing",
     "create_request_log_middleware",
+    "get_current_client_action_id",
+    "get_current_request_context",
     "get_current_request_id",
     "instrument_fastapi_app",
+    "install_runtime_middleware",
     "observability_config_from_env",
     "register_operational_handlers",
     "request_id_middleware_options",

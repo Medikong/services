@@ -11,10 +11,12 @@ RUN python -m venv /opt/venv
 
 COPY packages/contracts ./packages/contracts
 COPY packages/observability ./packages/observability
+COPY packages/middleware ./packages/middleware
 COPY packages/server ./packages/server
 COPY services/ticket-service/requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir ./packages/contracts \
+    && python -m pip install --no-cache-dir ./packages/middleware \
     && python -m pip install --no-cache-dir ./packages/observability \
     && python -m pip install --no-cache-dir ./packages/server \
     && python -m pip install --no-cache-dir -r requirements.txt

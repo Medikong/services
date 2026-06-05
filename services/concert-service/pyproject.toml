@@ -5,6 +5,7 @@ description = "Concert service FastAPI application"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.124.0",
+    "middleware",
     "observability",
     "server",
     "uvicorn[standard]==0.38.0",
@@ -25,6 +26,7 @@ test = [
 package = false
 
 [tool.uv.sources]
+middleware = { path = "../../packages/middleware", editable = true }
 observability = { path = "../../packages/observability", editable = true }
 server = { path = "../../packages/server", editable = true }
 

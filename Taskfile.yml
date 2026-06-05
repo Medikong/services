@@ -54,6 +54,7 @@ tasks:
         "${venv_python}" -m pip install \
           -e packages/contracts \
           -e packages/errors \
+          -e packages/middleware \
           -e packages/observability \
           -e packages/server \
           -r services/auth-service/requirements.txt \

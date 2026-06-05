@@ -3,17 +3,16 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from middleware import install_runtime_middleware
 
 from observability import (
     OBSERVABILITY_ENV_KEYS,
     ObservabilityConfig,
-    RequestIdMiddleware,
     configure_process_logging,
     configure_process_tracing,
     create_request_log_middleware,
     instrument_fastapi_app,
     observability_config_from_env,
-    request_id_middleware_options,
 )
 from observability import tracing as tracing_module
 from observability.tracing import _otlp_trace_export_enabled
@@ -154,7 +153,10 @@ def test_request_observability_emits_single_line_json_log(caplog) -> None:
     caplog.set_level(logging.INFO)
     client = TestClient(app)
 
-    response = client.get("/items/item-1", headers={"X-Request-Id": "req-test"})
+    response = client.get(
+        "/items/item-1",
+        headers={"X-Request-Id": "req-test", "X-Client-Action-Id": "act-test"},
+    )
 
     assert response.status_code == 200
     assert response.headers["X-Request-Id"] == "req-test"
@@ -163,6 +165,7 @@ def test_request_observability_emits_single_line_json_log(caplog) -> None:
     assert log["severity"] == "INFO"
     assert log["severity_text"] == "INFO"
     assert log["request_id"] == "req-test"
+    assert log["client_action_id"] == "act-test"
     assert log["trace_id"]
     assert log["span_id"]
     assert log["http.method"] == "GET"
@@ -194,8 +197,8 @@ def _observed_app(config: ObservabilityConfig) -> FastAPI:
     configure_process_logging()
     configure_process_tracing(config)
     instrument_fastapi_app(app)
-    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
     app.middleware("http")(create_request_log_middleware(config))
+    install_runtime_middleware(app)
     return app
 
 

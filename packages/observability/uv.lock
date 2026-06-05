@@ -274,12 +274,23 @@ wheels = [
 ]
 
 [[package]]
+name = "middleware"
+version = "0.1.0"
+source = { editable = "../middleware" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+test = [{ name = "pytest", specifier = "==9.0.2" }]
+
+[[package]]
 name = "observability"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "asgi-correlation-id" },
     { name = "fastapi" },
+    { name = "middleware" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-logging" },
@@ -297,6 +308,7 @@ test = [
 requires-dist = [
     { name = "asgi-correlation-id", specifier = "==5.0.0" },
     { name = "fastapi", specifier = "==0.124.0" },
+    { name = "middleware", editable = "../middleware" },
     { name = "opentelemetry-exporter-otlp", specifier = "==1.42.1" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = "==0.63b1" },
     { name = "opentelemetry-instrumentation-logging", specifier = "==0.63b1" },

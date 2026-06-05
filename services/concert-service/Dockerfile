@@ -13,6 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 
 COPY services/concert-service/pyproject.toml services/concert-service/uv.lock ./services/concert-service/
 COPY packages/observability ./packages/observability
+COPY packages/middleware ./packages/middleware
 COPY packages/server ./packages/server
 WORKDIR /build/services/concert-service
 RUN uv sync --frozen --no-dev --no-install-project --no-editable
