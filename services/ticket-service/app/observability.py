@@ -20,7 +20,7 @@ def configure_app_observability(app: FastAPI, config: ObservabilityConfig) -> No
     configure_process_logging()
     configure_process_tracing(config)
     # FastAPI 계측이 HTTP 요청 span을 자동으로 만들고, 요청이 끝나면 전송 흐름으로 넘긴다.
-    instrument_fastapi_app(app)
+    instrument_fastapi_app(app, config)
     # 요청 로그에는 현재 span ID를 함께 남겨 stdout 로그와 trace를 나중에 이어 볼 수 있게 한다.
     app.middleware("http")(create_request_log_middleware(config))
     # 예외 기록은 복구 응답보다 안쪽에서 수행하고, 응답 생성은 RuntimeRecoveryMiddleware에 맡긴다.

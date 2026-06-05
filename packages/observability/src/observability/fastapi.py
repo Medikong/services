@@ -25,11 +25,14 @@ def get_current_request_id() -> str | None:
     return request_id_context.get()
 
 
-def instrument_fastapi_app(app: FastAPI) -> None:
+def instrument_fastapi_app(app: FastAPI, config: ObservabilityConfig | None = None) -> None:
     # 들어오는 HTTP 요청 span은 FastAPI 계측이 자동으로 만든다.
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-    FastAPIInstrumentor.instrument_app(app)
+    excluded_urls = None
+    if config is not None and config.fastapi_trace_excluded_urls:
+        excluded_urls = ",".join(config.fastapi_trace_excluded_urls)
+    FastAPIInstrumentor.instrument_app(app, excluded_urls=excluded_urls)
 
 
 def request_id_middleware_options() -> dict[str, object]:

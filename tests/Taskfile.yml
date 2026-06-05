@@ -22,19 +22,31 @@ vars:
   E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
+  OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
+  OBS_E2E_COMPOSE_PROJECT: '{{default "ticketing-observability-e2e" .OBS_E2E_COMPOSE_PROJECT}}'
+  OBS_E2E_NETWORK: '{{default "ticketing-observability-e2e_default" .OBS_E2E_NETWORK}}'
+  OBS_E2E_SMOKE_IMAGE: '{{default "python:3.12-slim" .OBS_E2E_SMOKE_IMAGE}}'
+  OBS_E2E_SERVICE_NAME: '{{default "concert-service" .OBS_E2E_SERVICE_NAME}}'
+  OBS_E2E_SERVICE_URL: '{{default "http://concert-service:8082" .OBS_E2E_SERVICE_URL}}'
+  OBS_E2E_TRACE_PATH: '{{default "/concerts" .OBS_E2E_TRACE_PATH}}'
+  OBS_E2E_TEMPO_URL: '{{default "http://tempo:3200" .OBS_E2E_TEMPO_URL}}'
+  OBS_E2E_EXCLUSION_CHECK_SECONDS: '{{default "8" .OBS_E2E_EXCLUSION_CHECK_SECONDS}}'
 
 tasks:
   test-runner-build:
+    desc: Build the Docker Python test runner image.
     cmds:
       - docker build -f "{{.ROOT_DIR}}/tests/docker/Dockerfile" -t {{.TEST_RUNNER_IMAGE}} "{{.ROOT_DIR}}"
 
   test-service:
+    desc: Run one service pytest suite with SERVICE=<service-name>.
     cmds:
       - task: test-services
         vars:
           SERVICES: '{{default "" .SERVICE}}'
 
   test-services:
+    desc: Run selected service pytest suites in parallel with SERVICES="<service-names>".
     deps:
       - test-runner-build
     cmds:
@@ -125,12 +137,14 @@ tasks:
         exit "${failed}"
 
   test-unit:
+    desc: Run all managed service pytest suites in the Docker Python runner.
     cmds:
       - task: test-services
         vars:
           SERVICES: '{{.TEST_SERVICES}}'
 
   test-e2e:
+    desc: Run Docker Compose service E2E tests. Optionally set SCENARIO=<scenario-name>.
     cmds:
       - |
         set -e
@@ -205,10 +219,12 @@ tasks:
         done
 
   e2e-up:
+    desc: Start the service E2E Docker Compose stack.
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build postgres kafka kafka-init notification-db concert-service reservation-service payment-service ticket-service notification-service'
 
   e2e-wait:
+    desc: Wait for service E2E services to become ready.
     cmds:
       - |
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
@@ -225,6 +241,7 @@ tasks:
           {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
 
   e2e-newman:
+    desc: Run service E2E Newman collections against an already running stack.
     cmds:
       - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
       - |
@@ -246,5 +263,54 @@ tasks:
         done
 
   e2e-down:
+    desc: Stop the service E2E Docker Compose stack.
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
+
+  test-observability-e2e:
+    desc: Run Docker Compose observability E2E trace smoke with Collector, Tempo, and Grafana.
+    cmds:
+      - |
+        set -e
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        project='{{.OBS_E2E_COMPOSE_PROJECT}}'
+        file='{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build postgres tempo otel-collector grafana concert-service
+        docker run --rm --network {{.OBS_E2E_NETWORK}} \
+          -v "${repo_root}/tests/e2e/observability/scripts":/scripts:ro \
+          -e OBS_E2E_SERVICE_NAME="{{.OBS_E2E_SERVICE_NAME}}" \
+          -e OBS_E2E_SERVICE_URL="{{.OBS_E2E_SERVICE_URL}}" \
+          -e OBS_E2E_TRACE_PATH="{{.OBS_E2E_TRACE_PATH}}" \
+          -e OBS_E2E_TEMPO_URL="{{.OBS_E2E_TEMPO_URL}}" \
+          -e OBS_E2E_EXCLUSION_CHECK_SECONDS="{{.OBS_E2E_EXCLUSION_CHECK_SECONDS}}" \
+          -e OBS_E2E_TIMEOUT_SECONDS \
+          -e OBS_E2E_SLEEP_SECONDS \
+          {{.OBS_E2E_SMOKE_IMAGE}} python /scripts/trace-smoke.py
+
+  observability-e2e-up:
+    desc: Start the observability E2E Docker Compose stack.
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" up -d --build postgres tempo otel-collector grafana concert-service'
+
+  observability-e2e-smoke:
+    desc: Run observability E2E trace smoke against an already running stack.
+    cmds:
+      - |
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        docker run --rm --network {{.OBS_E2E_NETWORK}} \
+          -v "${repo_root}/tests/e2e/observability/scripts":/scripts:ro \
+          -e OBS_E2E_SERVICE_NAME="{{.OBS_E2E_SERVICE_NAME}}" \
+          -e OBS_E2E_SERVICE_URL="{{.OBS_E2E_SERVICE_URL}}" \
+          -e OBS_E2E_TRACE_PATH="{{.OBS_E2E_TRACE_PATH}}" \
+          -e OBS_E2E_TEMPO_URL="{{.OBS_E2E_TEMPO_URL}}" \
+          -e OBS_E2E_EXCLUSION_CHECK_SECONDS="{{.OBS_E2E_EXCLUSION_CHECK_SECONDS}}" \
+          -e OBS_E2E_TIMEOUT_SECONDS \
+          -e OBS_E2E_SLEEP_SECONDS \
+          {{.OBS_E2E_SMOKE_IMAGE}} python /scripts/trace-smoke.py
+
+  observability-e2e-down:
+    desc: Stop the observability E2E Docker Compose stack.
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" down -v --remove-orphans'

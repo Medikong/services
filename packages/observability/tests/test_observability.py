@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 import json
 import logging
+import sys
+import types
 
 from errors import in_domain
 from fastapi import FastAPI
@@ -18,6 +20,7 @@ from observability import exceptions as exceptions_module
 from observability import fastapi as fastapi_module
 from observability import (
     OBSERVABILITY_ENV_KEYS,
+    DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
     ObservabilityConfig,
     NoopTraceRecorder,
     configure_process_logging,
@@ -52,6 +55,7 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         otel_sdk_disabled=True,
         otel_traces_exporter="none",
         otlp_trace_exporter_endpoint="http://collector:4318/v1/traces",
+        fastapi_trace_excluded_urls=DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
     )
     assert set(OBSERVABILITY_ENV_KEYS) == {
         "SERVICE_VERSION",
@@ -60,6 +64,7 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         "OTEL_TRACES_EXPORTER",
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS",
     }
 
 
@@ -70,6 +75,38 @@ def test_observability_config_from_env_falls_back_to_common_otlp_endpoint() -> N
     )
 
     assert config.otlp_trace_exporter_endpoint == "http://collector:4317"
+
+
+def test_observability_config_defaults_common_fastapi_trace_exclusions() -> None:
+    config = observability_config_from_env("test-service", env={})
+
+    assert config.fastapi_trace_excluded_urls == ("/healthz", "/readyz", "/metrics")
+
+
+def test_observability_config_reads_fastapi_trace_exclusions_from_env() -> None:
+    config = observability_config_from_env(
+        "test-service",
+        env={"OTEL_PYTHON_FASTAPI_EXCLUDED_URLS": "/livez, /readyz ,/internal/metrics"},
+    )
+
+    assert config.fastapi_trace_excluded_urls == ("/livez", "/readyz", "/internal/metrics")
+
+
+def test_instrument_fastapi_app_passes_configured_excluded_urls(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class FakeFastAPIInstrumentor:
+        @staticmethod
+        def instrument_app(app: FastAPI, **kwargs: object) -> None:
+            calls.append({"app": app, **kwargs})
+
+    fake_fastapi_module = types.SimpleNamespace(FastAPIInstrumentor=FakeFastAPIInstrumentor)
+    monkeypatch.setitem(sys.modules, "opentelemetry.instrumentation.fastapi", fake_fastapi_module)
+
+    app = FastAPI()
+    instrument_fastapi_app(app, ObservabilityConfig(service_name="test-service"))
+
+    assert calls == [{"app": app, "excluded_urls": "/healthz,/readyz,/metrics"}]
 
 
 def test_otlp_trace_export_enabled_only_accepts_otlp_with_endpoint() -> None:
@@ -316,7 +353,7 @@ def _observed_app(config: ObservabilityConfig) -> FastAPI:
     app = FastAPI()
     configure_process_logging()
     configure_process_tracing(config)
-    instrument_fastapi_app(app)
+    instrument_fastapi_app(app, config)
     app.middleware("http")(create_request_log_middleware(config))
     app.add_middleware(RuntimeRecoveryMiddleware)
     app.add_middleware(ResponseHeadersMiddleware)

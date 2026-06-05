@@ -430,6 +430,43 @@ message headers:
 - 감사 로그 저장소 설계
 - metric/log Collector 배포
 
+## 로컬 검증 범위
+
+Kubernetes 없이 실행 가능한 trace E2E는 `tests/e2e/observability/`가 담당한다. 이 구성은 기존 service 기능 E2E와 분리된 로컬 Docker Compose stack이다.
+
+검증 경로:
+
+```text
+concert-service FastAPI inbound request span
+-> OTLP gRPC
+-> OpenTelemetry Collector OTLP receiver
+-> Tempo
+-> Tempo HTTP API polling
+```
+
+자동 smoke는 다음만 성공 기준으로 삼는다.
+
+- trace에서 제외된 `concert-service`의 `/healthz`, `/readyz` readiness 응답
+- 고유 `X-Request-Id`를 붙인 `/healthz`, `/readyz`, `/metrics` 요청이 Tempo에 저장되지 않았는지 확인
+- 고유 `X-Request-Id`를 붙인 `GET /concerts` public API 요청
+- Tempo search API에서 `service.name=concert-service`와 `request_id`로 trace 조회
+- trace 상세에서 trace id, span name, service name, request id 확인
+
+Grafana는 Tempo datasource provisioning과 수동 조회 보조 역할이다. 자동 판정은 Tempo API 중심으로 둔다. Tempo HTTP API의 search endpoint는 tag 기반 검색과 TraceQL query를 모두 지원하므로, smoke는 tag 기반 검색으로 대표 요청 trace를 찾는다.
+
+FastAPI trace 제외 기본값은 `/healthz,/readyz,/metrics`다. 이 endpoint들은 readiness, liveness, Prometheus scrape 목적이므로 요청/응답은 유지하되 Tempo에는 업무 trace 잡음으로 저장하지 않는다. 필요하면 `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS`로 서비스별 제외 목록을 조정한다.
+
+이 로컬 E2E는 다음을 검증하지 않는다.
+
+- Prometheus metric scrape 경로
+- stdout/stderr JSON log 수집과 Loki 저장
+- 감사 로그 저장 또는 trace backend 저장
+- Kong/Ingress gateway trace boundary
+- 서비스 간 HTTP client propagation
+- Kafka publish/consume trace propagation 전체 흐름
+
+Kong/Ingress boundary는 Kubernetes, Kong, Ingress/MetalLB 노출이 필요한 별도 gateway E2E에서 확인한다. Kafka 흐름은 `packages/kafka-utils`의 header/span helper와 서비스별 producer/consumer wiring 위에서 별도 시나리오로 확장한다.
+
 ## 후속 설계 범위
 
 ### dashboard action correlation

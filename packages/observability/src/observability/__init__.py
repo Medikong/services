@@ -1,4 +1,9 @@
-from observability.config import OBSERVABILITY_ENV_KEYS, ObservabilityConfig, observability_config_from_env
+from observability.config import (
+    DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
+    OBSERVABILITY_ENV_KEYS,
+    ObservabilityConfig,
+    observability_config_from_env,
+)
 from observability.database import instrument_motor_client, instrument_sqlalchemy_engine
 from observability.exceptions import ErrorRecordingMiddleware, record_exception
 from observability.fastapi import (
@@ -22,6 +27,7 @@ from observability.tracing import (
 
 __all__ = [
     "OBSERVABILITY_ENV_KEYS",
+    "DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS",
     "REQUEST_ID_HEADER",
     "RequestIdMiddleware",
     "ErrorRecordingMiddleware",
