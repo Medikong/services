@@ -94,6 +94,8 @@ install:
 	$(VENV_PYTHON) -m pip install --upgrade pip; \
 	$(VENV_PYTHON) -m pip install \
 		-e packages/contracts \
+		-e packages/errors \
+		-e packages/observability \
 		-e packages/server \
 		-r services/auth-service/requirements.txt \
 		-r services/auth-service/requirements-test.txt \

@@ -1,0 +1,18 @@
+[project]
+name = "errors"
+version = "0.1.0"
+description = "Exception context propagation helpers"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+test = [
+    "pytest==9.0.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
