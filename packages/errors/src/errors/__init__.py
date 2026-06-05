@@ -1,3 +1,5 @@
+"""Public API for exception context propagation."""
+
 from errors.builder import (
     ExceptionContextBuilder,
     code,

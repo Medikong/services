@@ -1,3 +1,5 @@
+"""Exception context storage and extraction primitives."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -11,6 +13,8 @@ _CONTEXT_ATTR: Final = "__medikong_exception_context__"
 
 @dataclass(frozen=True)
 class ExceptionContext:
+    """Metadata attached to an exception and later consumed at process boundaries."""
+
     code: str | None = None
     domain: str | None = None
     message: str | None = None
@@ -27,10 +31,12 @@ class ExceptionContext:
 
     @classmethod
     def empty(cls) -> ExceptionContext:
+        """Return a safe null object when an exception has no attached context."""
         return cls()
 
     @property
     def is_empty(self) -> bool:
+        """Report whether any context value has been set."""
         return (
             self.code is None
             and self.domain is None
@@ -48,6 +54,7 @@ class ExceptionContext:
         )
 
     def merge(self, incoming: ExceptionContext) -> ExceptionContext:
+        """Merge later context without overwriting earlier domain meaning."""
         return ExceptionContext(
             code=self.code or incoming.code,
             domain=self.domain or incoming.domain,
@@ -66,6 +73,7 @@ class ExceptionContext:
 
 
 def get_exception_context(exc: BaseException) -> ExceptionContext:
+    """Extract context from an exception or its Python exception chain."""
     context = _get_attached_context(exc)
     if context is not None:
         return context
@@ -94,6 +102,7 @@ def _get_attached_context(exc: BaseException) -> ExceptionContext | None:
 
 
 def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Walk explicit and implicit exception chains without mutating them."""
     seen: set[int] = {id(exc)}
     pending = [exc.__cause__, exc.__context__]
 
@@ -107,6 +116,7 @@ def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
 
 
 def _merge_tags(existing: tuple[str, ...], incoming: tuple[str, ...]) -> tuple[str, ...]:
+    # Tags are additive breadcrumbs, so keep first occurrence order and deduplicate.
     merged: list[str] = []
     seen: set[str] = set()
     for tag in existing + incoming:
