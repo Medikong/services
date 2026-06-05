@@ -1,7 +1,7 @@
-"""Compatibility exports for services that still import server.observability.
+"""아직 server.observability를 import하는 코드용 호환 재노출이다.
 
-The implementation lives in packages/observability so packages/server can stay
-focused on operational endpoints, readiness, and metrics.
+구현은 packages/observability에 두고, packages/server는 운영 endpoint,
+readiness, metrics 책임에 집중하게 한다.
 """
 
 from observability import (

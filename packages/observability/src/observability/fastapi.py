@@ -26,14 +26,14 @@ def get_current_request_id() -> str | None:
 
 
 def instrument_fastapi_app(app: FastAPI) -> None:
-    # Inbound request spans are automatic; manual spans stay out of service layers until a use case proves it.
+    # 들어오는 HTTP 요청 span은 FastAPI 계측이 자동으로 만든다.
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     FastAPIInstrumentor.instrument_app(app)
 
 
 def request_id_middleware_options() -> dict[str, object]:
-    # Request IDs are kept separate from trace IDs for support tickets, access logs, and client-visible lookup.
+    # request_id는 trace_id와 별개로 고객 문의, 접근 로그, 클라이언트 응답 확인에 쓴다.
     return {
         "header_name": REQUEST_ID_HEADER,
         "update_request_header": True,
@@ -61,7 +61,7 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
         finally:
             route = _route_template(request)
             duration_seconds = perf_counter() - started_at
-            # Logs go through stdout while traces go through OTLP, so IDs are the join keys across Loki and Tempo.
+            # 로그는 stdout으로, trace는 OTLP로 나가므로 두 데이터를 이어 볼 ID를 함께 남긴다.
             trace_id, span_id = current_trace_context()
             logger.info(
                 "http.request.completed",
