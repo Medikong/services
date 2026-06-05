@@ -136,10 +136,10 @@ tasks:
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           case "${service}" in
             auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-              docker build --platform linux/amd64,linux/arm64 -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+              docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
             auth-service)
-              docker build --platform linux/amd64,linux/arm64 -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+              docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
             "${dashboard}")
               docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
@@ -250,7 +250,7 @@ tasks:
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         case "${service}" in
           auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-            docker build --platform linux/amd64,linux/arm64 -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+            docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
             ;;
           "${dashboard}")
             docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
