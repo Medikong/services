@@ -1,0 +1,38 @@
+[project]
+name = "notification-service"
+version = "0.1.0"
+description = "Notification service FastAPI application"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.124.0",
+    "contracts",
+    "kafka-utils",
+    "middleware",
+    "observability",
+    "server",
+    "uvicorn[standard]==0.38.0",
+    "motor==3.7.0",
+    "aiokafka==0.12.0",
+    "prometheus-client==0.23.1",
+]
+
+[dependency-groups]
+test = [
+    "pytest==9.0.2",
+    "httpx==0.28.1",
+    "mongomock-motor==0.0.34",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+contracts = { path = "../../packages/contracts", editable = true }
+errors = { path = "../../packages/errors", editable = true }
+kafka-utils = { path = "../../packages/kafka-utils", editable = true }
+middleware = { path = "../../packages/middleware", editable = true }
+observability = { path = "../../packages/observability", editable = true }
+server = { path = "../../packages/server", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../../packages/errors/src"]

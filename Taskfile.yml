@@ -9,6 +9,9 @@ vars:
   DEV_IMAGE_REGISTRY: '{{default "localhost:5001" .DEV_IMAGE_REGISTRY}}'
   DEV_IMAGE_NAMESPACE: '{{default "" .DEV_IMAGE_NAMESPACE}}'
   DEV_IMAGE_TAG: '{{default "dev" .DEV_IMAGE_TAG}}'
+  DOCKER_BUILD_PLATFORMS: '{{default "linux/amd64,linux/arm64" .DOCKER_BUILD_PLATFORMS}}'
+  DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
+  DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   APP_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
   APP_IMAGE_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
   DASHBOARD_SERVICE: '{{default "dashboard" .DASHBOARD_SERVICE}}'
@@ -135,15 +138,41 @@ tasks:
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
+        build_platforms='{{.DOCKER_BUILD_PLATFORMS}}'
+        if [ -z "${build_platforms}" ]; then
+          printf '%s\n' 'DOCKER_BUILD_PLATFORMS is required and must include linux/arm64.' >&2
+          exit 2
+        fi
+        case ",${build_platforms}," in
+          *,linux/arm64,*) ;;
+          *)
+            printf 'DOCKER_BUILD_PLATFORMS must include linux/arm64, got: %s\n' "${build_platforms}" >&2
+            exit 2
+            ;;
+        esac
+        cache_args=""
+        cache_from='{{.DOCKER_BUILD_CACHE_FROM}}'
+        cache_to='{{.DOCKER_BUILD_CACHE_TO}}'
+        while IFS= read -r cache; do
+          if [ -n "${cache}" ]; then
+            cache_args="${cache_args} --cache-from ${cache}"
+          fi
+        done <<EOF
+        ${cache_from}
+        EOF
+        while IFS= read -r cache; do
+          if [ -n "${cache}" ]; then
+            cache_args="${cache_args} --cache-to ${cache}"
+          fi
+        done <<EOF
+        ${cache_to}
+        EOF
         build_image() {
           service="$1"
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           case "${service}" in
             auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-              docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
-              ;;
-            auth-service)
-              docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+              docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
               ;;
             "${dashboard}")
               docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
@@ -251,10 +280,39 @@ tasks:
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
+        build_platforms='{{.DOCKER_BUILD_PLATFORMS}}'
+        if [ -z "${build_platforms}" ]; then
+          printf '%s\n' 'DOCKER_BUILD_PLATFORMS is required and must include linux/arm64.' >&2
+          exit 2
+        fi
+        case ",${build_platforms}," in
+          *,linux/arm64,*) ;;
+          *)
+            printf 'DOCKER_BUILD_PLATFORMS must include linux/arm64, got: %s\n' "${build_platforms}" >&2
+            exit 2
+            ;;
+        esac
+        cache_args=""
+        cache_from='{{.DOCKER_BUILD_CACHE_FROM}}'
+        cache_to='{{.DOCKER_BUILD_CACHE_TO}}'
+        while IFS= read -r cache; do
+          if [ -n "${cache}" ]; then
+            cache_args="${cache_args} --cache-from ${cache}"
+          fi
+        done <<EOF
+        ${cache_from}
+        EOF
+        while IFS= read -r cache; do
+          if [ -n "${cache}" ]; then
+            cache_args="${cache_args} --cache-to ${cache}"
+          fi
+        done <<EOF
+        ${cache_to}
+        EOF
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         case "${service}" in
           auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-            docker buildx build --platform linux/amd64,linux/arm64 --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+            docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
             ;;
           "${dashboard}")
             docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"

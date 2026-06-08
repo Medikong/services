@@ -17,7 +17,8 @@ COPY packages/middleware ./packages/middleware
 COPY packages/observability ./packages/observability
 COPY packages/server ./packages/server
 WORKDIR /build/services/concert-service
-RUN uv sync --frozen --no-dev --no-install-project --no-editable
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project --no-editable
 
 FROM python:3.12-slim AS runtime
 

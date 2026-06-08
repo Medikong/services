@@ -35,6 +35,7 @@ env:
   IMAGE_REGISTRY: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com
   IMAGE_TAG: ${{ github.sha }}
   AWS_REGION: ap-northeast-2
+  DOCKER_BUILD_PLATFORMS: linux/amd64,linux/arm64
 
 jobs:
   select-images:
@@ -106,14 +107,22 @@ jobs:
       - name: Docker 이미지 빌드
         shell: bash
         working-directory: ${{ github.workspace }}
+        env:
+          DOCKER_BUILD_CACHE_FROM: |
+            type=gha,scope=${{ matrix.image }}-linux-amd64
+            type=gha,scope=${{ matrix.image }}-linux-arm64
+          DOCKER_BUILD_CACHE_TO: |
+            type=gha,scope=${{ matrix.image }}-linux-amd64,mode=max
+            type=gha,scope=${{ matrix.image }}-linux-arm64,mode=max
         run: |
           set -euo pipefail
-          pwd
-          ls
           task app-image-build \
             SERVICE="${{ matrix.image }}" \
             IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
-            IMAGE_TAG="${IMAGE_TAG}"
+            IMAGE_TAG="${IMAGE_TAG}" \
+            DOCKER_BUILD_PLATFORMS="${DOCKER_BUILD_PLATFORMS}" \
+            DOCKER_BUILD_CACHE_FROM="${DOCKER_BUILD_CACHE_FROM}" \
+            DOCKER_BUILD_CACHE_TO="${DOCKER_BUILD_CACHE_TO}"
 
 
       - name: digest 수집 및 deploy plan 작성
