@@ -2,9 +2,9 @@ SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
 
-VENV_DIR ?= .venv
-VENV_BOOTSTRAP_PYTHON ?= python3.13
-VENV_PYTHON := $(CURDIR)/$(VENV_DIR)/bin/python
+UV ?= uv
+UV_PYTHON ?= python3.13
+DEV_VENV_DIR ?= .venv
 
 TEST_RUNNER_IMAGE ?= ticketing-python-test-runner:local
 PYTEST_ARGS ?= -q -s -p no:cacheprovider
@@ -59,7 +59,7 @@ help:
 	@printf '%s\n' 'Ticketing service commands'
 	@printf '%s\n' ''
 	@printf '%s\n' 'Setup'
-	@printf '  %-30s %s\n' 'make install' 'Create a Python venv and install service dependencies.'
+	@printf '  %-30s %s\n' 'make install' 'Sync the unified uv development environment.'
 	@printf '%s\n' ''
 	@printf '%s\n' 'Tests'
 	@printf '  %-30s %s\n' 'make test-unit' 'Run FastAPI service pytest in the Docker Python runner.'
@@ -86,30 +86,12 @@ list: help
 
 install:
 	@set -e; \
-	if ! command -v $(VENV_BOOTSTRAP_PYTHON) >/dev/null 2>&1; then \
-		printf '%s\n' '$(VENV_BOOTSTRAP_PYTHON) command not found. Set VENV_BOOTSTRAP_PYTHON=python3 to use another interpreter.' >&2; \
+	if ! command -v $(UV) >/dev/null 2>&1; then \
+		printf '%s\n' '$(UV) command not found. Install uv or set UV=/path/to/uv.' >&2; \
 		exit 1; \
 	fi; \
-	$(VENV_BOOTSTRAP_PYTHON) -m venv $(VENV_DIR); \
-	$(VENV_PYTHON) -m pip install --upgrade pip; \
-	$(VENV_PYTHON) -m pip install \
-		-e packages/contracts \
-		-e packages/errors \
-		-e packages/observability \
-		-e packages/server \
-		-r services/auth-service/requirements.txt \
-		-r services/auth-service/requirements-test.txt \
-		-r services/concert-service/requirements.txt \
-		-r services/concert-service/requirements-test.txt \
-		-r services/notification-service/requirements.txt \
-		-r services/notification-service/requirements-test.txt \
-		-r services/payment-service/requirements.txt \
-		-r services/payment-service/requirements-test.txt \
-		-r services/reservation-service/requirements.txt \
-		-r services/reservation-service/requirements-test.txt \
-		-r services/ticket-service/requirements.txt \
-		-r services/ticket-service/requirements-test.txt; \
-	printf '%s\n' 'Python venv is ready at $(VENV_DIR).'
+	UV_PROJECT_ENVIRONMENT="$(DEV_VENV_DIR)" $(UV) sync --frozen --group test --python "$(UV_PYTHON)"; \
+	printf '%s\n' 'Unified uv development environment is ready at $(DEV_VENV_DIR).'
 
 test-runner-build:
 	docker build -f tests/docker/Dockerfile -t $(TEST_RUNNER_IMAGE) .

@@ -1,8 +1,9 @@
 version: "3"
 
 vars:
-  VENV_DIR: '{{default ".venv" .VENV_DIR}}'
-  VENV_BOOTSTRAP_PYTHON: '{{default "python3.13" .VENV_BOOTSTRAP_PYTHON}}'
+  UV: '{{default "uv" .UV}}'
+  UV_PYTHON: '{{default "python3.13" .UV_PYTHON}}'
+  DEV_VENV_DIR: '{{default ".venv" .DEV_VENV_DIR}}'
   IMAGE_REGISTRY: '{{default "10.10.10.10:5000" .IMAGE_REGISTRY}}'
   IMAGE_NAMESPACE: '{{default "" .IMAGE_NAMESPACE}}'
   IMAGE_TAG: '{{default "latest" .IMAGE_TAG}}'
@@ -38,42 +39,19 @@ tasks:
       - task --list
 
   install:
-    desc: Create a Python venv and install service dependencies.
+    desc: Sync the unified uv development environment.
     cmds:
       - |
         set -e
-        python_cmd='{{.VENV_BOOTSTRAP_PYTHON}}'
-        venv_dir='{{.VENV_DIR}}'
-        if ! command -v "${python_cmd}" >/dev/null 2>&1; then
-          printf '%s\n' "${python_cmd} command not found. Set VENV_BOOTSTRAP_PYTHON=python3 to use another interpreter." >&2
+        uv_cmd='{{.UV}}'
+        python_spec='{{.UV_PYTHON}}'
+        venv_dir='{{.DEV_VENV_DIR}}'
+        if ! command -v "${uv_cmd}" >/dev/null 2>&1; then
+          printf '%s\n' "${uv_cmd} command not found. Install uv or set UV=/path/to/uv." >&2
           exit 1
         fi
-        "${python_cmd}" -m venv "${venv_dir}"
-        venv_python="${venv_dir}/bin/python"
-        if [ ! -x "${venv_python}" ]; then
-          venv_python="${venv_dir}/Scripts/python.exe"
-        fi
-        "${venv_python}" -m pip install --upgrade pip
-        "${venv_python}" -m pip install \
-          -e packages/contracts \
-          -e packages/errors \
-          -e packages/kafka-utils \
-          -e packages/middleware \
-          -e packages/observability \
-          -e packages/server \
-          -r services/auth-service/requirements.txt \
-          -r services/auth-service/requirements-test.txt \
-          -r services/concert-service/requirements.txt \
-          -r services/concert-service/requirements-test.txt \
-          -r services/notification-service/requirements.txt \
-          -r services/notification-service/requirements-test.txt \
-          -r services/payment-service/requirements.txt \
-          -r services/payment-service/requirements-test.txt \
-          -r services/reservation-service/requirements.txt \
-          -r services/reservation-service/requirements-test.txt \
-          -r services/ticket-service/requirements.txt \
-          -r services/ticket-service/requirements-test.txt
-        printf 'Python venv is ready at %s.\n' "${venv_dir}"
+        UV_PROJECT_ENVIRONMENT="${venv_dir}" "${uv_cmd}" sync --frozen --group test --python "${python_spec}"
+        printf 'Unified uv development environment is ready at %s.\n' "${venv_dir}"
 
   test-runner-build:
     desc: Build the Docker Python test runner image.

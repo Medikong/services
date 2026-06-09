@@ -1,0 +1,48 @@
+[project]
+name = "medikong-service-dev"
+version = "0.1.0"
+description = "Unified local development environment for Medikong services"
+requires-python = ">=3.12"
+dependencies = [
+    "aiokafka==0.12.0",
+    "boto3==1.38.0",
+    "contracts",
+    "errors",
+    "fastapi==0.124.0",
+    "kafka-utils",
+    "metrics",
+    "middleware",
+    "motor==3.7.0",
+    "observability",
+    "pillow==11.2.1",
+    "prometheus-client==0.23.1",
+    "psycopg[binary]==3.3.2",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.12.0",
+    "qrcode==8.1",
+    "server",
+    "sqlalchemy==2.0.45",
+    "uvicorn[standard]==0.38.0",
+]
+
+[dependency-groups]
+test = [
+    "anyio==4.13.0",
+    "httpx==0.28.1",
+    "mongomock-motor==0.0.34",
+    "pytest==9.0.2",
+    "testcontainers>=4.14.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+contracts = { path = "packages/contracts", editable = true }
+errors = { path = "packages/errors", editable = true }
+kafka-utils = { path = "packages/kafka-utils", editable = true }
+metrics = { path = "packages/metrics", editable = true }
+middleware = { path = "packages/middleware", editable = true }
+observability = { path = "packages/observability", editable = true }
+server = { path = "packages/server", editable = true }
+
