@@ -36,6 +36,7 @@ class MetricResult(StrEnum):
     REJECTION = "rejection"
     DUPLICATE = "duplicate"
     SKIPPED = "skipped"
+    DELAYED = "delayed"
 
 
 class FailureKind(StrEnum):
@@ -46,6 +47,11 @@ class FailureKind(StrEnum):
 
 
 class Expected(StrEnum):
+    TRUE = "true"
+    FALSE = "false"
+
+
+class Retryable(StrEnum):
     TRUE = "true"
     FALSE = "false"
 

@@ -1,0 +1,213 @@
+import asyncio
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from aiokafka.errors import KafkaError
+from kafka_utils import build_producer_headers
+from sqlalchemy.orm import Session
+
+from app.auth import UserContext
+from app.config import settings
+from app.kafka import KafkaProducer
+from app.metrics import PaymentEventType
+from app.metrics.recorder import PaymentTelemetryRecorder
+from app.models import Payment, PaymentEvent
+from app.schemas import CreatePaymentRequest
+
+
+logger = logging.getLogger(__name__)
+PUBLISH_STATUS_PENDING = "pending"
+PUBLISH_STATUS_PUBLISHED = "published"
+PUBLISH_STATUS_FAILED = "failed"
+DEFAULT_MAX_PUBLISH_ATTEMPTS = 3
+
+
+@dataclass(frozen=True)
+class PaymentEventDraft:
+    event_id: str
+    event_type: PaymentEventType
+    payload: dict
+
+
+class PaymentEventDispatcher:
+    def __init__(
+        self,
+        *,
+        db: Session,
+        telemetry: PaymentTelemetryRecorder,
+        max_attempts: int = DEFAULT_MAX_PUBLISH_ATTEMPTS,
+    ) -> None:
+        """pending outbox 이벤트를 Kafka로 발행할 의존성을 보관한다."""
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be greater than 0")
+        self._db = db
+        self._telemetry = telemetry
+        self._max_attempts = max_attempts
+
+    async def dispatch_pending(
+        self,
+        *,
+        kafka_producer: KafkaProducer,
+        limit: int = 100,
+    ) -> int:
+        """pending 이벤트를 조회해 순서대로 Kafka에 발행한다."""
+        if limit < 1:
+            raise ValueError("limit must be greater than 0")
+
+        events = (
+            self._db.query(PaymentEvent)
+            .filter(PaymentEvent.publish_status == PUBLISH_STATUS_PENDING)
+            .order_by(PaymentEvent.created_at, PaymentEvent.id)
+            .limit(limit)
+            .all()
+        )
+
+        published_count = 0
+        for event in events:
+            await self.dispatch_event(event=event, kafka_producer=kafka_producer)
+            published_count += 1
+
+        return published_count
+
+    async def dispatch_event(
+        self,
+        *,
+        event: PaymentEvent,
+        kafka_producer: KafkaProducer,
+    ) -> None:
+        """단일 outbox 이벤트를 Kafka에 발행하고 상태를 갱신한다."""
+        if kafka_producer is None:
+            raise RuntimeError("kafka producer is not configured")
+
+        event_type = PaymentEventType(event.event_type)
+        try:
+            await kafka_producer.send_and_wait(
+                _payment_event_topic(event_type),
+                event.payload,
+                headers=build_producer_headers(correlation_id=event.payload.get("correlationId")),
+            )
+        except (KafkaError, RuntimeError) as exc:
+            self._mark_failed(event, exc)
+            self._telemetry.record_event_publish_failure(event_type)
+            raise
+
+        event.publish_attempts += 1
+        event.publish_status = PUBLISH_STATUS_PUBLISHED
+        event.published_at = datetime.now(UTC)
+        event.last_publish_error = None
+
+        self._db.commit()
+        self._telemetry.record_event_publish_success(event_type)
+
+    def _mark_failed(self, event: PaymentEvent, exc: KafkaError | RuntimeError) -> None:
+        """실패한 발행 시도의 outbox 상태를 저장한다."""
+        event.publish_attempts += 1
+        if event.publish_attempts >= self._max_attempts:
+            event.publish_status = PUBLISH_STATUS_FAILED
+        else:
+            event.publish_status = PUBLISH_STATUS_PENDING
+        event.last_publish_error = _summarize_publish_error(exc)
+        self._db.commit()
+
+
+async def run_payment_event_dispatcher(
+    stop_event: asyncio.Event,
+    *,
+    session_factory: Callable[[], Session],
+    kafka_producer: KafkaProducer,
+    interval_seconds: float,
+    batch_size: int,
+    max_attempts: int = DEFAULT_MAX_PUBLISH_ATTEMPTS,
+) -> None:
+    """애플리케이션 실행 중 pending outbox 이벤트를 주기적으로 발행한다."""
+    if kafka_producer is None:
+        raise RuntimeError("kafka producer is not configured")
+    if interval_seconds <= 0:
+        raise ValueError("interval_seconds must be greater than 0")
+    if batch_size < 1:
+        raise ValueError("batch_size must be greater than 0")
+
+    while not stop_event.is_set():
+        try:
+            with session_factory() as db:
+                dispatcher = PaymentEventDispatcher(
+                    db=db,
+                    telemetry=PaymentTelemetryRecorder(),
+                    max_attempts=max_attempts,
+                )
+                await dispatcher.dispatch_pending(kafka_producer=kafka_producer, limit=batch_size)
+        except (KafkaError, RuntimeError):
+            logger.exception("payment_event_dispatch_failed")
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except TimeoutError:
+            pass
+
+
+def payment_event_type_for_status(payment_status: str) -> PaymentEventType | None:
+    """결제 상태에 대응하는 외부 발행 이벤트 타입을 반환한다."""
+    # 승인/실패 상태만 외부 서비스가 소비할 결제 이벤트가 된다.
+    if payment_status == "approved":
+        return PaymentEventType.APPROVED
+    if payment_status == "failed":
+        return PaymentEventType.FAILED
+    return None
+
+
+def build_payment_event_draft(
+    *,
+    event_type: PaymentEventType,
+    payment: Payment,
+    request_body: CreatePaymentRequest,
+    user: UserContext,
+    correlation_id: str | None,
+) -> PaymentEventDraft:
+    """outbox 저장과 Kafka 발행에 사용할 결제 이벤트 초안을 만든다."""
+    event_id = f"evt-{uuid4()}"
+    payload = {
+        "eventId": event_id,
+        "eventType": event_type.value,
+        "userId": _event_user_id(user.user_id),
+        "sourceId": payment.id,
+        "paymentId": payment.id,
+        "reservationId": payment.reservation_id,
+        "concertId": payment.concert_id,
+        "seatId": request_body.seatId or "unknown",
+        "amount": payment.amount,
+        "status": payment.status,
+        "occurredAt": datetime.now(UTC).isoformat(),
+        "producer": settings.service_name,
+        "correlationId": correlation_id,
+    }
+
+    # payload에는 추적용 ID를 남기지만 metric label로는 보내지 않는다.
+    return PaymentEventDraft(
+        event_id=event_id,
+        event_type=event_type,
+        payload=payload,
+    )
+
+
+def _payment_event_topic(event_type: PaymentEventType) -> str:
+    """이벤트 타입에 대응하는 Kafka topic 이름을 반환한다."""
+    # topic 이름은 설정값을 우선 사용한다.
+    if event_type is PaymentEventType.APPROVED:
+        return settings.payment_approved_topic
+    if event_type is PaymentEventType.FAILED:
+        return settings.payment_failed_topic
+    return event_type.value
+
+
+def _event_user_id(value: str) -> int | str:
+    """이벤트 계약 호환을 위해 숫자형 user_id를 int로 변환한다."""
+    # 기존 이벤트 계약 호환을 위해 숫자 문자열은 int로 유지한다.
+    return int(value) if value.isdigit() else value
+
+
+def _summarize_publish_error(exc: KafkaError | RuntimeError) -> str:
+    """outbox에 저장할 발행 오류 요약을 만든다."""
+    summary = str(exc) or exc.__class__.__name__
+    return summary[:500]

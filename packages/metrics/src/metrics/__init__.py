@@ -13,6 +13,7 @@ from metrics.labels import (
     Expected,
     FailureKind,
     MetricResult,
+    Retryable,
     ServiceIdentity,
     assert_safe_metric_label_names,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "HttpActiveRequestLabel",
     "HttpRequestDurationLabel",
     "MetricResult",
+    "Retryable",
     "ServiceIdentity",
     "ServiceReadyLabel",
     "assert_safe_metric_label_names",

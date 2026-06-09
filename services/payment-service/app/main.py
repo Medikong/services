@@ -1,36 +1,63 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
-from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
-from kafka_utils import build_producer_headers
+from fastapi import FastAPI, status
 from observability import register_error_handlers
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from prometheus_client import CollectorRegistry
 from server.operational import register_operational_handlers, sqlalchemy_readiness_check
 
 from app import models
-from app.auth import UserContext, require_role, require_user_context
 from app.config import settings
-from app.database import engine, get_db
-from app.kafka import KafkaProducer, create_producer, get_kafka_producer
-from app.models import Payment, PaymentEvent
+from app.database import SessionLocal, engine
+from app.kafka import create_producer
+from app.metrics import configure_payment_metrics
 from app.observability import configure_app_observability
-from app.schemas import CreatePaymentRequest, PaymentResponse, SettlementBasisResponse
+from app.routes.payments import router as payments_router
+from app.services.payment_events import run_payment_event_dispatcher
 
 
 models.Base.metadata.create_all(bind=engine)
 
 
+def _configure_payment_service_metrics(registry: CollectorRegistry, *, service_environment: str) -> None:
+    """payment-service 전용 Prometheus metric을 운영 registry에 등록한다."""
+    configure_payment_metrics(
+        registry,
+        service_name=settings.service_name,
+        service_environment=service_environment,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """애플리케이션 시작/종료 시 Kafka producer와 outbox dispatcher를 관리한다."""
     producer = app.state.kafka_producer
     if producer is not None:
         await producer.start()
+        app.state.payment_event_dispatcher_stop_event = asyncio.Event()
+        app.state.payment_event_dispatcher_task = asyncio.create_task(
+            run_payment_event_dispatcher(
+                app.state.payment_event_dispatcher_stop_event,
+                session_factory=SessionLocal,
+                kafka_producer=producer,
+                interval_seconds=settings.payment_event_dispatch_interval_seconds,
+                batch_size=settings.payment_event_dispatch_batch_size,
+                max_attempts=settings.payment_event_dispatch_max_attempts,
+            )
+        )
     try:
         yield
     finally:
+        dispatcher_task = getattr(app.state, "payment_event_dispatcher_task", None)
+        dispatcher_stop_event = getattr(app.state, "payment_event_dispatcher_stop_event", None)
+        if dispatcher_task is not None and dispatcher_stop_event is not None:
+            dispatcher_stop_event.set()
+            dispatcher_task.cancel()
+            try:
+                await dispatcher_task
+            except asyncio.CancelledError:
+                pass
         if producer is not None:
             await producer.stop()
 
@@ -51,198 +78,23 @@ register_operational_handlers(
     service_version=observability_config.service_version,
     service_environment=observability_config.service_environment,
     readiness_checks={"database": sqlalchemy_readiness_check(engine)},
+    configure_metrics=lambda registry: _configure_payment_service_metrics(
+        registry,
+        service_environment=observability_config.service_environment,
+    ),
     include_timestamp=True,
 )
+app.include_router(payments_router)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """기존 호환용 health endpoint 응답을 반환한다."""
     return {"status": "ok", "service": settings.service_name}
 
 
-@app.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
-async def create_payment(
-    request_body: CreatePaymentRequest,
-    request: Request,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
-    user: UserContext = Depends(require_user_context),
-    db: Session = Depends(get_db),
-    kafka_producer: KafkaProducer = Depends(get_kafka_producer),
-) -> PaymentResponse:
-    require_role(user, {"CUSTOMER"})
-
-    if idempotency_key:
-        existing = (
-            db.query(Payment)
-            .filter(Payment.user_id == user.user_id, Payment.idempotency_key == idempotency_key)
-            .one_or_none()
-        )
-        if existing is not None:
-            return PaymentResponse.model_validate(existing)
-
-    payment = Payment(
-        id=f"pay-{uuid4()}",
-        reservation_id=request_body.reservationId,
-        concert_id=request_body.concertId,
-        user_id=user.user_id,
-        amount=request_body.amount,
-        method=request_body.method,
-        status=_status_from_simulation(request_body.simulation),
-        idempotency_key=idempotency_key,
-        approved_at=datetime.now(UTC) if request_body.simulation == "approve" else None,
-    )
-    db.add(payment)
-    event_name = _payment_event_name(payment.status)
-    event_payload = None
-    if event_name is not None:
-        event_id = f"evt-{uuid4()}"
-        event_payload = _payment_event_payload(
-            event_id=event_id,
-            event_name=event_name,
-            payment=payment,
-            request_body=request_body,
-            user=user,
-            request=request,
-        )
-        db.add(
-            PaymentEvent(
-                id=event_id,
-                event_type=event_name,
-                payment_id=payment.id,
-                payload=event_payload,
-            )
-        )
-    db.commit()
-    db.refresh(payment)
-    request.state.payment_event = event_name
-    if event_name is not None and event_payload is not None and kafka_producer is not None:
-        await kafka_producer.send_and_wait(
-            _payment_event_topic(event_name),
-            event_payload,
-            headers=build_producer_headers(correlation_id=event_payload.get("correlationId")),
-        )
-    return PaymentResponse.model_validate(payment)
-
-
-@app.get("/payments/{paymentId}", response_model=PaymentResponse)
-def get_payment(
-    paymentId: str,
-    user: UserContext = Depends(require_user_context),
-    db: Session = Depends(get_db),
-) -> PaymentResponse:
-    payment = db.get(Payment, paymentId)
-    if payment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
-    if user.role != "ADMIN" and payment.user_id != user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return PaymentResponse.model_validate(payment)
-
-
-@app.get("/provider/concerts/{concertId}/settlement-basis", response_model=SettlementBasisResponse)
-def provider_get_settlement_basis(
-    concertId: str,
-    user: UserContext = Depends(require_user_context),
-    db: Session = Depends(get_db),
-) -> SettlementBasisResponse:
-    require_role(user, {"PROVIDER", "ADMIN"})
-    return _settlement_for_concert(concertId, db)
-
-
-@app.get("/admin/concerts/{concertId}/settlement-basis", response_model=SettlementBasisResponse)
-def admin_get_settlement_basis(
-    concertId: str,
-    user: UserContext = Depends(require_user_context),
-    db: Session = Depends(get_db),
-) -> SettlementBasisResponse:
-    require_role(user, {"ADMIN"})
-    return _settlement_for_concert(concertId, db)
-
-
-def _status_from_simulation(simulation: str) -> str:
-    if simulation == "approve":
-        return "approved"
-    if simulation == "fail":
-        return "failed"
-    if simulation == "delay":
-        return "delayed"
-    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid payment simulation")
-
-
-def _payment_event_name(payment_status: str) -> str | None:
-    if payment_status == "approved":
-        return "payment-approved"
-    if payment_status == "failed":
-        return "payment-failed"
-    return None
-
-
-def _payment_event_topic(event_name: str) -> str:
-    if event_name == "payment-approved":
-        return settings.payment_approved_topic
-    if event_name == "payment-failed":
-        return settings.payment_failed_topic
-    return event_name
-
-
-def _payment_event_payload(
-    *,
-    event_id: str,
-    event_name: str,
-    payment: Payment,
-    request_body: CreatePaymentRequest,
-    user: UserContext,
-    request: Request,
-) -> dict:
-    return {
-        "eventId": event_id,
-        "eventType": event_name,
-        "userId": _event_user_id(user.user_id),
-        "sourceId": payment.id,
-        "paymentId": payment.id,
-        "reservationId": payment.reservation_id,
-        "concertId": payment.concert_id,
-        "seatId": request_body.seatId or "unknown",
-        "amount": payment.amount,
-        "status": payment.status,
-        "occurredAt": datetime.now(UTC).isoformat(),
-        "producer": settings.service_name,
-        "correlationId": getattr(request.state, "request_id", None) or request.headers.get("X-Request-Id"),
-    }
-
-
-def _event_user_id(value: str) -> int | str:
-    return int(value) if value.isdigit() else value
-
-
-def _settlement_for_concert(concert_id: str, db: Session) -> SettlementBasisResponse:
-    gross_amount = (
-        db.query(func.coalesce(func.sum(Payment.amount), 0))
-        .filter(Payment.concert_id == concert_id, Payment.status == "approved")
-        .scalar()
-    )
-    ticket_count = (
-        db.query(func.count(Payment.id))
-        .filter(Payment.concert_id == concert_id, Payment.status == "approved")
-        .scalar()
-    )
-    gross = int(gross_amount or 0)
-    count = int(ticket_count or 0)
-    refund = 0
-    platform_fee = int(gross * 0.1)
-    net = gross - refund
-    return SettlementBasisResponse(
-        concertId=concert_id,
-        grossAmount=gross,
-        refundAmount=refund,
-        netAmount=net,
-        ticketCount=count,
-        platformFeeAmount=platform_fee,
-        providerSettlementAmount=net - platform_fee,
-        calculatedAt=datetime.now(UTC),
-    )
-
-
 def _error_code_for_status(status_code: int) -> str:
+    """HTTP 상태 코드를 payment-service 오류 코드로 변환한다."""
     if status_code == status.HTTP_401_UNAUTHORIZED:
         return "auth.invalid_token"
     if status_code == status.HTTP_403_FORBIDDEN:
