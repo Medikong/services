@@ -28,8 +28,9 @@ models.Base.metadata.create_all(bind=engine)
 with SessionLocal() as seed_db:
     seed_demo_users(seed_db)
 
+observability_config = settings.observability_config()
 app = FastAPI(title=settings.service_name)
-configure_app_observability(app, settings.observability_config())
+configure_app_observability(app, observability_config)
 register_error_handlers(
     app,
     service_name=settings.service_name,
@@ -39,6 +40,8 @@ register_error_handlers(
 register_operational_handlers(
     app,
     service_name=settings.service_name,
+    service_version=observability_config.service_version,
+    service_environment=observability_config.service_environment,
     readiness_checks={"database": sqlalchemy_readiness_check(engine)},
     include_timestamp=True,
 )

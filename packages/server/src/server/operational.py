@@ -1,6 +1,5 @@
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
-from os import environ
 from time import perf_counter
 
 from fastapi import FastAPI, Request, status
@@ -33,6 +32,8 @@ def register_operational_handlers(
     app: FastAPI,
     *,
     service_name: str,
+    service_version: str,
+    service_environment: str,
     readiness_checks: Mapping[str, ReadinessCheck],
     configure_metrics: MetricsConfigurator | None = None,
     registry: CollectorRegistry | None = None,
@@ -40,19 +41,17 @@ def register_operational_handlers(
     readiness_success_status: str = "ready",
     readiness_failure_status: str = "not_ready",
     include_readiness_checks: bool = True,
-    service_version: str | None = None,
-    service_environment: str | None = None,
 ) -> CollectorRegistry:
     metrics_registry = registry or CollectorRegistry(auto_describe=True)
     configure_runtime_collectors(metrics_registry)
     # 서비스 식별 label
     # - 적용 대상: 모든 공통 HTTP/readiness 메트릭
-    # - 우선순위: 명시 인자 > SERVICE_VERSION/SERVICE_ENVIRONMENT > 기본값
-    # - 이유: 배포 버전/환경 label 누락으로 PromQL 쿼리가 갈라지는 상황 방지
-    service_identity = ServiceIdentity.from_optional_values(
+    # - 입력 기준: 호출자가 외부 설정/env를 해석해 넘긴 값만 사용
+    # - 실패 기준: 누락/빈 값은 잘못된 운영 설정으로 보고 즉시 예외
+    service_identity = ServiceIdentity(
         service_name=service_name,
-        service_version=service_version or environ.get("SERVICE_VERSION"),
-        service_environment=service_environment or environ.get("SERVICE_ENVIRONMENT"),
+        service_version=service_version,
+        service_environment=service_environment,
     )
 
     # Prometheus metric handles

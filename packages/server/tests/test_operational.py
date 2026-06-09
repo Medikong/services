@@ -14,9 +14,19 @@ from server.operational import (
 )
 
 
+def register_test_operational_handlers(app: FastAPI, **kwargs: object) -> None:
+    register_operational_handlers(
+        app,
+        service_name="test-service",
+        service_version="test-version",
+        service_environment="test",
+        **kwargs,
+    )
+
+
 def test_register_operational_handlers_adds_healthz_readyz_and_metrics() -> None:
     app = FastAPI()
-    register_operational_handlers(app, service_name="test-service", readiness_checks={"database": lambda: "ok"})
+    register_test_operational_handlers(app, readiness_checks={"database": lambda: "ok"})
     client = TestClient(app)
 
     assert client.get("/healthz").json() == {"status": "ok", "service": "test-service"}
@@ -30,9 +40,8 @@ def test_register_operational_handlers_adds_healthz_readyz_and_metrics() -> None
 
 def test_readyz_returns_503_and_failed_check_when_readiness_fails() -> None:
     app = FastAPI()
-    register_operational_handlers(
+    register_test_operational_handlers(
         app,
-        service_name="test-service",
         readiness_checks={"database": lambda: "failed: OperationalError"},
     )
     client = TestClient(app)
@@ -52,7 +61,7 @@ def test_readyz_surfaces_unexpected_check_exception_as_failed_check() -> None:
         raise RuntimeError("boom")
 
     app = FastAPI()
-    register_operational_handlers(app, service_name="test-service", readiness_checks={"database": failing_check})
+    register_test_operational_handlers(app, readiness_checks={"database": failing_check})
     client = TestClient(app)
 
     response = client.get("/readyz")
@@ -63,7 +72,7 @@ def test_readyz_surfaces_unexpected_check_exception_as_failed_check() -> None:
 
 def test_metrics_returns_prometheus_text_and_http_metrics() -> None:
     app = FastAPI()
-    register_operational_handlers(app, service_name="test-service", readiness_checks={})
+    register_test_operational_handlers(app, readiness_checks={})
     client = TestClient(app)
     client.get("/healthz")
 
@@ -78,8 +87,8 @@ def test_metrics_returns_prometheus_text_and_http_metrics() -> None:
     assert 'http_request_method="GET"' in response.text
     assert 'http_response_status_code="200"' in response.text
     assert 'service_name="test-service"' in response.text
-    assert 'service_version="unknown"' in response.text
-    assert 'service_environment="local"' in response.text
+    assert 'service_version="test-version"' in response.text
+    assert 'service_environment="test"' in response.text
 
 
 def test_http_metrics_use_route_template_not_raw_path() -> None:
@@ -109,7 +118,7 @@ def test_http_metrics_use_route_template_not_raw_path() -> None:
 
 def test_http_metrics_do_not_expose_high_cardinality_labels() -> None:
     app = FastAPI()
-    register_operational_handlers(app, service_name="test-service", readiness_checks={})
+    register_test_operational_handlers(app, readiness_checks={})
     client = TestClient(app)
     client.get("/healthz", headers={"X-Request-Id": "req-123"})
 
@@ -130,6 +139,23 @@ def test_http_metrics_do_not_expose_high_cardinality_labels() -> None:
         assert f"{label}=" not in response.text
 
 
+def test_operational_handlers_require_service_identity_values() -> None:
+    app = FastAPI()
+
+    try:
+        register_operational_handlers(
+            app,
+            service_name="test-service",
+            service_version="",
+            service_environment="test",
+            readiness_checks={},
+        )
+    except ValueError as exc:
+        assert "service_version" in str(exc)
+    else:
+        raise AssertionError("service_version must be required")
+
+
 def test_metrics_configurator_can_register_service_specific_metrics() -> None:
     def configure_metrics(registry: CollectorRegistry) -> None:
         business_gauge = Gauge(
@@ -140,9 +166,8 @@ def test_metrics_configurator_can_register_service_specific_metrics() -> None:
         business_gauge.set(7)
 
     app = FastAPI()
-    register_operational_handlers(
+    register_test_operational_handlers(
         app,
-        service_name="test-service",
         readiness_checks={},
         configure_metrics=configure_metrics,
     )
@@ -156,9 +181,8 @@ def test_metrics_configurator_can_register_service_specific_metrics() -> None:
 
 def test_operational_handlers_can_preserve_legacy_ready_status_without_checks() -> None:
     app = FastAPI()
-    register_operational_handlers(
+    register_test_operational_handlers(
         app,
-        service_name="test-service",
         readiness_checks={},
         readiness_success_status="ok",
         readiness_failure_status="failed",
@@ -174,9 +198,8 @@ def test_operational_handlers_can_preserve_legacy_ready_status_without_checks() 
 
 def test_operational_handlers_can_include_timestamp_for_existing_contracts() -> None:
     app = FastAPI()
-    register_operational_handlers(
+    register_test_operational_handlers(
         app,
-        service_name="test-service",
         readiness_checks={"database": lambda: "ok"},
         include_timestamp=True,
     )

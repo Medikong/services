@@ -56,18 +56,24 @@ def test_common_operational_metric_factories_create_prometheus_handles() -> None
     assert 'service_name="payment-service"' in metrics_text
 
 
-def test_service_identity_uses_safe_defaults_for_optional_values() -> None:
-    identity = ServiceIdentity.from_optional_values(
+def test_service_identity_requires_service_version_and_environment() -> None:
+    identity = ServiceIdentity(
         service_name="payment-service",
-        service_version=None,
-        service_environment="",
+        service_version="test-version",
+        service_environment="test",
     )
 
     assert identity.service_labels() == {
         "service_name": "payment-service",
-        "service_version": "unknown",
-        "service_environment": "local",
+        "service_version": "test-version",
+        "service_environment": "test",
     }
+
+    with pytest.raises(ValueError, match="service_version"):
+        ServiceIdentity(service_name="payment-service", service_version="", service_environment="test")
+
+    with pytest.raises(ValueError, match="service_environment"):
+        ServiceIdentity(service_name="payment-service", service_version="test-version", service_environment="")
 
 
 def test_high_cardinality_labels_are_rejected() -> None:

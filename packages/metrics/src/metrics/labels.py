@@ -3,9 +3,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 
-DEFAULT_SERVICE_VERSION = "unknown"
-DEFAULT_SERVICE_ENVIRONMENT = "local"
-
 # 고카디널리티 label 금지 목록
 # - 목적: Prometheus 시계열 폭증 방지
 # - metric: 서비스/route/status 같은 낮은 cardinality 차원만 기록
@@ -60,25 +57,17 @@ COMMON_SERVICE_LABELS = tuple(label.value for label in CommonServiceLabel)
 class ServiceIdentity:
     # 공통 서비스 식별 label
     # - 필수: service_name
-    # - 선택: service_version, service_environment
-    # - 기본값: label 누락으로 PromQL/dashboard 쿼리가 갈라지는 상황 방지
+    # - 필수: service_version
+    # - 필수: service_environment
+    # - 실패: 호출자가 외부 설정/env를 해석하지 못한 경우 즉시 예외
     service_name: str
-    service_version: str = DEFAULT_SERVICE_VERSION
-    service_environment: str = DEFAULT_SERVICE_ENVIRONMENT
+    service_version: str
+    service_environment: str
 
-    @classmethod
-    def from_optional_values(
-        cls,
-        *,
-        service_name: str,
-        service_version: str | None,
-        service_environment: str | None,
-    ) -> "ServiceIdentity":
-        return cls(
-            service_name=service_name,
-            service_version=_default_if_blank(service_version, DEFAULT_SERVICE_VERSION),
-            service_environment=_default_if_blank(service_environment, DEFAULT_SERVICE_ENVIRONMENT),
-        )
+    def __post_init__(self) -> None:
+        _require_label_value("service_name", self.service_name)
+        _require_label_value("service_version", self.service_version)
+        _require_label_value("service_environment", self.service_environment)
 
     def service_labels(self) -> dict[str, str]:
         return {
@@ -94,7 +83,6 @@ def assert_safe_metric_label_names(label_names: Iterable[str]) -> None:
         raise ValueError(f"high-cardinality metric labels are not allowed: {', '.join(forbidden)}")
 
 
-def _default_if_blank(value: str | None, default: str) -> str:
+def _require_label_value(name: str, value: str | None) -> None:
     if value is None or value == "":
-        return default
-    return value
+        raise ValueError(f"{name} is required")

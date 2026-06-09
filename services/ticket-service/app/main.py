@@ -49,12 +49,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await producer.stop()
 
 
+observability_config = settings.observability_config()
 app = FastAPI(title=settings.service_name, lifespan=lifespan)
 app.state.kafka_producer = create_producer()
-configure_app_observability(app, settings.observability_config())
+configure_app_observability(app, observability_config)
 register_operational_handlers(
     app,
     service_name=settings.service_name,
+    service_version=observability_config.service_version,
+    service_environment=observability_config.service_environment,
     readiness_checks={},
     readiness_success_status="ok",
     readiness_failure_status="failed",
