@@ -54,7 +54,7 @@ jobs:
             .
 
       - name: Trivy 이미지 스캔
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.service }}:scan
           format: sarif
