@@ -2,7 +2,8 @@ version: "3"
 
 vars:
   ROOT_DIR: '{{.TASKFILE_DIR}}/..'
-  TEST_RUNNER_IMAGE: '{{default "ticketing-python-test-runner:local" .TEST_RUNNER_IMAGE}}'
+  TEST_RUNNER_IMAGE_PREFIX: '{{default "ticketing-test-runner" .TEST_RUNNER_IMAGE_PREFIX}}'
+  TEST_RUNNER_DOCKERFILE: '{{default "tests/docker/Dockerfile" .TEST_RUNNER_DOCKERFILE}}'
   PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
   TEST_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
@@ -34,9 +35,55 @@ vars:
 
 tasks:
   test-runner-build:
-    desc: Build the Docker Python test runner image.
+    desc: Build service-scoped Docker Python test runner images. Optionally set SERVICE=<service-name>.
     cmds:
-      - docker build -f "{{.ROOT_DIR}}/tests/docker/Dockerfile" -t {{.TEST_RUNNER_IMAGE}} "{{.ROOT_DIR}}"
+      - |
+        set -eu
+        requested_service='{{default "" .SERVICE}}'
+        normalize_service() {
+          case "$1" in
+            auth|auth-service) printf '%s\n' 'auth-service' ;;
+            concert|concert-service) printf '%s\n' 'concert-service' ;;
+            notification|notification-service) printf '%s\n' 'notification-service' ;;
+            payment|payment-service) printf '%s\n' 'payment-service' ;;
+            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
+            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
+            *) return 1 ;;
+          esac
+        }
+        image_for_service() {
+          printf '%s-%s:local\n' '{{.TEST_RUNNER_IMAGE_PREFIX}}' "$1"
+        }
+        build_service_image() {
+          service="$1"
+          image="$(image_for_service "${service}")"
+          printf 'building %s for %s\n' "${image}" "${service}"
+          docker build \
+            --build-arg SERVICE="${service}" \
+            -f "{{.ROOT_DIR}}/{{.TEST_RUNNER_DOCKERFILE}}" \
+            -t "${image}" \
+            "{{.ROOT_DIR}}"
+        }
+        if [ -n "${requested_service}" ]; then
+          if ! service="$(normalize_service "${requested_service}")"; then
+            printf 'Unknown SERVICE=%s (expected one of: {{.TEST_SERVICES}}).\n' "${requested_service}" >&2
+            exit 2
+          fi
+          build_service_image "${service}"
+          exit 0
+        fi
+        pids=""
+        failed=0
+        for service in {{.TEST_SERVICES}}; do
+          build_service_image "${service}" &
+          pids="${pids} $!"
+        done
+        for pid in ${pids}; do
+          if ! wait "${pid}"; then
+            failed=1
+          fi
+        done
+        exit "${failed}"
 
   test-service:
     desc: Run one service pytest suite with SERVICE=<service-name>.
@@ -47,8 +94,6 @@ tasks:
 
   test-services:
     desc: Run selected service pytest suites in parallel with SERVICES="<service-names>".
-    deps:
-      - test-runner-build
     cmds:
       - |
         set -eu
@@ -68,6 +113,19 @@ tasks:
             *) return 1 ;;
           esac
         }
+        image_for_service() {
+          printf '%s-%s:local\n' '{{.TEST_RUNNER_IMAGE_PREFIX}}' "$1"
+        }
+        build_service_image() {
+          service="$1"
+          image="$(image_for_service "${service}")"
+          printf 'building %s for %s\n' "${image}" "${service}"
+          docker build \
+            --build-arg SERVICE="${service}" \
+            -f "{{.ROOT_DIR}}/{{.TEST_RUNNER_DOCKERFILE}}" \
+            -t "${image}" \
+            "{{.ROOT_DIR}}"
+        }
         services=""
         for requested in ${requested_services}; do
           if ! service="$(normalize_service "${requested}")"; then
@@ -84,16 +142,30 @@ tasks:
         rm -rf "${reports_root}"
         mkdir -p "${reports_root}"
         python_bin='{{.PYTHON_BIN}}'
+        pids=""
+        failed=0
+        for service in ${services}; do
+          build_service_image "${service}" &
+          pids="${pids} $!"
+        done
+        for pid in ${pids}; do
+          if ! wait "${pid}"; then
+            failed=1
+          fi
+        done
+        if [ "${failed}" -ne 0 ]; then
+          exit 1
+        fi
         utc_now() {
           "${python_bin}" -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))'
         }
         epoch_now() {
           "${python_bin}" -c 'import time; print(int(time.time()))'
         }
-        pids=""
         failed=0
         for service in ${services}; do
           (
+            image="$(image_for_service "${service}")"
             report_dir="${reports_root}/${service}"
             rm -rf "${report_dir}"
             mkdir -p "${report_dir}"
@@ -105,8 +177,8 @@ tasks:
             docker run --rm \
               -v "${repo_root}":/workspace \
               -w "/workspace/services/${service}" \
-              {{.TEST_RUNNER_IMAGE}} \
-              sh -c "COVERAGE_FILE=/workspace/{{.UNIT_REPORT_DIR}}/${service}/.coverage PYTHONPATH=. /opt/test-envs/${service}/bin/python -m pytest {{.PYTEST_ARGS}} --junitxml=/workspace/{{.UNIT_REPORT_DIR}}/${service}/junit.xml --cov=app --cov-report=term-missing --cov-report=xml:/workspace/{{.UNIT_REPORT_DIR}}/${service}/coverage.xml --cov-report=html:/workspace/{{.UNIT_REPORT_DIR}}/${service}/htmlcov" \
+              "${image}" \
+              sh -c "COVERAGE_FILE=/workspace/{{.UNIT_REPORT_DIR}}/${service}/.coverage PYTHONPATH=. /opt/test-env/bin/python -m pytest {{.PYTEST_ARGS}} --junitxml=/workspace/{{.UNIT_REPORT_DIR}}/${service}/junit.xml --cov=app --cov-report=term-missing --cov-report=xml:/workspace/{{.UNIT_REPORT_DIR}}/${service}/coverage.xml --cov-report=html:/workspace/{{.UNIT_REPORT_DIR}}/${service}/htmlcov" \
               > "${report_dir}/pytest.log" 2>&1
             exit_code="$?"
             set -e
@@ -137,7 +209,7 @@ tasks:
         exit "${failed}"
 
   test-unit:
-    desc: Run all managed service pytest suites in the Docker Python runner.
+    desc: Run all managed service pytest suites in service-scoped Docker runners.
     cmds:
       - task: test-services
         vars:

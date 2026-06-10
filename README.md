@@ -35,7 +35,7 @@ task test-unit
 task test-service SERVICE=auth-service
 ```
 
-`task test-unit`은 `tests/docker/Dockerfile`로 테스트 러너 이미지를 만든 뒤 티켓 예매 서비스의 pytest를 실행합니다. E2E 테스트는 별도 담당 범위에서 관리합니다.
+`task test-unit`은 `tests/docker/Dockerfile` 템플릿으로 서비스별 테스트 러너 이미지를 만든 뒤 티켓 예매 서비스의 pytest를 실행합니다. E2E 테스트는 별도 담당 범위에서 관리합니다.
 
 ## 이미지 빌드와 푸시
 

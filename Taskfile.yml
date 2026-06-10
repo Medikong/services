@@ -66,26 +66,28 @@ tasks:
         printf 'Unified uv development environment is ready at %s.\n' "${venv_dir}"
 
   test-runner-build:
-    desc: Build the Docker Python test runner image.
+    desc: Build service-scoped Docker Python test runner images. Optionally set SERVICE=<service-name>.
     cmds:
       - task: tests:test-runner-build
+        vars:
+          SERVICE: '{{default "" .SERVICE}}'
 
   test-service:
-    desc: Run one service pytest in the Docker Python runner with SERVICE=<service-name>.
+    desc: Run one service pytest in its Docker Python runner with SERVICE=<service-name>.
     cmds:
       - task: tests:test-service
         vars:
           SERVICE: '{{default "" .SERVICE}}'
 
   test-services:
-    desc: Run selected service pytest suites in parallel with SERVICES="<service-names>".
+    desc: Run selected service pytest suites in parallel with service-scoped Docker runners.
     cmds:
       - task: tests:test-services
         vars:
           SERVICES: '{{default "" .SERVICES}}'
 
   test-unit:
-    desc: Run all managed service pytest suites in the Docker Python runner.
+    desc: Run all managed service pytest suites in service-scoped Docker runners.
     cmds:
       - task: tests:test-unit
 

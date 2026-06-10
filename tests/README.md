@@ -56,7 +56,7 @@ services/ticket-service/tests/
 
 ## 로컬 단위 테스트
 
-루트에서 전체 서비스 테스트를 실행한다. `task test-unit`은 `tests/docker/Dockerfile`로 Python 테스트 러너 이미지를 빌드한 뒤, 현재 소스 트리를 컨테이너에 마운트해 서비스별 pytest를 실행한다.
+루트에서 전체 서비스 테스트를 실행한다. `task test-unit`은 `tests/docker/Dockerfile` 템플릿으로 서비스별 Python 테스트 러너 이미지를 빌드한 뒤, 현재 소스 트리를 컨테이너에 마운트해 서비스별 pytest를 실행한다.
 
 ```bash
 task test-unit
@@ -69,7 +69,7 @@ task test-service SERVICE=auth-service
 task test-service SERVICE=auth
 ```
 
-여러 서비스만 골라서 확인할 때는 테스트 러너 이미지를 한 번 준비한 뒤 선택된 서비스 테스트를 병렬로 실행한다.
+여러 서비스만 골라서 확인할 때는 선택된 서비스의 테스트 러너 이미지만 준비한 뒤 서비스 테스트를 병렬로 실행한다.
 
 ```bash
 task test-services SERVICES="auth-service ticket-service"
