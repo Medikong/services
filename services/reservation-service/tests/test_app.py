@@ -14,16 +14,38 @@ def test_create_app_returns_fastapi_app() -> None:
     assert isinstance(app, FastAPI)
 
 
-def test_create_app_defers_kafka_producer_creation(monkeypatch: MonkeyPatch) -> None:
-    """Kafka producer는 실행 중인 async loop가 있는 lifespan 안에서 생성한다."""
-    monkeypatch.setattr(
-        app_main,
-        "create_producer",
-        lambda: (_ for _ in ()).throw(AssertionError("producer should be created in lifespan")),
-    )
+def test_kafka_producer_is_created_inside_lifespan(monkeypatch: MonkeyPatch) -> None:
+    class FakeKafkaProducer:
+        def __init__(self) -> None:
+            self.started = False
+            self.stopped = False
+
+        async def start(self) -> None:
+            self.started = True
+
+        async def stop(self) -> None:
+            self.stopped = True
+
+    created: list[FakeKafkaProducer] = []
+
+    def fake_create_producer() -> FakeKafkaProducer:
+        producer = FakeKafkaProducer()
+        created.append(producer)
+        return producer
+
+    monkeypatch.setattr(app_main, "create_producer", fake_create_producer)
 
     app = create_app()
 
+    assert created == []
+    assert app.state.kafka_producer is None
+
+    with TestClient(app):
+        assert len(created) == 1
+        assert created[0].started is True
+        assert app.state.kafka_producer is created[0]
+
+    assert created[0].stopped is True
     assert app.state.kafka_producer is None
 
 
