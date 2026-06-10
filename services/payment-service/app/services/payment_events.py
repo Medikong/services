@@ -183,7 +183,6 @@ def build_payment_event_draft(
         "concertId": payment.concert_id,
         "seatId": request_body.seatId or "unknown",
         "amount": payment.amount,
-        "status": payment.status,
         "occurredAt": datetime.now(UTC).isoformat(),
         "producer": settings.service_name,
         "correlationId": correlation_id,
@@ -207,10 +206,8 @@ def _payment_event_topic(event_type: PaymentEventType) -> str:
     return event_type.value
 
 
-def _event_user_id(value: str) -> int | str:
-    """이벤트 계약 호환을 위해 숫자형 user_id를 int로 변환한다."""
-    # 기존 이벤트 계약 호환을 위해 숫자 문자열은 int로 유지한다.
-    return int(value) if value.isdigit() else value
+def _event_user_id(value: str) -> str:
+    return value
 
 
 def _summarize_publish_error(exc: KafkaError | RuntimeError) -> str:

@@ -65,6 +65,8 @@ def test_reservation_expire_publishes_event() -> None:
     assert expired["status"] == "expired"
     assert [item[0] for item in producer.sent] == ["reservation-created", "reservation-expired"]
     assert producer.sent[1][1]["reservationId"] == created["id"]
+    assert producer.sent[0][1]["userId"] == "1"
+    assert producer.sent[1][1]["userId"] == "1"
 
 
 def test_sales_and_policy_admin_flow() -> None:

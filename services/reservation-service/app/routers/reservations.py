@@ -132,5 +132,5 @@ def _reservation_event_payload(
     }
 
 
-def _event_user_id(value: str) -> int | str:
-    return int(value) if value.isdigit() else value
+def _event_user_id(value: str) -> str:
+    return value
