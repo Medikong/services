@@ -42,7 +42,8 @@ def _configure_reservation_service_metrics(registry: CollectorRegistry, *, servi
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    producer = app.state.kafka_producer
+    producer = create_producer()
+    app.state.kafka_producer = producer
     if producer is not None:
         await producer.start()
     try:
@@ -50,13 +51,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if producer is not None:
             await producer.stop()
+        app.state.kafka_producer = None
 
 
 def create_app() -> FastAPI:
     init_db()
     observability_config = settings.observability_config()
     app = FastAPI(title=settings.service_name, lifespan=lifespan)
-    app.state.kafka_producer = create_producer()
+    app.state.kafka_producer = None
     configure_app_observability(app, observability_config)
     register_exception_handlers(app)
     register_operational_handlers(
