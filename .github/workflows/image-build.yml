@@ -146,6 +146,7 @@ jobs:
           DOCKER_BUILD_CACHE_TO: |
             type=gha,scope=${{ matrix.image }}-linux-amd64,mode=max
             type=gha,scope=${{ matrix.image }}-linux-arm64,mode=max
+          DOCKER_BUILD_OUTPUT: type=cacheonly
         run: |
           set -euo pipefail
           task app-image-build \
@@ -154,7 +155,8 @@ jobs:
             IMAGE_TAG="${IMAGE_TAG}" \
             DOCKER_BUILD_PLATFORMS="${DOCKER_BUILD_PLATFORMS}" \
             DOCKER_BUILD_CACHE_FROM="${DOCKER_BUILD_CACHE_FROM}" \
-            DOCKER_BUILD_CACHE_TO="${DOCKER_BUILD_CACHE_TO}"
+            DOCKER_BUILD_CACHE_TO="${DOCKER_BUILD_CACHE_TO}" \
+            DOCKER_BUILD_OUTPUT="${DOCKER_BUILD_OUTPUT}"
 
       - name: Append image build summary
         if: always()

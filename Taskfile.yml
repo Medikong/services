@@ -287,10 +287,15 @@ tasks:
         done <<EOF
         ${cache_to}
         EOF
+        build_output='{{.DOCKER_BUILD_OUTPUT}}'
+        build_output_arg='--push'
+        if [ -n "${build_output}" ]; then
+          build_output_arg="--output ${build_output}"
+        fi
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         case "${service}" in
           auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-            docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
+            docker buildx build ${cache_args} --platform "${build_platforms}" ${build_output_arg} -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
             ;;
           "${dashboard}")
             docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
