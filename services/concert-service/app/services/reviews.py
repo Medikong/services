@@ -1,8 +1,9 @@
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import ReviewRequestAlreadyClosedError
 from app.metrics.events import ConcertAdminCommandRecorded
 from app.metrics.labels import CatalogResource, ConcertAdminCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
@@ -34,7 +35,9 @@ class ConcertReviewService(ConcertDomainService):
             response = self._review_response(self._review_request(request_id))
             attempt.mark_success()
             return response
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:
@@ -45,7 +48,7 @@ class ConcertReviewService(ConcertDomainService):
         try:
             request = self._review_request(request_id)
             if request.status != "pending":
-                raise ConflictError("review_request.invalid_state", "Review request is already closed.")
+                raise ReviewRequestAlreadyClosedError()
             request.status = "approved"
             request.reviewed_at = now_utc()
             concert = self._concert(request.concert_id)
@@ -61,7 +64,9 @@ class ConcertReviewService(ConcertDomainService):
                     open_request.status = "approved"
             self.commit()
             response = self._review_response(request)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.APPROVE_REVIEW_REQUEST, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -75,7 +80,7 @@ class ConcertReviewService(ConcertDomainService):
         try:
             request = self._review_request(request_id)
             if request.status != "pending":
-                raise ConflictError("review_request.invalid_state", "Review request is already closed.")
+                raise ReviewRequestAlreadyClosedError()
             request.status = "rejected"
             request.reviewed_at = now_utc()
             request.reason = command.reason
@@ -92,7 +97,9 @@ class ConcertReviewService(ConcertDomainService):
                     open_request.status = "rejected"
             self.commit()
             response = self._review_response(request)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.REJECT_REVIEW_REQUEST, result=MetricResult.REJECTION))
             raise
         except Exception:

@@ -12,6 +12,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 
 COPY services/payment-service/pyproject.toml services/payment-service/uv.lock ./services/payment-service/
+COPY packages/contracts ./packages/contracts
 COPY packages/errors ./packages/errors
 COPY packages/kafka-utils ./packages/kafka-utils
 COPY packages/metrics ./packages/metrics
@@ -39,4 +40,4 @@ RUN groupadd --system --gid 10001 app \
 USER 10001:10001
 
 EXPOSE 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]

@@ -1,8 +1,9 @@
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, assert_never
 from uuid import uuid4
 
 from aiokafka.errors import KafkaError
+from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi import APIRouter, Depends, Request, status
 from kafka_utils import build_producer_headers
 from metrics import MetricResult
@@ -32,7 +33,7 @@ async def create_reservation(
 ) -> schemas.ReservationResponse:
     response = reservations.create_reservation(user_id, request)
     payload = _reservation_event_payload(
-        event_name="reservation-created",
+        event_type=ReservationEventType.CREATED,
         response=response,
         source_id=response.id,
         concert_id=concert_id_from_request(request),
@@ -85,7 +86,7 @@ async def expire_reservation(
 ) -> schemas.ReservationResponse:
     response = reservations.expire_reservation(id)
     payload = _reservation_event_payload(
-        event_name="reservation-expired",
+        event_type=ReservationEventType.EXPIRED,
         response=response,
         source_id=response.id,
         concert_id=None,
@@ -112,25 +113,30 @@ async def expire_reservation(
 
 def _reservation_event_payload(
     *,
-    event_name: str,
+    event_type: ReservationEventType,
     response: schemas.ReservationResponse,
     source_id: str,
     concert_id: str | None,
     http_request: Request,
 ) -> dict:
-    return {
+    event_kwargs = {
         "eventId": f"evt-{uuid4()}",
-        "eventType": event_name,
-        "userId": _event_user_id(response.userId),
+        "userId": str(response.userId),
         "sourceId": source_id,
         "reservationId": response.id,
-        "concertId": concert_id,
+        "concertId": concert_id or "unknown",
         "seatId": response.seatId,
-        "occurredAt": datetime.now(UTC).isoformat(),
+        "performanceId": response.performanceId,
+        "occurredAt": datetime.now(UTC),
         "producer": settings.service_name,
         "correlationId": getattr(http_request.state, "request_id", None) or http_request.headers.get("X-Request-Id"),
     }
+    match event_type:
+        case ReservationEventType.CREATED:
+            event = ReservationCreatedEvent(**event_kwargs)
+        case ReservationEventType.EXPIRED:
+            event = ReservationExpiredEvent(**event_kwargs)
+        case unreachable:
+            assert_never(unreachable)
 
-
-def _event_user_id(value: str) -> str:
-    return value
+    return event.model_dump(mode="json")

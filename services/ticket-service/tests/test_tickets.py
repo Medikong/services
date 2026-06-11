@@ -180,6 +180,91 @@ def test_kafka_event_handlers_bind_topic_outside_consumer(monkeypatch: pytest.Mo
     ]
 
 
+def test_lifespan_creates_producer_awaits_consumer_and_disposes_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[object] = []
+
+    class LifespanKafkaProducer:
+        def __init__(self) -> None:
+            self.started = False
+            self.stopped = False
+
+        async def start(self) -> None:
+            self.started = True
+            calls.append("producer-start")
+
+        async def stop(self) -> None:
+            self.stopped = True
+            calls.append("producer-stop")
+
+    producer = LifespanKafkaProducer()
+
+    def fake_create_producer() -> LifespanKafkaProducer:
+        calls.append("create-producer")
+        return producer
+
+    async def fake_consume_events(stop_event: asyncio.Event, **kwargs: object) -> None:
+        calls.append(("consumer-producer-started", producer.started, list(kwargs["handlers"])))
+        await stop_event.wait()
+        calls.append("consumer-stopped")
+
+    monkeypatch.setattr(main_module, "create_producer", fake_create_producer)
+    monkeypatch.setattr(main_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(main_module.engine, "dispose", lambda: calls.append("dispose"))
+
+    assert app.state.kafka_producer is None
+
+    with TestClient(app):
+        assert app.state.kafka_producer is producer
+
+    assert producer.stopped is True
+    assert app.state.kafka_producer is None
+    assert calls == [
+        "create-producer",
+        "producer-start",
+        ("consumer-producer-started", True, ["payment-approved"]),
+        "consumer-stopped",
+        "producer-stop",
+        "dispose",
+    ]
+
+
+def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    class LifespanKafkaProducer:
+        async def start(self) -> None:
+            calls.append("producer-start")
+
+        async def stop(self) -> None:
+            calls.append("producer-stop")
+
+    async def fake_consume_events(stop_event: asyncio.Event, **kwargs: object) -> None:
+        calls.append("consumer-start")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            calls.append("consumer-cancelled")
+            raise
+
+    monkeypatch.setattr(main_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(main_module, "create_producer", lambda: LifespanKafkaProducer())
+    monkeypatch.setattr(main_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(main_module.engine, "dispose", lambda: calls.append("dispose"))
+
+    with TestClient(app):
+        assert app.state.consumer_task is not None
+
+    assert app.state.consumer_task is None
+    assert app.state.consumer_stop_event is None
+    assert calls == [
+        "producer-start",
+        "consumer-start",
+        "consumer-cancelled",
+        "producer-stop",
+        "dispose",
+    ]
+
+
 def test_payment_approved_event_handler_owns_db_session(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[object, dict, FakeKafkaProducer]] = []
 

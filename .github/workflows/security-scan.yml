@@ -4,13 +4,30 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.dockerignore'
+      - '.github/workflows/security-scan.yml'
   pull_request:
     branches:
       - main
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.dockerignore'
+      - '.github/workflows/security-scan.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
   security-events: write
   id-token: write
 
@@ -23,20 +40,74 @@ env:
   IMAGE_REGISTRY: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com
 
 jobs:
+  detect-services:
+    name: 스캔 대상 선택
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+      service_count: ${{ steps.matrix.outputs.service_count }}
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 변경 경로 감지
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            auth-service:
+              - 'services/auth-service/**'
+            concert-service:
+              - 'services/concert-service/**'
+            notification-service:
+              - 'services/notification-service/**'
+            payment-service:
+              - 'services/payment-service/**'
+            reservation-service:
+              - 'services/reservation-service/**'
+            ticket-service:
+              - 'services/ticket-service/**'
+            security-common:
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'Taskfile.yml'
+              - '.dockerignore'
+              - '.github/workflows/security-scan.yml'
+
+      - name: 스캔 matrix 생성
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          all_services='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
+          changed='${{ steps.changes.outputs.changes }}'
+          service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['security-common'] }}" = "true" ]; then
+            services="${all_services}"
+          else
+            services="$(jq -c --argjson allowed "${service_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
+          fi
+
+          service_count="$(jq 'length' <<<"${services}")"
+          printf 'services=%s\n' "${services}" >> "${GITHUB_OUTPUT}"
+          printf 'service_count=%s\n' "${service_count}" >> "${GITHUB_OUTPUT}"
+          printf '스캔 대상 서비스: %s\n' "${services}"
+
   trivy-image-scan:
     name: Trivy 이미지 스캔 (${{ matrix.service }})
+    needs: detect-services
+    if: needs.detect-services.outputs.service_count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - auth-service
-          - concert-service
-          - reservation-service
-          - payment-service
-          - ticket-service
-          - notification-service
+        service: ${{ fromJson(needs.detect-services.outputs.services) }}
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
@@ -77,3 +148,13 @@ jobs:
           title: "🚨 이미지 보안 취약점 발견"
           description: "${{ matrix.service }} 이미지에서 HIGH/CRITICAL 취약점이 발견되었습니다."
           color: 0xff0000
+
+  no-security-scan:
+    name: 보안 스캔 없음
+    needs: detect-services
+    if: needs.detect-services.outputs.service_count == '0'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: no-op 보고
+        run: echo "이번 변경에서 스캔할 서비스 이미지가 없습니다."

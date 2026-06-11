@@ -42,6 +42,7 @@ def _configure_reservation_service_metrics(registry: CollectorRegistry, *, servi
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """안전한 종료를 위해 앱이 붙잡고 있는 작업과 연결을 lifespan에서 관리한다."""
     producer = create_producer()
     app.state.kafka_producer = producer
     if producer is not None:
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if producer is not None:
             await producer.stop()
         app.state.kafka_producer = None
+        engine.dispose()
 
 
 def create_app() -> FastAPI:

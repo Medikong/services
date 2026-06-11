@@ -8,6 +8,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.dockerignore'
+      - '.github/workflows/image-publish.yml'
   workflow_dispatch:
     inputs:
       image:

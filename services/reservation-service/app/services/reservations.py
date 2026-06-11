@@ -2,11 +2,16 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from observability import TraceRecorder, trace_recorder
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError, TraceRecorder, trace_recorder
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import (
+    ReservationCancelInvalidStateError,
+    ReservationExpireInvalidStateError,
+    SalesNotOpenError,
+    SeatAlreadyReservedError,
+)
 from app.metrics.labels import ReservationCommand
 from app.metrics.recorder import ReservationTelemetryRecorder
 from app.services.base import ACTIVE_STATUSES, ReservationDomainService, new_id, now_utc
@@ -39,9 +44,9 @@ class ReservationCommandService(ReservationDomainService):
             with trace.span("reservation.reserve_seat"):
                 sales_state = self.sales.get_sales_state(concert_id)
                 if sales_state is not None and sales_state.sales_status in {"paused", "closed"}:
-                    raise ConflictError("sales.not_open", "Sales are not open for this concert.")
+                    raise SalesNotOpenError()
                 if self.reservations.find_active_reservation(request.performanceId, request.seatId) is not None:
-                    raise ConflictError("reservation.conflict", "Seat is already reserved.", {"seatId": request.seatId})
+                    raise SeatAlreadyReservedError(request.seatId)
                 created_at = now_utc()
                 reservation = model.Reservation(
                     id=new_id("rsv"),
@@ -56,13 +61,15 @@ class ReservationCommandService(ReservationDomainService):
                     created_at=created_at,
                 )
                 self.add(reservation)
-                self._commit_or_reservation_conflict()
+                self._commit_or_reservation_conflict(request.seatId)
                 trace.attribute("reservation.id", reservation.id)
                 trace.event("seat.hold.created", {"reservation.id": reservation.id, "seat.id": reservation.seat_id})
 
             attempt.mark_success()
             return reservation_response(reservation)
-        except (ConflictError, NotFoundError) as exc:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_error_code(exc.code)
             raise
         finally:
@@ -74,14 +81,16 @@ class ReservationCommandService(ReservationDomainService):
         try:
             reservation = self._reservation(reservation_id)
             if reservation.status not in ACTIVE_STATUSES:
-                raise ConflictError("reservation.invalid_state", "Only active reservations can be canceled.")
+                raise ReservationCancelInvalidStateError()
             reservation.status = "canceled"
             reservation.active_seat_key = None
             reservation.updated_at = now_utc()
             self.commit()
             attempt.mark_success()
             return reservation_response(reservation)
-        except (ConflictError, NotFoundError) as exc:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_error_code(exc.code)
             raise
         finally:
@@ -93,14 +102,16 @@ class ReservationCommandService(ReservationDomainService):
         try:
             reservation = self._reservation(reservation_id)
             if reservation.status != "pending":
-                raise ConflictError("reservation.invalid_state", "Only pending reservations can be expired.")
+                raise ReservationExpireInvalidStateError()
             reservation.status = "expired"
             reservation.active_seat_key = None
             reservation.updated_at = now_utc()
             self.commit()
             attempt.mark_success()
             return reservation_response(reservation)
-        except (ConflictError, NotFoundError) as exc:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_error_code(exc.code)
             raise
         finally:

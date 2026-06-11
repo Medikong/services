@@ -1,11 +1,19 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from observability import HttpError
 
 from app import entities as model
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import (
+    ConcertNotFoundError,
+    ReviewRequestNotFoundError,
+    SalePolicyNotFoundError,
+    ShowtimeNotFoundError,
+    VenueNotFoundError,
+)
 from app.repositories import (
     ConcertRepository,
     ConcertReviewRepository,
@@ -46,37 +54,37 @@ class ConcertDomainService:
     def _concert(self, concert_id: str) -> model.Concert:
         concert = self.concerts.get_concert(concert_id)
         if concert is None:
-            raise NotFoundError("concert", concert_id)
+            raise ConcertNotFoundError(concert_id)
         return concert
 
     def _venue(self, venue_id: str) -> model.Venue:
         venue = self.venues.get_venue(venue_id)
         if venue is None:
-            raise NotFoundError("venue", venue_id)
+            raise VenueNotFoundError(venue_id)
         return venue
 
     def _showtime(self, showtime_id: str) -> model.Showtime:
         showtime = self.showtimes.get_showtime(showtime_id)
         if showtime is None:
-            raise NotFoundError("showtime", showtime_id)
+            raise ShowtimeNotFoundError(showtime_id)
         return showtime
 
     def _sale_policy(self, concert_id: str) -> model.SalePolicy:
         self._concert(concert_id)
         policy = self.sale_policies.get_sale_policy(concert_id)
         if policy is None:
-            raise NotFoundError("sale_policy", concert_id)
+            raise SalePolicyNotFoundError(concert_id)
         return policy
 
     def _review_request(self, request_id: str) -> model.ConcertReviewRequest:
         request = self.reviews.get_review_request(request_id)
         if request is None:
-            raise NotFoundError("review_request", request_id)
+            raise ReviewRequestNotFoundError(request_id)
         return request
 
-    def _commit_or_conflict(self, code: str, message: str) -> None:
+    def _commit_or_domain_rejection(self, error_factory: Callable[[], HttpError]) -> None:
         try:
             self.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise ConflictError(code, message) from exc
+            raise error_factory() from exc

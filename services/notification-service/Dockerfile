@@ -40,4 +40,4 @@ RUN groupadd --system --gid 10001 app \
 USER 10001:10001
 
 EXPOSE 8084
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8084", "--no-access-log"]

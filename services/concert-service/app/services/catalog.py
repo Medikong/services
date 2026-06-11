@@ -1,8 +1,9 @@
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import ConcertEmptyUpdateError, PublicConcertNotFoundError
 from app.metrics.events import ConcertAdminCommandRecorded
 from app.metrics.labels import CatalogResource, ConcertAdminCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
@@ -41,7 +42,9 @@ class ConcertCatalogService(ConcertDomainService):
                 )
             )
             self.commit()
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(
                 ConcertAdminCommandRecorded(command=ConcertAdminCommand.CREATE_CONCERT, result=MetricResult.REJECTION)
             )
@@ -62,7 +65,7 @@ class ConcertCatalogService(ConcertDomainService):
             concert = self._concert(concert_id)
             values = request.model_dump(exclude_unset=True)
             if not values:
-                raise ConflictError("concert.empty_update", "At least one field must be supplied.")
+                raise ConcertEmptyUpdateError()
             if "title" in values:
                 concert.title = values["title"]
             if "description" in values:
@@ -75,7 +78,9 @@ class ConcertCatalogService(ConcertDomainService):
                 concert.running_minutes = values["runningMinutes"]
             concert.updated_at = now_utc()
             self.commit()
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(
                 ConcertAdminCommandRecorded(command=ConcertAdminCommand.UPDATE_CONCERT, result=MetricResult.REJECTION)
             )
@@ -98,7 +103,9 @@ class ConcertCatalogService(ConcertDomainService):
             response = schemas.ConcertListResponse(items=items, page=page())
             attempt.mark_success()
             return response
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:
@@ -110,11 +117,13 @@ class ConcertCatalogService(ConcertDomainService):
         try:
             concert = self._concert(concert_id)
             if not concert.showtimes:
-                raise NotFoundError("concert", concert_id)
+                raise PublicConcertNotFoundError(concert_id)
             response = public_concert_response(concert)
             attempt.mark_success()
             return response
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:

@@ -1,8 +1,9 @@
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import ShowtimeEmptyUpdateError
 from app.metrics.events import ConcertAdminCommandRecorded
 from app.metrics.labels import CatalogResource, ConcertAdminCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
@@ -29,7 +30,9 @@ class ShowtimeService(ConcertDomainService):
             )
             self.add(showtime)
             self.commit()
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.CREATE_SHOWTIME, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -44,7 +47,7 @@ class ShowtimeService(ConcertDomainService):
             showtime = self._showtime(showtime_id)
             values = request.model_dump(exclude_unset=True)
             if not values:
-                raise ConflictError("showtime.empty_update", "At least one field must be supplied.")
+                raise ShowtimeEmptyUpdateError()
             if "startsAt" in values:
                 showtime.starts_at = values["startsAt"]
             if "endsAt" in values:
@@ -52,7 +55,9 @@ class ShowtimeService(ConcertDomainService):
             if "status" in values:
                 showtime.status = values["status"]
             self.commit()
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.UPDATE_SHOWTIME, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -72,7 +77,9 @@ class ShowtimeService(ConcertDomainService):
             )
             attempt.mark_success()
             return response
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:
