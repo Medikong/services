@@ -96,6 +96,15 @@ class ReservationCommandService(ReservationDomainService):
         finally:
             attempt.record()
 
+
+    def confirm_reservation(self, reservation_id: str) -> None:
+        reservation = self._reservation(reservation_id)
+        if reservation.status not in ACTIVE_STATUSES:
+            return
+        reservation.status = "TICKETED"
+        reservation.active_seat_key = None
+        reservation.updated_at = now_utc()
+        self.commit()
     def expire_reservation(self, reservation_id: str) -> schemas.ReservationResponse:
         """예약을 만료시키고 command 결과 metric을 남긴다."""
         attempt = self.telemetry.start_command(ReservationCommand.EXPIRE)
@@ -131,3 +140,12 @@ class ReservationQueryService(ReservationDomainService):
 
 def concert_id_from_request(request: schemas.CreateReservationRequest) -> str:
     return request.concertId or f"concert-{request.performanceId}"
+
+    def confirm_reservation(self, reservation_id: str) -> None:
+        reservation = self._reservation(reservation_id)
+        if reservation.status not in ACTIVE_STATUSES:
+            return
+        reservation.status = "TICKETED"
+        reservation.active_seat_key = None
+        reservation.updated_at = now_utc()
+        self.commit()

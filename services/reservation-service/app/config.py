@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = ""
     reservation_created_topic: str = "reservation-created"
     reservation_expired_topic: str = "reservation-expired"
+    ticket_issued_topic: str = "ticket-issued"
+    kafka_group_id: str = "reservation-service"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
