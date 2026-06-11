@@ -13,9 +13,9 @@ vars:
   E2E_COMPOSE_PROJECT: '{{default "ticketing-e2e" .E2E_COMPOSE_PROJECT}}'
   E2E_COMPOSE_SERVICES: '{{default "" .E2E_COMPOSE_SERVICES}}'
   E2E_NETWORK: '{{default "ticketing-e2e_default" .E2E_NETWORK}}'
-  CURL_IMAGE: '{{default "curlimages/curl:8.7.1" .CURL_IMAGE}}'
   NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
-  E2E_WAIT_SERVICES: '{{default "concert-service reservation-service payment-service ticket-service notification-service" .E2E_WAIT_SERVICES}}'
+  E2E_WAIT_TIMEOUT_SECONDS: '{{default "180" .E2E_WAIT_TIMEOUT_SECONDS}}'
+  E2E_AUTH_SERVICE_URL: '{{default "http://auth-service:8080" .E2E_AUTH_SERVICE_URL}}'
   E2E_CONCERT_SERVICE_URL: '{{default "http://concert-service:8082" .E2E_CONCERT_SERVICE_URL}}'
   E2E_RESERVATION_SERVICE_URL: '{{default "http://reservation-service:8083" .E2E_RESERVATION_SERVICE_URL}}'
   E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8080" .E2E_PAYMENT_SERVICE_URL}}'
@@ -222,7 +222,6 @@ tasks:
         set -e
         scenario='{{default "" .SCENARIO}}'
         compose_services='{{.E2E_COMPOSE_SERVICES}}'
-        wait_services='{{.E2E_WAIT_SERVICES}}'
         scenario_key='{{.E2E_SCENARIO}}'
         report_name='{{.E2E_REPORT_NAME}}'
         if [ -n "${scenario}" ]; then
@@ -232,27 +231,27 @@ tasks:
         scenario_key="${scenario_key%.postman_collection.json}"
         case "${scenario_key}" in
           all|"")
-            compose_services="${compose_services:-postgres kafka kafka-init notification-db concert-service reservation-service payment-service ticket-service notification-service}"
-            wait_services="${wait_services:-concert-service reservation-service payment-service ticket-service notification-service}"
-            collections="01-concert-seat-setup 02-reservation-create 03-ticket-issue"
+            compose_services="${compose_services:-postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service}"
+            collections="01-concert-seat-setup 02-reservation-create 03-ticket-issue 04-user-booking-happy-path"
             ;;
           01-concert-seat-setup)
             compose_services="${compose_services:-postgres concert-service}"
-            wait_services="concert-service"
             collections="01-concert-seat-setup"
             ;;
           02-reservation-create)
             compose_services="${compose_services:-postgres reservation-service}"
-            wait_services="reservation-service"
             collections="02-reservation-create"
             ;;
           03-ticket-issue)
             compose_services="${compose_services:-postgres kafka kafka-init ticket-service}"
-            wait_services="ticket-service"
             collections="03-ticket-issue"
             ;;
+          04-user-booking-happy-path)
+            compose_services="${compose_services:-postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service}"
+            collections="04-user-booking-happy-path"
+            ;;
           *)
-            printf 'Unknown E2E SCENARIO=%s (expected: all, 01-concert-seat-setup, 02-reservation-create, 03-ticket-issue).\n' "${scenario_key}" >&2
+            printf 'Unknown E2E SCENARIO=%s (expected: all, 01-concert-seat-setup, 02-reservation-create, 03-ticket-issue, 04-user-booking-happy-path).\n' "${scenario_key}" >&2
             exit 2
             ;;
         esac
@@ -262,24 +261,14 @@ tasks:
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         mkdir -p "${repo_root}/tests/e2e/newman/reports"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build ${compose_services}
-        docker run --rm --network {{.E2E_NETWORK}} \
-          -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
-          -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
-          -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
-          -e E2E_PAYMENT_SERVICE_URL="{{.E2E_PAYMENT_SERVICE_URL}}" \
-          -e E2E_TICKET_SERVICE_URL="{{.E2E_TICKET_SERVICE_URL}}" \
-          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-          -e E2E_WAIT_SERVICES="${wait_services}" \
-          -e E2E_WAIT_TIMEOUT_SECONDS \
-          -e E2E_WAIT_SLEEP_SECONDS \
-          {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}
         for collection in ${collections}; do
           docker run --rm --network {{.E2E_NETWORK}} \
             -v "${repo_root}/tests/e2e":/etc/newman \
             -w /etc/newman \
             {{.NEWMAN_IMAGE}} run "scenarios/${collection}.postman_collection.json" \
             -e newman/docker.postman_environment.json \
+            --env-var authServiceUrl="{{.E2E_AUTH_SERVICE_URL}}" \
             --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
             --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
             --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
@@ -293,24 +282,12 @@ tasks:
   e2e-up:
     desc: Start the service E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build postgres kafka kafka-init notification-db concert-service reservation-service payment-service ticket-service notification-service'
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service'
 
   e2e-wait:
-    desc: Wait for service E2E services to become ready.
+    desc: Wait for service E2E services to become healthy through Docker Compose.
     cmds:
-      - |
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        docker run --rm --network {{.E2E_NETWORK}} \
-          -v "${repo_root}/tests/e2e/scripts":/scripts:ro \
-          -e E2E_CONCERT_SERVICE_URL="{{.E2E_CONCERT_SERVICE_URL}}" \
-          -e E2E_RESERVATION_SERVICE_URL="{{.E2E_RESERVATION_SERVICE_URL}}" \
-          -e E2E_PAYMENT_SERVICE_URL="{{.E2E_PAYMENT_SERVICE_URL}}" \
-          -e E2E_TICKET_SERVICE_URL="{{.E2E_TICKET_SERVICE_URL}}" \
-          -e E2E_NOTIFICATION_SERVICE_URL="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-          -e E2E_WAIT_SERVICES="{{.E2E_WAIT_SERVICES}}" \
-          -e E2E_WAIT_TIMEOUT_SECONDS \
-          -e E2E_WAIT_SLEEP_SECONDS \
-          {{.CURL_IMAGE}} sh /scripts/wait-for-services.sh
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}}'
 
   e2e-newman:
     desc: Run service E2E Newman collections against an already running stack.
@@ -318,12 +295,13 @@ tasks:
       - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
       - |
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        for collection in 01-concert-seat-setup 02-reservation-create 03-ticket-issue; do
+        for collection in 01-concert-seat-setup 02-reservation-create 03-ticket-issue 04-user-booking-happy-path; do
           docker run --rm --network {{.E2E_NETWORK}} \
             -v "${repo_root}/tests/e2e":/etc/newman \
             -w /etc/newman \
             {{.NEWMAN_IMAGE}} run "scenarios/${collection}.postman_collection.json" \
             -e newman/docker.postman_environment.json \
+            --env-var authServiceUrl="{{.E2E_AUTH_SERVICE_URL}}" \
             --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
             --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
             --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
