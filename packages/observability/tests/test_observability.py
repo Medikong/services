@@ -270,7 +270,13 @@ def test_noop_trace_recorder_ignores_all_calls() -> None:
 def test_request_observability_emits_single_line_json_log(caplog, monkeypatch) -> None:
     span_attributes: dict[str, object] = {}
     monkeypatch.setattr(fastapi_module, "set_current_span_attributes", span_attributes.update)
-    app = _observed_app(ObservabilityConfig(service_name="test-service"))
+    app = _observed_app(
+        ObservabilityConfig(
+            service_name="test-service",
+            service_version="2026.06.11",
+            service_environment="test",
+        )
+    )
 
     @app.get("/items/{item_id}")
     def get_item(item_id: str) -> dict[str, str]:
@@ -281,24 +287,33 @@ def test_request_observability_emits_single_line_json_log(caplog, monkeypatch) -
 
     response = client.get(
         "/items/item-1",
-        headers={"X-Request-Id": "req-test", "X-Client-Action-Id": "act-test"},
+        headers={
+            "X-Request-Id": "11111111-1111-4111-8111-111111111111",
+            "X-Client-Action-Id": "22222222-2222-4222-8222-222222222222",
+        },
     )
 
     assert response.status_code == 200
-    assert response.headers["X-Request-Id"] == "req-test"
+    assert response.headers["X-Request-Id"] == "11111111-1111-4111-8111-111111111111"
     log = _request_log(caplog.records)
     assert log["service.name"] == "test-service"
+    assert log["service.version"] == "2026.06.11"
+    assert log["service.environment"] == "test"
     assert log["severity"] == "INFO"
     assert log["severity_text"] == "INFO"
-    assert log["request_id"] == "req-test"
-    assert log["client_action_id"] == "act-test"
+    assert log["request_id"] == "11111111-1111-4111-8111-111111111111"
+    assert log["client_action_id"] == "22222222-2222-4222-8222-222222222222"
     assert log["trace_id"]
     assert log["span_id"]
     assert log["http.method"] == "GET"
     assert log["http.route"] == "/items/{item_id}"
+    assert log["http.route.kind"] == "api"
     assert log["http.status_code"] == 200
     assert isinstance(log["duration_ms"], int)
-    assert span_attributes["request_id"] == "req-test"
+    assert log["http.request.is_probe"] is False
+    assert log["log.kind"] == "access"
+    assert log["log.policy"] == "sample"
+    assert span_attributes["request_id"] == "11111111-1111-4111-8111-111111111111"
     assert span_attributes["http.route"] == "/items/{item_id}"
 
 
@@ -307,17 +322,73 @@ def test_request_observability_logs_failed_request_fields(caplog) -> None:
     caplog.set_level(logging.INFO)
     client = TestClient(app)
 
-    response = client.get("/missing", headers={"X-Request-Id": "req-missing"})
+    response = client.get("/missing", headers={"X-Request-Id": "33333333-3333-4333-8333-333333333333"})
 
     assert response.status_code == 404
     log = _request_log(caplog.records)
-    assert log["request_id"] == "req-missing"
+    assert log["request_id"] == "33333333-3333-4333-8333-333333333333"
     assert log["trace_id"]
     assert log["span_id"]
     assert log["service.name"] == "test-service"
-    assert log["severity"] == "INFO"
+    assert log["severity"] == "WARN"
     assert log["http.status_code"] == 404
+    assert log["log.policy"] == "keep"
     assert isinstance(log["duration_ms"], int)
+
+
+def test_request_observability_marks_probe_routes_for_collector_policy(caplog) -> None:
+    app = _observed_app(ObservabilityConfig(service_name="test-service"))
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        return {"status": "ok"}
+
+    caplog.set_level(logging.INFO)
+    client = TestClient(app)
+
+    response = client.get("/healthz", headers={"X-Request-Id": "44444444-4444-4444-8444-444444444444"})
+
+    assert response.status_code == 200
+    log = _request_log(caplog.records)
+    assert log["event"] == "http.request.completed"
+    assert log["http.route"] == "/healthz"
+    assert log["http.route.kind"] == "probe"
+    assert log["http.request.is_probe"] is True
+    assert log["log.policy"] == "drop"
+
+    caplog.clear()
+    response = client.get("/health", headers={"X-Request-Id": "55555555-5555-4555-8555-555555555555"})
+
+    assert response.status_code == 200
+    log = _request_log(caplog.records)
+    assert log["http.route"] == "/health"
+    assert log["http.route.kind"] == "probe"
+    assert log["log.policy"] == "drop"
+
+
+def test_request_observability_marks_slow_requests_for_collector_policy(caplog, monkeypatch) -> None:
+    ticks = iter([10.0, 11.001])
+    monkeypatch.setattr(fastapi_module, "perf_counter", lambda: next(ticks))
+    app = _observed_app(ObservabilityConfig(service_name="test-service"))
+
+    @app.get("/items")
+    def get_items() -> dict[str, list[str]]:
+        return {"items": []}
+
+    caplog.set_level(logging.INFO)
+    client = TestClient(app)
+
+    response = client.get("/items", headers={"X-Request-Id": "66666666-6666-4666-8666-666666666666"})
+
+    assert response.status_code == 200
+    log = _request_log(caplog.records)
+    assert log["duration_ms"] == 1000
+    assert log["severity"] == "WARN"
+    assert log["log.policy"] == "keep"
 
 
 def test_error_context_reads_errors_package_context() -> None:

@@ -18,6 +18,8 @@ REQUEST_ID_HEADER = "X-Request-Id"
 RequestIdMiddleware = CorrelationIdMiddleware
 RequestHandler = Callable[[Request], Awaitable[Response]]
 RequestMiddleware = Callable[[Request, RequestHandler], Awaitable[Response]]
+PROBE_ROUTES = frozenset(("/health", "/healthz", "/readyz", "/metrics"))
+SLOW_REQUEST_DURATION_MS = 1000
 request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
@@ -67,20 +69,29 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
             duration_seconds = perf_counter() - started_at
             # 로그는 stdout으로, trace는 OTLP로 나가므로 두 데이터를 이어 볼 ID를 함께 남긴다.
             trace_id, span_id = current_trace_context()
+            duration_ms = int(duration_seconds * 1000)
+            route_kind = _route_kind(route)
+            severity_text = _request_severity(status_code, duration_ms)
             logger.info(
                 "http.request.completed",
                 **{
                     "service.name": config.service_name,
-                    "severity": "INFO",
-                    "severity_text": "INFO",
+                    "service.version": config.service_version,
+                    "service.environment": config.service_environment,
+                    "severity": severity_text,
+                    "severity_text": severity_text,
                     "trace_id": trace_id,
                     "span_id": span_id,
                     "request_id": request_id,
                     "client_action_id": client_action_id,
                     "http.method": request.method,
                     "http.route": route,
+                    "http.route.kind": route_kind,
                     "http.status_code": status_code,
-                    "duration_ms": int(duration_seconds * 1000),
+                    "duration_ms": duration_ms,
+                    "http.request.is_probe": route_kind == "probe",
+                    "log.kind": "access",
+                    "log.policy": _log_policy(route_kind, status_code, duration_ms),
                 },
             )
             request_id_context.reset(request_id_token)
@@ -106,3 +117,29 @@ def _route_template(request: Request) -> str:
     route = request.scope.get("route")
     path = getattr(route, "path", None)
     return str(path or request.url.path)
+
+
+def _route_kind(route: str) -> str:
+    if route in PROBE_ROUTES:
+        return "probe"
+    if route.startswith("/debug") or route.startswith("/_debug"):
+        return "debug"
+    return "api"
+
+
+def _request_severity(status_code: int, duration_ms: int) -> str:
+    if status_code >= 500:
+        return "ERROR"
+    if status_code >= 400 or duration_ms >= SLOW_REQUEST_DURATION_MS:
+        return "WARN"
+    return "INFO"
+
+
+def _log_policy(route_kind: str, status_code: int, duration_ms: int) -> str:
+    if route_kind == "probe" and status_code < 500:
+        return "drop"
+    if status_code >= 500 or duration_ms >= SLOW_REQUEST_DURATION_MS:
+        return "keep"
+    if status_code >= 400 or route_kind == "debug":
+        return "keep"
+    return "sample"

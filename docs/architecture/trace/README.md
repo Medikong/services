@@ -596,13 +596,20 @@ timestamp
 severity
 severity_text
 service.name
+service.version
+service.environment
 request_id
 trace_id
 span_id
+client_action_id
 http.method
 http.route
+http.route.kind
 http.status_code
 duration_ms
+http.request.is_probe
+log.kind
+log.policy
 ```
 
 에러 로그 추가 필드:
@@ -616,6 +623,12 @@ exception.stacktrace
 ```
 
 `trace_id`는 Grafana trace-to-logs 조회를 위한 structured field로 둔다. Loki label로 승격하지 않는다.
+
+`/health`, `/healthz`, `/readyz`, `/metrics`는 `http.route.kind=probe`와 `log.policy=drop`으로 남긴다. 운영 Collector는 성공한 probe access log를 Loki로 보내지 않아도 되고, 실패 probe는 상태 코드와 severity로 보관할 수 있다.
+
+일반 API/debug 요청은 `http.route.kind=api|debug`로 구분한다. `duration_ms >= 1000`이면 `severity_text=WARN`, `log.policy=keep`으로 남겨 Collector가 일반 2xx/3xx sampling과 별도로 보관할 수 있게 한다. 느림 여부는 별도 boolean이 아니라 실제 실행 시간인 `duration_ms`를 기준으로 판단한다.
+
+감사성 증적이 필요한 도메인 이벤트는 request/access log와 별도 파이프라인에서 다룬다. reservation/payment/ticket/user id와 `synthetic_run_id`는 Loki label로 승격하지 않는다.
 
 ## 책임 경계
 
