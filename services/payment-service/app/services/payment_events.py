@@ -10,6 +10,7 @@ from aiokafka.errors import KafkaError
 from contracts.events import PaymentApprovedEvent, PaymentFailedEvent
 from kafka_utils import build_producer_headers
 from metrics import MetricResult
+from observability import TraceContext
 from sqlalchemy.orm import Session
 
 from app.auth import UserContext
@@ -34,6 +35,7 @@ class PaymentEventDraft:
     event_id: str
     event_type: PaymentEventType
     payload: dict
+    trace_context: dict | None
 
 
 class PaymentEventDispatcher:
@@ -91,7 +93,10 @@ class PaymentEventDispatcher:
             await kafka_producer.send_and_wait(
                 _payment_event_topic(event_type),
                 event.payload,
-                headers=build_producer_headers(correlation_id=event.payload.get("correlationId")),
+                headers=build_producer_headers(
+                    correlation_id=event.payload.get("correlationId"),
+                    carrier=_trace_carrier(event.trace_context),
+                ),
             )
         except (KafkaError, RuntimeError) as exc:
             self._mark_failed(event, exc)
@@ -172,6 +177,7 @@ def build_payment_event_draft(
     request_body: CreatePaymentRequest,
     user: UserContext,
     correlation_id: str | None,
+    trace_context: TraceContext | None = None,
 ) -> PaymentEventDraft:
     """outbox 저장과 Kafka 발행에 사용할 결제 이벤트 초안을 만든다."""
     event_id = f"evt-{uuid4()}"
@@ -201,7 +207,22 @@ def build_payment_event_draft(
         event_id=event_id,
         event_type=event_type,
         payload=event.model_dump(mode="json"),
+        trace_context=trace_context.as_dict() if trace_context is not None else None,
     )
+
+
+def _trace_carrier(trace_context: object) -> dict[str, str] | None:
+    if not isinstance(trace_context, dict):
+        return None
+    carrier = trace_context.get("carrier")
+    if not isinstance(carrier, dict):
+        return None
+    resolved = {
+        key: value
+        for key, value in carrier.items()
+        if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip()
+    }
+    return resolved or None
 
 
 def _payment_event_topic(event_type: PaymentEventType) -> str:

@@ -15,9 +15,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 import app.main as app_main  # noqa: E402
+import app.routes.payments as payment_routes  # noqa: E402
 from app.metrics.recorder import PaymentTelemetryRecorder  # noqa: E402
 from app.models import PaymentEvent  # noqa: E402
 from app.services.payment_events import PaymentEventDispatcher, run_payment_event_dispatcher  # noqa: E402
+from observability import TraceContext  # noqa: E402
 
 
 client = TestClient(app)
@@ -338,6 +340,37 @@ def test_payment_event_dispatcher_publishes_pending_event_and_marks_published() 
     assert events[0].last_publish_error is None
 
 
+def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    trace_context = sample_trace_context()
+    monkeypatch.setattr(payment_routes, "capture_current_trace_context", lambda: trace_context)
+    producer = FakeKafkaProducer()
+
+    response = client.post(
+        "/payments",
+        headers=auth_headers("CUSTOMER", user_id="trace-user"),
+        json={
+            "reservationId": "res-trace",
+            "concertId": "concert-trace",
+            "seatId": "seat-A1",
+            "amount": 50000,
+            "method": "mock",
+            "simulation": "approve",
+        },
+    )
+
+    assert response.status_code == 201
+    events = payment_events()
+    assert events[0].trace_context == trace_context.as_dict()
+    assert "traceparent" not in events[0].payload
+    assert "tracestate" not in events[0].payload
+
+    assert asyncio.run(dispatch_pending_events(producer)) == 1
+    headers = dict(producer.sent[0][2])
+    assert headers["traceparent"] == trace_context.carrier["traceparent"].encode("utf-8")
+    assert headers["tracestate"] == trace_context.carrier["tracestate"].encode("utf-8")
+    assert headers["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
+
+
 def test_payment_event_dispatcher_loop_publishes_pending_events() -> None:
     stop_event = asyncio.Event()
     producer = StoppingKafkaProducer(stop_event)
@@ -398,6 +431,17 @@ def auth_headers(role: str, user_id: str = "1") -> dict[str, str]:
         "X-User-Role": role,
         "X-Token-Id": f"token-{user_id}",
     }
+
+
+def sample_trace_context() -> TraceContext:
+    return TraceContext(
+        carrier={
+            "traceparent": "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01",
+            "tracestate": "vendor=value",
+        },
+        trace_id="4f3b2c1a9d8e7f60123456789abcdef0",
+        span_id="6f1a2b3c4d5e6f70",
+    )
 
 
 def payment_events() -> list[PaymentEvent]:

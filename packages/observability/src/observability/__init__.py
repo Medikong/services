@@ -28,7 +28,9 @@ from observability.observation import (
 )
 from observability.tracing import (
     NoopTraceRecorder,
+    TraceContext,
     TraceRecorder,
+    capture_current_trace_context,
     configure_process_tracing,
     configure_tracing,
     set_current_span_attributes,
@@ -44,6 +46,7 @@ __all__ = [
     "HttpError",
     "ObservabilityConfig",
     "NoopTraceRecorder",
+    "TraceContext",
     "CLIENT_REJECTION_OBSERVATION",
     "DOMAIN_REJECTION_OBSERVATION",
     "SECURITY_REJECTION_OBSERVATION",
@@ -54,6 +57,7 @@ __all__ = [
     "configure_process_tracing",
     "configure_structured_logging",
     "configure_tracing",
+    "capture_current_trace_context",
     "create_request_log_middleware",
     "error_response",
     "ExceptionCapture",

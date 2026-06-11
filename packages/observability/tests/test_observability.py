@@ -26,6 +26,8 @@ from observability import (
     HttpError,
     ObservabilityConfig,
     NoopTraceRecorder,
+    TraceContext,
+    capture_current_trace_context,
     configure_process_logging,
     configure_process_tracing,
     create_request_log_middleware,
@@ -259,6 +261,28 @@ def test_trace_recorder_noops_on_invalid_current_span(monkeypatch) -> None:
 
     assert span.attributes == {}
     assert span.events == []
+
+
+def test_capture_current_trace_context_keeps_carrier_and_ids(monkeypatch) -> None:
+    span = FakeSpan()
+
+    def fake_inject(carrier: dict[str, str]) -> None:
+        carrier["traceparent"] = "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01"
+        carrier["tracestate"] = "vendor=value"
+
+    monkeypatch.setattr(tracing_module.trace, "get_current_span", lambda: span)
+    monkeypatch.setattr(tracing_module.propagate, "inject", fake_inject)
+
+    trace_context = capture_current_trace_context()
+
+    assert trace_context == TraceContext(
+        carrier={
+            "traceparent": "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01",
+            "tracestate": "vendor=value",
+        },
+        trace_id="4f3b2c1a9d8e7f60123456789abcdef0",
+        span_id="6f1a2b3c4d5e6f70",
+    )
 
 
 def test_noop_trace_recorder_ignores_all_calls() -> None:
@@ -503,6 +527,8 @@ class DomainRejectionError(HttpError):
 class FakeSpanContext:
     def __init__(self, is_valid: bool = True) -> None:
         self.is_valid = is_valid
+        self.trace_id = int("4f3b2c1a9d8e7f60123456789abcdef0", 16)
+        self.span_id = int("6f1a2b3c4d5e6f70", 16)
 
 
 class FakeSpan:

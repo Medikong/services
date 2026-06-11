@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from contextlib import contextmanager
 import asyncio
 
 import pytest
@@ -7,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.consumers import kafka_consumer as kafka_consumer_module
 from app.consumers.kafka_consumer import consume_events
 from app.database import Base, get_db
 from app.kafka import get_kafka_producer
@@ -322,6 +324,45 @@ def test_consume_events_uses_injected_config_and_handlers() -> None:
     assert handled == [payload]
 
 
+def test_consume_events_passes_trace_headers_to_consumer_span(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = payment_approved_event()
+    trace_headers = [
+        ("traceparent", b"00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01"),
+        ("tracestate", b"vendor=value"),
+    ]
+    observed_headers: list[list[tuple[str, bytes]]] = []
+
+    @contextmanager
+    def fake_start_consumer_span(message: FakeMessage):
+        observed_headers.append(list(message.headers))
+        yield object()
+
+    monkeypatch.setattr(kafka_consumer_module, "start_consumer_span", fake_start_consumer_span)
+
+    async def handle_event(message_payload: dict) -> None:
+        assert message_payload == payload
+
+    def consumer_factory(*topics: str, **kwargs: object) -> FakeConsumer:
+        return FakeConsumer(
+            topics=topics,
+            kwargs=kwargs,
+            messages=[FakeMessage("payment-approved", payload, headers=trace_headers)],
+        )
+
+    asyncio.run(
+        kafka_consumer_module.consume_events(
+            asyncio.Event(),
+            bootstrap_servers="kafka:9092",
+            group_id="ticket-service",
+            service_name="ticket-service",
+            handlers={"payment-approved": handle_event},
+            consumer_factory=consumer_factory,
+        )
+    )
+
+    assert observed_headers == [trace_headers]
+
+
 def test_healthz() -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
@@ -413,10 +454,10 @@ class FailingKafkaProducer:
 
 
 class FakeMessage:
-    def __init__(self, topic: str, value: dict) -> None:
+    def __init__(self, topic: str, value: dict, *, headers: list[tuple[str, bytes]] | None = None) -> None:
         self.topic = topic
         self.value = value
-        self.headers: list[tuple[str, bytes]] = []
+        self.headers = headers or []
         self.partition = 0
         self.offset = 0
 

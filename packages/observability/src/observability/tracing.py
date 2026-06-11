@@ -1,8 +1,9 @@
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass
 from typing import Protocol
 
-from opentelemetry import trace
+from opentelemetry import propagate, trace
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -16,6 +17,22 @@ _MANUAL_TRACER_NAME = "observability.manual"
 
 TraceScalarValue = str | int | float | bool
 TraceAttributeValue = TraceScalarValue | Sequence[TraceScalarValue]
+
+
+@dataclass(frozen=True)
+class TraceContext:
+    """비동기 경계에 보관할 수 있는 trace 전파 값."""
+
+    carrier: dict[str, str]
+    trace_id: str | None = None
+    span_id: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "carrier": dict(self.carrier),
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+        }
 
 
 class TraceRecorder(Protocol):
@@ -85,6 +102,25 @@ def trace_recorder() -> TraceRecorder:
     return OpenTelemetryTraceRecorder()
 
 
+def capture_current_trace_context() -> TraceContext | None:
+    """현재 span context를 outbox 같은 비동기 저장소에 넣을 값으로 캡처한다."""
+    carrier: dict[str, str] = {}
+    propagate.inject(carrier)
+    trace_id, span_id = current_trace_context()
+    sanitized_carrier = {
+        key: value
+        for key, value in carrier.items()
+        if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip()
+    }
+    if not sanitized_carrier and not trace_id and not span_id:
+        return None
+    return TraceContext(
+        carrier=sanitized_carrier,
+        trace_id=trace_id or None,
+        span_id=span_id or None,
+    )
+
+
 def configure_process_tracing(config: ObservabilityConfig) -> None:
     """서비스 시작 시 프로세스 전체 OpenTelemetry tracer provider를 설정한다.
 
@@ -118,6 +154,17 @@ configure_tracing = configure_process_tracing
 
 
 def current_trace_context() -> tuple[str, str]:
+    """현재 실행 context의 trace_id와 span_id를 반환한다.
+
+    이 함수는 전역 함수지만 trace_id/span_id를 전역 변수에 저장하지 않는다.
+    OpenTelemetry는 Python의 contextvars를 통해 async task/thread별 current span을
+    관리하므로, FastAPI 요청 처리 중 호출하면 각 요청의 active span 값을 읽는다.
+
+    예:
+      요청 A의 handler 안에서 호출 -> 요청 A의 trace_id/span_id
+      요청 B의 handler 안에서 호출 -> 요청 B의 trace_id/span_id
+      요청 밖 dispatcher/background loop에서 호출 -> 유효한 current span이 없으면 빈 문자열
+    """
     span_context = trace.get_current_span().get_span_context()
     if not span_context.is_valid:
         return "", ""

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Header, Request, status
+from observability import capture_current_trace_context
 from sqlalchemy.orm import Session
 
 from app.auth import UserContext, require_role, require_user_context
@@ -39,6 +40,7 @@ async def create_payment(
             getattr(request.state, "request_id", None)
             or request.headers.get("X-Request-Id")
         ),
+        trace_context=capture_current_trace_context(),
     )
 
     result = await payment_service.create_payment(

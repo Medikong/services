@@ -34,15 +34,22 @@ def create_kafka_producer(
     return producer_factory(**producer_kwargs)
 
 
-def build_producer_headers(*, correlation_id: str | None = None) -> KafkaHeaders:
-    carrier: dict[str, str] = {}
-    propagate.inject(carrier)
+def build_producer_headers(
+    *,
+    correlation_id: str | None = None,
+    carrier: Mapping[str, str] | None = None,
+) -> KafkaHeaders:
+    resolved_carrier: dict[str, str] = {}
+    if carrier is None:
+        propagate.inject(resolved_carrier)
+    else:
+        resolved_carrier.update(_string_carrier(carrier))
 
     resolved_correlation_id = _string_value(correlation_id)
     if resolved_correlation_id:
-        carrier[CORRELATION_ID_HEADER] = resolved_correlation_id
+        resolved_carrier[CORRELATION_ID_HEADER] = resolved_correlation_id
 
-    return [(key, value.encode("utf-8")) for key, value in carrier.items() if key in _ALLOWED_HEADERS]
+    return [(key, value.encode("utf-8")) for key, value in resolved_carrier.items() if key in _ALLOWED_HEADERS]
 
 
 def headers_to_carrier(headers: Sequence[tuple[str | bytes, bytes]] | None) -> dict[str, str]:
@@ -101,6 +108,17 @@ def _string_value(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _string_carrier(carrier: Mapping[str, str]) -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for key, value in carrier.items():
+        resolved_key = _string_value(key)
+        resolved_value = _string_value(value)
+        if resolved_key is None or resolved_value is None:
+            continue
+        resolved[resolved_key] = resolved_value
+    return resolved
 
 
 _ALLOWED_HEADERS = {TRACEPARENT_HEADER, TRACESTATE_HEADER, CORRELATION_ID_HEADER}

@@ -45,6 +45,7 @@ class PaymentEvent(Base):
     event_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
     payment_id: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    trace_context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     publish_status: Mapped[str] = mapped_column(String(20), index=True, nullable=False, default="pending")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     publish_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

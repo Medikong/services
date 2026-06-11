@@ -14,10 +14,12 @@ from app.kafka import create_producer
 from app.metrics import configure_payment_metrics
 from app.observability import configure_app_observability
 from app.routes.payments import router as payments_router
+from app.schema_migrations import run_schema_migrations
 from app.services.payment_events import run_payment_event_dispatcher
 
 
 models.Base.metadata.create_all(bind=engine)
+run_schema_migrations(engine)
 
 _BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 

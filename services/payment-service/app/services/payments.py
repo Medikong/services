@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, status
+from observability import TraceContext
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ from app.services.payment_events import (
 class PaymentRequestContext:
     idempotency_key: str | None
     correlation_id: str | None
+    trace_context: TraceContext | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,7 @@ class PaymentService:
                     request_body=request_body,
                     user=user,
                     correlation_id=context.correlation_id,
+                    trace_context=context.trace_context,
                 )
                 self._db.add(
                     PaymentEvent(
@@ -100,6 +103,7 @@ class PaymentService:
                         event_type=event_draft.event_type.value,
                         payment_id=payment.id,
                         payload=event_draft.payload,
+                        trace_context=event_draft.trace_context,
                         publish_status=PUBLISH_STATUS_PENDING,
                     )
                 )
