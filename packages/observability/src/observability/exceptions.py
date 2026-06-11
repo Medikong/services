@@ -14,6 +14,7 @@ from opentelemetry.trace import Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
 from observability.error_context import extract_error_context
+from observability.observation import ExceptionCapture, SpanTreatment, observation_for_exception
 from observability.tracing import current_trace_context, set_current_span_attributes
 
 
@@ -31,8 +32,10 @@ def record_exception(
         return False
 
     mark_exception_recorded(exc)
+    observation = observation_for_exception(exc)
     error_attributes: dict[str, AttributeValue] = {
         "error.type": type(exc).__name__,
+        "error.kind": observation.kind.value,
         **extract_error_context(exc),
     }
     if attributes:
@@ -40,26 +43,32 @@ def record_exception(
 
     span = trace.get_current_span()
     if span.get_span_context().is_valid:
-        span.record_exception(exc)
-        span.set_status(Status(StatusCode.ERROR, str(exc)))
+        if observation.exception_capture is ExceptionCapture.FULL_EXCEPTION:
+            span.record_exception(exc)
+        if observation.span_treatment is SpanTreatment.RECORD_EVENT:
+            span.add_event(observation.event, attributes=error_attributes)
+        elif observation.span_treatment is SpanTreatment.ERROR:
+            span.set_status(Status(StatusCode.ERROR, str(exc)))
         set_current_span_attributes(error_attributes)
 
-    trace_id, span_id = current_trace_context()
-    structlog.get_logger(service_name).error(
-        "exception.recorded",
-        **{
+    if observation.exception_capture is not ExceptionCapture.NONE:
+        trace_id, span_id = current_trace_context()
+        log_fields: dict[str, object] = {
             "service.name": service_name,
-            "severity": "ERROR",
-            "severity_text": "ERROR",
+            "severity": observation.severity,
+            "severity_text": observation.severity,
             "trace_id": trace_id,
             "span_id": span_id,
             "request_id": get_current_request_id(),
             "error.type": type(exc).__name__,
             "error.message": str(exc),
-            "exception.stacktrace": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
             **error_attributes,
-        },
-    )
+        }
+        if observation.exception_capture is ExceptionCapture.FULL_EXCEPTION:
+            log_fields["exception.stacktrace"] = "".join(
+                traceback.format_exception(type(exc), exc, exc.__traceback__)
+            )
+        _log_observation(service_name, observation.severity, observation.event, log_fields)
     return True
 
 
@@ -69,6 +78,23 @@ def is_exception_recorded(exc: BaseException) -> bool:
 
 def mark_exception_recorded(exc: BaseException) -> None:
     setattr(exc, _RECORDED_ATTR, True)
+
+
+def _log_observation(service_name: str, severity: str, event: str, fields: dict[str, object]) -> None:
+    logger = structlog.get_logger(service_name)
+    match severity:
+        case "DEBUG":
+            logger.debug(event, **fields)
+        case "INFO":
+            logger.info(event, **fields)
+        case "WARNING":
+            logger.warning(event, **fields)
+        case "ERROR":
+            logger.error(event, **fields)
+        case "CRITICAL":
+            logger.critical(event, **fields)
+        case _:
+            raise ValueError(f"unsupported error observation severity: {severity}")
 
 
 class ErrorRecordingMiddleware:

@@ -1,8 +1,12 @@
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import (
+    SalePolicyAlreadyApprovedError,
+    SalePolicyAlreadyRejectedError,
+)
 from app.metrics.events import ConcertAdminCommandRecorded
 from app.metrics.labels import CatalogResource, ConcertAdminCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
@@ -40,7 +44,9 @@ class SalePolicyService(ConcertDomainService):
             )
             self.commit()
             response = sale_policy_response(policy)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.UPDATE_SALE_POLICY, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -56,7 +62,9 @@ class SalePolicyService(ConcertDomainService):
             response = sale_policy_response(self._sale_policy(concert_id))
             attempt.mark_success()
             return response
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:
@@ -67,11 +75,13 @@ class SalePolicyService(ConcertDomainService):
         try:
             policy = self._sale_policy(concert_id)
             if policy.status == "approved":
-                raise ConflictError("sale_policy.invalid_state", "Sale policy is already approved.")
+                raise SalePolicyAlreadyApprovedError()
             policy.status = "approved"
             self.commit()
             response = sale_policy_response(policy)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.APPROVE_SALE_POLICY, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -85,14 +95,16 @@ class SalePolicyService(ConcertDomainService):
         try:
             policy = self._sale_policy(concert_id)
             if policy.status == "rejected":
-                raise ConflictError("sale_policy.invalid_state", "Sale policy is already rejected.")
+                raise SalePolicyAlreadyRejectedError()
             policy.status = "rejected"
             concert = self._concert(concert_id)
             concert.review_reason = command.reason
             concert.last_reviewed_at = now_utc()
             self.commit()
             response = sale_policy_response(policy)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.REJECT_SALE_POLICY, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -127,7 +139,9 @@ class OpenPolicyService(ConcertDomainService):
             )
             self.commit()
             response = open_request_response(open_request)
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.SUBMIT_OPEN_REQUEST, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -145,7 +159,9 @@ class OpenPolicyService(ConcertDomainService):
             concert.status = "scheduled"
             self.commit()
             response = schemas.OpenScheduleResponse(concertId=concert.id, opensAt=concert.opens_at, status="scheduled")
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.UPDATE_OPEN_SCHEDULE, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -173,7 +189,9 @@ class OpenPolicyService(ConcertDomainService):
                 reopenDelaySeconds=request.reopenDelaySeconds,
                 batchSize=request.batchSize,
             )
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(ConcertAdminCommandRecorded(command=ConcertAdminCommand.SET_REOPEN_POLICY, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -201,7 +219,9 @@ class ReviewStatusService(ConcertDomainService):
             )
             attempt.mark_success()
             return response
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import schemas
 from app.database import Base
-from app.exceptions import ConflictError
+from app.exceptions import SeatGradeAlreadyExistsError, SeatMapContainsDuplicateSeatsError
 from app.repositories import ConcertReviewRepository, SeatRepository
 from app.services import ConcertCatalogService, ConcertReviewService, SeatService, ShowtimeService, VenueService
 
@@ -64,7 +64,7 @@ def test_postgres_enforces_unique_seat_grade_name(db_session: Session) -> None:
         schemas.SeatGradeCreateRequest(grades=[schemas.SeatGradeResponse(id="pg-vip-1", name="VIP", price=100000)]),
     )
 
-    with pytest.raises(ConflictError, match="Seat grade already exists"):
+    with pytest.raises(SeatGradeAlreadyExistsError, match="Seat grade already exists"):
         service.create_seat_grades(
             showtime.id,
             schemas.SeatGradeCreateRequest(grades=[schemas.SeatGradeResponse(id="pg-vip-2", name="VIP", price=120000)]),
@@ -77,7 +77,7 @@ def test_postgres_rolls_back_duplicate_seat_map_locations(db_session: Session) -
         sections=[schemas.SeatSectionRequest(name="A", rows=[schemas.SeatRowRequest(name="1", seatNumbers=["1", "1"])])]
     )
 
-    with pytest.raises(ConflictError, match="Seat map contains duplicate seats"):
+    with pytest.raises(SeatMapContainsDuplicateSeatsError, match="Seat map contains duplicate seats"):
         SeatService(db_session).upload_seat_map(showtime.id, request)
 
     assert list(SeatRepository(db_session).list_seats(showtime.id, limit=20)) == []

@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import entities as model
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import ReservationNotFoundError, SalesStateNotFoundError, SeatAlreadyReservedError
 from app.repositories import ReservationPolicyRepository, ReservationRepository, SalesRepository
 
 
@@ -37,18 +37,18 @@ class ReservationDomainService:
     def _reservation(self, reservation_id: str) -> model.Reservation:
         reservation = self.reservations.get_reservation(reservation_id)
         if reservation is None:
-            raise NotFoundError("reservation", reservation_id)
+            raise ReservationNotFoundError(reservation_id)
         return reservation
 
     def _sales_state(self, concert_id: str) -> model.SalesState:
         state = self.sales.get_sales_state(concert_id)
         if state is None:
-            raise NotFoundError("sales", concert_id)
+            raise SalesStateNotFoundError(concert_id)
         return state
 
-    def _commit_or_reservation_conflict(self) -> None:
+    def _commit_or_reservation_conflict(self, seat_id: str | None = None) -> None:
         try:
             self.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise ConflictError("reservation.conflict", "Seat is already reserved.") from exc
+            raise SeatAlreadyReservedError(seat_id) from exc

@@ -1,8 +1,13 @@
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import entities as model
 from app import schemas
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import (
+    SeatGradeAlreadyExistsError,
+    SeatMapContainsDuplicateSeatsError,
+    SeatNotFoundError,
+)
 from app.metrics.events import SeatInventoryCommandRecorded
 from app.metrics.labels import CatalogResource, SeatInventoryCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
@@ -22,7 +27,9 @@ class SeatService(ConcertDomainService):
             response = schemas.SeatListResponse(items=[seat_response(item) for item in self.seats.list_seats(showtime_id, limit)], page=page())
             attempt.mark_success()
             return response
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             attempt.mark_rejection()
             raise
         finally:
@@ -46,8 +53,10 @@ class SeatService(ConcertDomainService):
                                 status="sellable",
                             )
                         )
-            self._commit_or_conflict("seat_map.conflict", "Seat map contains duplicate seats.")
-        except (ConflictError, NotFoundError):
+            self._commit_or_domain_rejection(SeatMapContainsDuplicateSeatsError)
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(SeatInventoryCommandRecorded(command=SeatInventoryCommand.UPLOAD_SEAT_MAP, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -62,10 +71,12 @@ class SeatService(ConcertDomainService):
             for item in request.seats:
                 seat = self.seats.get_seat(item.seatId)
                 if seat is None or seat.showtime_id != showtime_id:
-                    raise NotFoundError("seat", item.seatId)
+                    raise SeatNotFoundError(item.seatId)
                 seat.status = item.status
             self.commit()
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(SeatInventoryCommandRecorded(command=SeatInventoryCommand.UPDATE_SEAT_INVENTORY, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -88,9 +99,11 @@ class SeatService(ConcertDomainService):
                 )
                 self.add(entity)
                 items.append(entity)
-            self._commit_or_conflict("seat_grade.conflict", "Seat grade already exists.")
+            self._commit_or_domain_rejection(SeatGradeAlreadyExistsError)
             response = schemas.SeatGradeListResponse(items=[seat_grade_response(item) for item in items])
-        except (ConflictError, NotFoundError):
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(SeatInventoryCommandRecorded(command=SeatInventoryCommand.CREATE_SEAT_GRADES, result=MetricResult.REJECTION))
             raise
         except Exception:
@@ -106,7 +119,7 @@ class SeatService(ConcertDomainService):
             for seat_id in request.seatIds:
                 seat = self.seats.get_seat(seat_id)
                 if seat is None or seat.showtime_id != showtime_id:
-                    raise NotFoundError("seat", seat_id)
+                    raise SeatNotFoundError(seat_id)
             hold = model.HoldSeatRequest(
                 id=new_id("hold"),
                 showtime_id=showtime_id,
@@ -118,7 +131,9 @@ class SeatService(ConcertDomainService):
             self.add(hold)
             self.commit()
             response = hold_request_response(hold)
-        except NotFoundError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             concert_metrics.record(SeatInventoryCommandRecorded(command=SeatInventoryCommand.CREATE_HOLD_REQUEST, result=MetricResult.REJECTION))
             raise
         except Exception:

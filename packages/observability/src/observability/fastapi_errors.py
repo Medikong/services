@@ -11,12 +11,15 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from observability.exceptions import record_exception
+from observability.observation import ErrorObservation, SYSTEM_FAILURE_OBSERVATION
 
 
 StatusCodeMapper = Callable[[int], str]
 
 
 class HttpError(ContextualError):
+    observation: ErrorObservation = SYSTEM_FAILURE_OBSERVATION
+
     def __init__(
         self,
         status_code: int,
@@ -48,7 +51,7 @@ def register_error_handlers(
 ) -> None:
     @app.exception_handler(HttpError)
     async def handle_http_error(request: Request, exc: HttpError) -> JSONResponse:
-        record_exception(exc, service_name=service_name)
+        record_exception(exc, service_name=service_name, attributes={"http.status_code": exc.status_code})
         return error_response(request, exc.status_code, exc.code, exc.message, exc.details)
 
     @app.exception_handler(HTTPException)
@@ -57,7 +60,7 @@ def register_error_handlers(
         message = str(exc.detail)
         contextual = HttpError(exc.status_code, code, message, domain=domain)
         contextual.__traceback__ = exc.__traceback__
-        record_exception(contextual, service_name=service_name)
+        record_exception(contextual, service_name=service_name, attributes={"http.status_code": exc.status_code})
         return error_response(request, exc.status_code, code, message)
 
     @app.exception_handler(RequestValidationError)
@@ -71,7 +74,11 @@ def register_error_handlers(
             domain=domain,
         )
         contextual.__traceback__ = exc.__traceback__
-        record_exception(contextual, service_name=service_name)
+        record_exception(
+            contextual,
+            service_name=service_name,
+            attributes={"http.status_code": status.HTTP_422_UNPROCESSABLE_ENTITY},
+        )
         return error_response(
             request,
             status.HTTP_422_UNPROCESSABLE_ENTITY,

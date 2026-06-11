@@ -19,8 +19,11 @@ from observability import error_context as error_context_module
 from observability import exceptions as exceptions_module
 from observability import fastapi as fastapi_module
 from observability import (
+    DOMAIN_REJECTION_OBSERVATION,
     OBSERVABILITY_ENV_KEYS,
     DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
+    ErrorObservation,
+    HttpError,
     ObservabilityConfig,
     NoopTraceRecorder,
     configure_process_logging,
@@ -349,6 +352,46 @@ def test_record_exception_marks_span_and_deduplicates(monkeypatch) -> None:
     assert span.attributes["error.domain"] == "test"
 
 
+def test_record_exception_preserves_system_failure_log_and_stacktrace(caplog, monkeypatch) -> None:
+    configure_process_logging()
+    span = FakeSpan()
+    monkeypatch.setattr(exceptions_module.trace, "get_current_span", lambda: span)
+    monkeypatch.setattr(exceptions_module, "current_trace_context", lambda: ("trace-1", "span-1"))
+    caplog.set_level(logging.INFO)
+
+    record_exception(RuntimeError("boom"), service_name="test-service")
+
+    log = _event_log(caplog.records, "test-service", "exception.recorded")
+    assert log["severity_text"] == "ERROR"
+    assert log["error.kind"] == "system_failure"
+    assert log["error.type"] == "RuntimeError"
+    assert "exception.stacktrace" in log
+    assert span.status_code == "ERROR"
+    assert span.recorded_exception is not None
+
+
+def test_record_exception_uses_domain_rejection_observation_without_stacktrace(caplog, monkeypatch) -> None:
+    configure_process_logging()
+    span = FakeSpan()
+    monkeypatch.setattr(exceptions_module.trace, "get_current_span", lambda: span)
+    monkeypatch.setattr(exceptions_module, "current_trace_context", lambda: ("trace-1", "span-1"))
+    caplog.set_level(logging.INFO)
+
+    exc = DomainRejectionError()
+    record_exception(exc, service_name="test-service", attributes={"http.status_code": 409})
+
+    log = _event_log(caplog.records, "test-service", "domain.rejection.recorded")
+    assert log["severity_text"] == "INFO"
+    assert log["error.kind"] == "domain_rejection"
+    assert log["error.type"] == "DomainRejectionError"
+    assert log["error.code"] == "reservation.conflict"
+    assert log["http.status_code"] == 409
+    assert "exception.stacktrace" not in log
+    assert span.recorded_exception is None
+    assert span.status_code is None
+    assert span.events == [("domain.rejection.recorded", span.attributes)]
+
+
 def _observed_app(config: ObservabilityConfig) -> FastAPI:
     app = FastAPI()
     configure_process_logging()
@@ -368,6 +411,22 @@ def _request_log(records: list[logging.LogRecord]) -> dict[str, object]:
             if payload.get("event") == "http.request.completed":
                 return payload
     raise AssertionError("request JSON log was not emitted")
+
+
+def _event_log(records: list[logging.LogRecord], logger_name: str, event: str) -> dict[str, object]:
+    for record in reversed(records):
+        if record.name == logger_name and record.message.startswith("{"):
+            payload = json.loads(record.message)
+            if payload.get("event") == event:
+                return payload
+    raise AssertionError(f"{event} JSON log was not emitted")
+
+
+class DomainRejectionError(HttpError):
+    observation: ErrorObservation = DOMAIN_REJECTION_OBSERVATION
+
+    def __init__(self) -> None:
+        super().__init__(409, "reservation.conflict", "Seat is already reserved.", domain="reservation")
 
 
 class FakeSpanContext:

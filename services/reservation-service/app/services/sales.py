@@ -1,9 +1,15 @@
 from sqlalchemy.orm import Session
 
 from metrics import MetricResult
+from observability import DOMAIN_REJECTION_OBSERVATION, HttpError
 
 from app import schemas
-from app.exceptions import ConflictError
+from app.exceptions import (
+    ClosedSalesCannotStartError,
+    SalesAlreadyOpenError,
+    SalesPauseInvalidStateError,
+    SalesResumeInvalidStateError,
+)
 from app.metrics.events import SalesStateChangeRecorded
 from app.metrics.labels import SalesStateAction
 from app.metrics.recorder import ReservationTelemetryRecorder
@@ -49,15 +55,17 @@ class SalesService(ReservationDomainService):
         try:
             state = self.sales.get_or_create_sales_state(concert_id, now_utc())
             if state.sales_status == "open":
-                raise ConflictError("sales.invalid_state", "Sales are already open.")
+                raise SalesAlreadyOpenError()
             if state.sales_status == "closed":
-                raise ConflictError("sales.invalid_state", "Closed sales cannot be started.")
+                raise ClosedSalesCannotStartError()
             state.sales_status = "open"
             state.updated_at = now_utc()
             self.commit()
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.START, result=MetricResult.SUCCESS))
             return sales_command_response(state)
-        except ConflictError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.START, result=MetricResult.REJECTION))
             raise
 
@@ -66,13 +74,15 @@ class SalesService(ReservationDomainService):
         try:
             state = self._sales_state(concert_id)
             if state.sales_status != "open":
-                raise ConflictError("sales.invalid_state", "Only open sales can be paused.")
+                raise SalesPauseInvalidStateError()
             state.sales_status = "paused"
             state.updated_at = now_utc()
             self.commit()
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.PAUSE, result=MetricResult.SUCCESS))
             return sales_command_response(state)
-        except ConflictError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.PAUSE, result=MetricResult.REJECTION))
             raise
 
@@ -81,12 +91,14 @@ class SalesService(ReservationDomainService):
         try:
             state = self._sales_state(concert_id)
             if state.sales_status != "paused":
-                raise ConflictError("sales.invalid_state", "Only paused sales can be resumed.")
+                raise SalesResumeInvalidStateError()
             state.sales_status = "open"
             state.updated_at = now_utc()
             self.commit()
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.RESUME, result=MetricResult.SUCCESS))
             return sales_command_response(state)
-        except ConflictError:
+        except HttpError as exc:
+            if exc.observation != DOMAIN_REJECTION_OBSERVATION:
+                raise
             self.telemetry.record(SalesStateChangeRecorded(action=SalesStateAction.RESUME, result=MetricResult.REJECTION))
             raise

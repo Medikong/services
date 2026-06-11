@@ -16,6 +16,16 @@ from observability.fastapi import (
 )
 from observability.fastapi_errors import HttpError, error_response, register_error_handlers
 from observability.logging import configure_process_logging, configure_structured_logging
+from observability.observation import (
+    CLIENT_REJECTION_OBSERVATION,
+    DOMAIN_REJECTION_OBSERVATION,
+    SECURITY_REJECTION_OBSERVATION,
+    SYSTEM_FAILURE_OBSERVATION,
+    ErrorKind,
+    ErrorObservation,
+    ExceptionCapture,
+    SpanTreatment,
+)
 from observability.tracing import (
     NoopTraceRecorder,
     TraceRecorder,
@@ -34,12 +44,19 @@ __all__ = [
     "HttpError",
     "ObservabilityConfig",
     "NoopTraceRecorder",
+    "CLIENT_REJECTION_OBSERVATION",
+    "DOMAIN_REJECTION_OBSERVATION",
+    "SECURITY_REJECTION_OBSERVATION",
+    "SYSTEM_FAILURE_OBSERVATION",
+    "ErrorKind",
+    "ErrorObservation",
     "configure_process_logging",
     "configure_process_tracing",
     "configure_structured_logging",
     "configure_tracing",
     "create_request_log_middleware",
     "error_response",
+    "ExceptionCapture",
     "get_current_request_id",
     "instrument_motor_client",
     "instrument_fastapi_app",
@@ -49,6 +66,7 @@ __all__ = [
     "register_error_handlers",
     "request_id_middleware_options",
     "set_current_span_attributes",
+    "SpanTreatment",
     "TraceRecorder",
     "trace_recorder",
 ]

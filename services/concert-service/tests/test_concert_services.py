@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import schemas
 from app.database import Base
+from app.exceptions import SeatGradeAlreadyExistsError
 from app.services import ConcertCatalogService, SeatService, ShowtimeService, VenueService
 
 
@@ -56,5 +57,5 @@ def test_duplicate_seat_grade_is_conflict(db_session: Session) -> None:
 
     SeatService(db_session).create_seat_grades(showtime.id, request)
 
-    with pytest.raises(Exception, match="Seat grade already exists"):
+    with pytest.raises(SeatGradeAlreadyExistsError, match="Seat grade already exists"):
         SeatService(db_session).create_seat_grades(showtime.id, request)

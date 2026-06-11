@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import schemas
 from app.database import Base
-from app.exceptions import ConflictError
+from app.exceptions import SeatAlreadyReservedError
 from app.services import ReservationCommandService, ReservationPolicyService, ReservationQueryService, SalesService
 
 
@@ -35,7 +35,7 @@ def test_reservation_state_transitions_and_duplicate_conflict(db_session: Sessio
     )
     reservation = command_service.create_reservation("user-service", request)
 
-    with pytest.raises(ConflictError):
+    with pytest.raises(SeatAlreadyReservedError):
         command_service.create_reservation("user-service-2", request)
 
     canceled = command_service.cancel_reservation(reservation.id)

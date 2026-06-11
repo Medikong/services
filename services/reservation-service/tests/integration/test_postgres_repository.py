@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app import entities as model
 from app import schemas
 from app.database import Base
-from app.exceptions import ConflictError
+from app.exceptions import SeatAlreadyReservedError
 from app.repositories import ReservationRepository
 from app.services import ReservationCommandService
 from app.services.serializers import active_seat_key
@@ -67,7 +67,7 @@ def test_postgres_active_reservation_query_and_conflict(db_session: Session) -> 
 
     assert active is not None
     assert active.id == created.id
-    with pytest.raises(ConflictError, match="Seat is already reserved"):
+    with pytest.raises(SeatAlreadyReservedError, match="Seat is already reserved"):
         service.create_reservation("user-pg-2", request)
 
 
@@ -143,7 +143,7 @@ def test_postgres_concurrent_reservations_allow_only_one_active_hold(db_session:
         try:
             ReservationCommandService(session).create_reservation(f"user-concurrent-{index}", request)
             return "created"
-        except ConflictError:
+        except SeatAlreadyReservedError:
             return "conflict"
         finally:
             session.close()

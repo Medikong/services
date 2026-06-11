@@ -1,3 +1,5 @@
+import json
+import logging
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -39,6 +41,47 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
     assert producer.sent[0][0] == "reservation-created"
     assert producer.sent[0][1]["reservationId"] == created["id"]
     assert dict(producer.sent[0][2])["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
+
+
+def test_duplicate_seat_conflict_logs_domain_rejection_without_exception_event(caplog) -> None:
+    """좌석 중복 예약은 409를 유지하되 시스템 예외 로그로 분류하지 않는다."""
+    producer = FakeKafkaProducer()
+    app = create_app()
+    app.dependency_overrides[get_kafka_producer] = lambda: producer
+    client = TestClient(app)
+    suffix = uuid4().hex[:8]
+    payload = {
+        "concertId": f"concert-observation-{suffix}",
+        "showtimeId": f"showtime-observation-{suffix}",
+        "performanceId": f"perf-observation-{suffix}",
+        "seatId": "A-1",
+    }
+    caplog.set_level(logging.INFO)
+
+    created = client.post("/reservations", json=payload, headers={"X-User-Id": "user-observation-1"})
+    duplicate = client.post(
+        "/reservations",
+        json=payload,
+        headers={"X-User-Id": "user-observation-2", "X-Request-Id": "req-duplicate-seat"},
+    )
+
+    duplicate_logs = [
+        log
+        for log in _json_logs(caplog.records, "reservation-service")
+        if log.get("request_id") == "req-duplicate-seat"
+    ]
+
+    assert created.status_code == 201
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "reservation.conflict"
+    assert any(log.get("event") == "domain.rejection.recorded" for log in duplicate_logs)
+    assert not any(log.get("event") == "exception.recorded" for log in duplicate_logs)
+    rejection_log = next(log for log in duplicate_logs if log.get("event") == "domain.rejection.recorded")
+    assert rejection_log["severity_text"] == "INFO"
+    assert rejection_log["error.kind"] == "domain_rejection"
+    assert rejection_log["error.type"] == "SeatAlreadyReservedError"
+    assert rejection_log["http.status_code"] == 409
+    assert "exception.stacktrace" not in rejection_log
 
 
 def test_reservation_expire_publishes_event() -> None:
@@ -197,6 +240,15 @@ def assert_no_high_cardinality_metric_labels(metrics_text: str) -> None:
     )
     for label in forbidden_labels:
         assert f"{label}=" not in metrics_text
+
+
+def _json_logs(records: list[logging.LogRecord], logger_name: str) -> list[dict[str, object]]:
+    logs: list[dict[str, object]] = []
+    for record in records:
+        if record.name != logger_name or not record.message.startswith("{"):
+            continue
+        logs.append(json.loads(record.message))
+    return logs
 
 
 class FakeKafkaProducer:
