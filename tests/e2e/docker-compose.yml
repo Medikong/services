@@ -1,3 +1,8 @@
+x-service-e2e-env: &service-e2e-env
+  # E2E에서는 모든 서비스가 같은 환경/버전 label을 노출해 healthcheck와 metric 확인 기준을 맞춘다.
+  SERVICE_ENVIRONMENT: e2e
+  SERVICE_VERSION: e2e
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -60,17 +65,36 @@ services:
       timeout: 5s
       retries: 20
 
+  # 사용자 관점 happy path는 실제 로그인에서 받은 JWT claim을 gateway header로 넘긴다.
+  # downstream 서비스는 JWT를 직접 검증하지 않고 X-User-* header를 신뢰하므로 auth-service가 claim의 출처 역할을 한다.
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      <<: *service-e2e-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/auth_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   concert-service:
     build:
       context: ../..
       dockerfile: services/concert-service/Dockerfile
     environment:
+      <<: *service-e2e-env
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/concert_service
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/readyz').read()"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -80,12 +104,18 @@ services:
       context: ../..
       dockerfile: services/reservation-service/Dockerfile
     environment:
+      <<: *service-e2e-env
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/reservation_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/readyz').read()"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -95,6 +125,7 @@ services:
       context: ../..
       dockerfile: services/payment-service/Dockerfile
     environment:
+      <<: *service-e2e-env
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -105,7 +136,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz').read()"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -115,6 +146,7 @@ services:
       context: ../..
       dockerfile: services/ticket-service/Dockerfile
     environment:
+      <<: *service-e2e-env
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/ticket_service
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       AWS_REGION: ap-northeast-2
@@ -127,7 +159,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/readyz').read()"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -137,6 +169,7 @@ services:
       context: ../..
       dockerfile: services/notification-service/Dockerfile
     environment:
+      <<: *service-e2e-env
       MONGODB_URL: mongodb://notification-db:27017
       MONGODB_DB_NAME: notification_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -148,7 +181,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/readyz').read()"]
       interval: 5s
       timeout: 5s
       retries: 20

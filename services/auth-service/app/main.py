@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
@@ -45,8 +47,17 @@ def _configure_auth_service_metrics(registry: CollectorRegistry, *, service_envi
     )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """앱 종료 시 DB 연결 풀이 남지 않도록 lifespan에서 정리한다."""
+    try:
+        yield
+    finally:
+        engine.dispose()
+
+
 observability_config = settings.observability_config()
-app = FastAPI(title=settings.service_name)
+app = FastAPI(title=settings.service_name, lifespan=lifespan)
 configure_app_observability(app, observability_config)
 register_error_handlers(
     app,

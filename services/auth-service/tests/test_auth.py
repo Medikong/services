@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 
 Path("test_auth_service.db").unlink(missing_ok=True)
 os.environ["DATABASE_URL"] = "sqlite:///./test_auth_service.db"
@@ -8,9 +10,20 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_auth_service.db"
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
+import app.main as app_main  # noqa: E402
 
 
 client = TestClient(app)
+
+
+def test_lifespan_disposes_engine(monkeypatch: MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(app_main.engine, "dispose", lambda: calls.append("dispose"))
+
+    with TestClient(app):
+        pass
+
+    assert calls == ["dispose"]
 
 
 def test_login_me_logout_and_audit_logs() -> None:

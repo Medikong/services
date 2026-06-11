@@ -15,6 +15,8 @@ def test_create_app_returns_fastapi_app() -> None:
 
 
 def test_kafka_producer_is_created_inside_lifespan(monkeypatch: MonkeyPatch) -> None:
+    calls: list[str] = []
+
     class FakeKafkaProducer:
         def __init__(self) -> None:
             self.started = False
@@ -22,9 +24,11 @@ def test_kafka_producer_is_created_inside_lifespan(monkeypatch: MonkeyPatch) -> 
 
         async def start(self) -> None:
             self.started = True
+            calls.append("producer-start")
 
         async def stop(self) -> None:
             self.stopped = True
+            calls.append("producer-stop")
 
     created: list[FakeKafkaProducer] = []
 
@@ -34,6 +38,7 @@ def test_kafka_producer_is_created_inside_lifespan(monkeypatch: MonkeyPatch) -> 
         return producer
 
     monkeypatch.setattr(app_main, "create_producer", fake_create_producer)
+    monkeypatch.setattr(app_main.engine, "dispose", lambda: calls.append("dispose"))
 
     app = create_app()
 
@@ -47,6 +52,7 @@ def test_kafka_producer_is_created_inside_lifespan(monkeypatch: MonkeyPatch) -> 
 
     assert created[0].stopped is True
     assert app.state.kafka_producer is None
+    assert calls == ["producer-start", "producer-stop", "dispose"]
 
 
 def test_health_returns_service_status() -> None:

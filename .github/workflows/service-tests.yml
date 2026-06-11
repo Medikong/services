@@ -4,9 +4,25 @@ on:
   push:
     branches-ignore:
       - main
+    paths:
+      - 'services/**'
+      - 'tests/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.github/workflows/service-tests.yml'
   pull_request:
     branches:
       - main
+    paths:
+      - 'services/**'
+      - 'tests/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.github/workflows/service-tests.yml'
   workflow_dispatch:
 
 permissions:

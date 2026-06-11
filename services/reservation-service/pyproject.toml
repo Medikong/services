@@ -5,6 +5,7 @@ description = "Reservation service FastAPI application"
 requires-python = ">=3.12"
 dependencies = [
     "blinker==1.9.0",
+    "contracts",
     "fastapi==0.124.0",
     "kafka-utils",
     "metrics",
@@ -30,6 +31,7 @@ test = [
 package = false
 
 [tool.uv.sources]
+contracts = { path = "../../packages/contracts", editable = true }
 errors = { path = "../../packages/errors", editable = true }
 middleware = { path = "../../packages/middleware", editable = true }
 kafka-utils = { path = "../../packages/kafka-utils", editable = true }

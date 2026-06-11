@@ -12,6 +12,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 
 COPY services/reservation-service/pyproject.toml services/reservation-service/uv.lock ./services/reservation-service/
+COPY packages/contracts ./packages/contracts
 COPY packages/errors ./packages/errors
 COPY packages/kafka-utils ./packages/kafka-utils
 COPY packages/metrics ./packages/metrics

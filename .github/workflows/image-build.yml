@@ -1,15 +1,21 @@
 name: Image Build
 
-# 이 workflow는 PR/브랜치 push에서 Docker image build 가능 여부만 검증한다.
+# 이 workflow는 PR 또는 수동 실행에서 Docker image build 가능 여부만 검증한다.
 # 단위 테스트 결과는 Service Tests workflow가 따로 담당하고, 이 workflow는 registry push를 하지 않는다.
 
 on:
-  push:
-    branches-ignore:
-      - main
   pull_request:
     branches:
       - main
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Taskfile.yml'
+      - '.dockerignore'
+      - '.github/workflows/image-build.yml'
+      - '.github/workflows/image-publish.yml'
   workflow_dispatch:
     inputs:
       image:
