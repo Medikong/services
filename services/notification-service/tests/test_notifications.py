@@ -1,9 +1,12 @@
+import asyncio
+
 import pytest
 from mongomock_motor import AsyncMongoMockClient
 from fastapi.testclient import TestClient
 
 import app.database as database
 from app.main import app
+import app.main as app_main
 from app.services.notification_service import handle_business_event
 
 
@@ -217,6 +220,61 @@ def test_healthz() -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_lifespan_awaits_consumer_before_closing_db(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def fake_connect_db() -> None:
+        calls.append("connect")
+
+    async def fake_consume_events(stop_event) -> None:
+        calls.append("consumer-start")
+        await stop_event.wait()
+        calls.append("consumer-stopped")
+
+    def fake_close_db() -> None:
+        calls.append("close")
+
+    monkeypatch.setattr(app_main, "connect_db", fake_connect_db)
+    monkeypatch.setattr(app_main, "consume_events", fake_consume_events)
+    monkeypatch.setattr(app_main, "close_db", fake_close_db)
+
+    with TestClient(app):
+        assert app.state.consumer_task is not None
+
+    assert app.state.consumer_task is None
+    assert calls == ["connect", "consumer-start", "consumer-stopped", "close"]
+
+
+def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def fake_connect_db() -> None:
+        calls.append("connect")
+
+    async def fake_consume_events(stop_event: asyncio.Event) -> None:
+        calls.append("consumer-start")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            calls.append("consumer-cancelled")
+            raise
+
+    def fake_close_db() -> None:
+        calls.append("close")
+
+    monkeypatch.setattr(app_main, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(app_main, "connect_db", fake_connect_db)
+    monkeypatch.setattr(app_main, "consume_events", fake_consume_events)
+    monkeypatch.setattr(app_main, "close_db", fake_close_db)
+
+    with TestClient(app):
+        assert app.state.consumer_task is not None
+
+    assert app.state.consumer_task is None
+    assert app.state.consumer_stop_event is None
+    assert calls == ["connect", "consumer-start", "consumer-cancelled", "close"]
 
 
 def test_readyz() -> None:

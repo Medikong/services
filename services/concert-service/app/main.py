@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from prometheus_client import CollectorRegistry
 from server.operational import (
@@ -36,10 +39,19 @@ def _configure_concert_service_metrics(registry: CollectorRegistry, *, service_e
     )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """앱 종료 시 DB 연결 풀이 남지 않도록 lifespan에서 정리한다."""
+    try:
+        yield
+    finally:
+        engine.dispose()
+
+
 def create_app() -> FastAPI:
     init_db()
     observability_config = settings.observability_config()
-    app = FastAPI(title=settings.service_name)
+    app = FastAPI(title=settings.service_name, lifespan=lifespan)
     configure_app_observability(app, observability_config)
     register_exception_handlers(app)
     register_operational_handlers(

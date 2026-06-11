@@ -13,6 +13,16 @@ def test_create_app_returns_fastapi_app() -> None:
     assert isinstance(app, FastAPI)
 
 
+def test_lifespan_disposes_engine(monkeypatch: MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(app_main.engine, "dispose", lambda: calls.append("dispose"))
+
+    with TestClient(create_app()):
+        pass
+
+    assert calls == ["dispose"]
+
+
 def test_health_returns_service_status() -> None:
     client = TestClient(create_app())
 

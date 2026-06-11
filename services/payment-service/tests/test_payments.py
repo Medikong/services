@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
+import app.main as app_main  # noqa: E402
 from app.metrics.recorder import PaymentTelemetryRecorder  # noqa: E402
 from app.models import PaymentEvent  # noqa: E402
 from app.services.payment_events import PaymentEventDispatcher, run_payment_event_dispatcher  # noqa: E402
@@ -179,6 +180,91 @@ def test_operational_endpoints_and_error_shape() -> None:
     response = client.get("/payments/pay-missing")
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "auth.invalid_token"
+
+
+def test_lifespan_creates_producer_starts_dispatcher_and_disposes_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[object] = []
+
+    class LifespanKafkaProducer:
+        def __init__(self) -> None:
+            self.started = False
+            self.stopped = False
+
+        async def start(self) -> None:
+            self.started = True
+            calls.append("producer-start")
+
+        async def stop(self) -> None:
+            self.stopped = True
+            calls.append("producer-stop")
+
+    producer = LifespanKafkaProducer()
+
+    def fake_create_producer() -> LifespanKafkaProducer:
+        calls.append("create-producer")
+        return producer
+
+    async def fake_run_payment_event_dispatcher(stop_event: asyncio.Event, **kwargs: object) -> None:
+        calls.append(("dispatcher-producer-started", kwargs["kafka_producer"].started))
+        await stop_event.wait()
+        calls.append("dispatcher-stopped")
+
+    monkeypatch.setattr(app_main, "create_producer", fake_create_producer)
+    monkeypatch.setattr(app_main, "run_payment_event_dispatcher", fake_run_payment_event_dispatcher)
+    monkeypatch.setattr(app_main.engine, "dispose", lambda: calls.append("dispose"))
+
+    assert app.state.kafka_producer is None
+
+    with TestClient(app):
+        assert app.state.kafka_producer is producer
+
+    assert producer.stopped is True
+    assert app.state.kafka_producer is None
+    assert calls == [
+        "create-producer",
+        "producer-start",
+        ("dispatcher-producer-started", True),
+        "dispatcher-stopped",
+        "producer-stop",
+        "dispose",
+    ]
+
+
+def test_lifespan_cancels_dispatcher_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    class LifespanKafkaProducer:
+        async def start(self) -> None:
+            calls.append("producer-start")
+
+        async def stop(self) -> None:
+            calls.append("producer-stop")
+
+    async def fake_run_payment_event_dispatcher(stop_event: asyncio.Event, **kwargs: object) -> None:
+        calls.append("dispatcher-start")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            calls.append("dispatcher-cancelled")
+            raise
+
+    monkeypatch.setattr(app_main, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(app_main, "create_producer", lambda: LifespanKafkaProducer())
+    monkeypatch.setattr(app_main, "run_payment_event_dispatcher", fake_run_payment_event_dispatcher)
+    monkeypatch.setattr(app_main.engine, "dispose", lambda: calls.append("dispose"))
+
+    with TestClient(app):
+        assert app.state.payment_event_dispatcher_task is not None
+
+    assert app.state.payment_event_dispatcher_task is None
+    assert app.state.payment_event_dispatcher_stop_event is None
+    assert calls == [
+        "producer-start",
+        "dispatcher-start",
+        "dispatcher-cancelled",
+        "producer-stop",
+        "dispose",
+    ]
 
 
 def test_payment_metrics_record_results_duration_and_event_publish_success() -> None:
