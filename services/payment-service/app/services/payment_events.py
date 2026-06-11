@@ -177,7 +177,7 @@ def build_payment_event_draft(
     event_id = f"evt-{uuid4()}"
     event_kwargs = {
         "eventId": event_id,
-        "userId": user.user_id,
+        "userId": str(user.user_id),
         "sourceId": payment.id,
         "paymentId": payment.id,
         "reservationId": payment.reservation_id,

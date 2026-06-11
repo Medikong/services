@@ -165,7 +165,7 @@ def _upload_ticket_artifact(artifact: TicketArtifact, ticket_id: int, reservatio
 def _ticket_issued_event(ticket: Ticket, *, correlation_id: str | None = None) -> dict:
     return TicketIssuedEvent(
         eventId=str(uuid4()),
-        userId=ticket.user_id,
+        userId=str(ticket.user_id),
         sourceId=str(ticket.id),
         reservationId=ticket.reservation_id,
         concertId=ticket.concert_id,

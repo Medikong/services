@@ -12,6 +12,7 @@ import pytest
 from mongomock_motor import AsyncMongoMockClient
 from fastapi.testclient import TestClient
 
+from app.consumers import kafka_consumer
 import app.database as database
 from app.main import app
 import app.main as app_main
@@ -210,6 +211,45 @@ def test_invalid_business_event_records_failure_metric() -> None:
     assert_metric_labels(metrics, "notification_events_consumed_total", event_type="payment-approved", result="failure", topic="payment-approved")
 
 
+def test_consumer_skips_invalid_event_and_continues(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    invalid_event = {
+        "eventId": "event-invalid-user-id",
+        "eventType": "reservation-created",
+        "userId": 2,
+        "sourceId": "reservation-invalid",
+        "reservationId": "reservation-invalid",
+        "concertId": "concert-1",
+        "seatId": "seat-1",
+        "occurredAt": OCCURRED_AT.isoformat().replace("+00:00", "Z"),
+        "producer": "reservation-service",
+        "correlationId": "corr-invalid",
+    }
+    valid_event = reservation_created_event(user_id="1", source_id="reservation-valid")
+    fake_consumer = FakeConsumer(
+        [
+            FakeMessage(topic="reservation-created", value=invalid_event, offset=1),
+            FakeMessage(topic="reservation-created", value=valid_event, offset=2),
+        ]
+    )
+
+    def fake_consumer_factory(*args, **kwargs):
+        assert kwargs["enable_auto_commit"] is False
+        return fake_consumer
+
+    monkeypatch.setattr(kafka_consumer.settings, "kafka_bootstrap_servers", "kafka:9092")
+    asyncio.get_event_loop().run_until_complete(
+        kafka_consumer.consume_events(asyncio.Event(), consumer_factory=fake_consumer_factory)
+    )
+
+    db = database.client["notification_db"]
+    notifications = asyncio.get_event_loop().run_until_complete(db["notifications"].find().to_list(None))
+    assert fake_consumer.commit_count == 2
+    assert fake_consumer.stopped is True
+    assert [doc["source_id"] for doc in notifications] == ["reservation-valid"]
+
+
 def test_user_can_list_only_own_notifications() -> None:
     _seed_notifications()
     response = client.get("/notifications", headers=user_headers(1))
@@ -336,3 +376,36 @@ def _seed_notifications() -> None:
 def assert_metric_labels(metrics: str, metric_name: str, **labels: str) -> None:
     label_fragments = [f'{key}="{value}"' for key, value in {"service_name": "notification-service", **labels}.items()]
     assert any(line.startswith(metric_name + "{") and all(fragment in line for fragment in label_fragments) for line in metrics.splitlines())
+
+
+class FakeMessage:
+    def __init__(self, *, topic: str, value: dict, offset: int) -> None:
+        self.topic = topic
+        self.value = value
+        self.partition = 0
+        self.offset = offset
+        self.headers = []
+
+
+class FakeConsumer:
+    def __init__(self, messages: list[FakeMessage]) -> None:
+        self.messages = messages
+        self.commit_count = 0
+        self.stopped = False
+
+    async def start(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+    async def commit(self) -> None:
+        self.commit_count += 1
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> FakeMessage:
+        if not self.messages:
+            raise StopAsyncIteration
+        return self.messages.pop(0)

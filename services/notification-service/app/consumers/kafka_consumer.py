@@ -3,6 +3,7 @@ import json
 from aiokafka import AIOKafkaConsumer
 from kafka_utils import kafka_message_attributes, start_consumer_span
 from observability import record_exception, set_current_span_attributes
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -21,6 +22,7 @@ async def consume_events(stop_event: asyncio.Event) -> None:
         settings.ticket_issued_topic,
         bootstrap_servers=settings.kafka_bootstrap_servers,
         group_id=settings.kafka_group_id,
+        enable_auto_commit=False,
         value_deserializer=lambda value: json.loads(value.decode("utf-8")),
     )
 
@@ -32,9 +34,14 @@ async def consume_events(stop_event: asyncio.Event) -> None:
                 try:
                     db = get_db()
                     await handle_business_event(db, message.value)
+                except (ValidationError, ValueError) as exc:
+                    record_exception(exc, service_name=settings.service_name, attributes=kafka_message_attributes(message))
+                    await consumer.commit()
+                    continue
                 except Exception as exc:
                     record_exception(exc, service_name=settings.service_name, attributes=kafka_message_attributes(message))
                     raise
+                await consumer.commit()
             if stop_event.is_set():
                 break
     finally:
