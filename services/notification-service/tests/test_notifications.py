@@ -1,5 +1,13 @@
 import asyncio
+from datetime import UTC, datetime
 
+from contracts.events import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    ReservationCreatedEvent,
+    ReservationExpiredEvent,
+    TicketIssuedEvent,
+)
 import pytest
 from mongomock_motor import AsyncMongoMockClient
 from fastapi.testclient import TestClient
@@ -25,72 +33,84 @@ def setup_mock_db():
 
 
 client = TestClient(app, raise_server_exceptions=True)
+OCCURRED_AT = datetime(2026, 5, 13, 10, tzinfo=UTC)
 
 
 # ── 이벤트 픽스처 ──────────────────────────────────────────────
 
 def reservation_created_event(user_id: str, source_id: str) -> dict:
-    return {
-        "eventId": "event-reservation-1",
-        "eventType": "reservation-created",
-        "userId": user_id,
-        "sourceId": source_id,
-        "concertId": "concert-1",
-        "occurredAt": "2026-05-13T10:00:00Z",
-        "producer": "reservation-service",
-        "correlationId": "corr-1",
-    }
+    return ReservationCreatedEvent(
+        eventId="event-reservation-1",
+        userId=user_id,
+        sourceId=source_id,
+        reservationId=source_id,
+        concertId="concert-1",
+        seatId="seat-1",
+        occurredAt=OCCURRED_AT,
+        producer="reservation-service",
+        correlationId="corr-1",
+    ).model_dump(mode="json")
 
 
 def reservation_expired_event(user_id: str, source_id: str) -> dict:
-    return {
-        "eventId": "event-expired-1",
-        "eventType": "reservation-expired",
-        "userId": user_id,
-        "sourceId": source_id,
-        "occurredAt": "2026-05-13T10:05:00Z",
-        "producer": "reservation-service",
-        "correlationId": "corr-2",
-    }
+    return ReservationExpiredEvent(
+        eventId="event-expired-1",
+        userId=user_id,
+        sourceId=source_id,
+        reservationId=source_id,
+        concertId="concert-1",
+        seatId="seat-1",
+        occurredAt=OCCURRED_AT,
+        producer="reservation-service",
+        correlationId="corr-2",
+    ).model_dump(mode="json")
 
 
 def payment_approved_event(user_id: str, source_id: str) -> dict:
-    return {
-        "eventId": "event-payment-approved-1",
-        "eventType": "payment-approved",
-        "userId": user_id,
-        "sourceId": source_id,
-        "reservationId": "reservation-1",
-        "occurredAt": "2026-05-13T10:10:00Z",
-        "producer": "payment-service",
-        "correlationId": "corr-3",
-    }
+    return PaymentApprovedEvent(
+        eventId="event-payment-approved-1",
+        userId=user_id,
+        sourceId=source_id,
+        paymentId=source_id,
+        reservationId="reservation-1",
+        concertId="concert-1",
+        seatId="seat-1",
+        amount=50000,
+        occurredAt=OCCURRED_AT,
+        producer="payment-service",
+        correlationId="corr-3",
+    ).model_dump(mode="json")
 
 
 def payment_failed_event(user_id: str, source_id: str) -> dict:
-    return {
-        "eventId": "event-payment-failed-1",
-        "eventType": "payment-failed",
-        "userId": user_id,
-        "sourceId": source_id,
-        "reservationId": "reservation-1",
-        "occurredAt": "2026-05-13T10:10:00Z",
-        "producer": "payment-service",
-        "correlationId": "corr-4",
-    }
+    return PaymentFailedEvent(
+        eventId="event-payment-failed-1",
+        userId=user_id,
+        sourceId=source_id,
+        paymentId=source_id,
+        reservationId="reservation-1",
+        concertId="concert-1",
+        seatId="seat-1",
+        amount=50000,
+        occurredAt=OCCURRED_AT,
+        producer="payment-service",
+        correlationId="corr-4",
+    ).model_dump(mode="json")
 
 
 def ticket_issued_event(user_id: str, source_id: str) -> dict:
-    return {
-        "eventId": "event-ticket-1",
-        "eventType": "ticket-issued",
-        "userId": user_id,
-        "sourceId": source_id,
-        "reservationId": "reservation-1",
-        "occurredAt": "2026-05-13T10:15:00Z",
-        "producer": "ticket-service",
-        "correlationId": "corr-5",
-    }
+    return TicketIssuedEvent(
+        eventId="event-ticket-1",
+        userId=user_id,
+        sourceId=source_id,
+        ticketId=source_id,
+        reservationId="reservation-1",
+        concertId="concert-1",
+        seatId="seat-1",
+        occurredAt=OCCURRED_AT,
+        producer="ticket-service",
+        correlationId="corr-5",
+    ).model_dump(mode="json")
 
 
 def user_headers(user_id: int | str) -> dict[str, str]:

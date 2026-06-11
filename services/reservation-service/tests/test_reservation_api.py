@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi.testclient import TestClient
 
 from app.kafka import get_kafka_producer
@@ -38,6 +39,7 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
     assert expire_after_cancel.status_code == 409
     assert producer.sent[0][0] == "reservation-created"
     assert producer.sent[0][1]["reservationId"] == created["id"]
+    assert ReservationCreatedEvent.model_validate(producer.sent[0][1]).reservationId == created["id"]
     assert dict(producer.sent[0][2])["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
 
 
@@ -67,6 +69,7 @@ def test_reservation_expire_publishes_event() -> None:
     assert producer.sent[1][1]["reservationId"] == created["id"]
     assert producer.sent[0][1]["userId"] == "1"
     assert producer.sent[1][1]["userId"] == "1"
+    assert ReservationExpiredEvent.model_validate(producer.sent[1][1]).userId == "1"
 
 
 def test_sales_and_policy_admin_flow() -> None:

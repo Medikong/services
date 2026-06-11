@@ -1,3 +1,5 @@
+from contracts.events import PaymentApprovedEvent
+
 from app.auth import UserContext
 from app.metrics import PaymentEventType
 from app.models import Payment
@@ -43,3 +45,4 @@ def test_payment_approved_event_payload_matches_consumer_contract() -> None:
     assert draft.payload["paymentId"] == "payment-1"
     assert draft.payload["seatId"] == "seat-A1"
     assert "status" not in draft.payload
+    assert PaymentApprovedEvent.model_validate(draft.payload).userId == "14"

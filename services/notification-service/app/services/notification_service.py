@@ -1,3 +1,5 @@
+from typing import TypeAlias, assert_never
+
 from bson import ObjectId
 from contracts.events import (
     PAYMENT_APPROVED_TOPIC,
@@ -5,6 +7,11 @@ from contracts.events import (
     RESERVATION_CREATED_TOPIC,
     RESERVATION_EXPIRED_TOPIC,
     TICKET_ISSUED_TOPIC,
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    ReservationCreatedEvent,
+    ReservationExpiredEvent,
+    TicketIssuedEvent,
 )
 from fastapi import HTTPException, status
 from metrics import MetricResult
@@ -15,10 +22,16 @@ from app.metrics.events import NotificationReadRecorded
 from app.metrics.labels import NotificationRouteKind
 from app.metrics.recorder import NotificationTelemetryRecorder
 from app.models import notification_to_doc, processed_event_to_doc
-from app.schemas import BusinessEvent
 
 
 notification_metrics = NotificationTelemetryRecorder()
+NotificationEvent: TypeAlias = (
+    ReservationCreatedEvent
+    | ReservationExpiredEvent
+    | PaymentApprovedEvent
+    | PaymentFailedEvent
+    | TicketIssuedEvent
+)
 
 
 def _serialize(doc: dict) -> dict:
@@ -83,7 +96,7 @@ async def handle_business_event(db: AsyncIOMotorDatabase, payload: dict) -> dict
     event_type = str(payload.get("eventType", ""))
     attempt = notification_metrics.start_event(topic=event_type, event_type=event_type)
     try:
-        event = BusinessEvent.model_validate(payload)
+        event = _parse_business_event(payload)
 
         processed = await db["processed_events"].find_one({"event_id": event.eventId})
         if processed:
@@ -109,29 +122,75 @@ async def handle_business_event(db: AsyncIOMotorDatabase, payload: dict) -> dict
         attempt.record()
 
 
-def _message_for_event(event: BusinessEvent) -> str:
-    if event.eventType == RESERVATION_CREATED_TOPIC:
-        return f"예매가 생성되었습니다. 예매 ID: {event.sourceId}"
-    if event.eventType == RESERVATION_EXPIRED_TOPIC:
-        return f"결제 시간이 만료되어 예매가 취소되었습니다. 예매 ID: {event.sourceId}"
-    if event.eventType == PAYMENT_APPROVED_TOPIC:
-        return f"결제가 완료되었습니다. 결제 ID: {event.sourceId}"
-    if event.eventType == PAYMENT_FAILED_TOPIC:
-        return f"결제에 실패하였습니다. 결제 ID: {event.sourceId}"
-    if event.eventType == TICKET_ISSUED_TOPIC:
-        return f"티켓이 발행되었습니다. 티켓 ID: {event.sourceId}"
-    return f"새 알림이 도착했습니다. 이벤트: {event.eventType}"
+def _parse_business_event(payload: dict) -> NotificationEvent:
+    match str(payload.get("eventType", "")):
+        case event_type if event_type == RESERVATION_CREATED_TOPIC:
+            return ReservationCreatedEvent.model_validate(payload)
+        case event_type if event_type == RESERVATION_EXPIRED_TOPIC:
+            return ReservationExpiredEvent.model_validate(payload)
+        case event_type if event_type == PAYMENT_APPROVED_TOPIC:
+            return PaymentApprovedEvent.model_validate(payload)
+        case event_type if event_type == PAYMENT_FAILED_TOPIC:
+            return PaymentFailedEvent.model_validate(payload)
+        case event_type if event_type == TICKET_ISSUED_TOPIC:
+            return TicketIssuedEvent.model_validate(payload)
+        case event_type:
+            raise ValueError(f"unsupported business event type: {event_type}")
 
 
-def _metadata_for_event(event: BusinessEvent) -> dict:
-    if event.eventType == RESERVATION_CREATED_TOPIC:
-        return {"reservation_id": event.sourceId, "concert_id": event.concertId}
-    if event.eventType == RESERVATION_EXPIRED_TOPIC:
-        return {"reservation_id": event.sourceId}
-    if event.eventType == PAYMENT_APPROVED_TOPIC:
-        return {"payment_id": event.sourceId, "reservation_id": event.reservationId}
-    if event.eventType == PAYMENT_FAILED_TOPIC:
-        return {"payment_id": event.sourceId, "reservation_id": event.reservationId}
-    if event.eventType == TICKET_ISSUED_TOPIC:
-        return {"ticket_id": event.sourceId, "reservation_id": event.reservationId}
-    return {}
+def _message_for_event(event: NotificationEvent) -> str:
+    match event:
+        case ReservationCreatedEvent():
+            return f"예매가 생성되었습니다. 예매 ID: {event.sourceId}"
+        case ReservationExpiredEvent():
+            return f"결제 시간이 만료되어 예매가 취소되었습니다. 예매 ID: {event.sourceId}"
+        case PaymentApprovedEvent():
+            return f"결제가 완료되었습니다. 결제 ID: {event.sourceId}"
+        case PaymentFailedEvent():
+            return f"결제에 실패하였습니다. 결제 ID: {event.sourceId}"
+        case TicketIssuedEvent():
+            return f"티켓이 발행되었습니다. 티켓 ID: {event.sourceId}"
+        case unreachable:
+            assert_never(unreachable)
+
+
+def _metadata_for_event(event: NotificationEvent) -> dict:
+    match event:
+        case ReservationCreatedEvent():
+            return {
+                "reservation_id": event.reservationId,
+                "concert_id": event.concertId,
+                "seat_id": event.seatId,
+                "performance_id": event.performanceId,
+            }
+        case ReservationExpiredEvent():
+            return {
+                "reservation_id": event.reservationId,
+                "concert_id": event.concertId,
+                "seat_id": event.seatId,
+                "performance_id": event.performanceId,
+            }
+        case PaymentApprovedEvent():
+            return {
+                "payment_id": event.paymentId,
+                "reservation_id": event.reservationId,
+                "concert_id": event.concertId,
+                "seat_id": event.seatId,
+            }
+        case PaymentFailedEvent():
+            return {
+                "payment_id": event.paymentId,
+                "reservation_id": event.reservationId,
+                "concert_id": event.concertId,
+                "seat_id": event.seatId,
+            }
+        case TicketIssuedEvent():
+            return {
+                "ticket_id": event.ticketId,
+                "reservation_id": event.reservationId,
+                "concert_id": event.concertId,
+                "seat_id": event.seatId,
+                "payment_id": event.paymentId,
+            }
+        case unreachable:
+            assert_never(unreachable)

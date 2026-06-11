@@ -3,9 +3,11 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import assert_never
 from uuid import uuid4
 
 from aiokafka.errors import KafkaError
+from contracts.events import PaymentApprovedEvent, PaymentFailedEvent
 from kafka_utils import build_producer_headers
 from metrics import MetricResult
 from sqlalchemy.orm import Session
@@ -173,26 +175,32 @@ def build_payment_event_draft(
 ) -> PaymentEventDraft:
     """outbox 저장과 Kafka 발행에 사용할 결제 이벤트 초안을 만든다."""
     event_id = f"evt-{uuid4()}"
-    payload = {
+    event_kwargs = {
         "eventId": event_id,
-        "eventType": event_type.value,
-        "userId": _event_user_id(user.user_id),
+        "userId": user.user_id,
         "sourceId": payment.id,
         "paymentId": payment.id,
         "reservationId": payment.reservation_id,
         "concertId": payment.concert_id,
         "seatId": request_body.seatId or "unknown",
         "amount": payment.amount,
-        "occurredAt": datetime.now(UTC).isoformat(),
+        "occurredAt": datetime.now(UTC),
         "producer": settings.service_name,
         "correlationId": correlation_id,
     }
+    match event_type:
+        case PaymentEventType.APPROVED:
+            event = PaymentApprovedEvent(**event_kwargs)
+        case PaymentEventType.FAILED:
+            event = PaymentFailedEvent(**event_kwargs)
+        case unreachable:
+            assert_never(unreachable)
 
     # payload에는 추적용 ID를 남기지만 metric label로는 보내지 않는다.
     return PaymentEventDraft(
         event_id=event_id,
         event_type=event_type,
-        payload=payload,
+        payload=event.model_dump(mode="json"),
     )
 
 
@@ -204,10 +212,6 @@ def _payment_event_topic(event_type: PaymentEventType) -> str:
     if event_type is PaymentEventType.FAILED:
         return settings.payment_failed_topic
     return event_type.value
-
-
-def _event_user_id(value: str) -> str:
-    return value
 
 
 def _summarize_publish_error(exc: KafkaError | RuntimeError) -> str:
