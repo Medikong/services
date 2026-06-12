@@ -1,5 +1,6 @@
 import asyncio
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 import app.main as app_main  # noqa: E402
 import app.routes.payments as payment_routes  # noqa: E402
+import app.services.payment_events as payment_events_module  # noqa: E402
 from app.metrics.recorder import PaymentTelemetryRecorder  # noqa: E402
 from app.models import PaymentEvent  # noqa: E402
 from app.services.payment_events import PaymentEventDispatcher, run_payment_event_dispatcher  # noqa: E402
@@ -340,6 +342,33 @@ def test_payment_event_dispatcher_publishes_pending_event_and_marks_published() 
     assert events[0].last_publish_error is None
 
 
+def test_payment_event_dispatcher_wraps_outbox_work_in_trace_spans(monkeypatch: pytest.MonkeyPatch) -> None:
+    producer = FakeKafkaProducer()
+    span_names: list[str] = []
+
+    @contextmanager
+    def fake_start_trace_span(name: str, attributes: dict[str, object] | None = None):
+        span_names.append(name)
+        yield
+
+    monkeypatch.setattr(payment_events_module, "start_trace_span", fake_start_trace_span)
+    response = client.post(
+        "/payments",
+        headers=auth_headers("CUSTOMER", user_id="trace-span-user"),
+        json={
+            "reservationId": "res-trace-span",
+            "concertId": "concert-events",
+            "amount": 50000,
+            "method": "mock",
+            "simulation": "approve",
+        },
+    )
+
+    assert response.status_code == 201
+    assert asyncio.run(dispatch_pending_events(producer)) == 1
+    assert span_names == ["payment.outbox.dispatch_pending", "payment.outbox.dispatch_event"]
+
+
 def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     trace_context = sample_trace_context()
     monkeypatch.setattr(payment_routes, "capture_current_trace_context", lambda: trace_context)
@@ -366,9 +395,64 @@ def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: p
 
     assert asyncio.run(dispatch_pending_events(producer)) == 1
     headers = dict(producer.sent[0][2])
-    assert headers["traceparent"] == trace_context.carrier["traceparent"].encode("utf-8")
+    traceparent = headers["traceparent"].decode("utf-8")
+    assert traceparent.startswith(f"00-{trace_context.trace_id}-")
+    assert traceparent.endswith("-01")
+    assert traceparent != trace_context.carrier["traceparent"]
     assert headers["tracestate"] == trace_context.carrier["tracestate"].encode("utf-8")
     assert headers["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
+
+
+def test_payment_event_dispatcher_starts_producer_span_from_outbox_trace_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trace_context = sample_trace_context()
+    monkeypatch.setattr(payment_routes, "capture_current_trace_context", lambda: trace_context)
+    producer = FakeKafkaProducer()
+    producer_spans: list[dict[str, object]] = []
+
+    @contextmanager
+    def fake_start_producer_span(
+        topic: str,
+        *,
+        carrier: dict[str, str] | None = None,
+        name: str | None = None,
+        attributes: dict[str, object] | None = None,
+    ):
+        producer_spans.append(
+            {
+                "topic": topic,
+                "carrier": carrier,
+                "name": name,
+                "attributes": attributes,
+            }
+        )
+        yield
+
+    monkeypatch.setattr(payment_events_module, "start_producer_span", fake_start_producer_span)
+    response = client.post(
+        "/payments",
+        headers=auth_headers("CUSTOMER", user_id="trace-producer-user"),
+        json={
+            "reservationId": "res-trace-producer",
+            "concertId": "concert-trace",
+            "seatId": "seat-A1",
+            "amount": 50000,
+            "method": "mock",
+            "simulation": "approve",
+        },
+    )
+
+    assert response.status_code == 201
+    assert asyncio.run(dispatch_pending_events(producer)) == 1
+    assert producer_spans == [
+        {
+            "topic": "payment-approved",
+            "carrier": trace_context.carrier,
+            "name": None,
+            "attributes": {"payment.event_type": "payment-approved"},
+        }
+    ]
 
 
 def test_payment_event_dispatcher_loop_publishes_pending_events() -> None:

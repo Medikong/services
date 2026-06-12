@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from typing import Any
 
-from kafka_utils import build_producer_headers, create_kafka_producer, start_consumer_span
+from opentelemetry.trace import SpanKind
+
+from kafka_utils import build_producer_headers, create_kafka_producer, start_consumer_span, start_producer_span
 from kafka_utils import producer as producer_module
 
 
@@ -126,6 +128,57 @@ def test_start_consumer_span_extracts_trace_headers(monkeypatch) -> None:
     ]
     assert started[0]["name"] == "kafka.consume payment-approved"
     assert started[0]["context"] == "parent-context"
+
+
+def test_start_producer_span_uses_stored_trace_carrier_as_parent(monkeypatch) -> None:
+    extracted: list[dict[str, str]] = []
+    started: list[dict[str, object]] = []
+
+    def fake_extract(carrier: dict[str, str]) -> object:
+        extracted.append(carrier)
+        return "parent-context"
+
+    class FakeTracer:
+        def start_as_current_span(self, name: str, **kwargs: object):
+            started.append({"name": name, **kwargs})
+
+            @contextmanager
+            def span_context():
+                yield object()
+
+            return span_context()
+
+    monkeypatch.setattr(producer_module.propagate, "extract", fake_extract)
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer())
+
+    with start_producer_span(
+        "payment-approved",
+        carrier={
+            "traceparent": "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01",
+            "tracestate": "vendor=value",
+            "correlation_id": "req-1",
+        },
+        attributes={"payment.event_type": "payment-approved"},
+    ):
+        pass
+
+    assert extracted == [
+        {
+            "traceparent": "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01",
+            "tracestate": "vendor=value",
+            "correlation_id": "req-1",
+        }
+    ]
+    assert started[0]["name"] == "kafka.produce payment-approved"
+    assert started[0]["context"] == "parent-context"
+    assert started[0]["kind"] is SpanKind.PRODUCER
+    assert started[0]["attributes"] == {
+        "messaging.system": "kafka",
+        "messaging.destination.name": "payment-approved",
+        "messaging.operation": "publish",
+        "correlation_id": "req-1",
+        "payment.event_type": "payment-approved",
+    }
 
 
 class FakeProducer:

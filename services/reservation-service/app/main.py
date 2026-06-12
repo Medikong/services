@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             group_id=settings.kafka_group_id,
             topic=settings.ticket_issued_topic,
             session_factory=SessionLocal,
+            service_name=settings.service_name,
         )
     )
     try:

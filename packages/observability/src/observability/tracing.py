@@ -5,11 +5,12 @@ from typing import Protocol
 
 from opentelemetry import propagate, trace
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_VERSION, Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.util.types import AttributeValue
 
-from observability.config import ObservabilityConfig
+from observability.callsite import find_application_callsite
+from observability.config import DEFAULT_CALLSITE_MODULE_PREFIXES, ObservabilityConfig
 
 
 _tracing_configured = False
@@ -42,7 +43,7 @@ class TraceRecorder(Protocol):
         """현재 span에 안전한 attribute를 기록한다."""
 
     def event(self, name: str, attributes: Mapping[str, TraceAttributeValue] | None = None) -> None:
-        """현재 span에 중요한 업무 event를 기록한다."""
+        """현재 span에 중요한 처리 event를 기록한다."""
 
     def span(
         self,
@@ -75,8 +76,9 @@ class OpenTelemetryTraceRecorder:
         if _current_valid_span() is None:
             return nullcontext()
         tracer = trace.get_tracer(_MANUAL_TRACER_NAME)
+        span_name = _require_trace_name(name, "span name")
         return tracer.start_as_current_span(
-            _require_trace_name(name, "span name"),
+            span_name,
             attributes=_safe_attributes(attributes),
         )
 
@@ -100,6 +102,19 @@ class NoopTraceRecorder:
 
 def trace_recorder() -> TraceRecorder:
     return OpenTelemetryTraceRecorder()
+
+
+def start_trace_span(
+    name: str,
+    attributes: Mapping[str, TraceAttributeValue] | None = None,
+) -> AbstractContextManager[None]:
+    """요청 span이 없는 background 작업에서 root span을 시작한다."""
+    tracer = trace.get_tracer(_MANUAL_TRACER_NAME)
+    span_name = _require_trace_name(name, "span name")
+    return tracer.start_as_current_span(
+        span_name,
+        attributes=_safe_attributes(attributes),
+    )
 
 
 def capture_current_trace_context() -> TraceContext | None:
@@ -142,6 +157,7 @@ def configure_process_tracing(config: ObservabilityConfig) -> None:
         attributes[DEPLOYMENT_ENVIRONMENT] = config.service_environment
 
     provider = TracerProvider(resource=Resource.create(attributes))
+    provider.add_span_processor(CallsiteSpanProcessor(config.callsite_module_prefixes))
     if _otlp_trace_export_enabled(config):
         # exporter가 env를 다시 해석하지 않도록, 앞에서 확정한 endpoint만 넘긴다.
         provider.add_span_processor(BatchSpanProcessor(_otlp_span_exporter(config.otlp_trace_exporter_endpoint)))
@@ -183,6 +199,41 @@ def set_current_span_attribute(key: str, value: AttributeValue | None) -> None:
 def set_current_span_attributes(attributes: dict[str, AttributeValue | None]) -> None:
     for key, value in attributes.items():
         set_current_span_attribute(key, value)
+
+
+class CallsiteSpanProcessor(SpanProcessor):
+    """span 시작 시점의 앱 코드 위치를 `code.*` attribute로 붙인다.
+
+    OpenTelemetry SDK는 `TracerProvider.add_span_processor()`로 등록된
+    processor의 `on_start()`를 span이 시작될 때 동기 호출한다. 이 위치에서
+    실행 stack을 보면 자동 instrumentation span도 어떤 앱 코드 경계에서
+    시작됐는지 찾을 수 있다.
+
+    docs: https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.html#opentelemetry.sdk.trace.SpanProcessor
+    """
+
+    def __init__(self, module_prefixes: Sequence[str] | None = None) -> None:
+        self._module_prefixes = (
+            tuple(module_prefixes) if module_prefixes is not None else DEFAULT_CALLSITE_MODULE_PREFIXES
+        )
+
+    def on_start(self, span: object, parent_context: object | None = None) -> None:
+        del parent_context
+        callsite = find_application_callsite(self._module_prefixes)
+        if callsite is None:
+            return
+        for key, value in callsite.as_trace_attributes().items():
+            span.set_attribute(key, value)
+
+    def on_end(self, span: object) -> None:
+        del span
+
+    def shutdown(self) -> None:
+        return None
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        del timeout_millis
+        return True
 
 
 def _current_valid_span() -> object | None:

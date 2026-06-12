@@ -1,7 +1,11 @@
+import asyncio
+from contextlib import contextmanager
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
+from app.consumers import kafka_consumer as kafka_consumer_module
 from app import main as app_main
 from app.config import Settings
 from app.main import create_app
@@ -146,3 +150,98 @@ def test_settings_defaults(monkeypatch: MonkeyPatch) -> None:
     assert settings.service_name == "reservation-service"
     assert settings.port == 8083
     assert settings.database_url == "sqlite:///./reservation_service.db"
+
+
+def test_ticket_issued_consumer_passes_trace_headers_to_consumer_span(monkeypatch: MonkeyPatch) -> None:
+    """ticket-issued 소비 처리가 Kafka trace header를 consumer span에 넘기는지 검증한다."""
+    trace_headers = [
+        ("traceparent", b"00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01"),
+        ("tracestate", b"vendor=value"),
+    ]
+    observed_headers: list[list[tuple[str, bytes]]] = []
+    confirmed_reservations: list[str] = []
+
+    @contextmanager
+    def fake_start_consumer_span(message: FakeMessage):
+        observed_headers.append(list(message.headers))
+        yield object()
+
+    class FakeReservationCommandService:
+        def __init__(self, db: object) -> None:
+            self.db = db
+
+        def confirm_reservation(self, reservation_id: str) -> None:
+            confirmed_reservations.append(reservation_id)
+
+    def fake_consumer_factory(*topics: str, **kwargs: object) -> FakeConsumer:
+        return FakeConsumer(
+            topics=topics,
+            kwargs=kwargs,
+            messages=[
+                FakeMessage(
+                    "ticket-issued",
+                    {"eventType": "ticket-issued", "reservationId": "rsv-trace"},
+                    headers=trace_headers,
+                )
+            ],
+        )
+
+    monkeypatch.setattr(kafka_consumer_module, "AIOKafkaConsumer", fake_consumer_factory)
+    monkeypatch.setattr(kafka_consumer_module, "start_consumer_span", fake_start_consumer_span)
+    monkeypatch.setattr(
+        "app.services.reservations.ReservationCommandService",
+        FakeReservationCommandService,
+    )
+
+    asyncio.run(
+        kafka_consumer_module.consume_ticket_issued(
+            asyncio.Event(),
+            bootstrap_servers="kafka:9092",
+            group_id="reservation-service",
+            topic="ticket-issued",
+            session_factory=FakeSession,
+        )
+    )
+
+    assert observed_headers == [trace_headers]
+    assert confirmed_reservations == ["rsv-trace"]
+
+
+class FakeMessage:
+    def __init__(self, topic: str, value: dict, *, headers: list[tuple[str, bytes]] | None = None) -> None:
+        self.topic = topic
+        self.value = value
+        self.headers = headers or []
+        self.partition = 0
+        self.offset = 1
+
+
+class FakeConsumer:
+    def __init__(self, *, topics: tuple[str, ...], kwargs: dict[str, object], messages: list[FakeMessage]) -> None:
+        self.topics = topics
+        self.kwargs = kwargs
+        self.messages = list(messages)
+        self.started = False
+        self.stopped = False
+
+    async def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+    def __aiter__(self) -> "FakeConsumer":
+        return self
+
+    async def __anext__(self) -> FakeMessage:
+        if not self.messages:
+            raise StopAsyncIteration
+        return self.messages.pop(0)
+
+
+class FakeSession:
+    def __enter__(self) -> "FakeSession":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        return None

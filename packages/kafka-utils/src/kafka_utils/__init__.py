@@ -7,7 +7,9 @@ from kafka_utils.producer import (
     create_kafka_producer,
     headers_to_carrier,
     kafka_message_attributes,
+    kafka_producer_attributes,
     start_consumer_span,
+    start_producer_span,
 )
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "create_kafka_producer",
     "headers_to_carrier",
     "kafka_message_attributes",
+    "kafka_producer_attributes",
     "start_consumer_span",
+    "start_producer_span",
 ]

@@ -8,6 +8,7 @@ import types
 from errors import in_domain
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 from middleware import (
     RequestContextMiddleware,
     ResponseHeadersMiddleware,
@@ -16,11 +17,17 @@ from middleware import (
 )
 
 from observability import error_context as error_context_module
+from observability import callsite as callsite_module
+from observability import database as database_module
 from observability import exceptions as exceptions_module
 from observability import fastapi as fastapi_module
 from observability import (
+    CALLSITE_MODULE_PREFIXES_ENV,
+    Callsite,
+    CallsiteSpanProcessor,
     DOMAIN_REJECTION_OBSERVATION,
     OBSERVABILITY_ENV_KEYS,
+    DEFAULT_CALLSITE_MODULE_PREFIXES,
     DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
     ErrorObservation,
     HttpError,
@@ -31,9 +38,14 @@ from observability import (
     configure_process_logging,
     configure_process_tracing,
     create_request_log_middleware,
+    clear_callsite_cache,
+    get_callsite,
     instrument_fastapi_app,
+    list_callsites,
     observability_config_from_env,
+    put_callsite,
     record_exception,
+    start_trace_span,
     trace_recorder,
 )
 from observability import tracing as tracing_module
@@ -50,6 +62,7 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
             "OTEL_TRACES_EXPORTER": "none",
             "OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4317",
             "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://collector:4318/v1/traces",
+            CALLSITE_MODULE_PREFIXES_ENV: " app, worker, , domain ",
         },
     )
 
@@ -61,6 +74,7 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         otel_traces_exporter="none",
         otlp_trace_exporter_endpoint="http://collector:4318/v1/traces",
         fastapi_trace_excluded_urls=DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
+        callsite_module_prefixes=("app", "worker", "domain"),
     )
     assert set(OBSERVABILITY_ENV_KEYS) == {
         "SERVICE_VERSION",
@@ -70,6 +84,7 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
         "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS",
+        CALLSITE_MODULE_PREFIXES_ENV,
     }
 
 
@@ -86,6 +101,16 @@ def test_observability_config_defaults_common_fastapi_trace_exclusions() -> None
     config = observability_config_from_env("test-service", env={})
 
     assert config.fastapi_trace_excluded_urls == ("/healthz", "/readyz", "/metrics")
+    assert config.callsite_module_prefixes == DEFAULT_CALLSITE_MODULE_PREFIXES
+
+
+def test_observability_config_uses_default_callsite_prefixes_when_env_is_blank() -> None:
+    config = observability_config_from_env(
+        "test-service",
+        env={CALLSITE_MODULE_PREFIXES_ENV: " ,  , "},
+    )
+
+    assert config.callsite_module_prefixes == DEFAULT_CALLSITE_MODULE_PREFIXES
 
 
 def test_observability_config_reads_fastapi_trace_exclusions_from_env() -> None:
@@ -150,9 +175,9 @@ def test_configure_tracing_passes_explicit_otlp_trace_endpoint(monkeypatch) -> N
     class FakeTracerProvider:
         def __init__(self, *, resource: object) -> None:
             self.resource = resource
-            self.span_processors: list[FakeBatchSpanProcessor] = []
+            self.span_processors: list[object] = []
 
-        def add_span_processor(self, processor: FakeBatchSpanProcessor) -> None:
+        def add_span_processor(self, processor: object) -> None:
             self.span_processors.append(processor)
 
     def fake_otlp_span_exporter(endpoint: str | None) -> object:
@@ -175,6 +200,8 @@ def test_configure_tracing_passes_explicit_otlp_trace_endpoint(monkeypatch) -> N
 
     assert exporters == ["http://collector:4318/v1/traces"]
     assert providers
+    assert isinstance(providers[0].span_processors[0], CallsiteSpanProcessor)
+    assert isinstance(providers[0].span_processors[1], FakeBatchSpanProcessor)
 
 
 def test_configure_tracing_skips_unsupported_trace_exporter(monkeypatch) -> None:
@@ -242,6 +269,143 @@ def test_trace_recorder_span_starts_child_span(monkeypatch) -> None:
 
     assert started_spans == [("reservation.reserve_seat", {"seat.id": "A-1"})]
     assert entered == ["enter", "inside", "exit"]
+
+
+def test_start_trace_span_starts_span_without_current_parent(monkeypatch) -> None:
+    started_spans: list[tuple[str, dict[str, object] | None]] = []
+    entered: list[str] = []
+
+    class FakeTracer:
+        def start_as_current_span(self, name: str, *, attributes: dict[str, object] | None = None):
+            started_spans.append((name, attributes))
+
+            @contextmanager
+            def span() -> Iterator[None]:
+                entered.append("enter")
+                yield
+                entered.append("exit")
+
+            return span()
+
+    monkeypatch.setattr(tracing_module.trace, "get_tracer", lambda name: FakeTracer())
+
+    with start_trace_span("payment.outbox.dispatch_pending", {"app.component": "payment_outbox_dispatcher"}):
+        entered.append("inside")
+
+    assert started_spans == [
+        ("payment.outbox.dispatch_pending", {"app.component": "payment_outbox_dispatcher"})
+    ]
+    assert entered == ["enter", "inside", "exit"]
+
+
+def test_callsite_cache_stores_structured_values() -> None:
+    clear_callsite_cache()
+    callsite = Callsite(
+        namespace="app.services.payment_events",
+        function_name="dispatch_pending",
+        file_path="/service/services/payment-service/app/services/payment_events.py",
+        line_number=73,
+    )
+
+    put_callsite("payment.outbox.dispatch_pending", callsite)
+
+    assert get_callsite("payment.outbox.dispatch_pending") == callsite
+    assert list_callsites() == {"payment.outbox.dispatch_pending": callsite}
+    assert callsite.location() == (
+        "app.services.payment_events.dispatch_pending "
+        "/service/services/payment-service/app/services/payment_events.py:73"
+    )
+    assert callsite.as_trace_attributes() == {
+        "code.function.name": "dispatch_pending",
+        "code.location": (
+            "app.services.payment_events.dispatch_pending "
+            "/service/services/payment-service/app/services/payment_events.py:73"
+        ),
+    }
+
+
+def test_callsite_cache_rejects_empty_keys() -> None:
+    clear_callsite_cache()
+
+    with pytest.raises(ValueError, match="callsite key must not be empty"):
+        get_callsite("")
+
+
+def test_find_application_callsite_accepts_app_service_module() -> None:
+    callsite = _callsite_from_module("app.services.payment_events")
+
+    assert callsite is not None
+    assert callsite.namespace == "app.services.payment_events"
+    assert callsite.function_name == "locate_callsite"
+
+
+def test_find_application_callsite_accepts_app_module_itself() -> None:
+    callsite = _callsite_from_module("app")
+
+    assert callsite is not None
+    assert callsite.namespace == "app"
+    assert callsite.function_name == "locate_callsite"
+
+
+@pytest.mark.parametrize("module_name", ["__main__", "uvicorn.main", "starlette.responses"])
+def test_find_application_callsite_rejects_non_app_modules(module_name: str) -> None:
+    assert _callsite_from_module(module_name) is None
+
+
+def test_find_application_callsite_accepts_configured_module_prefix() -> None:
+    config = observability_config_from_env(
+        "test-service",
+        env={CALLSITE_MODULE_PREFIXES_ENV: "app, worker, domain"},
+    )
+
+    callsite = _callsite_from_module(
+        "worker.jobs.dispatcher",
+        module_prefixes=config.callsite_module_prefixes,
+    )
+
+    assert callsite is not None
+    assert callsite.namespace == "worker.jobs.dispatcher"
+    assert callsite.function_name == "locate_callsite"
+
+
+def test_callsite_span_processor_sets_app_callsite_attributes() -> None:
+    span = FakeSpan()
+    processor = CallsiteSpanProcessor()
+
+    _start_span_for_callsite_processor("app.services.payment_events", processor, span)
+
+    assert span.attributes["code.function.name"] == "start_span"
+    assert span.attributes["code.location"].startswith("app.services.payment_events.start_span ")
+    assert "code.namespace" not in span.attributes
+    assert "code.file.path" not in span.attributes
+    assert "code.line.number" not in span.attributes
+
+
+def test_callsite_span_processor_skips_code_attributes_when_no_callsite() -> None:
+    span = FakeSpan()
+    processor = CallsiteSpanProcessor()
+
+    _start_span_for_callsite_processor("uvicorn.main", processor, span)
+
+    assert "code.function.name" not in span.attributes
+    assert "code.location" not in span.attributes
+
+
+def test_instrument_sqlalchemy_engine_registers_sqlalchemy_instrumentation(monkeypatch) -> None:
+    instrumented_engines: list[object] = []
+
+    class FakeSQLAlchemyInstrumentor:
+        def instrument(self, *, engine: object) -> None:
+            instrumented_engines.append(engine)
+
+    fake_sqlalchemy_instrumentation = types.SimpleNamespace(SQLAlchemyInstrumentor=FakeSQLAlchemyInstrumentor)
+    monkeypatch.setattr(database_module, "_sqlalchemy_instrumented_engine_ids", set())
+    monkeypatch.setitem(sys.modules, "opentelemetry.instrumentation.sqlalchemy", fake_sqlalchemy_instrumentation)
+    engine = object()
+
+    database_module.instrument_sqlalchemy_engine(engine)
+
+    assert instrumented_engines == [engine]
 
 
 def test_trace_recorder_noops_on_invalid_current_span(monkeypatch) -> None:
@@ -515,6 +679,43 @@ def _event_log(records: list[logging.LogRecord], logger_name: str, event: str) -
             if payload.get("event") == event:
                 return payload
     raise AssertionError(f"{event} JSON log was not emitted")
+
+
+def _callsite_from_module(
+    module_name: str,
+    module_prefixes: tuple[str, ...] | None = None,
+) -> Callsite | None:
+    namespace = {
+        "__name__": module_name,
+        "find_application_callsite": callsite_module.find_application_callsite,
+        "module_prefixes": module_prefixes,
+    }
+    exec(
+        "def locate_callsite():\n"
+        "    if module_prefixes is None:\n"
+        "        return find_application_callsite()\n"
+        "    return find_application_callsite(module_prefixes)\n",
+        namespace,
+    )
+    return namespace["locate_callsite"]()
+
+
+def _start_span_for_callsite_processor(
+    module_name: str,
+    processor: CallsiteSpanProcessor,
+    span: "FakeSpan",
+) -> None:
+    namespace = {
+        "__name__": module_name,
+        "processor": processor,
+        "span": span,
+    }
+    exec(
+        "def start_span():\n"
+        "    processor.on_start(span)\n",
+        namespace,
+    )
+    namespace["start_span"]()
 
 
 class DomainRejectionError(HttpError):

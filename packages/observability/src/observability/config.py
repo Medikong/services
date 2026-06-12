@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 
 DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS = ("/healthz", "/readyz", "/metrics")
+DEFAULT_CALLSITE_MODULE_PREFIXES = ("app",)
+CALLSITE_MODULE_PREFIXES_ENV = "OBSERVABILITY_CALLSITE_MODULE_PREFIXES"
 
 OBSERVABILITY_ENV_KEYS = (
     "SERVICE_VERSION",
@@ -12,6 +14,7 @@ OBSERVABILITY_ENV_KEYS = (
     "OTEL_EXPORTER_OTLP_ENDPOINT",
     "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
     "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS",
+    CALLSITE_MODULE_PREFIXES_ENV,
 )
 
 
@@ -24,6 +27,7 @@ class ObservabilityConfig:
     otel_traces_exporter: str = "otlp"
     otlp_trace_exporter_endpoint: str | None = None
     fastapi_trace_excluded_urls: tuple[str, ...] = DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS
+    callsite_module_prefixes: tuple[str, ...] = DEFAULT_CALLSITE_MODULE_PREFIXES
 
 
 def observability_config_from_env(
@@ -41,6 +45,7 @@ def observability_config_from_env(
         otel_traces_exporter=env.get("OTEL_TRACES_EXPORTER", "otlp"),
         otlp_trace_exporter_endpoint=otlp_traces_endpoint or otlp_endpoint,
         fastapi_trace_excluded_urls=_fastapi_trace_excluded_urls_from_env(env),
+        callsite_module_prefixes=_callsite_module_prefixes_from_env(env),
     )
 
 
@@ -56,3 +61,11 @@ def _fastapi_trace_excluded_urls_from_env(env: Mapping[str, str]) -> tuple[str, 
     if value is None:
         return DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS
     return tuple(part.strip() for part in value.split(",") if part.strip())
+
+
+def _callsite_module_prefixes_from_env(env: Mapping[str, str]) -> tuple[str, ...]:
+    value = env.get(CALLSITE_MODULE_PREFIXES_ENV)
+    if value is None:
+        return DEFAULT_CALLSITE_MODULE_PREFIXES
+    prefixes = tuple(part.strip() for part in value.split(",") if part.strip())
+    return prefixes or DEFAULT_CALLSITE_MODULE_PREFIXES

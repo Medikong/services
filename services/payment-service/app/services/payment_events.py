@@ -8,9 +8,9 @@ from uuid import uuid4
 
 from aiokafka.errors import KafkaError
 from contracts.events import PaymentApprovedEvent, PaymentFailedEvent
-from kafka_utils import build_producer_headers
+from kafka_utils import build_producer_headers, start_producer_span
 from metrics import MetricResult
-from observability import TraceContext
+from observability import TraceContext, set_current_span_attributes, start_trace_span
 from sqlalchemy.orm import Session
 
 from app.auth import UserContext
@@ -63,20 +63,30 @@ class PaymentEventDispatcher:
         if limit < 1:
             raise ValueError("limit must be greater than 0")
 
-        events = (
-            self._db.query(PaymentEvent)
-            .filter(PaymentEvent.publish_status == PUBLISH_STATUS_PENDING)
-            .order_by(PaymentEvent.created_at, PaymentEvent.id)
-            .limit(limit)
-            .all()
-        )
+        with start_trace_span(
+            "payment.outbox.dispatch_pending",
+            {
+                "app.component": "payment_outbox_dispatcher",
+                "app.operation": "dispatch_pending",
+                "payment.outbox.batch_size": limit,
+            },
+        ):
+            events = (
+                self._db.query(PaymentEvent)
+                .filter(PaymentEvent.publish_status == PUBLISH_STATUS_PENDING)
+                .order_by(PaymentEvent.created_at, PaymentEvent.id)
+                .limit(limit)
+                .all()
+            )
+            set_current_span_attributes({"payment.outbox.events.count": len(events)})
 
-        published_count = 0
-        for event in events:
-            await self.dispatch_event(event=event, kafka_producer=kafka_producer)
-            published_count += 1
+            published_count = 0
+            for event in events:
+                await self.dispatch_event(event=event, kafka_producer=kafka_producer)
+                published_count += 1
 
-        return published_count
+            set_current_span_attributes({"payment.outbox.events.published": published_count})
+            return published_count
 
     async def dispatch_event(
         self,
@@ -88,32 +98,49 @@ class PaymentEventDispatcher:
         if kafka_producer is None:
             raise RuntimeError("kafka producer is not configured")
 
-        event_type = PaymentEventType(event.event_type)
-        try:
-            await kafka_producer.send_and_wait(
-                _payment_event_topic(event_type),
-                event.payload,
-                headers=build_producer_headers(
-                    correlation_id=event.payload.get("correlationId"),
-                    carrier=_trace_carrier(event.trace_context),
-                ),
-            )
-        except (KafkaError, RuntimeError) as exc:
-            self._mark_failed(event, exc)
+        with start_trace_span(
+            "payment.outbox.dispatch_event",
+            {
+                "app.component": "payment_outbox_dispatcher",
+                "app.operation": "dispatch_event",
+                "payment.event_type": event.event_type,
+            },
+        ):
+            event_type = PaymentEventType(event.event_type)
+            topic = _payment_event_topic(event_type)
+            trace_carrier = _trace_carrier(event.trace_context)
+            try:
+                with start_producer_span(
+                    topic,
+                    carrier=trace_carrier,
+                    attributes={"payment.event_type": event.event_type},
+                ):
+                    await kafka_producer.send_and_wait(
+                        topic,
+                        event.payload,
+                        headers=_producer_headers(
+                            correlation_id=event.payload.get("correlationId"),
+                            fallback_carrier=trace_carrier,
+                        ),
+                    )
+            except (KafkaError, RuntimeError) as exc:
+                self._mark_failed(event, exc)
+                self._telemetry.record(
+                    PaymentEventPublishRecorded(event_type=event_type, result=MetricResult.FAILURE)
+                )
+                set_current_span_attributes({"payment.outbox.publish.result": "failure"})
+                raise
+
+            event.publish_attempts += 1
+            event.publish_status = PUBLISH_STATUS_PUBLISHED
+            event.published_at = datetime.now(UTC)
+            event.last_publish_error = None
+
+            self._db.commit()
             self._telemetry.record(
-                PaymentEventPublishRecorded(event_type=event_type, result=MetricResult.FAILURE)
+                PaymentEventPublishRecorded(event_type=event_type, result=MetricResult.SUCCESS)
             )
-            raise
-
-        event.publish_attempts += 1
-        event.publish_status = PUBLISH_STATUS_PUBLISHED
-        event.published_at = datetime.now(UTC)
-        event.last_publish_error = None
-
-        self._db.commit()
-        self._telemetry.record(
-            PaymentEventPublishRecorded(event_type=event_type, result=MetricResult.SUCCESS)
-        )
+            set_current_span_attributes({"payment.outbox.publish.result": "success"})
 
     def _mark_failed(self, event: PaymentEvent, exc: KafkaError | RuntimeError) -> None:
         """실패한 발행 시도의 outbox 상태를 저장한다."""
@@ -223,6 +250,17 @@ def _trace_carrier(trace_context: object) -> dict[str, str] | None:
         if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip()
     }
     return resolved or None
+
+
+def _producer_headers(*, correlation_id: str | None, fallback_carrier: dict[str, str] | None) -> list[tuple[str, bytes]]:
+    headers = build_producer_headers(correlation_id=correlation_id)
+    if _has_traceparent(headers) or fallback_carrier is None:
+        return headers
+    return build_producer_headers(correlation_id=correlation_id, carrier=fallback_carrier)
+
+
+def _has_traceparent(headers: list[tuple[str, bytes]]) -> bool:
+    return any(key == "traceparent" for key, _value in headers)
 
 
 def _payment_event_topic(event_type: PaymentEventType) -> str:

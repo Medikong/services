@@ -52,6 +52,32 @@ def build_producer_headers(
     return [(key, value.encode("utf-8")) for key, value in resolved_carrier.items() if key in _ALLOWED_HEADERS]
 
 
+@contextmanager
+def start_producer_span(
+    topic: str,
+    *,
+    carrier: Mapping[str, str] | None = None,
+    name: str | None = None,
+    attributes: Mapping[str, str | int] | None = None,
+) -> Iterator[Span]:
+    resolved_carrier = _string_carrier(carrier or {})
+    parent_context = propagate.extract(resolved_carrier) if resolved_carrier else None
+    tracer = trace.get_tracer("kafka_utils.producer")
+    span_attributes = kafka_producer_attributes(topic, carrier=resolved_carrier)
+    if attributes is not None:
+        span_attributes.update(attributes)
+
+    span_kwargs: dict[str, object] = {
+        "kind": SpanKind.PRODUCER,
+        "attributes": span_attributes,
+    }
+    if parent_context is not None:
+        span_kwargs["context"] = parent_context
+
+    with tracer.start_as_current_span(name or f"kafka.produce {topic}", **span_kwargs) as span:
+        yield span
+
+
 def headers_to_carrier(headers: Sequence[tuple[str | bytes, bytes]] | None) -> dict[str, str]:
     carrier: dict[str, str] = {}
     for key, value in headers or ():
@@ -94,6 +120,18 @@ def kafka_message_attributes(message: Any, *, carrier: Mapping[str, str] | None 
         attributes["messaging.kafka.message.offset"] = offset
 
     correlation_id = (carrier or headers_to_carrier(getattr(message, "headers", None))).get(CORRELATION_ID_HEADER)
+    if correlation_id:
+        attributes[CORRELATION_ID_HEADER] = correlation_id
+    return attributes
+
+
+def kafka_producer_attributes(topic: str, *, carrier: Mapping[str, str] | None = None) -> dict[str, str]:
+    attributes = {
+        "messaging.system": "kafka",
+        "messaging.destination.name": topic,
+        "messaging.operation": "publish",
+    }
+    correlation_id = (carrier or {}).get(CORRELATION_ID_HEADER)
     if correlation_id:
         attributes[CORRELATION_ID_HEADER] = correlation_id
     return attributes
