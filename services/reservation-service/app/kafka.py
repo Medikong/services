@@ -1,11 +1,10 @@
-from aiokafka import AIOKafkaProducer
 from fastapi import Request
-from kafka_utils import create_kafka_producer
+from kafka_utils import TraceAwareKafkaProducer, create_kafka_producer
 
 from app.config import settings
 
 
-KafkaProducer = AIOKafkaProducer | None
+KafkaProducer = TraceAwareKafkaProducer | None
 
 
 def create_producer() -> KafkaProducer:

@@ -1,9 +1,11 @@
 import json
 import logging
+from dataclasses import dataclass, field
 from uuid import uuid4
 
 from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi.testclient import TestClient
+from kafka_utils import KafkaProducerOption
 
 from app.kafka import get_kafka_producer
 from app.main import create_app
@@ -42,7 +44,8 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
     assert producer.sent[0][0] == "reservation-created"
     assert producer.sent[0][1]["reservationId"] == created["id"]
     assert ReservationCreatedEvent.model_validate(producer.sent[0][1]).reservationId == created["id"]
-    assert dict(producer.sent[0][2])["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
+    assert producer.sent[0][2] == []
+    assert producer.options_sent[0].correlation_id == producer.sent[0][1]["correlationId"]
 
 
 def test_duplicate_seat_conflict_logs_domain_rejection_without_exception_event(caplog) -> None:
@@ -113,6 +116,10 @@ def test_reservation_expire_publishes_event() -> None:
     assert producer.sent[0][1]["userId"] == "1"
     assert producer.sent[1][1]["userId"] == "1"
     assert ReservationExpiredEvent.model_validate(producer.sent[1][1]).userId == "1"
+    assert [options.correlation_id for options in producer.options_sent] == [
+        producer.sent[0][1]["correlationId"],
+        producer.sent[1][1]["correlationId"],
+    ]
 
 
 def test_sales_and_policy_admin_flow() -> None:
@@ -259,11 +266,37 @@ def _json_logs(records: list[logging.LogRecord], logger_name: str) -> list[dict[
 class FakeKafkaProducer:
     def __init__(self) -> None:
         self.sent: list[tuple[str, dict, list[tuple[str, bytes]]]] = []
+        self.options_sent: list[RecordedKafkaOptions] = []
 
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
-        self.sent.append((topic, payload, headers))
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
+        options = RecordedKafkaOptions()
+        for producer_option in producer_options:
+            producer_option(options)
+        self.options_sent.append(options)
+        self.sent.append((topic, payload, list(headers or [])))
 
 
 class FailingKafkaProducer:
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
         raise RuntimeError("kafka publish failed")
+
+
+@dataclass
+class RecordedKafkaOptions:
+    trace_context: dict | None = None
+    trace_carrier: dict | None = None
+    correlation_id: str | None = None
+    span_name: str | None = None
+    span_attributes: dict[str, object] = field(default_factory=dict)

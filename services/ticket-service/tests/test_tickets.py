@@ -1,9 +1,11 @@
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from kafka_utils import KafkaProducerOption
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -125,7 +127,8 @@ def test_payment_approved_event_issues_ticket(monkeypatch: pytest.MonkeyPatch) -
     ticket = db.query(Ticket).first()
     assert ticket is not None
     assert ticket.reservation_id == "reservation-1"
-    assert dict(producer.sent[0][2])["correlation_id"] == b"corr-1"
+    assert producer.sent[0][2] == []
+    assert producer.options_sent[0].correlation_id == "corr-1"
     metrics = client.get("/metrics").text
     assert_metric_labels(metrics, "ticket_events_consumed_total", event_type="payment-approved", result="success", topic="payment-approved")
     assert_metric_labels(metrics, "ticket_events_published_total", event_type="ticket-issued", result="success")
@@ -443,14 +446,40 @@ def assert_metric_labels(metrics: str, metric_name: str, **labels: str) -> None:
 class FakeKafkaProducer:
     def __init__(self) -> None:
         self.sent: list[tuple[str, dict, list[tuple[str, bytes]]]] = []
+        self.options_sent: list[RecordedKafkaOptions] = []
 
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
-        self.sent.append((topic, payload, headers))
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
+        options = RecordedKafkaOptions()
+        for producer_option in producer_options:
+            producer_option(options)
+        self.options_sent.append(options)
+        self.sent.append((topic, payload, list(headers or [])))
 
 
 class FailingKafkaProducer:
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
         raise RuntimeError("kafka unavailable")
+
+
+@dataclass
+class RecordedKafkaOptions:
+    trace_context: dict | None = None
+    trace_carrier: dict | None = None
+    correlation_id: str | None = None
+    span_name: str | None = None
+    span_attributes: dict[str, object] = field(default_factory=dict)
 
 
 class FakeMessage:

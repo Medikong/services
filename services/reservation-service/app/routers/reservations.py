@@ -5,7 +5,7 @@ from uuid import uuid4
 from aiokafka.errors import KafkaError
 from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi import APIRouter, Depends, Request, status
-from kafka_utils import build_producer_headers
+from kafka_utils import with_correlation_id
 from metrics import MetricResult
 
 from app import schemas
@@ -45,7 +45,7 @@ async def create_reservation(
             await kafka_producer.send_and_wait(
                 settings.reservation_created_topic,
                 payload,
-                headers=build_producer_headers(correlation_id=payload.get("correlationId")),
+                with_correlation_id(payload.get("correlationId")),
             )
         except (KafkaError, RuntimeError):
             telemetry.record(
@@ -98,7 +98,7 @@ async def expire_reservation(
             await kafka_producer.send_and_wait(
                 settings.reservation_expired_topic,
                 payload,
-                headers=build_producer_headers(correlation_id=payload.get("correlationId")),
+                with_correlation_id(payload.get("correlationId")),
             )
         except (KafkaError, RuntimeError):
             telemetry.record(

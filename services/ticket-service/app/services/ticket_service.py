@@ -3,7 +3,7 @@ from uuid import uuid4
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from kafka_utils import build_producer_headers
+from kafka_utils import with_correlation_id
 from metrics import MetricResult
 from sqlalchemy.orm import Session
 from contracts.events import PaymentApprovedEvent, TicketIssuedEvent
@@ -75,7 +75,7 @@ async def issue_ticket(
                 await kafka_producer.send_and_wait(
                     settings.ticket_issued_topic,
                     payload,
-                    headers=build_producer_headers(correlation_id=correlation_id or payload.get("correlationId")),
+                    with_correlation_id(correlation_id or payload.get("correlationId")),
                 )
             except Exception:
                 ticket_metrics.record(
