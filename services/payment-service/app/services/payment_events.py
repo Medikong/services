@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from aiokafka.errors import KafkaError
 from contracts.events import PaymentApprovedEvent, PaymentFailedEvent
-from kafka_utils import build_producer_headers, start_producer_span
+from kafka_utils import with_correlation_id, with_span_attributes, with_trace_context
 from metrics import MetricResult
 from observability import TraceContext, set_current_span_attributes, start_trace_span
 from sqlalchemy.orm import Session
@@ -108,21 +108,14 @@ class PaymentEventDispatcher:
         ):
             event_type = PaymentEventType(event.event_type)
             topic = _payment_event_topic(event_type)
-            trace_carrier = _trace_carrier(event.trace_context)
             try:
-                with start_producer_span(
+                await kafka_producer.send_and_wait(
                     topic,
-                    carrier=trace_carrier,
-                    attributes={"payment.event_type": event.event_type},
-                ):
-                    await kafka_producer.send_and_wait(
-                        topic,
-                        event.payload,
-                        headers=_producer_headers(
-                            correlation_id=event.payload.get("correlationId"),
-                            fallback_carrier=trace_carrier,
-                        ),
-                    )
+                    event.payload,
+                    with_trace_context(event.trace_context),
+                    with_correlation_id(event.payload.get("correlationId")),
+                    with_span_attributes({"payment.event_type": event.event_type}),
+                )
             except (KafkaError, RuntimeError) as exc:
                 self._mark_failed(event, exc)
                 self._telemetry.record(
@@ -236,31 +229,6 @@ def build_payment_event_draft(
         payload=event.model_dump(mode="json"),
         trace_context=trace_context.as_dict() if trace_context is not None else None,
     )
-
-
-def _trace_carrier(trace_context: object) -> dict[str, str] | None:
-    if not isinstance(trace_context, dict):
-        return None
-    carrier = trace_context.get("carrier")
-    if not isinstance(carrier, dict):
-        return None
-    resolved = {
-        key: value
-        for key, value in carrier.items()
-        if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip()
-    }
-    return resolved or None
-
-
-def _producer_headers(*, correlation_id: str | None, fallback_carrier: dict[str, str] | None) -> list[tuple[str, bytes]]:
-    headers = build_producer_headers(correlation_id=correlation_id)
-    if _has_traceparent(headers) or fallback_carrier is None:
-        return headers
-    return build_producer_headers(correlation_id=correlation_id, carrier=fallback_carrier)
-
-
-def _has_traceparent(headers: list[tuple[str, bytes]]) -> bool:
-    return any(key == "traceparent" for key, _value in headers)
 
 
 def _payment_event_topic(event_type: PaymentEventType) -> str:

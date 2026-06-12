@@ -1,6 +1,7 @@
 import asyncio
 import os
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,8 @@ from app.main import app  # noqa: E402
 import app.main as app_main  # noqa: E402
 import app.routes.payments as payment_routes  # noqa: E402
 import app.services.payment_events as payment_events_module  # noqa: E402
+from kafka_utils import KafkaProducerOption, TraceAwareKafkaProducer  # noqa: E402
+from kafka_utils import producer as producer_module  # noqa: E402
 from app.metrics.recorder import PaymentTelemetryRecorder  # noqa: E402
 from app.models import PaymentEvent  # noqa: E402
 from app.services.payment_events import PaymentEventDispatcher, run_payment_event_dispatcher  # noqa: E402
@@ -372,7 +375,21 @@ def test_payment_event_dispatcher_wraps_outbox_work_in_trace_spans(monkeypatch: 
 def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     trace_context = sample_trace_context()
     monkeypatch.setattr(payment_routes, "capture_current_trace_context", lambda: trace_context)
-    producer = FakeKafkaProducer()
+    raw_producer = RecordingRawKafkaProducer()
+    producer = TraceAwareKafkaProducer(raw_producer)
+    extracted: list[dict[str, str]] = []
+
+    def fake_extract(carrier: dict[str, str]) -> object:
+        extracted.append(carrier)
+        return "parent-context"
+
+    def fake_inject(carrier: dict[str, str]) -> None:
+        carrier["traceparent"] = f"00-{trace_context.trace_id}-1111111111111111-01"
+        carrier["tracestate"] = trace_context.carrier["tracestate"]
+
+    monkeypatch.setattr(producer_module.propagate, "extract", fake_extract)
+    monkeypatch.setattr(producer_module.propagate, "inject", fake_inject)
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeKafkaUtilsTracer())
 
     response = client.post(
         "/payments",
@@ -394,42 +411,22 @@ def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: p
     assert "tracestate" not in events[0].payload
 
     assert asyncio.run(dispatch_pending_events(producer)) == 1
-    headers = dict(producer.sent[0][2])
+    assert extracted == [trace_context.carrier]
+    headers = dict(raw_producer.sent[0][2])
     traceparent = headers["traceparent"].decode("utf-8")
     assert traceparent.startswith(f"00-{trace_context.trace_id}-")
     assert traceparent.endswith("-01")
     assert traceparent != trace_context.carrier["traceparent"]
     assert headers["tracestate"] == trace_context.carrier["tracestate"].encode("utf-8")
-    assert headers["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
+    assert headers["correlation_id"] == raw_producer.sent[0][1]["correlationId"].encode("utf-8")
 
 
-def test_payment_event_dispatcher_starts_producer_span_from_outbox_trace_context(
+def test_payment_event_dispatcher_passes_outbox_trace_context_to_kafka_send_options(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     trace_context = sample_trace_context()
     monkeypatch.setattr(payment_routes, "capture_current_trace_context", lambda: trace_context)
     producer = FakeKafkaProducer()
-    producer_spans: list[dict[str, object]] = []
-
-    @contextmanager
-    def fake_start_producer_span(
-        topic: str,
-        *,
-        carrier: dict[str, str] | None = None,
-        name: str | None = None,
-        attributes: dict[str, object] | None = None,
-    ):
-        producer_spans.append(
-            {
-                "topic": topic,
-                "carrier": carrier,
-                "name": name,
-                "attributes": attributes,
-            }
-        )
-        yield
-
-    monkeypatch.setattr(payment_events_module, "start_producer_span", fake_start_producer_span)
     response = client.post(
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="trace-producer-user"),
@@ -445,13 +442,12 @@ def test_payment_event_dispatcher_starts_producer_span_from_outbox_trace_context
 
     assert response.status_code == 201
     assert asyncio.run(dispatch_pending_events(producer)) == 1
-    assert producer_spans == [
-        {
-            "topic": "payment-approved",
-            "carrier": trace_context.carrier,
-            "name": None,
-            "attributes": {"payment.event_type": "payment-approved"},
-        }
+    assert producer.options_sent == [
+        RecordedKafkaOptions(
+            trace_context=trace_context.as_dict(),
+            correlation_id=producer.sent[0][1]["correlationId"],
+            span_attributes={"payment.event_type": "payment-approved"},
+        )
     ]
 
 
@@ -533,7 +529,7 @@ def payment_events() -> list[PaymentEvent]:
         return db.query(PaymentEvent).order_by(PaymentEvent.created_at).all()
 
 
-async def dispatch_pending_events(producer: "FakeKafkaProducer | FailingKafkaProducer", *, max_attempts: int = 3) -> int:
+async def dispatch_pending_events(producer: object, *, max_attempts: int = 3) -> int:
     with SessionLocal() as db:
         dispatcher = PaymentEventDispatcher(
             db=db,
@@ -572,12 +568,35 @@ def assert_no_high_cardinality_metric_labels(metrics_text: str) -> None:
         assert f"{label}=" not in metrics_text
 
 
+@dataclass
+class RecordedKafkaOptions:
+    trace_context: dict | None = None
+    trace_carrier: dict | None = None
+    correlation_id: str | None = None
+    span_name: str | None = None
+    span_attributes: dict[str, object] = field(default_factory=dict)
+
+
 class FakeKafkaProducer:
     def __init__(self) -> None:
         self.sent: list[tuple[str, dict, list[tuple[str, bytes]]]] = []
+        self.options_sent: list[RecordedKafkaOptions] = []
 
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
-        self.sent.append((topic, payload, headers))
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
+        options = RecordedKafkaOptions()
+        for producer_option in producer_options:
+            producer_option(options)
+        self.options_sent.append(options)
+        resolved_headers = list(headers or [])
+        if options.correlation_id is not None:
+            resolved_headers.append(("correlation_id", options.correlation_id.encode("utf-8")))
+        self.sent.append((topic, payload, resolved_headers))
 
 
 class StoppingKafkaProducer(FakeKafkaProducer):
@@ -585,11 +604,57 @@ class StoppingKafkaProducer(FakeKafkaProducer):
         super().__init__()
         self._stop_event = stop_event
 
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
-        await super().send_and_wait(topic, payload, headers=headers)
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
+        await super().send_and_wait(topic, payload, *producer_options, headers=headers)
         self._stop_event.set()
 
 
 class FailingKafkaProducer:
-    async def send_and_wait(self, topic: str, payload: dict, *, headers: list[tuple[str, bytes]]) -> None:
+    async def send_and_wait(
+        self,
+        topic: str,
+        payload: dict,
+        *producer_options: KafkaProducerOption,
+        headers: list[tuple[str, bytes]] | None = None,
+    ) -> None:
         raise RuntimeError("kafka publish failed")
+
+
+class RecordingRawKafkaProducer:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, dict, list[tuple[str, bytes]]]] = []
+
+    async def send_and_wait(
+        self,
+        topic: str,
+        *,
+        value: dict,
+        key: bytes | None,
+        partition: int | None,
+        timestamp_ms: int | None,
+        headers: list[tuple[str, bytes]],
+    ) -> None:
+        self.sent.append((topic, value, headers))
+
+
+class FakeKafkaUtilsSpan:
+    def record_exception(self, exc: Exception) -> None:
+        pass
+
+    def set_status(self, status: object) -> None:
+        pass
+
+
+class FakeKafkaUtilsTracer:
+    def start_as_current_span(self, name: str, **kwargs: object):
+        @contextmanager
+        def span_context():
+            yield FakeKafkaUtilsSpan()
+
+        return span_context()
