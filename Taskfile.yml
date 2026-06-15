@@ -345,6 +345,16 @@ tasks:
         printf 'pushing %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
         docker push "${image_prefix}/${service}:${image_tag}"
 
+  deploy:tag:
+    desc: Create and push a deploy tag with SERVICE=<service|changed|all> BUMP=<patch|minor|major>. Set DRY_RUN=true to preview.
+    cmds:
+      - bash scripts/deploy_tag.sh
+    env:
+      SERVICE: '{{default "" .SERVICE}}'
+      BUMP: '{{default "patch" .BUMP}}'
+      DRY_RUN: '{{default "false" .DRY_RUN}}'
+      DEPLOY_ENV: '{{default "dev" .DEPLOY_ENV}}'
+
   dev-images-build:
     desc: Build Docker Desktop dev images with DEV_IMAGE_* variables.
     cmds:
