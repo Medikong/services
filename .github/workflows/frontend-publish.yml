@@ -1,0 +1,90 @@
+name: Frontend Publish
+
+# 프론트엔드 데모(단일 HTML)를 nginx 이미지로 build/push 한다.
+# 트리거: frontend/ 변경 push(main) 또는 수동 실행.
+
+on:
+  push:
+    tags:
+      - 'deploy/dev/frontend/v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '이미지 태그 (예: v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: frontend-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REGISTRY: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com
+  IMAGE_NAME: frontend
+  AWS_REGION: ap-northeast-2
+
+jobs:
+  publish:
+    name: 프론트엔드 이미지 publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 내려받기
+        uses: actions/checkout@v4
+
+      - name: 이미지 태그 결정
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            # 수동 실행 시 입력값 사용
+            tag="${{ github.event.inputs.tag }}"
+          else
+            # deploy tag(deploy/dev/frontend/v0.1.0)에서 마지막 버전 부분 추출
+            tag="${GITHUB_REF_NAME##*/}"
+          fi
+          if ! [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf '버전이 SemVer(v0.0.0) 형식이 아닙니다: %s\n' "${tag}" >&2
+            exit 2
+          fi
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
+          printf '선택된 태그: %s\n' "${tag}"
+
+      - name: AWS 인증 (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::941141115079:role/github-actions-ecr-role
+          aws-region: ap-northeast-2
+
+      - name: ECR 로그인
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: 이미지 빌드 및 push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+      - name: 배포 요약
+        shell: bash
+        run: |
+          {
+            printf '### 프론트엔드 이미지 publish\n\n'
+            printf -- '- 이미지: `%s/%s:%s`\n' "${IMAGE_REGISTRY}" "${IMAGE_NAME}" "${{ steps.meta.outputs.tag }}"
+            printf -- '- latest 태그도 함께 push됨\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
