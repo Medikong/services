@@ -71,8 +71,25 @@ validate_inputs() {
 
 latest_service_version() {
   local service="$1"
+  local tag
+  local contents
 
-  git tag --list "deploy/${DEPLOY_ENV}/${service}/v[0-9]*.[0-9]*.[0-9]*" |
+  {
+    git tag --list "deploy/${DEPLOY_ENV}/${service}/v[0-9]*.[0-9]*.[0-9]*" |
+      sed -E 's#^deploy/[^/]+/[^/]+/v([0-9]+)\.([0-9]+)\.([0-9]+)$#\1.\2.\3#'
+
+    git for-each-ref \
+      --format='%(refname:short)' \
+      "refs/tags/deploy/${DEPLOY_ENV}/changed" \
+      "refs/tags/deploy/${DEPLOY_ENV}/all" 2>/dev/null |
+      while IFS= read -r tag; do
+        contents="$(git for-each-ref "refs/tags/${tag}" --format='%(contents)')"
+        jq -r --arg service "${service}" '
+          try (.services[]? | select(.image == $service) | .tag) catch empty
+        ' <<<"${contents}" 2>/dev/null || true
+      done |
+      sed -E 's#^v([0-9]+)\.([0-9]+)\.([0-9]+)$#\1.\2.\3#'
+  } |
     sed -E 's#^deploy/[^/]+/[^/]+/v([0-9]+)\.([0-9]+)\.([0-9]+)$#\1.\2.\3#' |
     awk -F. 'NF == 3 { printf "%d.%d.%d\n", $1, $2, $3 }' |
     sort -t. -k1,1n -k2,2n -k3,3n |
