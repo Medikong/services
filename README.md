@@ -37,6 +37,22 @@ task test-service SERVICE=auth-service
 
 `task test-unit`은 `tests/docker/Dockerfile` 템플릿으로 서비스별 테스트 러너 이미지를 만든 뒤 티켓 예매 서비스의 pytest를 실행합니다. E2E 테스트는 별도 담당 범위에서 관리합니다.
 
+## 로컬 부하테스트 보고서
+
+`service` repo는 k6 부하테스트 실행과 로컬 artifact 생성을 소유합니다. 기본 실행은 read API 조회 경로를 대상으로 하고, 결과는 gitignore 되는 `loadtest/reports/local/{run_id}/`에 남습니다.
+
+```bash
+task loadtest LOADTEST_BASE_URL=http://localhost LOADTEST_VUS=5 LOADTEST_DURATION=1m
+```
+
+각 실행은 `metadata.json`, `summary.json`, `report.html`, `report.md`를 만들고, `loadtest/reports/local/latest`가 최근 실행 결과를 가리킵니다. `run_id`는 UTC timestamp, scenario, short git SHA로 구성합니다. AWS/S3 업로드와 장기 보관은 이후 artifact 저장소 확장 단계에서 다룹니다.
+
+서비스 연결 없이 보고서 생성만 확인할 때는 다음 smoke 명령을 사용합니다.
+
+```bash
+task loadtest-smoke
+```
+
 ## 이미지 빌드와 푸시
 
 `service` repo는 Dockerfile과 image build/push 명령을 소유합니다. Kubernetes 배포 선언은 `gitops` repo가 관리하므로, 여기서는 registry와 tag를 인자로 받아 이미지만 준비합니다.

@@ -14,6 +14,12 @@ vars:
   DOCKER_BUILD_PLATFORMS: '{{default "linux/amd64,linux/arm64" .DOCKER_BUILD_PLATFORMS}}'
   DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
+  K6: '{{default "k6" .K6}}'
+  LOADTEST_SCENARIO: '{{default "read-api-baseline" .LOADTEST_SCENARIO}}'
+  LOADTEST_BASE_URL: '{{default "http://localhost" .LOADTEST_BASE_URL}}'
+  LOADTEST_VUS: '{{default "1" .LOADTEST_VUS}}'
+  LOADTEST_DURATION: '{{default "30s" .LOADTEST_DURATION}}'
+  LOADTEST_REPORT_ROOT: '{{default "loadtest/reports/local" .LOADTEST_REPORT_ROOT}}'
   APP_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
   APP_IMAGE_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
   DEV_SERVICE_PYPROJECTS: services/auth-service/pyproject.toml services/concert-service/pyproject.toml services/reservation-service/pyproject.toml services/payment-service/pyproject.toml services/ticket-service/pyproject.toml services/notification-service/pyproject.toml
@@ -108,6 +114,58 @@ tasks:
       - task: tests:test-e2e
         vars:
           SCENARIO: '{{default "" .SCENARIO}}'
+
+  loadtest:
+    desc: Run local k6 loadtest and write artifacts under loadtest/reports/local/{run_id}.
+    cmds:
+      - |
+        set -eu
+        k6_cmd='{{.K6}}'
+        if ! command -v "${k6_cmd}" >/dev/null 2>&1; then
+          printf '%s\n' "${k6_cmd} command not found. Install k6 or set K6=/path/to/k6." >&2
+          exit 2
+        fi
+        scenario='{{.LOADTEST_SCENARIO}}'
+        base_url='{{.LOADTEST_BASE_URL}}'
+        vus='{{.LOADTEST_VUS}}'
+        duration='{{.LOADTEST_DURATION}}'
+        report_root='{{.LOADTEST_REPORT_ROOT}}'
+        scenario_slug="$(printf '%s' "${scenario}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)"
+        scenario_slug="${scenario_slug:-loadtest}"
+        git_sha="$(git rev-parse --short HEAD)"
+        timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+        started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        run_id="${timestamp}-${scenario_slug}-${git_sha}"
+        report_dir="${report_root}/${run_id}"
+        mkdir -p "${report_dir}"
+        printf 'Running k6 scenario=%s run_id=%s report_dir=%s\n' "${scenario}" "${run_id}" "${report_dir}"
+        set +e
+        LOADTEST_RUN_ID="${run_id}" \
+        LOADTEST_SCENARIO="${scenario}" \
+        LOADTEST_ENVIRONMENT=local \
+        LOADTEST_BASE_URL="${base_url}" \
+        LOADTEST_VUS="${vus}" \
+        LOADTEST_DURATION="${duration}" \
+        LOADTEST_GIT_SHA="${git_sha}" \
+        LOADTEST_STARTED_AT="${started_at}" \
+        LOADTEST_REPORT_DIR="${report_dir}" \
+          "${k6_cmd}" run loadtest/scenarios/read-api-local.js
+        exit_code="$?"
+        set -e
+        rm -f "${report_root}/latest"
+        ln -s "${run_id}" "${report_root}/latest"
+        printf 'Loadtest report: %s\n' "${report_dir}"
+        exit "${exit_code}"
+
+  loadtest-smoke:
+    desc: Verify local k6 report artifact generation without calling a service.
+    cmds:
+      - task: loadtest
+        vars:
+          LOADTEST_SCENARIO: report-smoke
+          LOADTEST_BASE_URL: http://127.0.0.1
+          LOADTEST_VUS: 1
+          LOADTEST_DURATION: 1s
 
   app-images-build:
     desc: Build service and dashboard Docker images.
