@@ -11,6 +11,8 @@ servers:
 security: []
 
 paths:
+  /auth/signup:
+    $ref: ./paths/auth_signup.yaml
   /auth/login:
     $ref: ./paths/auth_login.yaml
   /auth/refresh:
@@ -32,6 +34,31 @@ components:
       $ref: ../../common/components.yaml#/components/securitySchemes/BearerAuth
 
   schemas:
+    SignupRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+        - displayName
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 180
+          examples:
+            - customer@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          examples:
+            - Kim Ticket
     LoginRequest:
       type: object
       required:

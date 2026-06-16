@@ -1,11 +1,35 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class SignupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(max_length=180)
+    password: str = Field(min_length=8, max_length=128)
+    displayName: str = Field(min_length=1, max_length=100)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized or normalized.startswith("@") or normalized.endswith("@"):
+            raise ValueError("email must be a valid email address")
+        return normalized
+
+    @field_validator("displayName")
+    @classmethod
+    def normalize_display_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("displayName must not be blank")
+        return normalized
 
 
 class UserResponse(BaseModel):

@@ -29,6 +29,8 @@ class AuthRevocationReason(StrEnum):
 
 
 class AuditEventType(StrEnum):
+    SIGNUP_FAILED = "signup_failed"
+    SIGNUP_SUCCEEDED = "signup_succeeded"
     LOGIN_FAILED = "login_failed"
     LOGIN_SUCCEEDED = "login_succeeded"
     ME_VIEWED = "me_viewed"

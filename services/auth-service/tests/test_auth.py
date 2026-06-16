@@ -26,6 +26,56 @@ def test_lifespan_disposes_engine(monkeypatch: MonkeyPatch) -> None:
     assert calls == ["dispose"]
 
 
+def test_signup_creates_customer_and_issues_tokens() -> None:
+    response = client.post(
+        "/auth/signup",
+        json={
+            "email": "New.Customer@example.com",
+            "password": "newcustomer1234",
+            "displayName": " New Customer ",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["accessToken"]
+    assert body["refreshToken"]
+    assert body["user"]["email"] == "new.customer@example.com"
+    assert body["user"]["displayName"] == "New Customer"
+    assert body["user"]["role"] == "CUSTOMER"
+    assert body["user"]["isActive"] is True
+
+    login_response = client.post(
+        "/auth/login",
+        json={"email": "new.customer@example.com", "password": "newcustomer1234"},
+    )
+    assert login_response.status_code == 200
+    assert login_response.json()["user"]["role"] == "CUSTOMER"
+
+
+def test_signup_rejects_duplicate_email_and_role_field() -> None:
+    duplicate_response = client.post(
+        "/auth/signup",
+        json={
+            "email": "customer@example.com",
+            "password": "customer1234",
+            "displayName": "Duplicate Customer",
+        },
+    )
+    assert duplicate_response.status_code == 409
+
+    role_response = client.post(
+        "/auth/signup",
+        json={
+            "email": "role-customer@example.com",
+            "password": "customer1234",
+            "displayName": "Role Customer",
+            "role": "ADMIN",
+        },
+    )
+    assert role_response.status_code == 422
+
+
 def test_login_me_logout_and_audit_logs() -> None:
     login_response = client.post(
         "/auth/login",
