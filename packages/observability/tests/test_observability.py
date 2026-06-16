@@ -33,9 +33,11 @@ from observability import (
     HttpError,
     ObservabilityConfig,
     NoopTraceRecorder,
+    ProfilingConfig,
     TraceContext,
     capture_current_trace_context,
     configure_process_logging,
+    configure_process_profiling,
     configure_process_tracing,
     create_request_log_middleware,
     clear_callsite_cache,
@@ -48,6 +50,7 @@ from observability import (
     start_trace_span,
     trace_recorder,
 )
+from observability import profiling as profiling_module
 from observability import tracing as tracing_module
 from observability.tracing import _otlp_trace_export_enabled
 
@@ -75,6 +78,10 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         otlp_trace_exporter_endpoint="http://collector:4318/v1/traces",
         fastapi_trace_excluded_urls=DEFAULT_FASTAPI_TRACE_EXCLUDED_URLS,
         callsite_module_prefixes=("app", "worker", "domain"),
+        profiling=ProfilingConfig(
+            application_name="test-service",
+            tags={"service": "test-service", "environment": "staging", "version": "1.2.3"},
+        ),
     )
     assert set(OBSERVABILITY_ENV_KEYS) == {
         "SERVICE_VERSION",
@@ -85,6 +92,16 @@ def test_observability_config_from_env_maps_explicit_otel_settings() -> None:
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
         "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS",
         CALLSITE_MODULE_PREFIXES_ENV,
+        "PYROSCOPE_ENABLED",
+        "PYROSCOPE_SERVER_ADDRESS",
+        "PYROSCOPE_APPLICATION_NAME",
+        "PYROSCOPE_SAMPLE_RATE",
+        "PYROSCOPE_ONCPU",
+        "PYROSCOPE_GIL_ONLY",
+        "PYROSCOPE_TAGS",
+        "PYROSCOPE_BASIC_AUTH_USERNAME",
+        "PYROSCOPE_BASIC_AUTH_PASSWORD",
+        "PYROSCOPE_TENANT_ID",
     }
 
 
@@ -120,6 +137,118 @@ def test_observability_config_reads_fastapi_trace_exclusions_from_env() -> None:
     )
 
     assert config.fastapi_trace_excluded_urls == ("/livez", "/readyz", "/internal/metrics")
+
+
+def test_observability_config_reads_pyroscope_settings_from_env() -> None:
+    config = observability_config_from_env(
+        "auth-service",
+        env={
+            "SERVICE_VERSION": "abc123",
+            "SERVICE_ENVIRONMENT": "aws-dev",
+            "PYROSCOPE_ENABLED": "true",
+            "PYROSCOPE_SERVER_ADDRESS": "http://pyroscope:4040",
+            "PYROSCOPE_APPLICATION_NAME": "medikong.auth",
+            "PYROSCOPE_SAMPLE_RATE": "50",
+            "PYROSCOPE_ONCPU": "false",
+            "PYROSCOPE_GIL_ONLY": "false",
+            "PYROSCOPE_TAGS": "scenario=reservation-journey-load-test, run_id=run-001",
+            "PYROSCOPE_BASIC_AUTH_USERNAME": "profiles-user",
+            "PYROSCOPE_BASIC_AUTH_PASSWORD": "profiles-password",
+            "PYROSCOPE_TENANT_ID": "tenant-a",
+        },
+    )
+
+    assert config.profiling == ProfilingConfig(
+        enabled=True,
+        server_address="http://pyroscope:4040",
+        application_name="medikong.auth",
+        sample_rate=50,
+        oncpu=False,
+        gil_only=False,
+        tags={
+            "service": "auth-service",
+            "environment": "aws-dev",
+            "version": "abc123",
+            "scenario": "reservation-journey-load-test",
+            "run_id": "run-001",
+        },
+        basic_auth_username="profiles-user",
+        basic_auth_password="profiles-password",
+        tenant_id="tenant-a",
+    )
+
+
+@pytest.mark.parametrize("tag_key", ["user_id", "reservation_id", "payment_id", "ticket_id", "customer_id"])
+def test_observability_config_rejects_high_cardinality_pyroscope_tags(tag_key: str) -> None:
+    with pytest.raises(ValueError, match="forbidden high-cardinality tag key"):
+        observability_config_from_env(
+            "auth-service",
+            env={"PYROSCOPE_TAGS": f"{tag_key}=123"},
+        )
+
+
+def test_configure_process_profiling_skips_disabled_config(monkeypatch) -> None:
+    monkeypatch.setattr(profiling_module, "_profiling_configured", False)
+
+    configured = configure_process_profiling(
+        ObservabilityConfig(
+            service_name="auth-service",
+            profiling=ProfilingConfig(enabled=False, server_address="http://pyroscope:4040"),
+        )
+    )
+
+    assert not configured
+
+
+def test_configure_process_profiling_configures_pyroscope_once(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    fake_pyroscope_module = types.SimpleNamespace(configure=lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setitem(sys.modules, "pyroscope", fake_pyroscope_module)
+    monkeypatch.setattr(profiling_module, "_profiling_configured", False)
+
+    config = ObservabilityConfig(
+        service_name="auth-service",
+        profiling=ProfilingConfig(
+            enabled=True,
+            server_address="http://pyroscope:4040",
+            application_name="medikong.auth",
+            sample_rate=50,
+            oncpu=True,
+            gil_only=True,
+            tags={"service": "auth-service", "scenario": "reservation-journey-load-test"},
+            basic_auth_username="profiles-user",
+            basic_auth_password="profiles-password",
+            tenant_id="tenant-a",
+        ),
+    )
+
+    assert configure_process_profiling(config)
+    assert not configure_process_profiling(config)
+    assert calls == [
+        {
+            "application_name": "medikong.auth",
+            "server_address": "http://pyroscope:4040",
+            "sample_rate": 50,
+            "oncpu": True,
+            "gil_only": True,
+            "tags": {"service": "auth-service", "scenario": "reservation-journey-load-test"},
+            "basic_auth_username": "profiles-user",
+            "basic_auth_password": "profiles-password",
+            "tenant_id": "tenant-a",
+        }
+    ]
+
+
+def test_configure_process_profiling_requires_server_address(monkeypatch) -> None:
+    monkeypatch.setattr(profiling_module, "_profiling_configured", False)
+
+    with pytest.raises(ValueError, match="PYROSCOPE_SERVER_ADDRESS is required"):
+        configure_process_profiling(
+            ObservabilityConfig(
+                service_name="auth-service",
+                profiling=ProfilingConfig(enabled=True),
+            )
+        )
 
 
 def test_instrument_fastapi_app_passes_configured_excluded_urls(monkeypatch) -> None:
