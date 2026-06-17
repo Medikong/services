@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth import UserContext
 from app.consumers import kafka_consumer as kafka_consumer_module
 from app.consumers.kafka_consumer import consume_events
 from app.database import Base, get_db
@@ -149,6 +150,41 @@ def test_list_my_tickets_does_not_mix_other_user_tickets(monkeypatch: pytest.Mon
     assert [ticket["id"] for ticket in body["items"]] == [ticket["id"] for ticket in user_one_tickets]
     assert {ticket["userId"] for ticket in body["items"]} == {"1"}
     assert body["nextCursor"] is None
+
+
+def test_list_my_tickets_records_query_and_response_trace_spans(monkeypatch: pytest.MonkeyPatch) -> None:
+    issued = issue_tickets_for_user(monkeypatch, "1", 2)
+    trace = RecordingTraceRecorder()
+    db = TestingSessionLocal()
+
+    try:
+        response = ticket_service.list_my_tickets(
+            db,
+            UserContext(user_id="1", role="USER"),
+            limit=1,
+            trace=trace,
+        )
+    finally:
+        db.close()
+
+    assert response.items[0].id == issued[0]["id"]
+    assert response.nextCursor == str(issued[0]["id"])
+    assert trace.spans == [
+        (
+            "ticket.list.query",
+            {
+                "ticket.list.limit": 1,
+                "ticket.list.cursor_present": False,
+            },
+        ),
+        (
+            "ticket.list.response",
+            {
+                "ticket.list.item_count": 1,
+                "ticket.list.has_next_cursor": True,
+            },
+        ),
+    ]
 
 
 def test_user_cannot_get_other_user_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -537,6 +573,26 @@ class FailingKafkaProducer:
         headers: list[tuple[str, bytes]] | None = None,
     ) -> None:
         raise RuntimeError("kafka unavailable")
+
+
+class RecordingTraceRecorder:
+    def __init__(self) -> None:
+        self.spans: list[tuple[str, dict[str, object]]] = []
+
+    def span(self, name: str, attributes: dict[str, object] | None = None):
+        self.spans.append((name, attributes or {}))
+
+        @contextmanager
+        def child_span() -> Generator[None, None, None]:
+            yield
+
+        return child_span()
+
+    def attribute(self, key: str, value: object) -> None:
+        return None
+
+    def event(self, name: str, attributes: dict[str, object] | None = None) -> None:
+        return None
 
 
 @dataclass

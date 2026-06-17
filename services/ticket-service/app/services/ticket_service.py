@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi import HTTPException, status
 from kafka_utils import with_correlation_id
 from metrics import MetricResult
+from observability import TraceRecorder, trace_recorder
 from sqlalchemy.orm import Session
 from contracts.events import PaymentApprovedEvent, TicketIssuedEvent
 
@@ -16,7 +17,7 @@ from app.metrics.events import TicketEventPublishRecorded
 from app.metrics.labels import TicketArtifact, TicketEventType, TicketSource
 from app.metrics.recorder import TicketTelemetryRecorder
 from app.models import ProcessedEvent, Ticket
-from app.schemas import TicketIssueRequest, TicketListResponse
+from app.schemas import TicketIssueRequest, TicketListResponse, TicketResponse
 
 
 SessionFactory = Callable[[], Session]
@@ -113,15 +114,35 @@ def list_my_tickets(
     *,
     limit: int,
     cursor: int | None = None,
+    trace: TraceRecorder | None = None,
 ) -> TicketListResponse:
-    query = db.query(Ticket).filter(Ticket.user_id == user.user_id)
-    if cursor is not None:
-        query = query.filter(Ticket.id > cursor)
+    recorder = trace or trace_recorder()
+    with recorder.span(
+        "ticket.list.query",
+        {
+            "ticket.list.limit": limit,
+            "ticket.list.cursor_present": cursor is not None,
+        },
+    ):
+        query = db.query(Ticket).filter(Ticket.user_id == user.user_id)
+        if cursor is not None:
+            query = query.filter(Ticket.id > cursor)
 
-    tickets = query.order_by(Ticket.id).limit(limit + 1).all()
+        tickets = query.order_by(Ticket.id).limit(limit + 1).all()
+
     items = tickets[:limit]
     next_cursor = str(items[-1].id) if len(tickets) > limit and items else None
-    return TicketListResponse(items=items, nextCursor=next_cursor)
+    with recorder.span(
+        "ticket.list.response",
+        {
+            "ticket.list.item_count": len(items),
+            "ticket.list.has_next_cursor": next_cursor is not None,
+        },
+    ):
+        return TicketListResponse(
+            items=[_ticket_response(item) for item in items],
+            nextCursor=next_cursor,
+        )
 
 
 async def handle_payment_approved(db: Session, payload: dict, kafka_producer: KafkaProducer) -> None:
@@ -186,3 +207,17 @@ def _ticket_issued_event(ticket: Ticket, *, correlation_id: str | None = None) -
         producer=settings.service_name,
         correlationId=correlation_id,
     ).model_dump(mode="json")
+
+
+def _ticket_response(ticket: Ticket) -> TicketResponse:
+    return TicketResponse(
+        id=ticket.id,
+        reservationId=ticket.reservation_id,
+        userId=ticket.user_id,
+        concertId=ticket.concert_id,
+        seatId=ticket.seat_id,
+        status=ticket.status,
+        qrUrl=ticket.qr_url,
+        pdfUrl=ticket.pdf_url,
+        issuedAt=ticket.issued_at,
+    )

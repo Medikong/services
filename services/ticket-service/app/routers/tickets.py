@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from observability import trace_recorder
 from sqlalchemy.orm import Session
 
 from app.auth import UserContext, get_user_context
@@ -29,7 +30,15 @@ def list_my_tickets(
     db: Session = Depends(get_db),
     user: UserContext = Depends(get_user_context),
 ) -> TicketListResponse:
-    return ticket_service.list_my_tickets(db, user, limit=limit, cursor=cursor)
+    recorder = trace_recorder()
+    with recorder.span(
+        "ticket.list.route",
+        {
+            "ticket.list.limit": limit,
+            "ticket.list.cursor_present": cursor is not None,
+        },
+    ):
+        return ticket_service.list_my_tickets(db, user, limit=limit, cursor=cursor, trace=recorder)
 
 
 # 티켓 상세 조회
