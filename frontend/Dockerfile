@@ -1,10 +1,16 @@
+FROM nginx:1.27-alpine AS builder
+COPY ticketmong-front.html /tmp/index.html
+
 FROM nginx:1.27-alpine
+RUN apk add --no-cache dumb-init && \
+    addgroup -g 1001 -S appuser && \
+    adduser -S appuser -G appuser -u 1001 && \
+    chmod 777 /var/cache/nginx /var/run /var/log/nginx
 
-# 단일 HTML 데모 파일을 nginx 기본 페이지로 배치
-COPY ticketmong-front.html /usr/share/nginx/html/index.html
+COPY --from=builder /tmp/index.html /usr/share/nginx/html/index.html
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# nginx 기본 설정으로 80 포트 서빙
+USER appuser
 EXPOSE 80
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -q --spider http://localhost/ || exit 1
+ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
+CMD ["nginx", "-g", "daemon off;"]
