@@ -179,7 +179,7 @@ jobs:
         if: steps.critical.outcome == 'failure'
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_SECURITY_WEBHOOK }}
+          webhook: ${{ secrets.DISCORD_SECURITY_CRITICAL_WEBHOOK }}
           status: failure
           title: "🔴 CRITICAL 취약점 발견"
           description: "${{ matrix.service }}에서 CRITICAL CVE ${{ steps.count-critical.outputs.count }}건 발견. ECR push 차단됨."
@@ -189,7 +189,7 @@ jobs:
         if: steps.high.outcome == 'failure'
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_SECURITY_WEBHOOK }}
+          webhook: ${{ secrets.DISCORD_SECURITY_HIGH_WEBHOOK }}
           status: failure
           title: "🟠 HIGH 취약점 발견"
           description: "${{ matrix.service }}에서 HIGH CVE ${{ steps.count-high.outputs.count }}건 발견."
