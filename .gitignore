@@ -30,5 +30,6 @@ id_rsa*
 *secret*
 *credential*
 *token*
+!services/auth-service/app/token_response.py
 *.log
 .DS_Store
