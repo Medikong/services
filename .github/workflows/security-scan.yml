@@ -143,7 +143,7 @@ jobs:
         if: failure()
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          webhook: ${{ secrets.DISCORD_SECURITY_WEBHOOK }}
           status: failure
           title: "🚨 이미지 보안 취약점 발견"
           description: "${{ matrix.service }} 이미지에서 HIGH/CRITICAL 취약점이 발견되었습니다."

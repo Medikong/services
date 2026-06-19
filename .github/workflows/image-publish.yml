@@ -355,7 +355,7 @@ jobs:
         if: always()
         uses: sarisia/actions-status-discord@v1
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          webhook: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
           status: ${{ job.status }}
           title: "이미지 배포 완료"
           description: "배포 태그: ${{ needs.select-images.outputs.deploy_tag }}"
