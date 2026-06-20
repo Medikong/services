@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 
@@ -38,6 +39,11 @@ def test_provider_to_public_concert_flow() -> None:
     seat_map = client.get(f"/performances/{showtime['id']}/seat-map").json()
     metrics = client.get("/metrics").text
 
+    UUID(concert["id"])
+    UUID(venue["id"])
+    UUID(showtime["id"])
+    UUID(seats["items"][0]["id"])
+    UUID(seat_map["seats"][0]["seatId"])
     assert performances["items"][0]["id"] == showtime["id"]
     assert len(seats["items"]) == 2
     assert public_concert["concertId"] == concert["id"]

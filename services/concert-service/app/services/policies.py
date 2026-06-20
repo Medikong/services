@@ -34,7 +34,7 @@ class SalePolicyService(ConcertDomainService):
             concert = self._concert(concert_id)
             self.add(
                 model.ConcertReviewRequest(
-                    id=new_id("review"),
+                    id=new_id(),
                     concert_id=concert_id,
                     provider_id=concert.provider_id,
                     type="sale_policy",
@@ -120,7 +120,7 @@ class OpenPolicyService(ConcertDomainService):
         try:
             concert = self._concert(concert_id)
             open_request = model.OpenRequest(
-                id=new_id("openreq"),
+                id=new_id(),
                 concert_id=concert_id,
                 requested_open_at=request.requestedOpenAt,
                 message=request.message,
@@ -129,7 +129,7 @@ class OpenPolicyService(ConcertDomainService):
             self.add(open_request)
             self.add(
                 model.ConcertReviewRequest(
-                    id=new_id("review"),
+                    id=new_id(),
                     concert_id=concert_id,
                     provider_id=concert.provider_id,
                     type="open_request",

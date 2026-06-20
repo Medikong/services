@@ -35,7 +35,7 @@ class ConcertCatalogService(ConcertDomainService):
         try:
             created_at = now_utc()
             concert = model.Concert(
-                id=new_id("concert"),
+                id=new_id(),
                 provider_id=provider_id,
                 title=request.title,
                 description=request.description,
@@ -48,7 +48,7 @@ class ConcertCatalogService(ConcertDomainService):
             self.add(concert)
             self.add(
                 model.ConcertReviewRequest(
-                    id=new_id("review"),
+                    id=new_id(),
                     concert_id=concert.id,
                     provider_id=provider_id,
                     type="concert",

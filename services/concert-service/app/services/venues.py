@@ -16,7 +16,7 @@ class VenueService(ConcertDomainService):
     def create_venue(self, request: schemas.VenueCreateRequest) -> schemas.VenueResponse:
         """공연장 생성 command 결과를 metric으로 남긴다."""
         try:
-            venue = model.Venue(id=new_id("venue"), name=request.name, address=request.address, total_seats=request.totalSeats)
+            venue = model.Venue(id=new_id(), name=request.name, address=request.address, total_seats=request.totalSeats)
             self.add(venue)
             self.commit()
         except Exception:

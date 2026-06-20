@@ -29,8 +29,8 @@ def now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-def new_id(prefix: str) -> str:
-    return f"{prefix}-{uuid4().hex[:16]}"
+def new_id() -> str:
+    return str(uuid4())
 
 
 class ConcertDomainService:

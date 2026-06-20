@@ -74,7 +74,7 @@ class PaymentService:
 
             # 결제 레코드는 이벤트 payload 생성 전 DB 세션에 먼저 올린다.
             payment = Payment(
-                id=f"pay-{uuid4()}",
+                id=str(uuid4()),
                 reservation_id=request_body.reservationId,
                 concert_id=request_body.concertId,
                 user_id=user.user_id,

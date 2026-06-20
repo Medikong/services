@@ -8,7 +8,7 @@ from app.schemas.common import PageInfo
 class CreateReservationRequest(BaseModel):
     performanceId: str
     seatId: str
-    concertId: str | None = None
+    concertId: str
     showtimeId: str | None = None
 
 

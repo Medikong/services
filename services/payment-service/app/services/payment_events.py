@@ -200,7 +200,7 @@ def build_payment_event_draft(
     trace_context: TraceContext | None = None,
 ) -> PaymentEventDraft:
     """outbox 저장과 Kafka 발행에 사용할 결제 이벤트 초안을 만든다."""
-    event_id = f"evt-{uuid4()}"
+    event_id = str(uuid4())
     event_kwargs = {
         "eventId": event_id,
         "userId": str(user.user_id),

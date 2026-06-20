@@ -49,7 +49,7 @@ class ReservationCommandService(ReservationDomainService):
                     raise SeatAlreadyReservedError(request.seatId)
                 created_at = now_utc()
                 reservation = model.Reservation(
-                    id=new_id("rsv"),
+                    id=new_id(),
                     user_id=user_id,
                     concert_id=concert_id,
                     showtime_id=request.showtimeId or request.performanceId,
@@ -138,4 +138,4 @@ class ReservationQueryService(ReservationDomainService):
 
 
 def concert_id_from_request(request: schemas.CreateReservationRequest) -> str:
-    return request.concertId or f"concert-{request.performanceId}"
+    return request.concertId

@@ -65,7 +65,7 @@ class SeatService(ConcertDomainService):
                     for number in row.seatNumbers:
                         self.add(
                             model.Seat(
-                                id=f"seat-{showtime_id}-{section.name}-{row.name}-{number}".replace(" ", "-"),
+                                id=new_id(),
                                 showtime_id=showtime_id,
                                 section=section.name,
                                 row_label=row.name,
@@ -141,7 +141,7 @@ class SeatService(ConcertDomainService):
                 if seat is None or seat.showtime_id != showtime_id:
                     raise SeatNotFoundError(seat_id)
             hold = model.HoldSeatRequest(
-                id=new_id("hold"),
+                id=new_id(),
                 showtime_id=showtime_id,
                 type=request.type,
                 seat_ids=request.seatIds,

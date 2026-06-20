@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from contracts.events import PaymentApprovedEvent
 
 from app.auth import UserContext
@@ -40,6 +42,8 @@ def test_payment_approved_event_payload_matches_consumer_contract() -> None:
     )
 
     assert draft.payload["eventType"] == "payment-approved"
+    UUID(draft.event_id)
+    UUID(draft.payload["eventId"])
     assert draft.payload["userId"] == "14"
     assert draft.payload["reservationId"] == "reservation-1"
     assert draft.payload["paymentId"] == "payment-1"

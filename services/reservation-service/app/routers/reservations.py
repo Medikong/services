@@ -120,7 +120,7 @@ def _reservation_event_payload(
     http_request: Request,
 ) -> dict:
     event_kwargs = {
-        "eventId": f"evt-{uuid4()}",
+        "eventId": str(uuid4()),
         "userId": str(response.userId),
         "sourceId": source_id,
         "reservationId": response.id,

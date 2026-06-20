@@ -3,6 +3,7 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -56,11 +57,13 @@ def test_create_and_get_approved_payment() -> None:
     assert response.status_code == 201
     payment = response.json()
     assert payment["reservationId"] == "res-1"
+    UUID(payment["id"])
     assert payment["concertId"] == "concert-1"
     assert payment["status"] == "approved"
     assert payment["approvedAt"] is not None
     events = payment_events()
     assert [event.event_type for event in events] == ["payment-approved"]
+    UUID(events[0].id)
     assert events[0].publish_status == "pending"
     assert events[0].publish_attempts == 0
     assert events[0].published_at is None

@@ -1,7 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi.testclient import TestClient
@@ -37,6 +37,8 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
     expire_after_cancel = client.post(f"/reservations/{created['id']}/expire")
 
     assert created["status"] == "pending"
+    UUID(created["id"])
+    UUID(producer.sent[0][1]["eventId"])
     assert duplicate.status_code == 409
     assert listed["items"][0]["id"] == created["id"]
     assert canceled["status"] == "canceled"

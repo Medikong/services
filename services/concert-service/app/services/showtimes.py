@@ -25,7 +25,7 @@ class ShowtimeService(ConcertDomainService):
             self._concert(concert_id)
             self._venue(request.venueId)
             showtime = model.Showtime(
-                id=new_id("showtime"),
+                id=new_id(),
                 concert_id=concert_id,
                 venue_id=request.venueId,
                 starts_at=request.startsAt,
