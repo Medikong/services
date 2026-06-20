@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "6d8ac9ab-6d13-4d17-b5e9-0f0a2f0a4c04",
     "name": "04 User Booking Happy Path",
-    "description": "사용자 관점의 핵심 예매 happy path를 검증한다.\n\n검증 순서:\n1. auth-service 로그인으로 JWT를 발급받고 sub, role, email, jti를 gateway header 값으로 준비한다.\n2. concert-service provider API로 공연장, 공연 초안, 회차, 좌석맵을 만든다.\n3. concert-service public API로 사용자가 볼 수 있는 회차와 좌석을 조회하고 실제 seatId를 선택한다.\n4. reservation-service에서 판매를 시작하고 로그인 사용자 X-User-Id로 좌석 예약을 만든다.\n5. payment-service에 gateway header와 예약 정보를 넘겨 mock approve 결제를 승인한다.\n6. payment-approved Kafka 이벤트를 받은 ticket-service가 티켓을 발행했는지 /tickets/me로 확인한다.\n7. notification-service에서 reservation-created, payment-approved, ticket-issued 알림이 저장됐는지 polling으로 확인한다.\n\n범위 밖:\n- concert-service 좌석 상태가 예약 후 reserved로 바뀌는지는 검증하지 않는다.\n- QR/PDF 파일이 S3에 실제 저장되는지는 검증하지 않으며, qrUrl과 pdfUrl은 문자열 또는 null을 허용한다.",
+    "description": "사용자 관점의 핵심 예매 happy path를 검증한다.\n\n검증 순서:\n1. auth-service 로그인으로 JWT를 발급받고 sub, role, email, jti를 gateway header 값으로 준비한다.\n2. concert-service provider API로 공연장, 공연 초안, 회차, 좌석맵을 만든다.\n3. concert-service public API를 사용자가 보는 순서대로 추천 공연, 공연 상세, 달력, 날짜별 회차, 좌석도로 조회하고 실제 seatId를 선택한다.\n4. reservation-service에서 판매를 시작하고 로그인 사용자 X-User-Id로 좌석 예약을 만든다.\n5. payment-service에 gateway header와 예약 정보를 넘겨 mock approve 결제를 승인한다.\n6. payment-approved Kafka 이벤트를 받은 ticket-service가 티켓을 발행했는지 /tickets/me로 확인한다.\n7. notification-service에서 reservation-created, payment-approved, ticket-issued 알림이 저장됐는지 polling으로 확인한다.\n\n범위 밖:\n- concert-service 좌석 상태가 예약 후 reserved로 바뀌는지는 검증하지 않는다.\n- QR/PDF 파일이 S3에 실제 저장되는지는 검증하지 않으며, qrUrl과 pdfUrl은 문자열 또는 null을 허용한다.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -170,7 +170,7 @@
     },
     {
       "name": "회차 생성",
-      "description": "공연에 연결된 실제 예매 회차를 생성하고 showtimeId를 저장한다.",
+      "description": "공연에 연결된 실제 예매 회차를 생성하고 public calendar/date 조회에 쓸 날짜 변수를 저장한다.",
       "event": [
         {
           "listen": "prerequest",
@@ -178,8 +178,11 @@
             "type": "text/javascript",
             "exec": [
               "// 항상 미래 회차를 만들기 위해 현재 시각 기준 7일 뒤를 사용한다.",
-              "const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();",
-              "pm.environment.set('concertStartsAt', startsAt);"
+              "const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);",
+              "const startsAtIso = startsAt.toISOString();",
+              "pm.environment.set('concertStartsAt', startsAtIso);",
+              "pm.environment.set('concertYearMonth', startsAtIso.slice(0, 7));",
+              "pm.environment.set('concertDate', startsAtIso.slice(0, 10));"
             ]
           }
         },
@@ -247,12 +250,12 @@
       ]
     },
     {
-      "name": "공개 회차 조회",
-      "description": "사용자가 공연 상세에서 예매 가능한 회차를 조회하는 단계다.",
+      "name": "추천 공연 조회",
+      "description": "사용자가 홈에서 최신 추천 공연을 보고 방금 준비한 공연을 선택할 수 있는지 확인한다.",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{concertServiceUrl}}/concerts/{{concertId}}/performances"
+        "url": "{{concertServiceUrl}}/concerts/recommended?sort=latest&limit=10"
       },
       "event": [
         {
@@ -260,13 +263,13 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('공개 회차 목록에 생성한 회차가 포함된다', function () {",
+              "pm.test('추천 공연 목록에 생성한 공연이 포함된다', function () {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
               "  pm.expect(body.items).to.be.an('array').that.is.not.empty;",
-              "  const performance = body.items.find((item) => item.id === pm.environment.get('showtimeId'));",
-              "  pm.expect(performance, '생성한 showtimeId').to.not.equal(undefined);",
-              "  pm.expect(performance.concertId).to.eql(pm.environment.get('concertId'));",
+              "  pm.expect(body.page.limit).to.eql(10);",
+              "  const concert = body.items.find((item) => (item.concertId || item.id) === pm.environment.get('concertId'));",
+              "  pm.expect(concert, '생성한 concertId').to.not.equal(undefined);",
               "});"
             ]
           }
@@ -274,12 +277,12 @@
       ]
     },
     {
-      "name": "공개 좌석 조회",
-      "description": "실제 조회 결과에서 예약할 좌석을 고른다. 예약 후 concert-service 좌석 상태 동기화는 검증하지 않는다.",
+      "name": "공연 상세 조회",
+      "description": "추천 공연에서 선택한 공연의 상세 화면에 진입한다.",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{concertServiceUrl}}/performances/{{showtimeId}}/seats"
+        "url": "{{concertServiceUrl}}/concerts/{{concertId}}"
       },
       "event": [
         {
@@ -287,14 +290,103 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('공개 좌석 목록에서 예약할 좌석을 선택한다', function () {",
+              "pm.test('공연 상세를 조회할 수 있다', function () {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
-              "  pm.expect(body.items).to.be.an('array').with.lengthOf(2);",
-              "  const targetSeat = body.items.find((item) => item.section === 'A' && item.row === '1' && item.number === '1');",
+              "  pm.expect(body.concertId || body.id).to.eql(pm.environment.get('concertId'));",
+              "  pm.expect(body.performances).to.equal(undefined);",
+              "  pm.expect(body.seats).to.equal(undefined);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "공연 달력 조회",
+      "description": "공연 상세에서 예매 가능한 날짜를 달력으로 확인한다.",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{concertServiceUrl}}/concerts/{{concertId}}/calendar?yearMonth={{concertYearMonth}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('달력에서 생성한 회차 날짜가 예매 가능하다', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.concertId).to.eql(pm.environment.get('concertId'));",
+              "  pm.expect(body.yearMonth).to.eql(pm.environment.get('concertYearMonth'));",
+              "  pm.expect(body.days).to.be.an('array').that.is.not.empty;",
+              "  const targetDay = body.days.find((day) => day.date === pm.environment.get('concertDate'));",
+              "  pm.expect(targetDay, '생성한 concertDate').to.not.equal(undefined);",
+              "  pm.expect(targetDay.bookable).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "날짜별 회차 조회",
+      "description": "사용자가 달력에서 선택한 날짜의 회차를 확인하고 예매할 performanceId를 저장한다.",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{concertServiceUrl}}/concerts/{{concertId}}/dates/{{concertDate}}/performances"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('날짜별 회차 목록에 생성한 회차가 포함된다', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.concertId).to.eql(pm.environment.get('concertId'));",
+              "  pm.expect(body.date).to.eql(pm.environment.get('concertDate'));",
+              "  pm.expect(body.performances).to.be.an('array').that.is.not.empty;",
+              "  const performance = body.performances.find((item) => (item.performanceId || item.id) === pm.environment.get('showtimeId'));",
+              "  pm.expect(performance, '생성한 showtimeId').to.not.equal(undefined);",
+              "  pm.expect(performance.saleStatus).to.eql('ON_SALE');",
+              "  const performanceId = performance.performanceId || performance.id;",
+              "  pm.environment.set('performanceId', performanceId);",
+              "  pm.environment.set('showtimeId', performanceId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "좌석도 조회",
+      "description": "선택한 회차의 좌석도에서 사용자가 선택할 수 있는 좌석을 고른다. 예약 후 concert-service 좌석 상태 동기화는 검증하지 않는다.",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{concertServiceUrl}}/performances/{{performanceId}}/seat-map"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('좌석도에서 예약할 수 있는 좌석을 선택한다', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.performanceId || body.id).to.eql(pm.environment.get('performanceId'));",
+              "  pm.expect(body.sections).to.be.an('array').that.is.not.empty;",
+              "  pm.expect(body.seats).to.be.an('array').with.lengthOf(2);",
+              "  const targetSeat = body.seats.find((item) => (item.sectionId || item.section) === 'A' && item.row === '1' && item.number === '1');",
               "  pm.expect(targetSeat, 'A-1 좌석').to.not.equal(undefined);",
-              "  pm.expect(targetSeat.status).to.eql('available');",
-              "  pm.environment.set('seatId', targetSeat.id);",
+              "  pm.expect(String(targetSeat.status).toUpperCase()).to.eql('AVAILABLE');",
+              "  pm.environment.set('seatId', targetSeat.seatId || targetSeat.id);",
               "});"
             ]
           }
@@ -328,7 +420,7 @@
     },
     {
       "name": "예약 생성",
-      "description": "로그인 사용자 sub를 X-User-Id 문자열로 전달해 실제 조회한 concertId/showtimeId/seatId로 예약한다.",
+      "description": "로그인 사용자 sub를 X-User-Id 문자열로 전달해 실제 사용자 조회 절차에서 선택한 concertId/performanceId/seatId로 예약한다.",
       "request": {
         "method": "POST",
         "header": [
@@ -343,7 +435,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"concertId\":\"{{concertId}}\",\"showtimeId\":\"{{showtimeId}}\",\"performanceId\":\"{{showtimeId}}\",\"seatId\":\"{{seatId}}\"}"
+          "raw": "{\"concertId\":\"{{concertId}}\",\"showtimeId\":\"{{performanceId}}\",\"performanceId\":\"{{performanceId}}\",\"seatId\":\"{{seatId}}\"}"
         },
         "url": "{{reservationServiceUrl}}/reservations"
       },
@@ -358,7 +450,7 @@
               "  const body = pm.response.json();",
               "  pm.expect(body.id).to.be.a('string').that.is.not.empty;",
               "  pm.expect(body.userId).to.eql(pm.environment.get('e2eUserId'));",
-              "  pm.expect(body.performanceId).to.eql(pm.environment.get('showtimeId'));",
+              "  pm.expect(body.performanceId).to.eql(pm.environment.get('performanceId'));",
               "  pm.expect(body.seatId).to.eql(pm.environment.get('seatId'));",
               "  pm.expect(body.status).to.eql('pending');",
               "  pm.environment.set('reservationId', body.id);",
