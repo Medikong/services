@@ -53,6 +53,8 @@ class SeatMapSectionResponse(BaseModel):
     price: int = Field(ge=0)
     currency: str = "KRW"
     available: bool
+    availableCount: int = Field(default=0, ge=0)
+    totalCount: int = Field(default=0, ge=0)
 
 
 class SeatMapSeatResponse(BaseModel):
@@ -70,6 +72,9 @@ class SeatMapResponse(BaseModel):
     mapVersion: str
     sections: list[SeatMapSectionResponse]
     seats: list[SeatMapSeatResponse]
+    seatLimit: int | None = Field(default=None, ge=0)
+    seatOffset: int = Field(default=0, ge=0)
+    hasMoreSeats: bool = False
 
 
 class SeatGradeResponse(BaseModel):

@@ -59,10 +59,52 @@ def test_provider_to_public_concert_flow() -> None:
     assert next(day for day in calendar["days"] if day["date"] == f"{starts_at:%Y-%m-%d}")["bookable"] is True
     assert date_performances["performances"][0]["performanceId"] == showtime["id"]
     assert seat_map["sections"][0]["sectionId"] == "A"
+    assert seat_map["sections"][0]["availableCount"] == 2
+    assert seat_map["sections"][0]["totalCount"] == 2
     assert len(seat_map["seats"]) == 2
+    assert seat_map["seatLimit"] == 200
+    assert seat_map["seatOffset"] == 0
+    assert seat_map["hasMoreSeats"] is False
     assert_metric_labels(metrics, "concert_admin_commands_total", command="create_concert", result="success")
     assert_metric_labels(metrics, "seat_inventory_commands_total", command="upload_seat_map", result="success")
     assert_metric_labels(metrics, "catalog_queries_total", resource="concert", result="success")
+
+
+def test_seat_map_limits_seat_payload() -> None:
+    client = TestClient(create_app())
+    starts_at = datetime.now(UTC) + timedelta(days=7)
+    venue = client.post("/provider/venues", json={"name": "Limit Hall", "address": "Seoul", "totalSeats": 4}).json()
+    concert = client.post(
+        "/provider/concerts",
+        json={"title": "Limit Live", "description": "Seat payload limit test", "ageRating": "ALL", "runningMinutes": 120},
+        headers={"X-Provider-Id": "provider-api"},
+    ).json()
+    showtime = client.post(
+        f"/provider/concerts/{concert['id']}/showtimes",
+        json={"venueId": venue["id"], "startsAt": starts_at.isoformat()},
+    ).json()
+    response = client.post(
+        f"/provider/showtimes/{showtime['id']}/seat-map",
+        json={
+            "sections": [
+                {"name": "A", "rows": [{"name": "1", "seatNumbers": ["1", "2", "3"]}]},
+                {"name": "B", "rows": [{"name": "1", "seatNumbers": ["1"]}]},
+            ]
+        },
+    )
+    assert response.status_code == 204
+
+    first_page = client.get(f"/performances/{showtime['id']}/seat-map?limit=2").json()
+    second_page = client.get(f"/performances/{showtime['id']}/seat-map?limit=2&offset=2").json()
+    section_page = client.get(f"/performances/{showtime['id']}/seat-map?sectionId=B").json()
+
+    assert [(item["sectionId"], item["totalCount"]) for item in first_page["sections"]] == [("A", 3), ("B", 1)]
+    assert [seat["number"] for seat in first_page["seats"]] == ["1", "2"]
+    assert first_page["hasMoreSeats"] is True
+    assert [seat["number"] for seat in second_page["seats"]] == ["3", "1"]
+    assert second_page["hasMoreSeats"] is False
+    assert [seat["sectionId"] for seat in section_page["seats"]] == ["B"]
+    assert section_page["hasMoreSeats"] is False
 
 
 def test_recommended_concerts_clamps_limit() -> None:

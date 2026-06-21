@@ -72,5 +72,8 @@ def list_performance_seats(
 def get_performance_seat_map(
     id: str,
     concerts: Annotated[SeatService, Depends(seat_service)],
+    limit: int = Query(default=200, ge=0, le=500),
+    offset: int = Query(default=0, ge=0),
+    sectionId: str | None = None,
 ) -> schemas.SeatMapResponse:
-    return concerts.get_seat_map(id)
+    return concerts.get_seat_map(id, limit=limit, offset=offset, section_id=sectionId)

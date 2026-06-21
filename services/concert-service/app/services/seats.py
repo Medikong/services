@@ -7,16 +7,19 @@ from app.exceptions import (
     SeatGradeAlreadyExistsError,
     SeatMapContainsDuplicateSeatsError,
     SeatNotFoundError,
+    ShowtimeNotFoundError,
 )
 from app.metrics.events import SeatInventoryCommandRecorded
 from app.metrics.labels import CatalogResource, SeatInventoryCommand
 from app.metrics.recorder import ConcertTelemetryRecorder
 from app.services.base import ConcertDomainService, new_id
-from app.services.serializers import hold_request_response, page, seat_grade_response, seat_map_response, seat_response
+from app.services.serializers import hold_request_response, page, seat_grade_response, seat_map_status, seat_response
 
 
 concert_metrics = ConcertTelemetryRecorder()
 SEAT_LIST_MAX_LIMIT = 500
+SEAT_MAP_DEFAULT_LIMIT = 200
+SEAT_MAP_MAX_LIMIT = 500
 
 
 class SeatService(ConcertDomainService):
@@ -39,12 +42,17 @@ class SeatService(ConcertDomainService):
         finally:
             attempt.record()
 
-    def get_seat_map(self, showtime_id: str) -> schemas.SeatMapResponse:
+    def get_seat_map(
+        self,
+        showtime_id: str,
+        limit: int = SEAT_MAP_DEFAULT_LIMIT,
+        offset: int = 0,
+        section_id: str | None = None,
+    ) -> schemas.SeatMapResponse:
         """선택한 performance의 좌석도와 현재 좌석 상태를 반환한다."""
         attempt = concert_metrics.start_catalog_query(CatalogResource.SEATS)
         try:
-            showtime = self._showtime(showtime_id)
-            response = seat_map_response(showtime)
+            response = self._seat_map_response(showtime_id, min(limit, SEAT_MAP_MAX_LIMIT), offset, section_id)
             attempt.mark_success()
             return response
         except HttpError as exc:
@@ -54,6 +62,62 @@ class SeatService(ConcertDomainService):
             raise
         finally:
             attempt.record()
+
+    def _seat_map_response(self, showtime_id: str, limit: int, offset: int, section_id: str | None) -> schemas.SeatMapResponse:
+        showtime = self.showtimes.get_seat_map_showtime(showtime_id)
+        if showtime is None:
+            raise ShowtimeNotFoundError(showtime_id)
+
+        grades = self.showtimes.list_seat_map_grades(showtime_id)
+        grades_by_name = {grade.name: grade for grade in grades}
+        fallback_grade = grades[0] if grades else None
+        section_rows = self.showtimes.list_seat_map_sections(showtime_id)
+        selected_total = 0
+        sections: list[schemas.SeatMapSectionResponse] = []
+        for section in section_rows:
+            if section_id is None or section.section == section_id:
+                selected_total += section.total_count
+            grade = grades_by_name.get(section.section, fallback_grade)
+            grade_code = grade.name if grade is not None else "GENERAL"
+            price = grade.price if grade is not None else 0
+            sections.append(
+                schemas.SeatMapSectionResponse(
+                    sectionId=section.section,
+                    name=section.section,
+                    gradeCode=grade_code,
+                    price=price,
+                    currency="KRW",
+                    available=section.available_count > 0,
+                    availableCount=section.available_count,
+                    totalCount=section.total_count,
+                )
+            )
+
+        seat_rows = self.showtimes.list_seat_map_seats(showtime_id, limit, offset, section_id)
+        seats = []
+        for seat in seat_rows:
+            grade = grades_by_name.get(seat.section, fallback_grade)
+            seats.append(
+                schemas.SeatMapSeatResponse(
+                    seatId=seat.id,
+                    sectionId=seat.section,
+                    row=seat.row_label,
+                    number=seat.number,
+                    gradeCode=grade.name if grade is not None else "GENERAL",
+                    status=seat_map_status(seat.status),
+                )
+            )
+
+        return schemas.SeatMapResponse(
+            performanceId=showtime.id,
+            venue=schemas.SeatMapVenueResponse(venueId=showtime.venue_id, name=showtime.venue_name),
+            mapVersion=showtime.starts_at.isoformat(),
+            sections=sections,
+            seats=seats,
+            seatLimit=limit,
+            seatOffset=offset,
+            hasMoreSeats=offset + len(seats) < selected_total,
+        )
 
     def upload_seat_map(self, showtime_id: str, request: schemas.SeatMapRequest) -> None:
         """좌석 맵 업로드 command 결과를 metric으로 남긴다."""
