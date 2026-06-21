@@ -13,7 +13,7 @@ class TicketIssueRequest(BaseModel):
 class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: str
     reservationId: str
     userId: str
     concertId: str

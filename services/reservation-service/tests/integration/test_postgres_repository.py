@@ -1,13 +1,14 @@
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from itertools import count
 
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+from server.ids import deterministic_uuid_string
 
 from app import entities as model
 from app import schemas
@@ -16,6 +17,17 @@ from app.exceptions import SeatAlreadyReservedError
 from app.repositories import ReservationRepository
 from app.services import ReservationCommandService
 from app.services.serializers import active_seat_key
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("reservation-postgres-test", *parts)
+
+
+_suffixes = count(1)
+
+
+def suffix_id(prefix: str = "pg") -> str:
+    return f"{prefix}-{next(_suffixes):04d}"
 
 
 @pytest.fixture(scope="module")
@@ -47,18 +59,18 @@ def db_session(postgres_engine: Engine) -> Iterator[Session]:
         Base.metadata.drop_all(postgres_engine)
 
 
-def _request(suffix: str, seat_id: str = "A-1") -> schemas.CreateReservationRequest:
+def _request(suffix: str, seat_id: str | None = None) -> schemas.CreateReservationRequest:
     return schemas.CreateReservationRequest(
-        concertId=f"concert-{suffix}",
-        showtimeId=f"showtime-{suffix}",
-        performanceId=f"perf-{suffix}",
-        seatId=seat_id,
+        concertId=uuid_id("concert", suffix),
+        showtimeId=uuid_id("showtime", suffix),
+        performanceId=uuid_id("performance", suffix),
+        seatId=seat_id or uuid_id("seat", suffix),
     )
 
 
 def test_postgres_active_reservation_query_and_conflict(db_session: Session) -> None:
     """Postgres에서 활성 예약 조회와 중복 좌석 예약 충돌 처리를 검증한다."""
-    suffix = uuid4().hex[:8]
+    suffix = suffix_id()
     request = _request(suffix)
     service = ReservationCommandService(db_session)
     created = service.create_reservation("user-pg-1", request)
@@ -73,32 +85,34 @@ def test_postgres_active_reservation_query_and_conflict(db_session: Session) -> 
 
 def test_postgres_unique_active_seat_key_constraint(db_session: Session) -> None:
     """같은 활성 좌석 키가 두 번 저장될 때 DB 유니크 제약이 막는지 검증한다."""
-    suffix = uuid4().hex[:8]
-    key = active_seat_key(f"perf-{suffix}", "A-1")
+    suffix = suffix_id()
+    performance_id = uuid_id("performance", suffix)
+    seat_id = uuid_id("seat", suffix)
+    key = active_seat_key(performance_id, seat_id)
     expires_at = datetime.now(UTC) + timedelta(minutes=5)
     created_at = datetime.now(UTC)
 
     db_session.add_all(
         [
             model.Reservation(
-                id=f"rsv-{suffix}-1",
+                id=uuid_id("reservation", suffix, 1),
                 user_id="user-1",
-                concert_id=f"concert-{suffix}",
-                showtime_id=f"showtime-{suffix}",
-                performance_id=f"perf-{suffix}",
-                seat_id="A-1",
+                concert_id=uuid_id("concert", suffix),
+                showtime_id=uuid_id("showtime", suffix),
+                performance_id=performance_id,
+                seat_id=seat_id,
                 status="pending",
                 active_seat_key=key,
                 expires_at=expires_at,
                 created_at=created_at,
             ),
             model.Reservation(
-                id=f"rsv-{suffix}-2",
+                id=uuid_id("reservation", suffix, 2),
                 user_id="user-2",
-                concert_id=f"concert-{suffix}",
-                showtime_id=f"showtime-{suffix}",
-                performance_id=f"perf-{suffix}",
-                seat_id="A-1",
+                concert_id=uuid_id("concert", suffix),
+                showtime_id=uuid_id("showtime", suffix),
+                performance_id=performance_id,
+                seat_id=seat_id,
                 status="pending",
                 active_seat_key=key,
                 expires_at=expires_at,
@@ -111,14 +125,14 @@ def test_postgres_unique_active_seat_key_constraint(db_session: Session) -> None
         db_session.commit()
     db_session.rollback()
 
-    assert ReservationRepository(db_session).find_active_reservation(f"perf-{suffix}", "A-1") is None
+    assert ReservationRepository(db_session).find_active_reservation(performance_id, seat_id) is None
 
 
 def test_postgres_allows_re_reservation_after_cancel_or_expire(db_session: Session) -> None:
     """취소 또는 만료된 예약의 좌석을 다시 예약할 수 있는지 검증한다."""
     service = ReservationCommandService(db_session)
-    cancel_request = _request(f"cancel-{uuid4().hex[:8]}")
-    expire_request = _request(f"expire-{uuid4().hex[:8]}")
+    cancel_request = _request(suffix_id("cancel"))
+    expire_request = _request(suffix_id("expire"))
 
     canceled = service.cancel_reservation(service.create_reservation("user-cancel-1", cancel_request).id)
     after_cancel = service.create_reservation("user-cancel-2", cancel_request)
@@ -133,7 +147,7 @@ def test_postgres_allows_re_reservation_after_cancel_or_expire(db_session: Sessi
 
 def test_postgres_concurrent_reservations_allow_only_one_active_hold(db_session: Session) -> None:
     """동시에 같은 좌석을 예약해도 활성 예약은 하나만 남는지 검증한다."""
-    suffix = uuid4().hex[:8]
+    suffix = suffix_id()
     request = _request(f"concurrent-{suffix}")
     session_factory = sessionmaker(bind=db_session.get_bind())
     attempts = 12

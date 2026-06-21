@@ -111,7 +111,7 @@ class SeatService(ConcertDomainService):
             items: list[model.SeatGrade] = []
             for grade in request.grades:
                 entity = model.SeatGrade(
-                    id=grade.id,
+                    id=new_id(),
                     showtime_id=showtime_id,
                     name=grade.name,
                     price=grade.price,

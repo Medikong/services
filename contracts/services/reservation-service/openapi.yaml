@@ -60,11 +60,11 @@ components:
         performanceId:
           type: string
           examples:
-            - perf-20260528-001
+            - 018f3f74-8f2a-7000-8000-000000000501
         seatId:
           type: string
           examples:
-            - seat-A-01
+            - 018f3f74-8f2a-7000-8000-000000000601
     Reservation:
       type: object
       required:
@@ -79,7 +79,7 @@ components:
         id:
           type: string
           examples:
-            - rsv-01HV6W8ZK2J2J9N9S4V7T3F0CA
+            - 018f3f74-8f2a-7000-8000-000000000701
         userId:
           type: string
           examples:
@@ -87,11 +87,11 @@ components:
         performanceId:
           type: string
           examples:
-            - perf-20260528-001
+            - 018f3f74-8f2a-7000-8000-000000000501
         seatId:
           type: string
           examples:
-            - seat-A-01
+            - 018f3f74-8f2a-7000-8000-000000000601
         status:
           type: string
           enum:

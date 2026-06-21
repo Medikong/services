@@ -20,6 +20,9 @@ from kafka_utils import (
 from kafka_utils import producer as producer_module
 
 
+EVENT_ID = "6c98a5ce-8913-5597-9ad7-c617f71f0be3"
+
+
 def test_create_kafka_producer_returns_none_without_kafka_config() -> None:
     producer = create_kafka_producer("")
 
@@ -44,7 +47,9 @@ def test_create_kafka_producer_configures_aiokafka_producer() -> None:
     assert producer.raw_producer is producers[0]
     assert producers[0].kwargs["bootstrap_servers"] == "kafka:9092"
     assert producers[0].kwargs["client_id"] == "reservation-service"
-    assert producers[0].kwargs["value_serializer"]({"eventId": "evt-1", "count": 1}) == b'{"eventId":"evt-1","count":1}'
+    assert producers[0].kwargs["value_serializer"]({"eventId": EVENT_ID, "count": 1}) == (
+        b'{"eventId":"6c98a5ce-8913-5597-9ad7-c617f71f0be3","count":1}'
+    )
 
 
 def test_create_kafka_producer_omits_empty_client_id() -> None:
@@ -214,7 +219,7 @@ def test_trace_aware_producer_send_and_wait_extracts_stored_parent_and_injects_p
     result = run_async(
         TraceAwareKafkaProducer(raw_producer).send_and_wait(
             "payment-approved",
-            {"eventId": "evt-1"},
+            {"eventId": EVENT_ID},
             with_trace_context(
                 {
                     "carrier": {
@@ -242,7 +247,7 @@ def test_trace_aware_producer_send_and_wait_extracts_stored_parent_and_injects_p
     assert raw_producer.sent == [
         {
             "topic": "payment-approved",
-            "value": {"eventId": "evt-1"},
+            "value": {"eventId": EVENT_ID},
             "key": None,
             "partition": None,
             "timestamp_ms": None,
@@ -267,7 +272,7 @@ def test_trace_aware_producer_merges_headers_with_wrapper_trace_priority(monkeyp
     run_async(
         TraceAwareKafkaProducer(raw_producer).send_and_wait(
             "payment-approved",
-            {"eventId": "evt-1"},
+            {"eventId": EVENT_ID},
             with_correlation_id("wrapper-correlation"),
             headers=[
                 ("traceparent", b"caller-trace"),
@@ -290,7 +295,7 @@ def test_trace_aware_producer_send_and_wait_failure_is_not_swallowed(monkeypatch
     monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
 
     with pytest.raises(RuntimeError, match="kafka publish failed"):
-        run_async(TraceAwareKafkaProducer(raw_producer).send_and_wait("payment-approved", {"eventId": "evt-1"}))
+        run_async(TraceAwareKafkaProducer(raw_producer).send_and_wait("payment-approved", {"eventId": EVENT_ID}))
 
     span = started[0]["span"]
     assert span.recorded_exceptions == ["kafka publish failed"]

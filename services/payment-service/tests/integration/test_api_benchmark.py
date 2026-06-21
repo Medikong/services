@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.orm import Session, sessionmaker
+from server.ids import deterministic_uuid_string
 
 SERVICE_REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(SERVICE_REPO_ROOT))
@@ -30,6 +31,10 @@ from app.routes.payments import router as payment_router
 
 
 SERVICE_NAME = "payment-service"
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string(SERVICE_NAME, *parts)
 
 
 @dataclass(frozen=True)
@@ -132,13 +137,13 @@ def _benchmark_app(factory: sessionmaker[Session]) -> FastAPI:
 def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
     tables = config.preset.service_tables(SERVICE_NAME)
     now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
-    concert_id = "concert-payment-bench-0000"
+    concert_id = uuid_id("concert", "bench", 0)
     customer_id = user_id_for(SERVICE_NAME, "normal")
     for rows in chunked(_payment_rows(config, now, customer_id, concert_id)):
         session.execute(insert(Payment), rows)
     for rows in chunked(_payment_event_rows(tables["payment_events"], now)):
         session.execute(insert(PaymentEvent), rows)
-    return SeedTargets(payment_id="pay-bench-000000", customer_id=customer_id, concert_id=concert_id)
+    return SeedTargets(payment_id=uuid_id("payment", "bench", 0), customer_id=customer_id, concert_id=concert_id)
 
 
 def _payment_rows(
@@ -152,9 +157,9 @@ def _payment_rows(
     for index in range(total):
         status = status_for_index(index, counts)
         yield {
-            "id": f"pay-bench-{index:06d}",
-            "reservation_id": f"reservation-bench-{index:06d}",
-            "concert_id": concert_id if index % 7 == 0 else f"concert-payment-{index % config.preset.catalog['concerts']:04d}",
+            "id": uuid_id("payment", "bench", index),
+            "reservation_id": uuid_id("reservation", "bench", index),
+            "concert_id": concert_id if index % 7 == 0 else uuid_id("concert", "payment", index % config.preset.catalog["concerts"]),
             "user_id": customer_id if index == 0 else _payment_user_id(index, total, config),
             "amount": 50000 + (index % 10000),
             "method": "mock",
@@ -168,16 +173,17 @@ def _payment_rows(
 def _payment_event_rows(total: int, now: datetime) -> Iterator[dict[str, Any]]:
     for index in range(total):
         status = "approved" if index % 13 else "failed"
-        payment_id = f"pay-bench-{index:06d}"
+        payment_id = uuid_id("payment", "bench", index)
+        event_id = uuid_id("payment-event", "bench", index)
         yield {
-            "id": f"evt-payment-{index:06d}",
+            "id": event_id,
             "event_type": f"payment.{status}",
             "payment_id": payment_id,
             "payload": {
-                "eventId": f"evt-payment-{index:06d}",
+                "eventId": event_id,
                 "paymentId": payment_id,
-                "reservationId": f"reservation-bench-{index:06d}",
-                "concertId": f"concert-payment-{index % 270:04d}",
+                "reservationId": uuid_id("reservation", "bench", index),
+                "concertId": uuid_id("concert", "payment", index % 270),
                 "sourceId": payment_id,
             },
             "trace_context": None,
@@ -208,7 +214,7 @@ def _benchmark_endpoints(targets: SeedTargets) -> list[EndpointCase]:
             path=lambda _: "/payments",
             status=201,
             json_body=lambda index: {
-                "reservationId": f"reservation-create-{index:06d}",
+                "reservationId": uuid_id("reservation", "create", index),
                 "concertId": targets.concert_id,
                 "seatId": f"A-{index:06d}",
                 "amount": 50000,

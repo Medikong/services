@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from server.ids import native_uuid
 
 from app.database import Base
 
@@ -11,7 +12,7 @@ class Concert(Base):
     __tablename__ = "concerts"
     __table_args__ = (Index("ix_concerts_created_at_id", "created_at", "id"),)
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id: Mapped[str] = mapped_column(native_uuid(), primary_key=True)
     provider_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)

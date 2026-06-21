@@ -6,6 +6,9 @@ vars:
   TEST_RUNNER_DOCKERFILE: '{{default "tests/docker/Dockerfile" .TEST_RUNNER_DOCKERFILE}}'
   PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
   TEST_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
+  API_BENCHMARK_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
+  API_BENCHMARK_REPORT_ROOT: '{{default "tests/tmp/reports/api-integration" .API_BENCHMARK_REPORT_ROOT}}'
+  API_BENCHMARK_DOC_DIR: '{{default "../workspace/docs/evidence/services/api-integration-test-benchmark/half-year-early-growth" .API_BENCHMARK_DOC_DIR}}'
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
   PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
@@ -214,6 +217,233 @@ tasks:
       - task: test-services
         vars:
           SERVICES: '{{.TEST_SERVICES}}'
+
+  benchmark-concert-public-api:
+    cmds:
+      - task: test-runner-build
+        vars:
+          SERVICE: concert-service
+      - |
+        set -eu
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        image='{{.TEST_RUNNER_IMAGE_PREFIX}}-concert-service:local'
+        service_head="$(git -C "${repo_root}" rev-parse --short HEAD)"
+        service_dirty=false
+        if [ -n "$(git -C "${repo_root}" status --short)" ]; then
+          service_dirty=true
+        fi
+        docker run --rm \
+          -e SERVICE_GIT_HEAD="${service_head}" \
+          -e SERVICE_GIT_DIRTY="${service_dirty}" \
+          -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+          -v "${repo_root}":/workspace \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -w /workspace/services/concert-service \
+          "${image}" \
+          sh -c "PYTHONPATH=. /opt/test-env/bin/python -m pytest {{.PYTEST_ARGS}} --run-public-api-benchmark --public-benchmark-concerts={{default "1000" .CONCERTS}} --public-benchmark-showtimes-per-concert={{default "4" .SHOWTIMES_PER_CONCERT}} --public-benchmark-seats-per-showtime={{default "100" .SEATS_PER_SHOWTIME}} --public-benchmark-samples={{default "50" .SAMPLES}} --public-benchmark-warmup={{default "5" .WARMUP}} tests/integration/test_public_api_benchmark.py"
+
+  benchmark-api-smoke:
+    cmds:
+      - |
+        set -eu
+        for service in {{.API_BENCHMARK_SERVICES}}; do
+          task --dir "{{.ROOT_DIR}}/tests" benchmark-api-smoke-service SERVICE="${service}" PRESET='{{default "smoke" .PRESET}}' SAMPLES='{{default "5" .SAMPLES}}' WARMUP='{{default "1" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
+        done
+
+  benchmark-api-smoke-service:
+    cmds:
+      - task: benchmark-api-service
+        vars:
+          SERVICE: '{{default "" .SERVICE}}'
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-large:
+    cmds:
+      - |
+        set -eu
+        for service in {{.API_BENCHMARK_SERVICES}}; do
+          task --dir "{{.ROOT_DIR}}/tests" benchmark-api-large-service SERVICE="${service}" PRESET='{{default "half-year-early-growth" .PRESET}}' SAMPLES='{{default "100" .SAMPLES}}' WARMUP='{{default "2" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
+        done
+
+  benchmark-api-large-service:
+    cmds:
+      - task: benchmark-api-service
+        vars:
+          SERVICE: '{{default "" .SERVICE}}'
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-service:
+    internal: true
+    cmds:
+      - |
+        set -eu
+        requested='{{default "" .SERVICE}}'
+        preset='{{default "smoke" .PRESET}}'
+        samples='{{default "5" .SAMPLES}}'
+        warmup='{{default "1" .WARMUP}}'
+        normalize_service() {
+          case "$1" in
+            auth|auth-service) printf '%s\n' 'auth-service' ;;
+            concert|concert-service) printf '%s\n' 'concert-service' ;;
+            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
+            payment|payment-service) printf '%s\n' 'payment-service' ;;
+            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
+            notification|notification-service) printf '%s\n' 'notification-service' ;;
+            *) return 1 ;;
+          esac
+        }
+        if [ -z "${requested}" ]; then
+          printf '%s\n' 'SERVICE is required, for example: task benchmark-api-smoke-service SERVICE=reservation-service PRESET=smoke' >&2
+          exit 2
+        fi
+        if ! service="$(normalize_service "${requested}")"; then
+          printf 'Unknown SERVICE=%s (expected one of: {{.API_BENCHMARK_SERVICES}}).\n' "${requested}" >&2
+          exit 2
+        fi
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        key="${service%-service}"
+        flag="--run-${key}-api-benchmark"
+        artifact_dir="${repo_root}/{{.API_BENCHMARK_REPORT_ROOT}}/${service}/${preset}"
+        rm -rf "${artifact_dir}"
+        mkdir -p "${artifact_dir}"
+        (
+          cd "${repo_root}/services/${service}"
+          uv run --group test pytest {{.PYTEST_ARGS}} \
+            "${flag}" \
+            "--${key}-benchmark-preset=${preset}" \
+            "--${key}-benchmark-samples=${samples}" \
+            "--${key}-benchmark-warmup=${warmup}" \
+            "--${key}-benchmark-artifact-dir=${artifact_dir}" \
+            tests/integration/test_api_benchmark.py
+        )
+        if [ ! -s "${artifact_dir}/latest.json" ]; then
+          printf 'Benchmark artifact was not created for service=%s preset=%s. Docker/testcontainers may be unavailable or the benchmark was skipped.\n' "${service}" "${preset}" >&2
+          exit 3
+        fi
+        printf 'wrote %s/latest.json\n' "${artifact_dir}"
+
+  benchmark-api-smoke-auth:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: auth-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-smoke-concert:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: concert-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-smoke-reservation:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: reservation-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-smoke-payment:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: payment-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-smoke-ticket:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: ticket-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-smoke-notification:
+    cmds:
+      - task: benchmark-api-smoke-service
+        vars:
+          SERVICE: notification-service
+          PRESET: '{{default "smoke" .PRESET}}'
+          SAMPLES: '{{default "5" .SAMPLES}}'
+          WARMUP: '{{default "1" .WARMUP}}'
+
+  benchmark-api-large-reservation:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: reservation-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-large-payment:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: payment-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-large-ticket:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: ticket-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-large-notification:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: notification-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-large-auth:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: auth-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-large-concert:
+    cmds:
+      - task: benchmark-api-large-service
+        vars:
+          SERVICE: concert-service
+          PRESET: '{{default "half-year-early-growth" .PRESET}}'
+          SAMPLES: '{{default "100" .SAMPLES}}'
+          WARMUP: '{{default "2" .WARMUP}}'
+
+  benchmark-api-report:
+    cmds:
+      - |
+        set -eu
+        service='{{default "all" .SERVICE}}'
+        cd "{{.ROOT_DIR}}"
+        uv run python tests/scripts/api_benchmark_report.py \
+          --reports-root '{{.API_BENCHMARK_REPORT_ROOT}}' \
+          --output-dir '{{.API_BENCHMARK_DOC_DIR}}' \
+          --service "${service}"
 
   test-e2e:
     desc: Run Docker Compose service E2E tests. Optionally set SCENARIO=<scenario-name>.

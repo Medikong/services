@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import JSON, DateTime, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
+from server.ids import native_uuid
 
 from app.database import Base
 
@@ -13,9 +14,9 @@ class Payment(Base):
         Index("ix_payments_concert_status", "concert_id", "status"),
     )
 
-    id: Mapped[str] = mapped_column(String(80), primary_key=True)
-    reservation_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
-    concert_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    id: Mapped[str] = mapped_column(native_uuid(), primary_key=True)
+    reservation_id: Mapped[str] = mapped_column(native_uuid(), index=True, nullable=False)
+    concert_id: Mapped[str] = mapped_column(native_uuid(), nullable=False)
     user_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     method: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -44,9 +45,9 @@ class Payment(Base):
 class PaymentEvent(Base):
     __tablename__ = "payment_events"
 
-    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    id: Mapped[str] = mapped_column(native_uuid(), primary_key=True)
     event_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
-    payment_id: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    payment_id: Mapped[str] = mapped_column(native_uuid(), index=True, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     trace_context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     publish_status: Mapped[str] = mapped_column(String(20), index=True, nullable=False, default="pending")

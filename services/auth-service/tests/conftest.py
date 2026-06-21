@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
 
 
 os.environ.setdefault("SERVICE_VERSION", "test-version")
 os.environ.setdefault("SERVICE_ENVIRONMENT", "test")
+Path("test_auth_service.db").unlink(missing_ok=True)
+os.environ["DATABASE_URL"] = "sqlite:///./test_auth_service.db"
 
 
 def pytest_addoption(parser):

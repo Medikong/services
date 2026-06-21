@@ -1,6 +1,6 @@
 from collections.abc import Iterator
+from itertools import count
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,6 +12,13 @@ from app.database import Base
 from app.exceptions import SeatGradeAlreadyExistsError, SeatMapContainsDuplicateSeatsError
 from app.repositories import ConcertReviewRepository, SeatRepository, ShowtimeRepository
 from app.services import ConcertCatalogService, ConcertReviewService, SeatService, ShowtimeService, VenueService
+
+
+_suffixes = count(1)
+
+
+def _suffix() -> str:
+    return f"pg-{next(_suffixes):04d}"
 
 
 @pytest.fixture(scope="module")
@@ -56,7 +63,7 @@ def _create_showtime(session: Session, suffix: str, starts_at: datetime | None =
 
 
 def test_postgres_enforces_unique_seat_grade_name(db_session: Session) -> None:
-    showtime = _create_showtime(db_session, uuid4().hex[:8])
+    showtime = _create_showtime(db_session, _suffix())
     service = SeatService(db_session)
 
     service.create_seat_grades(
@@ -72,7 +79,7 @@ def test_postgres_enforces_unique_seat_grade_name(db_session: Session) -> None:
 
 
 def test_postgres_rolls_back_duplicate_seat_map_locations(db_session: Session) -> None:
-    showtime = _create_showtime(db_session, uuid4().hex[:8])
+    showtime = _create_showtime(db_session, _suffix())
     request = schemas.SeatMapRequest(
         sections=[schemas.SeatSectionRequest(name="A", rows=[schemas.SeatRowRequest(name="1", seatNumbers=["1", "1"])])]
     )
@@ -84,7 +91,7 @@ def test_postgres_rolls_back_duplicate_seat_map_locations(db_session: Session) -
 
 
 def test_postgres_persists_review_request_query_and_status(db_session: Session) -> None:
-    suffix = uuid4().hex[:8]
+    suffix = _suffix()
     concert = ConcertCatalogService(db_session).create_concert(
         f"provider-review-{suffix}",
         schemas.ConcertDraftCreateRequest(title=f"Review Live {suffix}", ageRating="ALL", runningMinutes=70),
@@ -105,7 +112,7 @@ def test_postgres_persists_review_request_query_and_status(db_session: Session) 
 
 def test_postgres_catalog_read_models_match_new_public_api(db_session: Session) -> None:
     starts_at = datetime(2026, 7, 18, 14, 0, tzinfo=UTC)
-    showtime = _create_showtime(db_session, uuid4().hex[:8], starts_at=starts_at)
+    showtime = _create_showtime(db_session, _suffix(), starts_at=starts_at)
     SeatService(db_session).upload_seat_map(
         showtime.id,
         schemas.SeatMapRequest(
@@ -133,7 +140,7 @@ def test_postgres_calendar_bookable_dates_use_sellable_seat_exists(db_session: S
     sellable_starts_at = datetime(2026, 7, 18, 14, 0, tzinfo=UTC)
     blocked_starts_at = datetime(2026, 7, 19, 14, 0, tzinfo=UTC)
     closed_starts_at = datetime(2026, 7, 20, 14, 0, tzinfo=UTC)
-    suffix = uuid4().hex[:8]
+    suffix = _suffix()
     venue = VenueService(db_session).create_venue(schemas.VenueCreateRequest(name=f"Calendar Hall {suffix}"))
     concert = ConcertCatalogService(db_session).create_concert(
         f"provider-calendar-{suffix}",
@@ -169,10 +176,11 @@ def test_postgres_calendar_bookable_dates_use_sellable_seat_exists(db_session: S
             sections=[schemas.SeatSectionRequest(name="A", rows=[schemas.SeatRowRequest(name="1", seatNumbers=["1"])])]
         ),
     )
+    blocked_seat = next(iter(SeatRepository(db_session).list_seats(blocked_showtime.id, limit=1)))
     SeatService(db_session).update_seat_inventory(
         blocked_showtime.id,
         schemas.SeatInventoryUpdateRequest(
-            seats=[schemas.SeatInventoryItem(seatId=f"seat-{blocked_showtime.id}-A-1-1", status="blocked")]
+            seats=[schemas.SeatInventoryItem(seatId=blocked_seat.id, status="blocked")]
         ),
     )
     closed_showtime_entity = ShowtimeRepository(db_session).get_showtime(closed_showtime.id)

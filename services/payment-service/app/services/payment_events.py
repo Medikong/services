@@ -4,13 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import assert_never
-from uuid import uuid4
 
 from aiokafka.errors import KafkaError
 from contracts.events import PaymentApprovedEvent, PaymentFailedEvent
 from kafka_utils import with_correlation_id, with_span_attributes, with_trace_context
 from metrics import MetricResult
 from observability import TraceContext, set_current_span_attributes, start_trace_span
+from server.ids import new_uuid_v7_string
 from sqlalchemy.orm import Session
 
 from app.auth import UserContext
@@ -200,7 +200,7 @@ def build_payment_event_draft(
     trace_context: TraceContext | None = None,
 ) -> PaymentEventDraft:
     """outbox 저장과 Kafka 발행에 사용할 결제 이벤트 초안을 만든다."""
-    event_id = str(uuid4())
+    event_id = new_uuid_v7_string()
     event_kwargs = {
         "eventId": event_id,
         "userId": str(user.user_id),

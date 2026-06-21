@@ -4,11 +4,16 @@ from contextlib import contextmanager
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
+from server.ids import deterministic_uuid_string
 
 from app.consumers import kafka_consumer as kafka_consumer_module
 from app import main as app_main
 from app.config import Settings
 from app.main import create_app
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("reservation-app-test", *parts)
 
 
 def test_create_app_returns_fastapi_app() -> None:
@@ -160,6 +165,7 @@ def test_ticket_issued_consumer_passes_trace_headers_to_consumer_span(monkeypatc
     ]
     observed_headers: list[list[tuple[str, bytes]]] = []
     confirmed_reservations: list[str] = []
+    reservation_id = uuid_id("reservation", "trace")
 
     @contextmanager
     def fake_start_consumer_span(message: FakeMessage):
@@ -180,7 +186,7 @@ def test_ticket_issued_consumer_passes_trace_headers_to_consumer_span(monkeypatc
             messages=[
                 FakeMessage(
                     "ticket-issued",
-                    {"eventType": "ticket-issued", "reservationId": "rsv-trace"},
+                    {"eventType": "ticket-issued", "reservationId": reservation_id},
                     headers=trace_headers,
                 )
             ],
@@ -204,7 +210,7 @@ def test_ticket_issued_consumer_passes_trace_headers_to_consumer_span(monkeypatc
     )
 
     assert observed_headers == [trace_headers]
-    assert confirmed_reservations == ["rsv-trace"]
+    assert confirmed_reservations == [reservation_id]
 
 
 class FakeMessage:

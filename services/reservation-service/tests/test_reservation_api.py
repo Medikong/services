@@ -1,14 +1,19 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi.testclient import TestClient
 from kafka_utils import KafkaProducerOption
+from server.ids import deterministic_uuid_string
 
 from app.kafka import get_kafka_producer
 from app.main import create_app
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("reservation-api-test", *parts)
 
 
 def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
@@ -17,19 +22,19 @@ def test_reservation_create_list_cancel_and_expire_conflict_flow() -> None:
     app = create_app()
     app.dependency_overrides[get_kafka_producer] = lambda: producer
     client = TestClient(app)
-    suffix = uuid4().hex[:8]
-    concert_id = f"concert-api-flow-{suffix}"
-    showtime_id = f"showtime-api-flow-{suffix}"
-    performance_id = f"perf-api-flow-{suffix}"
+    concert_id = uuid_id("concert", "api-flow")
+    showtime_id = uuid_id("showtime", "api-flow")
+    performance_id = uuid_id("performance", "api-flow")
+    seat_id = uuid_id("seat", "api-flow")
 
     created = client.post(
         "/reservations",
-        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": "A-1"},
+        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": seat_id},
         headers={"X-User-Id": "user-api"},
     ).json()
     duplicate = client.post(
         "/reservations",
-        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": "A-1"},
+        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": seat_id},
         headers={"X-User-Id": "user-api"},
     )
     listed = client.get("/reservations/me", headers={"X-User-Id": "user-api"}).json()
@@ -56,12 +61,11 @@ def test_duplicate_seat_conflict_logs_domain_rejection_without_exception_event(c
     app = create_app()
     app.dependency_overrides[get_kafka_producer] = lambda: producer
     client = TestClient(app)
-    suffix = uuid4().hex[:8]
     payload = {
-        "concertId": f"concert-observation-{suffix}",
-        "showtimeId": f"showtime-observation-{suffix}",
-        "performanceId": f"perf-observation-{suffix}",
-        "seatId": "A-1",
+        "concertId": uuid_id("concert", "observation"),
+        "showtimeId": uuid_id("showtime", "observation"),
+        "performanceId": uuid_id("performance", "observation"),
+        "seatId": uuid_id("seat", "observation"),
     }
     caplog.set_level(logging.INFO)
 
@@ -97,15 +101,13 @@ def test_reservation_expire_publishes_event() -> None:
     app = create_app()
     app.dependency_overrides[get_kafka_producer] = lambda: producer
     client = TestClient(app)
-    suffix = uuid4().hex[:8]
-
     created = client.post(
         "/reservations",
         json={
-            "concertId": f"concert-expire-{suffix}",
-            "showtimeId": f"showtime-expire-{suffix}",
-            "performanceId": f"perf-expire-{suffix}",
-            "seatId": "A-2",
+            "concertId": uuid_id("concert", "expire"),
+            "showtimeId": uuid_id("showtime", "expire"),
+            "performanceId": uuid_id("performance", "expire"),
+            "seatId": uuid_id("seat", "expire"),
         },
         headers={"X-User-Id": "1"},
     ).json()
@@ -127,7 +129,7 @@ def test_reservation_expire_publishes_event() -> None:
 def test_sales_and_policy_admin_flow() -> None:
     """판매 상태 변경과 대기열/트래픽 정책 갱신 API 흐름을 검증한다."""
     client = TestClient(create_app())
-    concert_id = f"concert-sales-api-{uuid4().hex[:8]}"
+    concert_id = uuid_id("concert", "sales-api")
 
     started = client.post(f"/admin/concerts/{concert_id}/sales/start").json()
     paused = client.post(f"/admin/concerts/{concert_id}/sales/pause").json()
@@ -152,7 +154,7 @@ def test_error_response_uses_common_shape() -> None:
     """예약 서비스 오류 응답이 공통 에러 형식을 따르는지 검증한다."""
     client = TestClient(create_app())
 
-    response = client.get("/reservations/missing-rsv", headers={"X-Request-Id": "req-reservation"})
+    response = client.get(f"/reservations/{uuid_id('reservation', 'missing')}", headers={"X-Request-Id": "req-reservation"})
 
     assert response.status_code == 404
     assert response.json()["requestId"] == "req-reservation"
@@ -165,19 +167,19 @@ def test_reservation_metrics_record_command_conflict_sales_and_event_publish_res
     app = create_app()
     app.dependency_overrides[get_kafka_producer] = lambda: producer
     client = TestClient(app)
-    suffix = uuid4().hex[:8]
-    concert_id = f"concert-metrics-{suffix}"
-    showtime_id = f"showtime-metrics-{suffix}"
-    performance_id = f"perf-metrics-{suffix}"
+    concert_id = uuid_id("concert", "metrics")
+    showtime_id = uuid_id("showtime", "metrics")
+    performance_id = uuid_id("performance", "metrics")
+    seat_id = uuid_id("seat", "metrics")
 
     created = client.post(
         "/reservations",
-        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": "A-1"},
+        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": seat_id},
         headers={"X-User-Id": "user-metrics"},
     )
     duplicate = client.post(
         "/reservations",
-        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": "A-1"},
+        json={"concertId": concert_id, "showtimeId": showtime_id, "performanceId": performance_id, "seatId": seat_id},
         headers={"X-User-Id": "user-metrics-2"},
     )
     sales_started = client.post(f"/admin/concerts/{concert_id}/sales/start")
@@ -219,15 +221,13 @@ def test_reservation_event_publish_failure_metric_preserves_error_flow() -> None
     app = create_app()
     app.dependency_overrides[get_kafka_producer] = lambda: FailingKafkaProducer()
     client = TestClient(app)
-    suffix = uuid4().hex[:8]
-
     response = client.post(
         "/reservations",
         json={
-            "concertId": f"concert-publish-failure-{suffix}",
-            "showtimeId": f"showtime-publish-failure-{suffix}",
-            "performanceId": f"perf-publish-failure-{suffix}",
-            "seatId": "A-1",
+            "concertId": uuid_id("concert", "publish-failure"),
+            "showtimeId": uuid_id("showtime", "publish-failure"),
+            "performanceId": uuid_id("performance", "publish-failure"),
+            "seatId": uuid_id("seat", "publish-failure"),
         },
         headers={"X-User-Id": "user-publish-failure"},
     )

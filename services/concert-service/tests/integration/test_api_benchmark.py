@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.orm import Session, sessionmaker
+from server.ids import deterministic_uuid_string
 
 SERVICE_REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(SERVICE_REPO_ROOT))
@@ -32,6 +33,10 @@ from app.routers import router as concert_router
 
 
 SERVICE_NAME = "concert-service"
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string(SERVICE_NAME, *parts)
 
 
 @dataclass(frozen=True)
@@ -173,10 +178,10 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
         session.execute(insert(model.Seat), rows)
 
     target_index = config.concerts - 1
-    target_showtime_id = f"showtime-bench-{target_index:04d}-00"
+    target_showtime_id = uuid_id("showtime", target_index, 0)
     target_date = (base + timedelta(hours=target_index % 8)).date()
     return SeedTargets(
-        concert_id=f"concert-bench-{target_index:04d}",
+        concert_id=uuid_id("concert", target_index),
         performance_id=target_showtime_id,
         date=target_date.isoformat(),
         year_month=f"{target_date:%Y-%m}",
@@ -186,7 +191,7 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
 def _venue_rows(config: BenchmarkConfig):
     for concert_index in range(config.concerts):
         yield {
-            "id": f"venue-bench-{concert_index:04d}",
+            "id": uuid_id("venue", concert_index),
             "name": f"Benchmark Hall {concert_index:04d}",
             "address": "Seoul",
             "total_seats": config.seats_per_showtime,
@@ -196,7 +201,7 @@ def _venue_rows(config: BenchmarkConfig):
 def _concert_rows(config: BenchmarkConfig, base: datetime):
     for concert_index in range(config.concerts):
         yield {
-            "id": f"concert-bench-{concert_index:04d}",
+            "id": uuid_id("concert", concert_index),
             "provider_id": f"provider-bench-{concert_index % 10:02d}",
             "title": f"Benchmark Concert {concert_index:04d}",
             "description": "Deterministic public API benchmark fixture",
@@ -218,9 +223,9 @@ def _showtime_rows(config: BenchmarkConfig, base: datetime):
         for showtime_index in range(config.showtimes_per_concert):
             starts_at = base + timedelta(days=showtime_index, hours=concert_index % 8)
             yield {
-                "id": f"showtime-bench-{concert_index:04d}-{showtime_index:02d}",
-                "concert_id": f"concert-bench-{concert_index:04d}",
-                "venue_id": f"venue-bench-{concert_index:04d}",
+                "id": uuid_id("showtime", concert_index, showtime_index),
+                "concert_id": uuid_id("concert", concert_index),
+                "venue_id": uuid_id("venue", concert_index),
                 "starts_at": starts_at,
                 "ends_at": starts_at + timedelta(hours=2),
                 "status": "open",
@@ -230,10 +235,10 @@ def _showtime_rows(config: BenchmarkConfig, base: datetime):
 def _seat_grade_rows(config: BenchmarkConfig):
     for concert_index in range(config.concerts):
         for showtime_index in range(config.showtimes_per_concert):
-            showtime_id = f"showtime-bench-{concert_index:04d}-{showtime_index:02d}"
+            showtime_id = uuid_id("showtime", concert_index, showtime_index)
             for grade_index, section in enumerate(("A", "B", "C", "D")):
                 yield {
-                    "id": f"grade-{showtime_id}-{section}",
+                    "id": uuid_id("grade", concert_index, showtime_index, section),
                     "showtime_id": showtime_id,
                     "name": section,
                     "price": 50000 + grade_index * 25000,
@@ -244,7 +249,7 @@ def _seat_grade_rows(config: BenchmarkConfig):
 def _seat_rows(config: BenchmarkConfig):
     for concert_index in range(config.concerts):
         for showtime_index in range(config.showtimes_per_concert):
-            showtime_id = f"showtime-bench-{concert_index:04d}-{showtime_index:02d}"
+            showtime_id = uuid_id("showtime", concert_index, showtime_index)
             for seat_index in range(config.seats_per_showtime):
                 section = ("A", "B", "C", "D")[seat_index % 4]
                 row = f"{seat_index // 20 + 1:02d}"
@@ -255,7 +260,7 @@ def _seat_rows(config: BenchmarkConfig):
                 elif seat_index % 89 == 0:
                     status = "reserved"
                 yield {
-                    "id": f"seat-{showtime_id}-{section}-{row}-{number}",
+                    "id": uuid_id("seat", concert_index, showtime_index, section, row, number),
                     "showtime_id": showtime_id,
                     "section": section,
                     "row_label": row,
@@ -317,7 +322,7 @@ def _measure_endpoint(client: TestClient, endpoint: EndpointCase, config: Benchm
 def _assert_endpoint_shape(name: str, body: dict[str, Any]) -> None:
     validators: dict[str, Callable[[dict[str, Any]], bool]] = {
         "recommended-concerts": lambda payload: len(payload["items"]) == 10 and payload["page"]["limit"] == 10,
-        "concert-detail": lambda payload: payload["concertId"].startswith("concert-bench-") and "performances" not in payload,
+        "concert-detail": lambda payload: payload["concertId"] and "performances" not in payload,
         "concert-calendar": lambda payload: len(payload["days"]) >= 28 and any(day["bookable"] for day in payload["days"]),
         "date-performances": lambda payload: len(payload["performances"]) >= 1,
         "seat-map": lambda payload: len(payload["sections"]) == 4 and len(payload["seats"]) >= 1,

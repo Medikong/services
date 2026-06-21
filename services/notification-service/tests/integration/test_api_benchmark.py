@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 import pytest
+from server.ids import deterministic_uuid_string
 
 SERVICE_REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(SERVICE_REPO_ROOT))
@@ -167,9 +168,9 @@ def _notification_docs(
             "type": _notification_type(index),
             "message": f"Benchmark notification {index:06d}",
             "status": "CREATED",
-            "source_id": f"source-{index:06d}",
+            "source_id": _benchmark_uuid("notification-source", index),
             "metadata": {
-                "concert_id": f"concert-{index % config.preset.catalog['concerts']:04d}",
+                "concert_id": _benchmark_uuid("concert", index % config.preset.catalog["concerts"]),
                 "retention_days": config.preset.notification_retention_days,
             },
             "created_at": now - timedelta(seconds=index),
@@ -179,7 +180,7 @@ def _notification_docs(
 def _processed_event_docs(total: int, now: datetime) -> Iterator[dict[str, Any]]:
     for index in range(total):
         yield {
-            "event_id": f"business-event-{index:06d}",
+            "event_id": _benchmark_uuid("business-event", index),
             "notification_id": str(ObjectId()),
             "created_at": now - timedelta(seconds=index),
         }
@@ -199,6 +200,10 @@ def _notification_user_id(index: int, total: int, config: BenchmarkConfig) -> st
 def _notification_type(index: int) -> str:
     types = ("reservation-created", "reservation-expired", "payment-approved", "payment-failed", "ticket-issued")
     return types[index % len(types)]
+
+
+def _benchmark_uuid(*parts: object) -> str:
+    return deterministic_uuid_string(SERVICE_NAME, *parts)
 
 
 def _benchmark_endpoints(targets: SeedTargets) -> list[EndpointCase]:

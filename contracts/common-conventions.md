@@ -50,7 +50,7 @@ JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions
     "code": "reservation.conflict",
     "message": "Seat is already reserved.",
     "details": {
-      "seatId": "seat-001"
+      "seatId": "2ec15d50-317a-5d4b-a686-a8bb790c08e0"
     }
   },
   "requestId": "req-01HV6W8ZK2J2J9N9S4V7T3F0CA",

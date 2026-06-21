@@ -2,8 +2,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from server.ids import deterministic_uuid_string
 
 from app.main import create_app
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("concert-api-test", *parts)
 
 
 def create_public_concert(client: TestClient, title: str = "Spring Live"):
@@ -100,11 +105,13 @@ def test_date_performances_empty_result() -> None:
 
 def test_new_public_api_not_found_cases() -> None:
     client = TestClient(create_app())
+    missing_concert_id = uuid_id("concert", "missing")
+    missing_showtime_id = uuid_id("showtime", "missing")
 
-    detail = client.get("/concerts/missing-concert")
-    calendar = client.get("/concerts/missing-concert/calendar?yearMonth=2026-07")
-    performances = client.get("/concerts/missing-concert/dates/2026-07-18/performances")
-    seat_map = client.get("/performances/missing-performance/seat-map")
+    detail = client.get(f"/concerts/{missing_concert_id}")
+    calendar = client.get(f"/concerts/{missing_concert_id}/calendar?yearMonth=2026-07")
+    performances = client.get(f"/concerts/{missing_concert_id}/dates/2026-07-18/performances")
+    seat_map = client.get(f"/performances/{missing_showtime_id}/seat-map")
 
     assert detail.status_code == 404
     assert calendar.status_code == 404
@@ -145,7 +152,7 @@ def test_provider_and_admin_policy_review_flow() -> None:
 def test_error_response_uses_common_shape() -> None:
     client = TestClient(create_app())
 
-    response = client.get("/concerts/missing-concert", headers={"X-Request-Id": "req-test"})
+    response = client.get(f"/concerts/{uuid_id('concert', 'missing-error')}", headers={"X-Request-Id": "req-test"})
     metrics = client.get("/metrics").text
 
     assert response.status_code == 404

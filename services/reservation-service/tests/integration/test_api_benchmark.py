@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.orm import Session, sessionmaker
+from server.ids import deterministic_uuid_string
 
 SERVICE_REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(SERVICE_REPO_ROOT))
@@ -33,6 +34,10 @@ from app.routers import router as reservation_router
 
 
 SERVICE_NAME = "reservation-service"
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string(SERVICE_NAME, *parts)
 
 
 @dataclass(frozen=True)
@@ -149,10 +154,10 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
 
     normal_user_id = user_id_for(SERVICE_NAME, "normal")
     heavy_user_id = user_id_for(SERVICE_NAME, "heavy")
-    concert_id = "concert-bench-0000"
-    showtime_id = "showtime-bench-0000"
-    cancel_ids = [f"rsv-cancel-{index:06d}" for index in range(measured_total)]
-    expire_ids = [f"rsv-expire-{index:06d}" for index in range(measured_total)]
+    concert_id = uuid_id("concert", "bench", 0)
+    showtime_id = uuid_id("showtime", "bench", 0)
+    cancel_ids = [uuid_id("reservation", "cancel", index) for index in range(measured_total)]
+    expire_ids = [uuid_id("reservation", "expire", index) for index in range(measured_total)]
 
     for rows in chunked(_reservation_rows(config, now, cancel_ids, expire_ids, normal_user_id, heavy_user_id)):
         session.execute(insert(model.Reservation), rows)
@@ -160,7 +165,7 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
     session.execute(insert(model.QueuePolicy), list(_queue_policy_rows(tables["queue_policies"])))
     session.execute(insert(model.TrafficPolicy), list(_traffic_policy_rows(tables["traffic_policies"])))
     return SeedTargets(
-        get_reservation_id="rsv-seed-000000",
+        get_reservation_id=uuid_id("reservation", "seed", 0),
         list_normal_user_id=normal_user_id,
         list_heavy_user_id=heavy_user_id,
         concert_id=concert_id,
@@ -190,10 +195,10 @@ def _reservation_rows(
         yield _reservation_row(
             reservation_id,
             user_id_for(SERVICE_NAME, "cancel"),
-            f"concert-cancel-{index:06d}",
-            f"showtime-cancel-{index:06d}",
-            f"perf-cancel-{index:06d}",
-            f"C-{index:06d}",
+            uuid_id("concert", "cancel", index),
+            uuid_id("showtime", "cancel", index),
+            uuid_id("performance", "cancel", index),
+            uuid_id("seat", "cancel", index),
             "pending",
             now + timedelta(seconds=index),
         )
@@ -201,10 +206,10 @@ def _reservation_rows(
         yield _reservation_row(
             reservation_id,
             user_id_for(SERVICE_NAME, "expire"),
-            f"concert-expire-{index:06d}",
-            f"showtime-expire-{index:06d}",
-            f"perf-expire-{index:06d}",
-            f"E-{index:06d}",
+            uuid_id("concert", "expire", index),
+            uuid_id("showtime", "expire", index),
+            uuid_id("performance", "expire", index),
+            uuid_id("seat", "expire", index),
             "pending",
             now + timedelta(minutes=1, seconds=index),
         )
@@ -222,12 +227,12 @@ def _reservation_rows(
             user_id = _distributed_reservation_user_id(seed_index, total, config)
         status = status_for_index(offset, counts)
         yield _reservation_row(
-            f"rsv-seed-{offset:06d}",
+            uuid_id("reservation", "seed", offset),
             user_id,
-            f"concert-bench-{offset % config.preset.catalog['concerts']:04d}",
-            f"showtime-bench-{offset % config.preset.catalog['showtimes']:04d}",
-            f"perf-bench-{offset % config.preset.catalog['showtimes']:04d}",
-            f"S-{offset:06d}",
+            uuid_id("concert", "bench", offset % config.preset.catalog["concerts"]),
+            uuid_id("showtime", "bench", offset % config.preset.catalog["showtimes"]),
+            uuid_id("performance", "bench", offset % config.preset.catalog["showtimes"]),
+            uuid_id("seat", "bench", offset),
             status,
             now - timedelta(seconds=offset),
         )
@@ -273,7 +278,7 @@ def _sales_rows(count: int, now: datetime) -> Iterator[dict[str, Any]]:
     for index in range(count):
         status = "paused" if index % 2 else "open"
         yield {
-            "concert_id": f"concert-bench-{index:04d}",
+            "concert_id": uuid_id("concert", "bench", index),
             "sales_status": status,
             "total_seats": 2100,
             "updated_at": now,
@@ -283,7 +288,7 @@ def _sales_rows(count: int, now: datetime) -> Iterator[dict[str, Any]]:
 def _queue_policy_rows(count: int) -> Iterator[dict[str, Any]]:
     for index in range(count):
         yield {
-            "concert_id": f"concert-bench-{index:04d}",
+            "concert_id": uuid_id("concert", "bench", index),
             "enabled": index % 2 == 0,
             "max_entrants_per_minute": 1000,
             "waiting_room_url": "https://queue.example.com",
@@ -293,7 +298,7 @@ def _queue_policy_rows(count: int) -> Iterator[dict[str, Any]]:
 def _traffic_policy_rows(count: int) -> Iterator[dict[str, Any]]:
     for index in range(count):
         yield {
-            "concert_id": f"concert-bench-{index:04d}",
+            "concert_id": uuid_id("concert", "bench", index),
             "macro_protection_enabled": True,
             "max_requests_per_user_per_minute": 60,
             "block_suspicious_traffic": True,
@@ -311,10 +316,10 @@ def _benchmark_endpoints(targets: SeedTargets, config: BenchmarkConfig) -> list[
             path=lambda _: "/reservations",
             status=201,
             json_body=lambda index: {
-                "concertId": f"concert-create-{index:06d}",
-                "showtimeId": f"showtime-create-{index:06d}",
-                "performanceId": f"perf-create-{index:06d}",
-                "seatId": f"A-{index:06d}",
+                "concertId": uuid_id("concert", "create", index),
+                "showtimeId": uuid_id("showtime", "create", index),
+                "performanceId": uuid_id("performance", "create", index),
+                "seatId": uuid_id("seat", "create", index),
             },
             headers=lambda index: {"X-User-Id": f"bench-user-create-{index:06d}"},
         ),
@@ -353,19 +358,19 @@ def _benchmark_endpoints(targets: SeedTargets, config: BenchmarkConfig) -> list[
         EndpointCase(
             name="admin-start-sales",
             method="POST",
-            path=lambda index: f"/admin/concerts/concert-start-{index:06d}/sales/start",
+            path=lambda index: f"/admin/concerts/{uuid_id('concert', 'start', index)}/sales/start",
             status=200,
         ),
         EndpointCase(
             name="admin-pause-sales",
             method="POST",
-            path=lambda index: f"/admin/concerts/concert-bench-{(index % policy_count) * 2:04d}/sales/pause",
+            path=lambda index: f"/admin/concerts/{uuid_id('concert', 'bench', (index % policy_count) * 2)}/sales/pause",
             status=200,
         ),
         EndpointCase(
             name="admin-resume-sales",
             method="POST",
-            path=lambda index: f"/admin/concerts/concert-bench-{((index % policy_count) * 2 + 1) % policy_count:04d}/sales/resume",
+            path=lambda index: f"/admin/concerts/{uuid_id('concert', 'bench', ((index % policy_count) * 2 + 1) % policy_count)}/sales/resume",
             status=200,
         ),
         EndpointCase(
@@ -389,7 +394,7 @@ def _benchmark_endpoints(targets: SeedTargets, config: BenchmarkConfig) -> list[
         EndpointCase(
             name="admin-queue-policy",
             method="PUT",
-            path=lambda index: f"/admin/concerts/concert-bench-{index % policy_count:04d}/queue-policy",
+            path=lambda index: f"/admin/concerts/{uuid_id('concert', 'bench', index % policy_count)}/queue-policy",
             status=200,
             json_body=lambda _: {
                 "enabled": True,
@@ -400,7 +405,7 @@ def _benchmark_endpoints(targets: SeedTargets, config: BenchmarkConfig) -> list[
         EndpointCase(
             name="admin-traffic-policy",
             method="PUT",
-            path=lambda index: f"/admin/concerts/concert-bench-{index % policy_count:04d}/traffic-policy",
+            path=lambda index: f"/admin/concerts/{uuid_id('concert', 'bench', index % policy_count)}/traffic-policy",
             status=200,
             json_body=lambda _: {
                 "macroProtectionEnabled": True,
@@ -463,7 +468,10 @@ def _query_analysis(session: Session, targets: SeedTargets, config: BenchmarkCon
                         "SELECT id FROM reservations "
                         "WHERE performance_id = :performance_id AND seat_id = :seat_id AND status IN ('pending', 'paid')"
                     ),
-                    params={"performance_id": "perf-create-explain", "seat_id": "A-explain"},
+                    params={
+                        "performance_id": uuid_id("performance", "create-explain"),
+                        "seat_id": uuid_id("seat", "create-explain"),
+                    },
                     query_shape="SELECT active reservation WHERE performance_id, seat_id, status",
                     index_decision="중복 방어는 active_seat_key unique를 유지한다. active lookup은 복합/부분 index 후보로 남긴다.",
                     data_analysis=f"reservations={tables['reservations']:,}. 생성 path는 conflict check + insert + commit 비용이다.",

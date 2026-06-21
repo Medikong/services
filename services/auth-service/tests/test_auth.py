@@ -1,12 +1,6 @@
-import os
-from pathlib import Path
-
 import pytest
 from pytest import MonkeyPatch
 
-
-Path("test_auth_service.db").unlink(missing_ok=True)
-os.environ["DATABASE_URL"] = "sqlite:///./test_auth_service.db"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

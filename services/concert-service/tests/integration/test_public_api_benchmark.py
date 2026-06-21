@@ -16,12 +16,20 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import Select, create_engine, event, insert, select, text
 from sqlalchemy.orm import Session, sessionmaker
+from server.ids import deterministic_uuid_string
 
 from app import entities as model
 from app.database import Base
 from app.dependencies import get_db
 from app.exceptions import register_exception_handlers
 from app.routers import router as concert_router
+
+
+SERVICE_NAME = "concert-service"
+
+
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("concert-service-public", *parts)
 
 
 @dataclass(frozen=True)
@@ -177,8 +185,8 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
     seats: list[dict[str, Any]] = []
 
     for concert_index in range(config.concerts):
-        concert_id = f"concert-bench-{concert_index:04d}"
-        venue_id = f"venue-bench-{concert_index:04d}"
+        concert_id = uuid_id("concert", concert_index)
+        venue_id = uuid_id("venue", concert_index)
         venues.append(
             {
                 "id": venue_id,
@@ -206,7 +214,7 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
             }
         )
         for showtime_index in range(config.showtimes_per_concert):
-            showtime_id = f"showtime-bench-{concert_index:04d}-{showtime_index:02d}"
+            showtime_id = uuid_id("showtime", concert_index, showtime_index)
             starts_at = base + timedelta(days=showtime_index, hours=concert_index % 8)
             showtimes.append(
                 {
@@ -221,7 +229,7 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
             for grade_index, section in enumerate(("A", "B", "C", "D")):
                 grades.append(
                     {
-                        "id": f"grade-{showtime_id}-{section}",
+                        "id": uuid_id("grade", concert_index, showtime_index, section),
                         "showtime_id": showtime_id,
                         "name": section,
                         "price": 50000 + grade_index * 25000,
@@ -239,7 +247,7 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
                     status = "reserved"
                 seats.append(
                     {
-                        "id": f"seat-{showtime_id}-{section}-{row}-{number}",
+                        "id": uuid_id("seat", concert_index, showtime_index, section, row, number),
                         "showtime_id": showtime_id,
                         "section": section,
                         "row_label": row,
@@ -256,11 +264,11 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
         session.execute(insert(model.Seat), seats[start : start + 5000])
 
     target_index = config.concerts - 1
-    target_showtime_id = f"showtime-bench-{target_index:04d}-00"
+    target_showtime_id = uuid_id("showtime", target_index, 0)
     target_date = (base + timedelta(hours=target_index % 8)).date()
     cursor_index = max(config.concerts // 2, 1)
     return SeedTargets(
-        concert_id=f"concert-bench-{target_index:04d}",
+        concert_id=uuid_id("concert", target_index),
         performance_id=target_showtime_id,
         date=target_date.isoformat(),
         year_month=f"{target_date:%Y-%m}",
@@ -371,7 +379,7 @@ def _summarize_sql(statement: str) -> str:
 def _assert_endpoint_shape(name: str, body: dict[str, Any]) -> None:
     validators: dict[str, Callable[[dict[str, Any]], bool]] = {
         "recommended-concerts": lambda payload: len(payload["items"]) == 10 and payload["page"]["limit"] == 10,
-        "concert-detail": lambda payload: payload["concertId"].startswith("concert-bench-") and "performances" not in payload,
+        "concert-detail": lambda payload: payload["concertId"] and "performances" not in payload,
         "concert-calendar": lambda payload: len(payload["days"]) >= 28 and any(day["bookable"] for day in payload["days"]),
         "date-performances": lambda payload: len(payload["performances"]) >= 1,
         "seat-map": lambda payload: len(payload["sections"]) == 4 and len(payload["seats"]) >= 1,

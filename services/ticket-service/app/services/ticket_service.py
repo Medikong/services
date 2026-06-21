@@ -1,11 +1,11 @@
 from collections.abc import Callable
-from uuid import uuid4
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from kafka_utils import with_correlation_id
 from metrics import MetricResult
 from observability import TraceRecorder, trace_recorder
+from server.ids import new_uuid_v7_string
 from sqlalchemy.orm import Session
 from contracts.events import PaymentApprovedEvent, TicketIssuedEvent
 
@@ -55,6 +55,7 @@ async def issue_ticket(
             return existing
 
         ticket = Ticket(
+            id=new_uuid_v7_string(),
             reservation_id=request.reservationId,
             user_id=request.userId,
             concert_id=request.concertId,
@@ -99,7 +100,7 @@ async def issue_ticket(
         issue_attempt.record()
 
 
-def get_ticket(db: Session, ticket_id: int, user: UserContext) -> Ticket:
+def get_ticket(db: Session, ticket_id: str, user: UserContext) -> Ticket:
     ticket = db.get(Ticket, ticket_id)
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
@@ -113,7 +114,7 @@ def list_my_tickets(
     user: UserContext,
     *,
     limit: int,
-    cursor: int | None = None,
+    cursor: str | None = None,
     trace: TraceRecorder | None = None,
 ) -> TicketListResponse:
     recorder = trace or trace_recorder()
@@ -212,7 +213,7 @@ async def handle_payment_approved(db: Session, payload: dict, kafka_producer: Ka
         consume_attempt.record()
 
 
-def _upload_ticket_artifact(artifact: TicketArtifact, ticket_id: int, reservation_id: str) -> str | None:
+def _upload_ticket_artifact(artifact: TicketArtifact, ticket_id: str, reservation_id: str) -> str | None:
     """QR/PDF 업로드 시간을 artifact별 metric으로 남긴다."""
     attempt = ticket_metrics.start_artifact_upload(artifact)
     try:
@@ -228,7 +229,7 @@ def _upload_ticket_artifact(artifact: TicketArtifact, ticket_id: int, reservatio
 
 def _ticket_issued_event(ticket: Ticket, *, correlation_id: str | None = None) -> dict:
     return TicketIssuedEvent(
-        eventId=str(uuid4()),
+        eventId=new_uuid_v7_string(),
         userId=str(ticket.user_id),
         sourceId=str(ticket.id),
         reservationId=ticket.reservation_id,

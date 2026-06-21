@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
 from typing import Annotated, assert_never
-from uuid import uuid4
 
 from aiokafka.errors import KafkaError
 from contracts.events import ReservationCreatedEvent, ReservationExpiredEvent
 from fastapi import APIRouter, Depends, Request, status
 from kafka_utils import with_correlation_id
 from metrics import MetricResult
+from server.ids import new_uuid_v7_string
 
 from app import schemas
 from app.config import settings
@@ -120,7 +120,7 @@ def _reservation_event_payload(
     http_request: Request,
 ) -> dict:
     event_kwargs = {
-        "eventId": str(uuid4()),
+        "eventId": new_uuid_v7_string(),
         "userId": str(response.userId),
         "sourceId": source_id,
         "reservationId": response.id,

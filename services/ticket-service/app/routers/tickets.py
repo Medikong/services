@@ -27,7 +27,7 @@ async def issue_ticket(
 @router.get("/me", response_model=TicketListResponse)
 def list_my_tickets(
     limit: int = Query(20, ge=1, le=100),
-    cursor: int | None = Query(None, ge=1),
+    cursor: str | None = Query(None, min_length=1),
     db: Session = Depends(get_db),
     user: UserContext = Depends(get_user_context),
 ) -> TicketListResponse:
@@ -54,7 +54,7 @@ def list_my_tickets(
 @router.get("/me/async-experiment", response_model=TicketListResponse, include_in_schema=False)
 async def list_my_tickets_async_experiment(
     limit: int = Query(20, ge=1, le=100),
-    cursor: int | None = Query(None, ge=1),
+    cursor: str | None = Query(None, min_length=1),
     db: Session = Depends(get_db),
     user: UserContext = Depends(get_user_context),
 ) -> TicketListResponse:
@@ -88,7 +88,7 @@ async def list_my_tickets_async_experiment(
 # 티켓 상세 조회
 @router.get("/{ticket_id}", response_model=TicketResponse)
 def get_ticket(
-    ticket_id: int,
+    ticket_id: str,
     db: Session = Depends(get_db),
     user: UserContext = Depends(get_user_context),
 ) -> TicketResponse:

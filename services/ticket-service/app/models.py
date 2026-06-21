@@ -1,17 +1,18 @@
 from datetime import datetime
 from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+from server.ids import native_uuid
 from app.database import Base
 
 
 class Ticket(Base):
     __tablename__ = "tickets"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    reservation_id: Mapped[str] = mapped_column(String(100), index=True, nullable=False, unique=True)
+    id: Mapped[str] = mapped_column(native_uuid(), primary_key=True, index=True)
+    reservation_id: Mapped[str] = mapped_column(native_uuid(), index=True, nullable=False, unique=True)
     user_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
-    concert_id: Mapped[str] = mapped_column(String(100), nullable=False)
-    seat_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    concert_id: Mapped[str] = mapped_column(native_uuid(), nullable=False)
+    seat_id: Mapped[str] = mapped_column(native_uuid(), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="ISSUED")
     qr_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -50,6 +51,6 @@ class ProcessedEvent(Base):
     __tablename__ = "processed_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    event_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    ticket_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_id: Mapped[str] = mapped_column(native_uuid(), unique=True, nullable=False)
+    ticket_id: Mapped[str] = mapped_column(native_uuid(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
-from uuid import uuid4
 
+from server.ids import new_uuid_v7_string
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from observability import HttpError
@@ -30,7 +30,7 @@ def now_utc() -> datetime:
 
 
 def new_id() -> str:
-    return str(uuid4())
+    return new_uuid_v7_string()
 
 
 class ConcertDomainService:

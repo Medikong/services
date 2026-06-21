@@ -13,7 +13,7 @@ def _s3_client():
     )
 
 
-def upload_qr(ticket_id: int, reservation_id: str) -> str | None:
+def upload_qr(ticket_id: str, reservation_id: str) -> str | None:
     if not settings.aws_access_key_id:
         return None
 
@@ -28,7 +28,7 @@ def upload_qr(ticket_id: int, reservation_id: str) -> str | None:
     return f"https://{settings.s3_bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
 
 
-def upload_pdf(ticket_id: int, reservation_id: str) -> str | None:
+def upload_pdf(ticket_id: str, reservation_id: str) -> str | None:
     if not settings.aws_access_key_id:
         return None
 

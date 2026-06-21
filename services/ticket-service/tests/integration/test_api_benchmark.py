@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
+from server.ids import deterministic_uuid_string
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -43,10 +44,10 @@ class BenchmarkConfig:
 
 @dataclass(frozen=True)
 class SeedTargets:
-    ticket_id: int
+    ticket_id: str
     normal_user_id: str
     heavy_user_id: str
-    cursor: int
+    cursor: str
 
 
 @dataclass(frozen=True)
@@ -142,8 +143,12 @@ def _seed_dataset(session: Session, config: BenchmarkConfig) -> SeedTargets:
         session.execute(insert(Ticket), rows)
     for rows in chunked(_processed_event_rows(tables["processed_events"], now)):
         session.execute(insert(ProcessedEvent), rows)
-    session.execute(text("SELECT setval(pg_get_serial_sequence('tickets', 'id'), (SELECT max(id) FROM tickets))"))
-    return SeedTargets(ticket_id=1, normal_user_id=normal_user_id, heavy_user_id=heavy_user_id, cursor=20)
+    return SeedTargets(
+        ticket_id=_benchmark_uuid("ticket", 0),
+        normal_user_id=normal_user_id,
+        heavy_user_id=heavy_user_id,
+        cursor=_benchmark_uuid("ticket", 19),
+    )
 
 
 def _ticket_rows(
@@ -163,11 +168,11 @@ def _ticket_rows(
         else:
             user_id = _ticket_user_id(index, total, config)
         yield {
-            "id": index + 1,
-            "reservation_id": f"reservation-ticket-{index:06d}",
+            "id": _benchmark_uuid("ticket", index),
+            "reservation_id": _benchmark_uuid("reservation", index),
             "user_id": user_id,
-            "concert_id": f"concert-ticket-{index % config.preset.catalog['concerts']:04d}",
-            "seat_id": f"A-{index:06d}",
+            "concert_id": _benchmark_uuid("concert", index % config.preset.catalog["concerts"]),
+            "seat_id": _benchmark_uuid("seat", index),
             "status": "ISSUED",
             "qr_url": None,
             "pdf_url": None,
@@ -178,8 +183,8 @@ def _ticket_rows(
 def _processed_event_rows(total: int, now: datetime) -> Iterator[dict[str, Any]]:
     for index in range(total):
         yield {
-            "event_id": f"payment-approved-{index:06d}",
-            "ticket_id": index + 1,
+            "event_id": _benchmark_uuid("payment-approved-event", index),
+            "ticket_id": _benchmark_uuid("ticket", index),
             "created_at": now - timedelta(seconds=index),
         }
 
@@ -203,10 +208,10 @@ def _benchmark_endpoints(targets: SeedTargets) -> list[EndpointCase]:
             path=lambda _: "/tickets/issue",
             status=200,
             json_body=lambda index: {
-                "reservationId": f"reservation-issue-{index:06d}",
+                "reservationId": _benchmark_uuid("reservation-issue", index),
                 "userId": targets.normal_user_id,
-                "concertId": "concert-ticket-issue",
-                "seatId": f"B-{index:06d}",
+                "concertId": _benchmark_uuid("concert-issue", index),
+                "seatId": _benchmark_uuid("seat-issue", index),
             },
         ),
         EndpointCase(
@@ -293,7 +298,7 @@ def _query_analysis(session: Session, targets: SeedTargets, config: BenchmarkCon
                     session,
                     label="ticket-by-reservation-id",
                     sql="SELECT id FROM tickets WHERE reservation_id = :reservation_id LIMIT 1",
-                    params={"reservation_id": "reservation-issue-explain"},
+                    params={"reservation_id": _benchmark_uuid("reservation-issue", "explain")},
                     query_shape="SELECT tickets WHERE reservation_id, INSERT ticket",
                     index_decision="중복 발급 방어에는 reservation_id unique index 유지.",
                     data_analysis=f"tickets={tables['tickets']:,}. S3/Kafka는 제외되어 DB insert와 local artifact path 중심이다.",
@@ -362,6 +367,10 @@ def _percentile(values: list[float], percentile: int) -> float:
     ordered = sorted(values)
     index = max(math.ceil(len(ordered) * percentile / 100) - 1, 0)
     return ordered[index]
+
+
+def _benchmark_uuid(*parts: object) -> str:
+    return deterministic_uuid_string(SERVICE_NAME, *parts)
 
 
 def _artifact(

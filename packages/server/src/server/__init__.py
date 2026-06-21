@@ -10,6 +10,13 @@ from server.sqlalchemy import (
     SQLAlchemyPoolSettings,
     sqlalchemy_engine_options_from_env,
 )
+from server.ids import (
+    deterministic_uuid,
+    deterministic_uuid_string,
+    native_uuid,
+    new_uuid_v7,
+    new_uuid_v7_string,
+)
 from server.middleware import (
     CLIENT_ACTION_ID_HEADER,
     RequestContext,
@@ -46,6 +53,8 @@ __all__ = [
     "ResponseHeadersMiddleware",
     "RuntimeRecoveryMiddleware",
     "SQLAlchemyPoolSettings",
+    "deterministic_uuid",
+    "deterministic_uuid_string",
     "ObservabilityConfig",
     "ReadinessCheck",
     "configure_process_logging",
@@ -58,12 +67,15 @@ __all__ = [
     "get_current_request_context",
     "get_current_request_id",
     "instrument_fastapi_app",
+    "native_uuid",
     "observability_config_from_env",
     "register_debug_status_route",
     "register_operational_handlers",
     "request_context_middleware_options",
     "request_id_middleware_options",
     "required_settings_readiness_check",
+    "new_uuid_v7",
+    "new_uuid_v7_string",
     "sqlalchemy_engine_options_from_env",
     "sqlalchemy_readiness_check",
 ]

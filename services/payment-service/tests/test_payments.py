@@ -14,6 +14,7 @@ os.environ["SERVICE_VERSION"] = "test-version"
 os.environ["SERVICE_ENVIRONMENT"] = "test"
 
 from fastapi.testclient import TestClient  # noqa: E402
+from server.ids import deterministic_uuid_string  # noqa: E402
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -31,6 +32,10 @@ from observability import TraceContext  # noqa: E402
 client = TestClient(app)
 
 
+def uuid_id(*parts: object) -> str:
+    return deterministic_uuid_string("payment-service-test", *parts)
+
+
 @pytest.fixture(autouse=True)
 def reset_db() -> None:
     Base.metadata.drop_all(bind=engine)
@@ -41,13 +46,16 @@ def reset_db() -> None:
 def test_create_and_get_approved_payment() -> None:
     producer = FakeKafkaProducer()
     headers = auth_headers("CUSTOMER", user_id="1")
+    reservation_id = uuid_id("reservation", 1)
+    concert_id = uuid_id("concert", 1)
+    seat_id = uuid_id("seat", 1)
     response = client.post(
         "/payments",
         headers=headers,
         json={
-            "reservationId": "res-1",
-            "concertId": "concert-1",
-            "seatId": "seat-A1",
+            "reservationId": reservation_id,
+            "concertId": concert_id,
+            "seatId": seat_id,
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -56,9 +64,9 @@ def test_create_and_get_approved_payment() -> None:
 
     assert response.status_code == 201
     payment = response.json()
-    assert payment["reservationId"] == "res-1"
+    assert payment["reservationId"] == reservation_id
     UUID(payment["id"])
-    assert payment["concertId"] == "concert-1"
+    assert payment["concertId"] == concert_id
     assert payment["status"] == "approved"
     assert payment["approvedAt"] is not None
     events = payment_events()
@@ -76,12 +84,13 @@ def test_create_and_get_approved_payment() -> None:
 
 def test_payment_simulation_fail_and_delay() -> None:
     producer = FakeKafkaProducer()
+    concert_id = uuid_id("concert", "simulation")
     fail_response = client.post(
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="2"),
         json={
-            "reservationId": "res-2",
-            "concertId": "concert-1",
+            "reservationId": uuid_id("reservation", 2),
+            "concertId": concert_id,
             "amount": 50000,
             "method": "mock",
             "simulation": "fail",
@@ -91,8 +100,8 @@ def test_payment_simulation_fail_and_delay() -> None:
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="3"),
         json={
-            "reservationId": "res-3",
-            "concertId": "concert-1",
+            "reservationId": uuid_id("reservation", 3),
+            "concertId": concert_id,
             "amount": 50000,
             "method": "mock",
             "simulation": "delay",
@@ -112,8 +121,8 @@ def test_payment_simulation_fail_and_delay() -> None:
 def test_idempotency_key_returns_existing_payment() -> None:
     headers = auth_headers("CUSTOMER", user_id="4") | {"Idempotency-Key": "idem-1"}
     payload = {
-        "reservationId": "res-4",
-        "concertId": "concert-2",
+        "reservationId": uuid_id("reservation", 4),
+        "concertId": uuid_id("concert", 2),
         "amount": 30000,
         "method": "mock",
         "simulation": "approve",
@@ -133,8 +142,8 @@ def test_customer_cannot_read_other_customer_payment() -> None:
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="5"),
         json={
-            "reservationId": "res-5",
-            "concertId": "concert-3",
+            "reservationId": uuid_id("reservation", 5),
+            "concertId": uuid_id("concert", 3),
             "amount": 40000,
             "method": "mock",
         },
@@ -147,23 +156,24 @@ def test_customer_cannot_read_other_customer_payment() -> None:
 
 
 def test_provider_and_admin_can_get_settlement_basis() -> None:
+    concert_id = uuid_id("concert", 4)
     client.post(
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="7"),
         json={
-            "reservationId": "res-7",
-            "concertId": "concert-4",
+            "reservationId": uuid_id("reservation", 7),
+            "concertId": concert_id,
             "amount": 100000,
             "method": "mock",
         },
     )
 
     provider_response = client.get(
-        "/provider/concerts/concert-4/settlement-basis",
+        f"/provider/concerts/{concert_id}/settlement-basis",
         headers=auth_headers("PROVIDER", user_id="provider-1"),
     )
     admin_response = client.get(
-        "/admin/concerts/concert-4/settlement-basis",
+        f"/admin/concerts/{concert_id}/settlement-basis",
         headers=auth_headers("ADMIN", user_id="admin-1"),
     )
 
@@ -196,7 +206,7 @@ def test_operational_endpoints_and_error_shape() -> None:
     assert 'http_route="/healthz"' in metrics_response.text
     assert 'http_response_status_code="200"' in metrics_response.text
 
-    response = client.get("/payments/pay-missing")
+    response = client.get(f"/payments/{uuid_id('payment', 'missing')}")
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "auth.invalid_token"
 
@@ -294,8 +304,8 @@ def test_payment_metrics_record_results_duration_and_event_publish_success() -> 
             "/payments",
             headers=auth_headers("CUSTOMER", user_id=user_id),
             json={
-                "reservationId": f"res-{user_id}",
-                "concertId": "concert-metrics",
+                "reservationId": uuid_id("reservation", user_id),
+                "concertId": uuid_id("concert", "metrics"),
                 "amount": 50000,
                 "method": "mock",
                 "simulation": simulation,
@@ -330,13 +340,15 @@ def test_payment_metrics_record_results_duration_and_event_publish_success() -> 
 
 def test_payment_event_dispatcher_publishes_pending_event_and_marks_published() -> None:
     producer = FakeKafkaProducer()
+    reservation_id = uuid_id("reservation", 14)
+    seat_id = uuid_id("seat", "events")
     response = client.post(
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="14"),
         json={
-            "reservationId": "res-14",
-            "concertId": "concert-events",
-            "seatId": "seat-A1",
+            "reservationId": reservation_id,
+            "concertId": uuid_id("concert", "events"),
+            "seatId": seat_id,
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -347,8 +359,8 @@ def test_payment_event_dispatcher_publishes_pending_event_and_marks_published() 
     assert asyncio.run(dispatch_pending_events(producer)) == 1
 
     assert producer.sent[0][0] == "payment-approved"
-    assert producer.sent[0][1]["reservationId"] == "res-14"
-    assert producer.sent[0][1]["seatId"] == "seat-A1"
+    assert producer.sent[0][1]["reservationId"] == reservation_id
+    assert producer.sent[0][1]["seatId"] == seat_id
     assert dict(producer.sent[0][2])["correlation_id"] == producer.sent[0][1]["correlationId"].encode("utf-8")
     events = payment_events()
     assert events[0].publish_status == "published"
@@ -371,8 +383,8 @@ def test_payment_event_dispatcher_wraps_outbox_work_in_trace_spans(monkeypatch: 
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="trace-span-user"),
         json={
-            "reservationId": "res-trace-span",
-            "concertId": "concert-events",
+            "reservationId": uuid_id("reservation", "trace-span"),
+            "concertId": uuid_id("concert", "events"),
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -407,9 +419,9 @@ def test_payment_outbox_preserves_trace_context_for_kafka_headers(monkeypatch: p
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="trace-user"),
         json={
-            "reservationId": "res-trace",
-            "concertId": "concert-trace",
-            "seatId": "seat-A1",
+            "reservationId": uuid_id("reservation", "trace"),
+            "concertId": uuid_id("concert", "trace"),
+            "seatId": uuid_id("seat", "trace"),
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -443,9 +455,9 @@ def test_payment_event_dispatcher_passes_outbox_trace_context_to_kafka_send_opti
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="trace-producer-user"),
         json={
-            "reservationId": "res-trace-producer",
-            "concertId": "concert-trace",
-            "seatId": "seat-A1",
+            "reservationId": uuid_id("reservation", "trace-producer"),
+            "concertId": uuid_id("concert", "trace"),
+            "seatId": uuid_id("seat", "trace-producer"),
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -470,8 +482,8 @@ def test_payment_event_dispatcher_loop_publishes_pending_events() -> None:
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="16"),
         json={
-            "reservationId": "res-16",
-            "concertId": "concert-events",
+            "reservationId": uuid_id("reservation", 16),
+            "concertId": uuid_id("concert", "events"),
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
@@ -493,8 +505,8 @@ def test_payment_event_dispatcher_failure_metric_preserves_error_flow() -> None:
         "/payments",
         headers=auth_headers("CUSTOMER", user_id="15"),
         json={
-            "reservationId": "res-15",
-            "concertId": "concert-metrics",
+            "reservationId": uuid_id("reservation", 15),
+            "concertId": uuid_id("concert", "metrics"),
             "amount": 50000,
             "method": "mock",
             "simulation": "approve",
