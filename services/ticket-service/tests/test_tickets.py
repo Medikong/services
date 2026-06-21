@@ -22,6 +22,7 @@ from app.main import app
 import app.main as main_module
 from app.routers import tickets as tickets_router_module
 from app.services import ticket_service
+import app.worker as worker_module
 
 
 RESERVATION_ID = deterministic_uuid_string("ticket-service-test", "reservation", 1)
@@ -385,29 +386,27 @@ def test_kafka_event_handlers_bind_topic_outside_consumer(monkeypatch: pytest.Mo
         async def __call__(self, payload: dict) -> None:
             calls.append(("call", payload, None))
 
-    monkeypatch.setattr(main_module, "PaymentApprovedEventHandler", FakePaymentApprovedEventHandler)
+    monkeypatch.setattr(worker_module, "PaymentApprovedEventHandler", FakePaymentApprovedEventHandler)
     producer = FakeKafkaProducer()
-    handlers = main_module.kafka_event_handlers(producer)
+    handlers = worker_module.kafka_event_handlers(producer)
     payload = payment_approved_event()
     asyncio.run(handlers["payment-approved"](payload))
 
     assert list(handlers) == ["payment-approved"]
     assert calls == [
-        ("init", main_module.SessionLocal, producer),
+        ("init", worker_module.SessionLocal, producer),
         ("call", payload, None),
     ]
 
 
-def test_lifespan_creates_producer_awaits_consumer_and_disposes_engine(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[object] = []
+def test_lifespan_creates_producer_and_disposes_engine_without_consumer(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
 
     class LifespanKafkaProducer:
         def __init__(self) -> None:
-            self.started = False
             self.stopped = False
 
         async def start(self) -> None:
-            self.started = True
             calls.append("producer-start")
 
         async def stop(self) -> None:
@@ -420,13 +419,7 @@ def test_lifespan_creates_producer_awaits_consumer_and_disposes_engine(monkeypat
         calls.append("create-producer")
         return producer
 
-    async def fake_consume_events(stop_event: asyncio.Event, **kwargs: object) -> None:
-        calls.append(("consumer-producer-started", producer.started, list(kwargs["handlers"])))
-        await stop_event.wait()
-        calls.append("consumer-stopped")
-
     monkeypatch.setattr(main_module, "create_producer", fake_create_producer)
-    monkeypatch.setattr(main_module, "consume_events", fake_consume_events)
     monkeypatch.setattr(main_module.engine, "dispose", lambda: calls.append("dispose"))
 
     assert app.state.kafka_producer is None
@@ -439,17 +432,60 @@ def test_lifespan_creates_producer_awaits_consumer_and_disposes_engine(monkeypat
     assert calls == [
         "create-producer",
         "producer-start",
-        ("consumer-producer-started", True, ["payment-approved"]),
-        "consumer-stopped",
         "producer-stop",
         "dispose",
     ]
 
 
-def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_worker_creates_producer_awaits_consumer_and_disposes_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[object] = []
+
+    class WorkerKafkaProducer:
+        def __init__(self) -> None:
+            self.started = False
+            self.stopped = False
+
+        async def start(self) -> None:
+            self.started = True
+            calls.append("producer-start")
+
+        async def stop(self) -> None:
+            self.stopped = True
+            calls.append("producer-stop")
+
+    producer = WorkerKafkaProducer()
+
+    def fake_create_producer() -> WorkerKafkaProducer:
+        calls.append("create-producer")
+        return producer
+
+    async def fake_consume_events(stop_event: asyncio.Event, **kwargs: object) -> None:
+        calls.append(("consumer-producer-started", producer.started, list(kwargs["handlers"])))
+        stop_event.set()
+
+    monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: calls.append("create-all"))
+    monkeypatch.setattr(worker_module, "create_producer", fake_create_producer)
+    monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(worker_module.engine, "dispose", lambda: calls.append("dispose"))
+
+    asyncio.run(worker_module.run_worker())
+
+    assert producer.stopped is True
+    assert calls == [
+        "create-all",
+        "create-producer",
+        "producer-start",
+        ("consumer-producer-started", True, ["payment-approved"]),
+        "producer-stop",
+        "dispose",
+    ]
+
+
+def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
-    class LifespanKafkaProducer:
+    class WorkerKafkaProducer:
         async def start(self) -> None:
             calls.append("producer-start")
 
@@ -464,16 +500,15 @@ def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.Mo
             calls.append("consumer-cancelled")
             raise
 
-    monkeypatch.setattr(main_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
-    monkeypatch.setattr(main_module, "create_producer", lambda: LifespanKafkaProducer())
-    monkeypatch.setattr(main_module, "consume_events", fake_consume_events)
-    monkeypatch.setattr(main_module.engine, "dispose", lambda: calls.append("dispose"))
+    monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
+    monkeypatch.setattr(worker_module, "create_producer", lambda: WorkerKafkaProducer())
+    monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(worker_module.engine, "dispose", lambda: calls.append("dispose"))
 
-    with TestClient(app):
-        assert app.state.consumer_task is not None
+    asyncio.run(worker_module.run_worker())
 
-    assert app.state.consumer_task is None
-    assert app.state.consumer_stop_event is None
     assert calls == [
         "producer-start",
         "consumer-start",

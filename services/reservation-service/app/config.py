@@ -7,6 +7,7 @@ from observability import ObservabilityConfig, observability_config_from_env
 class Settings(BaseSettings):
     service_name: str = "reservation-service"
     port: int = 8083
+    uvicorn_workers: int = 2
     database_url: str = "sqlite:///./reservation_service.db"
     kafka_bootstrap_servers: str = ""
     reservation_created_topic: str = "reservation-created"

@@ -34,10 +34,11 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 COPY --from=builder /opt/venv /opt/venv
 COPY services/payment-service/app ./app
+COPY services/payment-service/cmd ./cmd
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app \
     && chown -R app:app /app
 USER 10001:10001
 
 EXPOSE 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8080 --no-access-log --workers ${UVICORN_WORKERS:-2}"]

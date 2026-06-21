@@ -1,11 +1,17 @@
 import uvicorn
 
 from app.config import settings
-from app.main import create_app
 
 
 def main() -> None:
-    uvicorn.run(create_app(), host="0.0.0.0", port=settings.port, access_log=False)
+    uvicorn.run(
+        "app.main:create_app",
+        factory=True,
+        host="0.0.0.0",
+        port=settings.port,
+        access_log=False,
+        workers=settings.uvicorn_workers,
+    )
 
 
 if __name__ == "__main__":

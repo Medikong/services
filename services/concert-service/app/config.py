@@ -7,6 +7,7 @@ from observability import ObservabilityConfig, observability_config_from_env
 class Settings(BaseSettings):
     service_name: str = "concert-service"
     port: int = 8082
+    uvicorn_workers: int = 2
     database_url: str = "sqlite:///./concert_service.db"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

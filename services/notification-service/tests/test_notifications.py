@@ -19,6 +19,7 @@ import app.database as database
 from app.main import app
 import app.main as app_main
 from app.services.notification_service import handle_business_event
+import app.worker as worker_module
 
 
 def override_get_db():
@@ -364,7 +365,25 @@ def test_healthz() -> None:
     assert response.json()["status"] == "ok"
 
 
-def test_lifespan_awaits_consumer_before_closing_db(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_lifespan_connects_and_closes_db_without_consumer(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def fake_connect_db() -> None:
+        calls.append("connect")
+
+    def fake_close_db() -> None:
+        calls.append("close")
+
+    monkeypatch.setattr(app_main, "connect_db", fake_connect_db)
+    monkeypatch.setattr(app_main, "close_db", fake_close_db)
+
+    with TestClient(app):
+        pass
+
+    assert calls == ["connect", "close"]
+
+
+def test_worker_awaits_consumer_before_closing_db(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
     async def fake_connect_db() -> None:
@@ -372,24 +391,22 @@ def test_lifespan_awaits_consumer_before_closing_db(monkeypatch: pytest.MonkeyPa
 
     async def fake_consume_events(stop_event) -> None:
         calls.append("consumer-start")
-        await stop_event.wait()
-        calls.append("consumer-stopped")
+        stop_event.set()
 
     def fake_close_db() -> None:
         calls.append("close")
 
-    monkeypatch.setattr(app_main, "connect_db", fake_connect_db)
-    monkeypatch.setattr(app_main, "consume_events", fake_consume_events)
-    monkeypatch.setattr(app_main, "close_db", fake_close_db)
+    monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(worker_module, "connect_db", fake_connect_db)
+    monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(worker_module, "close_db", fake_close_db)
 
-    with TestClient(app):
-        assert app.state.consumer_task is not None
+    asyncio.run(worker_module.run_worker())
 
-    assert app.state.consumer_task is None
-    assert calls == ["connect", "consumer-start", "consumer-stopped", "close"]
+    assert calls == ["connect", "consumer-start", "close"]
 
 
-def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
     async def fake_connect_db() -> None:
@@ -406,16 +423,14 @@ def test_lifespan_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.Mo
     def fake_close_db() -> None:
         calls.append("close")
 
-    monkeypatch.setattr(app_main, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
-    monkeypatch.setattr(app_main, "connect_db", fake_connect_db)
-    monkeypatch.setattr(app_main, "consume_events", fake_consume_events)
-    monkeypatch.setattr(app_main, "close_db", fake_close_db)
+    monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module, "connect_db", fake_connect_db)
+    monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
+    monkeypatch.setattr(worker_module, "close_db", fake_close_db)
 
-    with TestClient(app):
-        assert app.state.consumer_task is not None
+    asyncio.run(worker_module.run_worker())
 
-    assert app.state.consumer_task is None
-    assert app.state.consumer_stop_event is None
     assert calls == ["connect", "consumer-start", "consumer-cancelled", "close"]
 
 

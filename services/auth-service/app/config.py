@@ -5,6 +5,7 @@ from observability import ObservabilityConfig, observability_config_from_env
 
 class Settings:
     service_name = "auth-service"
+    uvicorn_workers = int(os.getenv("UVICORN_WORKERS", "2"))
     database_url = os.getenv("DATABASE_URL", "sqlite:///./auth_service.db")
     token_ttl_seconds = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "900"))
     refresh_token_ttl_seconds = int(os.getenv("AUTH_REFRESH_TOKEN_TTL_SECONDS", "604800"))

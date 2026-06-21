@@ -13,8 +13,6 @@ from server.operational import (
 from app.config import settings
 from app.database import engine, init_db
 from app.exceptions import register_exception_handlers
-import asyncio
-from app.consumers.kafka_consumer import consume_ticket_issued
 from app.kafka import create_producer
 from app.metrics import configure_reservation_metrics
 from app.observability import configure_app_observability
@@ -49,27 +47,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.kafka_producer = producer
     if producer is not None:
         await producer.start()
-    stop_event = asyncio.Event()
-    from app.database import SessionLocal
-    consumer_task = asyncio.create_task(
-        consume_ticket_issued(
-            stop_event,
-            bootstrap_servers=settings.kafka_bootstrap_servers,
-            group_id=settings.kafka_group_id,
-            topic=settings.ticket_issued_topic,
-            session_factory=SessionLocal,
-            service_name=settings.service_name,
-        )
-    )
     try:
         yield
     finally:
-        stop_event.set()
-        consumer_task.cancel()
-        try:
-            await consumer_task
-        except asyncio.CancelledError:
-            pass
         if producer is not None:
             await producer.stop()
         app.state.kafka_producer = None
@@ -102,6 +82,3 @@ def create_app() -> FastAPI:
     app.include_router(reservation_router)
 
     return app
-
-
-app = create_app()
