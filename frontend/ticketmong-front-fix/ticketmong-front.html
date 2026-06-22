@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>티켓몽 — 공연 티켓 예매</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+:root{
+  --bg:#f5f3fa;--white:#ffffff;--card:#ffffff;
+  --primary:#7c4dff;--primary-d:#5e35b1;--primary-l:#ede7f6;--primary-vl:#f3efff;
+  --text:#1a1a2e;--sub:#666680;--muted:#9e9eb8;--line:#e8e5f0;
+  --ok:#4caf50;--warn:#ff9800;--err:#f44336;
+  --radius:14px;--shadow:0 2px 12px rgba(100,60,180,.08);
+  --font:'Noto Sans KR',-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;min-height:100vh;}
+/* header */
+.topbar{background:var(--white);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
+.topbar .logo{font-size:20px;font-weight:800;color:var(--primary);display:flex;align-items:center;gap:6px;}
+.topbar .logo span{font-size:22px;}
+.topbar .cfg{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+.topbar input{background:var(--primary-vl);border:1px solid var(--line);color:var(--text);padding:5px 8px;border-radius:8px;font-size:11px;width:220px;font-family:monospace;}
+/* layout */
+.wrap{max-width:480px;margin:0 auto;padding:16px 16px 80px;}
+/* steps */
+.step-bar{display:flex;align-items:center;gap:0;margin-bottom:20px;overflow-x:auto;padding:4px 0;}
+.step-bar .st{display:flex;align-items:center;gap:0;white-space:nowrap;}
+.step-bar .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid var(--line);color:var(--muted);background:var(--white);flex:none;}
+.step-bar .dot.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.step-bar .dot.done{background:var(--ok);color:#fff;border-color:var(--ok);}
+.step-bar .lbl{font-size:9px;color:var(--muted);position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);white-space:nowrap;}
+.step-bar .arr{color:var(--line);font-size:12px;margin:0 3px;}
+/* card */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:14px;}
+.card h2{font-size:17px;font-weight:700;margin-bottom:14px;color:var(--text);}
+.card h3{font-size:14px;font-weight:600;color:var(--sub);margin-bottom:10px;}
+/* form */
+label.f{display:block;font-size:12px;font-weight:600;color:var(--sub);margin:10px 0 4px;}
+input.f,select.f{width:100%;background:var(--primary-vl);border:1.5px solid var(--line);color:var(--text);padding:10px 12px;border-radius:10px;font-size:14px;font-family:var(--font);outline:none;transition:border .2s;}
+input.f:focus,select.f:focus{border-color:var(--primary);}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .2s;width:100%;}
+.btn:hover{background:var(--primary-d);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-ghost{background:transparent;color:var(--primary);border:1.5px solid var(--primary);}
+.btn-ghost:hover{background:var(--primary-vl);}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:8px;width:auto;}
+/* concert list */
+.concert-card{display:flex;gap:14px;padding:14px;border:1.5px solid var(--line);border-radius:12px;margin-bottom:10px;cursor:pointer;transition:border .2s,box-shadow .2s;}
+.concert-card:hover{border-color:var(--primary);box-shadow:0 4px 16px rgba(124,77,255,.12);}
+.concert-card .poster{width:80px;height:100px;border-radius:10px;background:linear-gradient(135deg,var(--primary-l),var(--primary));display:flex;align-items:center;justify-content:center;font-size:28px;flex:none;}
+.concert-card .info{flex:1;}
+.concert-card .info .title{font-size:14px;font-weight:700;}
+.concert-card .info .detail{font-size:11px;color:var(--sub);margin-top:4px;}
+.concert-card .info .status{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;margin-top:6px;background:var(--primary-vl);color:var(--primary);}
+/* perf list */
+.perf-card{padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border .2s;}
+.perf-card:hover{border-color:var(--primary);}
+.perf-card .time{font-size:14px;font-weight:600;}
+.perf-card .meta{font-size:11px;color:var(--muted);}
+/* seat grid */
+.stage{background:var(--primary-l);color:var(--primary);text-align:center;padding:8px;border-radius:8px;font-size:11px;font-weight:700;margin-bottom:12px;letter-spacing:2px;}
+.seat-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;}
+.seat{aspect-ratio:1;border:1.5px solid var(--line);border-radius:6px;background:var(--white);font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:600;color:var(--sub);transition:all .15s;}
+.seat:hover:not(.taken){border-color:var(--primary);background:var(--primary-vl);}
+.seat.taken{background:#eee;color:#ccc;cursor:not-allowed;border-color:transparent;}
+.seat.selected{background:var(--primary);color:#fff;border-color:var(--primary);}
+.legend{display:flex;gap:14px;margin-top:10px;font-size:10px;color:var(--muted);}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:3px;}
+/* summary / confirm */
+.summary-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.summary-row:last-child{border:none;}
+.summary-row .k{color:var(--sub);}
+.summary-row .v{font-weight:600;}
+.total-row{display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800;color:var(--primary);}
+/* ticket */
+.ticket-card{background:linear-gradient(135deg,#7c4dff,#b388ff);border-radius:16px;padding:24px;color:#fff;text-align:center;position:relative;overflow:hidden;}
+.ticket-card::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.1);border-radius:50%;}
+.ticket-card .icon{font-size:48px;margin-bottom:8px;}
+.ticket-card .t{font-size:18px;font-weight:800;margin-bottom:4px;}
+.ticket-card .d{font-size:12px;opacity:.85;}
+.ticket-card .qr-wrap{display:inline-block;background:#fff;border-radius:10px;padding:10px;margin-top:14px;}
+.ticket-card .qr-wrap svg{display:block;}
+.ticket-detail{margin-top:12px;text-align:left;}
+.ticket-detail .row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.15);}
+.ticket-detail .row:last-child{border:none;}
+/* banner */
+.banner{padding:10px 14px;border-radius:10px;font-size:12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.banner.err{background:#fde8e8;color:#c62828;}
+.banner.ok{background:#e8f5e9;color:#2e7d32;}
+.banner.info{background:var(--primary-vl);color:var(--primary);}
+.banner .icon{font-size:16px;}
+/* demo accounts */
+.demo-btns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;}
+.demo-btns button{font-size:11px;padding:6px 10px;border-radius:8px;background:var(--primary-vl);color:var(--primary);border:1px solid var(--line);cursor:pointer;font-family:var(--font);font-weight:600;transition:all .15s;}
+.demo-btns button:hover{background:var(--primary);color:#fff;}
+/* method radio */
+.method-list{display:flex;flex-direction:column;gap:8px;margin:10px 0;}
+.method-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;cursor:pointer;transition:border .2s;}
+.method-item:hover,.method-item.sel{border-color:var(--primary);background:var(--primary-vl);}
+.method-item input[type=radio]{accent-color:var(--primary);width:16px;height:16px;}
+.method-item .lbl{font-size:13px;font-weight:600;}
+/* sim */
+.sim-wrap{display:flex;gap:6px;margin:8px 0;}
+.sim-wrap button{flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);color:var(--sub);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);}
+.sim-wrap button.sel{border-color:var(--primary);background:var(--primary-vl);color:var(--primary);}
+/* log */
+.log-toggle{position:fixed;bottom:16px;right:16px;z-index:200;background:var(--primary);color:#fff;border:none;width:48px;height:48px;border-radius:50%;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(124,77,255,.3);}
+.log-panel{position:fixed;bottom:76px;right:16px;width:380px;max-height:50vh;background:var(--white);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.12);overflow:auto;z-index:200;display:none;padding:14px;}
+.log-panel.open{display:block;}
+.log-panel h4{font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;}
+.le{font-family:monospace;font-size:10px;border-left:2px solid var(--line);padding:4px 8px;margin-bottom:4px;}
+.le .l1{color:var(--text);}
+.le .kv{color:var(--muted);}
+.le .kv b{color:var(--primary);font-weight:600;}
+.le.action{border-left-color:var(--primary);}
+.le.req{border-left-color:#aaa;}
+.le.ok{border-left-color:var(--ok);}
+.le.er{border-left-color:var(--err);}
+.le.idem .kv b{color:var(--warn);}
+.tag{display:inline-block;font-size:8px;padding:1px 4px;border-radius:3px;background:var(--primary-vl);color:var(--primary);margin-right:4px;font-weight:600;}
+@media(max-width:500px){.wrap{padding:12px 12px 80px;}.log-panel{width:calc(100vw - 32px);right:16px;}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><span>🎫</span>티켓몽</div>
+  <div class="cfg">
+    <span>API</span>
+    <input id="baseUrl" type="text" value="http://localhost:32407"/>
+  </div>
+</div>
+<div class="wrap" id="app"></div>
+
+<button class="log-toggle" onclick="toggleLog()" title="Client Log">📋</button>
+<div class="log-panel" id="logPanel">
+  <h4>Client Log (traceparent 전파)</h4>
+  <div id="lb"></div>
+</div>
+
+<script>
+/* === CONFIG === */
+const C={
+  base:()=>document.getElementById("baseUrl").value.trim(),
+  ep:{
+    demoAccounts:{m:"GET",p:"/auth/demo-accounts"},
+    login:{m:"POST",p:"/auth/login"},
+    concerts:{m:"GET",p:"/concerts"},
+    performances:{m:"GET",p:"/concerts/{concertId}/performances"},
+    seats:{m:"GET",p:"/performances/{performanceId}/seats"},
+    createReservation:{m:"POST",p:"/reservations"},
+    getReservation:{m:"GET",p:"/reservations/{id}"},
+    createPayment:{m:"POST",p:"/payments"},
+  },
+  pollMs:1500,pollMax:8,
+};
+
+/* === STATE === */
+const S={token:null,userId:null,concert:null,performance:null,seat:null,seatInfo:null,reservation:null,payment:null,traceparent:null,payIdemKey:null};
+const $=s=>document.querySelector(s);
+const uid=()=>crypto.randomUUID();
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const sh=v=>v?String(v).slice(0,8):"—";
+function tpTrace(tp){const m=/^00-([0-9a-f]{32})-/.exec(tp||"");return m?m[1]:null;}
+
+/* === LOG === */
+let logOpen=false;
+function toggleLog(){logOpen=!logOpen;$("#logPanel").classList.toggle("open",logOpen);}
+function log(kind,title,kv={}){
+  const el=document.createElement("div");el.className="le "+kind;
+  const kh=Object.entries(kv).map(([k,v])=>`<span class="kv">${k}=<b>${v}</b></span>`).join(" ");
+  const tag={action:"ACTION",req:"REQ",ok:"2xx",er:"ERR",idem:"IDEM"}[kind]||"";
+  el.innerHTML=`<div class="l1"><span class="tag">${tag}</span>${title}</div>${kh?`<div>${kh}</div>`:""}`;
+  $("#lb").prepend(el);
+}
+const logAction=name=>log("action",`유저 액션: ${name}`);
+
+/* === API === */
+class ApiError extends Error{constructor(s,c,m){super(m);this.status=s;this.code=c;}}
+async function api(key,{params={},query={},body,idemKey}={}){
+  const ep=C.ep[key];
+  let url=C.base()+ep.p.replace(/\{(\w+)\}/g,(_,k)=>encodeURIComponent(params[k]||""));
+  const qs=new URLSearchParams(query).toString();if(qs)url+="?"+qs;
+  const h={"Content-Type":"application/json"};
+  if(S.token)h["Authorization"]=`Bearer ${S.token}`;
+  if(S.userId)h["X-User-Id"]=S.userId;
+  if(S.traceparent)h["traceparent"]=S.traceparent;
+  if(idemKey)h["Idempotency-Key"]=idemKey;
+  log("req",`${ep.m} ${ep.p}`,{trace:S.traceparent?`trace:${sh(tpTrace(S.traceparent))}`:"첫요청",...(idemKey?{idem:sh(idemKey)}:{})});
+  const res=await fetch(url,{method:ep.m,headers:h,body:body!==undefined?JSON.stringify(body):undefined});
+  const tp=res.headers.get("traceparent"),xtr=res.headers.get("X-Trace-Id"),xrq=res.headers.get("X-Request-Id");
+  if(tp)S.traceparent=tp;
+  let data=null;try{data=await res.json();}catch{}
+  if(!res.ok){const code=data?.error?.code||"error",msg=data?.error?.message||"error";log("er",`${res.status} ${code}`,{trace:sh(xtr),req:sh(xrq)});throw new ApiError(res.status,code,msg);}
+  log("ok",`${res.status}`,{trace:sh(xtr),req:sh(xrq)});
+  return data;
+}
+
+/* === UI === */
+const STEPS=["홈","공연","회차","좌석","확인","결제","티켓"];
+let stepIdx=0;
+function stepBar(){
+  return `<div class="step-bar">${STEPS.map((s,i)=>{
+    let cls=i===stepIdx?"active":i<stepIdx?"done":"";
+    return `<div class="st"><div class="dot ${cls}">${i<stepIdx?"✓":i+1}</div>${i<STEPS.length-1?'<span class="arr">→</span>':""}</div>`;
+  }).join("")}</div>`;
+}
+const render=h=>{$("#app").innerHTML=stepBar()+h;};
+const banner=(k,ico,m)=>`<div class="banner ${k}"><span class="icon">${ico}</span>${m}</div>`;
+
+/* 1. LOGIN */
+async function viewLogin(err){
+  stepIdx=0;
+  let demos=[];
+  try{demos=await api("demoAccounts");}catch{}
+  render(`<div class="card"><h2>로그인</h2>
+    ${err?banner("err","❌",err):""}
+    ${demos.length?`<div class="demo-btns">${demos.map(d=>
+      `<button data-e="${d.email}" data-p="${d.password}">${d.displayName}<br><span style="font-weight:400;font-size:10px">${d.role}</span></button>`
+    ).join("")}</div>`:""}
+    <label class="f">이메일</label><input class="f" id="em" type="email" value="${demos.find(d=>d.role==='CUSTOMER')?.email||""}" placeholder="email@example.com"/>
+    <label class="f">비밀번호</label><input class="f" id="pw" type="password" value="${demos.find(d=>d.role==='CUSTOMER')?.password||""}" placeholder="비밀번호"/>
+    <div style="height:14px"></div>
+    <button class="btn" id="loginBtn">로그인</button>
+  </div>`);
+  $("#loginBtn").onclick=doLogin;
+  document.querySelectorAll(".demo-btns button").forEach(b=>{b.onclick=()=>{$("#em").value=b.dataset.e;$("#pw").value=b.dataset.p;};});
+}
+async function doLogin(){
+  logAction("로그인");$("#loginBtn").disabled=true;
+  try{const r=await api("login",{body:{email:$("#em").value,password:$("#pw").value}});S.token=r.accessToken;S.userId=r.user?.id;viewConcerts();}
+  catch(e){viewLogin(`${e.code}: ${e.message}`);}
+}
+
+/* 2. CONCERTS */
+async function viewConcerts(){
+  stepIdx=1;render(`<div class="card"><h2>공연 선택</h2><div id="cl"><div style="text-align:center;padding:20px;color:var(--muted)">불러오는 중...</div></div></div>`);
+  logAction("공연 목록");
+  try{
+    const r=await api("concerts",{query:{limit:20}});
+    if(!r.items?.length){$("#cl").innerHTML=banner("info","📭","등록된 공연이 없습니다.");return;}
+    const emojis=["🎤","🎵","🎸","🎹","🎺","🥁","🎻","🎷"];
+    $("#cl").innerHTML=r.items.map((c,i)=>
+      `<div class="concert-card" data-idx="${i}">
+        <div class="poster">${emojis[i%emojis.length]}</div>
+        <div class="info">
+          <div class="title">${c.title}</div>
+          <div class="detail">📍 ${c.venue?.name||"장소 미정"}<br>📅 ${c.startsAt?new Date(c.startsAt).toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"short"}):""}</div>
+          <div class="status">${c.status}</div>
+        </div>
+      </div>`
+    ).join("");
+    const items=r.items;
+    document.querySelectorAll(".concert-card").forEach(el=>{el.onclick=()=>{S.concert=items[el.dataset.idx];viewPerformances();};});
+  }catch(e){$("#cl").innerHTML=banner("err","❌",`조회 실패: ${e.code}`);}
+}
+
+/* 3. PERFORMANCES */
+async function viewPerformances(){
+  stepIdx=2;render(`<div class="card"><h2>${S.concert.title}</h2><h3>날짜 / 시간 선택</h3><div id="pl"><div style="text-align:center;padding:20px;color:var(--muted)">불러오는 중...</div></div></div>`);
+  logAction("회차 목록");
+  try{
+    const r=await api("performances",{params:{concertId:S.concert.id},query:{limit:20}});
+    if(!r.items?.length){$("#pl").innerHTML=banner("info","📭","등록된 회차가 없습니다.");return;}
+    $("#pl").innerHTML=r.items.map((p,i)=>{
+      const d=new Date(p.startsAt);
+      return `<div class="perf-card" data-idx="${i}">
+        <div><div class="time">${d.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"short"})}</div>
+          <div class="meta">${d.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})} · ${p.status}</div></div>
+        <span style="color:var(--primary);font-weight:700;font-size:20px">›</span>
+      </div>`;
+    }).join("");
+    const items=r.items;
+    document.querySelectorAll(".perf-card").forEach(el=>{el.onclick=()=>{S.performance=items[el.dataset.idx];viewSeats();};});
+  }catch(e){$("#pl").innerHTML=banner("err","❌",`조회 실패: ${e.code}`);}
+}
+
+/* 4. SEATS */
+async function viewSeats(){
+  stepIdx=3;render(`<div class="card"><h2>좌석 선택</h2><div id="sl"><div style="text-align:center;padding:20px;color:var(--muted)">불러오는 중...</div></div></div>`);
+  logAction("좌석 목록");
+  try{
+    const r=await api("seats",{params:{performanceId:S.performance.id},query:{limit:200}});
+    if(!r.items?.length){$("#sl").innerHTML=banner("info","📭","좌석 없음");return;}
+    const items=r.items;
+    $("#sl").innerHTML=`<div class="stage">S T A G E</div>
+      <div class="seat-grid">${items.map(s=>
+        `<div class="seat ${s.status!=="AVAILABLE"?"taken":""}" data-id="${s.id}" data-status="${s.status}" title="${s.section||""} ${s.row||""}${s.number||""}">${s.row||""}${s.number||s.id.slice(-3)}</div>`
+      ).join("")}</div>
+      <div class="legend"><span><i style="background:var(--white);border:1px solid var(--line)"></i>선택 가능</span><span><i style="background:#eee"></i>매진</span><span><i style="background:var(--primary)"></i>선택</span></div>
+      <div style="height:14px"></div>
+      <button class="btn" id="resvBtn" disabled>좌석 선택</button>`;
+    let sel=null;
+    document.querySelectorAll(".seat:not(.taken)").forEach(el=>{
+      el.onclick=()=>{sel?.classList.remove("selected");el.classList.add("selected");sel=el;S.seat=el.dataset.id;S.seatInfo=items.find(s=>s.id===el.dataset.id);$("#resvBtn").disabled=false;$("#resvBtn").textContent=`${el.title||el.dataset.id} 좌석 선택`;};
+    });
+    $("#resvBtn").onclick=doReserve;
+  }catch(e){$("#sl").innerHTML=banner("err","❌",`조회 실패: ${e.code}`);}
+}
+
+/* 5. RESERVE */
+async function doReserve(){
+  logAction("예약 생성");$("#resvBtn").disabled=true;$("#resvBtn").textContent="예약 중...";
+  try{
+    const r=await api("createReservation",{body:{performanceId:S.performance.id,seatId:S.seat,concertId:S.concert.id}});
+    S.reservation=r;S.payIdemKey=uid();viewConfirm();
+  }catch(e){
+    if(e.status===409){alert(`좌석 충돌 (${e.code})\n다른 좌석을 선택해주세요.`);viewSeats();}
+    else{$("#resvBtn").disabled=false;$("#resvBtn").textContent="다시 시도";alert(`예약 실패: ${e.code}`);}
+  }
+}
+
+/* 5b. CONFIRM → PAY */
+function viewConfirm(){
+  stepIdx=5;
+  const si=S.seatInfo||{};
+  render(`<div class="card"><h2>예매 확인</h2>
+    <div class="summary-row"><span class="k">공연</span><span class="v">${S.concert.title}</span></div>
+    <div class="summary-row"><span class="k">일시</span><span class="v">${new Date(S.performance.startsAt).toLocaleString("ko-KR")}</span></div>
+    <div class="summary-row"><span class="k">장소</span><span class="v">${S.concert.venue?.name||""}</span></div>
+    <div class="summary-row"><span class="k">좌석</span><span class="v">${si.section||""} ${si.row||""}열 ${si.number||""} (${S.seat})</span></div>
+    <div class="summary-row"><span class="k">예약 상태</span><span class="v">${S.reservation.status}</span></div>
+    <div class="summary-row"><span class="k">만료</span><span class="v">${new Date(S.reservation.expiresAt).toLocaleTimeString("ko-KR")}</span></div>
+  </div>
+  <div class="card"><h2>결제</h2>
+    ${banner("info","💡","결제하기를 두 번 눌러보세요 — 같은 Idempotency-Key로 중복 결제가 차단됩니다.")}
+    <h3>결제 수단</h3>
+    <div class="method-list">
+      <label class="method-item sel"><input type="radio" name="method" value="card" checked/><span class="lbl">💳 신용/체크카드</span></label>
+      <label class="method-item"><input type="radio" name="method" value="transfer"/><span class="lbl">🏦 계좌이체</span></label>
+    </div>
+    <h3>시뮬레이션 (mock 결제)</h3>
+    <div class="sim-wrap">
+      <button class="sel" data-v="approve">✅ 승인</button>
+      <button data-v="fail">❌ 실패</button>
+      <button data-v="delay">⏳ 지연</button>
+    </div>
+    <input type="hidden" id="simVal" value="approve"/>
+    <div style="height:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="payBtn" style="flex:2">결제하기</button>
+      <button class="btn btn-ghost" id="payAgainBtn" style="flex:1;font-size:12px">중복 테스트</button>
+    </div>
+    <div id="payMsg" style="margin-top:10px"></div>
+  </div>`);
+  // method radio styling
+  document.querySelectorAll(".method-item").forEach(el=>{
+    el.onclick=()=>{document.querySelectorAll(".method-item").forEach(x=>x.classList.remove("sel"));el.classList.add("sel");};
+  });
+  // sim buttons
+  document.querySelectorAll(".sim-wrap button").forEach(b=>{
+    b.onclick=()=>{document.querySelectorAll(".sim-wrap button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");$("#simVal").value=b.dataset.v;};
+  });
+  $("#payBtn").onclick=()=>doPay(false);
+  $("#payAgainBtn").onclick=()=>doPay(true);
+}
+
+async function doPay(again){
+  logAction(again?"결제 재시도(중복)":"결제");
+  const method=document.querySelector('input[name=method]:checked')?.value||"card";
+  try{
+    const r=await api("createPayment",{body:{reservationId:S.reservation.id,concertId:S.concert.id,seatId:S.seat,amount:66000,method,simulation:$("#simVal").value},idemKey:S.payIdemKey});
+    S.payment=r;
+    $("#payMsg").innerHTML=banner("ok","✅",`결제 ${r.status} (${r.id}) — 티켓 발행 대기 중...`);
+    if(!again)pollTicket();
+  }catch(e){$("#payMsg").innerHTML=banner("err","❌",`결제 실패: ${e.code} — ${e.message}`);}
+}
+
+/* 7. TICKET POLL */
+async function pollTicket(){
+  stepIdx=6;
+  for(let i=0;i<C.pollMax;i++){
+    await wait(C.pollMs);
+    try{const r=await api("getReservation",{params:{id:S.reservation.id}});
+      if(r.status==="TICKETED"||r.status==="CONFIRMED")return viewTicket(r);
+      if(r.status==="CANCELLED"||r.status==="EXPIRED"){$("#payMsg").innerHTML=banner("err","❌",`예약 ${r.status}`);return;}
+    }catch{}
+  }
+  $("#payMsg").innerHTML=banner("err","⏳","티켓 발행이 지연되고 있어요.");
+}
+
+function viewTicket(r){
+  stepIdx=6;
+  render(`<div class="ticket-card">
+    <div class="icon">✅</div>
+    <div class="t">예매가 완료되었습니다!</div>
+    <div class="d">즐거운 관람 되세요 🎉</div>
+    <div class="qr-wrap"><svg width="80" height="80" viewBox="0 0 10 10">${qr()}</svg></div>
+    <div class="ticket-detail">
+      <div class="row"><span>공연</span><span>${S.concert.title}</span></div>
+      <div class="row"><span>일시</span><span>${new Date(S.performance.startsAt).toLocaleString("ko-KR")}</span></div>
+      <div class="row"><span>장소</span><span>${S.concert.venue?.name||""}</span></div>
+      <div class="row"><span>좌석</span><span>${r.seatId}</span></div>
+      <div class="row"><span>결제</span><span>${S.payment?.id||""}</span></div>
+    </div>
+  </div>
+  <div style="height:14px"></div>
+  <button class="btn btn-ghost" onclick="resetAll()">홈으로 이동</button>`);
+}
+
+function resetAll(){Object.keys(S).forEach(k=>S[k]=null);viewLogin();}
+function qr(){let s='<rect width="10" height="10" fill="#fff"/>';for(let y=0;y<10;y++)for(let x=0;x<10;x++)if((x*7+y*3+x*y)%3===0)s+=`<rect x="${x}" y="${y}" width="1" height="1" fill="#7c4dff"/>`;return s;}
+
+viewLogin();
+</script>
+</body>
+</html>
