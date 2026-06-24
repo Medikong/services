@@ -466,6 +466,11 @@ def test_worker_creates_producer_awaits_consumer_and_disposes_engine(monkeypatch
         stop_event.set()
 
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(
+        worker_module,
+        "configure_worker_observability",
+        lambda config: calls.append(("observability", config.service_name)),
+    )
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: calls.append("create-all"))
     monkeypatch.setattr(worker_module, "create_producer", fake_create_producer)
     monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
@@ -475,6 +480,7 @@ def test_worker_creates_producer_awaits_consumer_and_disposes_engine(monkeypatch
 
     assert producer.stopped is True
     assert calls == [
+        ("observability", "ticket-service"),
         "create-all",
         "create-producer",
         "producer-start",
@@ -504,6 +510,7 @@ def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module, "configure_worker_observability", lambda config: calls.append("observability"))
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
     monkeypatch.setattr(worker_module, "create_producer", lambda: WorkerKafkaProducer())
     monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
@@ -512,6 +519,7 @@ def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.Monk
     asyncio.run(worker_module.run_worker())
 
     assert calls == [
+        "observability",
         "producer-start",
         "consumer-start",
         "consumer-cancelled",

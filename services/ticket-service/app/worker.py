@@ -6,6 +6,7 @@ from app.config import settings
 from app.consumers.kafka_consumer import EventHandlers, consume_events
 from app.database import SessionLocal, engine
 from app.kafka import KafkaProducer, create_producer
+from app.observability import configure_worker_observability
 from app.services.ticket_service import PaymentApprovedEventHandler
 
 
@@ -42,6 +43,7 @@ async def _stop_background_task(task: asyncio.Task[None] | None, stop_event: asy
 
 async def run_worker() -> None:
     """payment-approved consumer를 HTTP app과 별도 프로세스로 실행한다."""
+    configure_worker_observability(settings.observability_config())
     models.Base.metadata.create_all(bind=engine)
 
     producer = create_producer()

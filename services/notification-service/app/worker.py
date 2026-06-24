@@ -1,8 +1,10 @@
 import asyncio
 import signal
 
+from app.config import settings
 from app.consumers.kafka_consumer import consume_events
 from app.database import connect_db, close_db
+from app.observability import configure_worker_observability
 
 
 _BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS = 5.0
@@ -34,6 +36,7 @@ async def _stop_background_task(task: asyncio.Task[None] | None, stop_event: asy
 
 async def run_worker() -> None:
     """notification Kafka consumer를 HTTP app과 별도 프로세스로 실행한다."""
+    configure_worker_observability(settings.observability_config())
     await connect_db()
     stop_event = asyncio.Event()
     _install_signal_handlers(stop_event)

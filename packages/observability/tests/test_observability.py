@@ -38,6 +38,7 @@ from observability import (
     TraceContext,
     capture_current_trace_context,
     configure_process_logging,
+    configure_process_observability,
     configure_process_profiling,
     configure_process_tracing,
     create_request_log_middleware,
@@ -51,6 +52,7 @@ from observability import (
     start_trace_span,
     trace_recorder,
 )
+from observability import process as process_module
 from observability import profiling as profiling_module
 from observability import tracing as tracing_module
 from observability.tracing import _otlp_trace_export_enabled
@@ -257,6 +259,32 @@ def test_configure_process_profiling_requires_server_address(monkeypatch) -> Non
                 profiling=ProfilingConfig(enabled=True),
             )
         )
+
+
+def test_configure_process_observability_wires_process_level_hooks(monkeypatch) -> None:
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_configure_process_logging() -> None:
+        calls.append(("logging", None))
+
+    def fake_configure_process_profiling(config: ObservabilityConfig) -> bool:
+        calls.append(("profiling", config.service_name))
+        return True
+
+    def fake_configure_process_tracing(config: ObservabilityConfig) -> None:
+        calls.append(("tracing", config.service_name))
+
+    monkeypatch.setattr(process_module, "configure_process_logging", fake_configure_process_logging)
+    monkeypatch.setattr(process_module, "configure_process_profiling", fake_configure_process_profiling)
+    monkeypatch.setattr(process_module, "configure_process_tracing", fake_configure_process_tracing)
+
+    configure_process_observability(ObservabilityConfig(service_name="worker-service"))
+
+    assert calls == [
+        ("logging", None),
+        ("profiling", "worker-service"),
+        ("tracing", "worker-service"),
+    ]
 
 
 def test_instrument_fastapi_app_passes_configured_excluded_urls(monkeypatch) -> None:

@@ -2,9 +2,7 @@ from fastapi import FastAPI
 from observability import (
     ErrorRecordingMiddleware,
     ObservabilityConfig,
-    configure_process_logging,
-    configure_process_profiling,
-    configure_process_tracing,
+    configure_process_observability,
     create_request_log_middleware,
     instrument_fastapi_app,
 )
@@ -18,9 +16,7 @@ from server import (
 
 def configure_app_observability(app: FastAPI, config: ObservabilityConfig) -> None:
     # 프로세스 설정에서 tracer와 전송 exporter를 붙인다. 요청 처리 코드가 span을 직접 보내지 않는다.
-    configure_process_logging()
-    configure_process_profiling(config)
-    configure_process_tracing(config)
+    configure_worker_observability(config)
     # FastAPI 계측이 HTTP 요청 span을 자동으로 만들고, 요청이 끝나면 전송 흐름으로 넘긴다.
     instrument_fastapi_app(app, config)
     # 요청 로그에는 현재 span ID를 함께 남겨 stdout 로그와 trace를 나중에 이어 볼 수 있게 한다.
@@ -31,3 +27,7 @@ def configure_app_observability(app: FastAPI, config: ObservabilityConfig) -> No
     app.add_middleware(RuntimeRecoveryMiddleware)
     app.add_middleware(ResponseHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware, **request_context_middleware_options())
+
+
+def configure_worker_observability(config: ObservabilityConfig) -> None:
+    configure_process_observability(config)

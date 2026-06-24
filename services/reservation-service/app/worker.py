@@ -4,6 +4,7 @@ import signal
 from app.config import settings
 from app.consumers.kafka_consumer import consume_ticket_issued
 from app.database import SessionLocal, engine, init_db
+from app.observability import configure_worker_observability
 
 
 _BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS = 5.0
@@ -35,6 +36,7 @@ async def _stop_background_task(task: asyncio.Task[None] | None, stop_event: asy
 
 async def run_worker() -> None:
     """ticket-issued consumer를 HTTP app과 별도 프로세스로 실행한다."""
+    configure_worker_observability(settings.observability_config())
     init_db()
 
     stop_event = asyncio.Event()

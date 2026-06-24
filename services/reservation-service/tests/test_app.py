@@ -73,6 +73,11 @@ def test_worker_awaits_ticket_issued_consumer_and_disposes_engine(monkeypatch: M
         stop_event.set()
 
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(
+        worker_module,
+        "configure_worker_observability",
+        lambda config: calls.append(("observability", config.service_name)),
+    )
     monkeypatch.setattr(worker_module, "init_db", lambda: calls.append("init-db"))
     monkeypatch.setattr(worker_module, "consume_ticket_issued", fake_consume_ticket_issued)
     monkeypatch.setattr(worker_module.engine, "dispose", lambda: calls.append("dispose"))
@@ -80,6 +85,7 @@ def test_worker_awaits_ticket_issued_consumer_and_disposes_engine(monkeypatch: M
     asyncio.run(worker_module.run_worker())
 
     assert calls == [
+        ("observability", "reservation-service"),
         "init-db",
         ("consumer-start", "ticket-issued", worker_module.SessionLocal),
         "dispose",
@@ -99,6 +105,7 @@ def test_worker_cancels_ticket_issued_consumer_after_shutdown_timeout(monkeypatc
 
     monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module, "configure_worker_observability", lambda config: calls.append("observability"))
     monkeypatch.setattr(worker_module, "init_db", lambda: calls.append("init-db"))
     monkeypatch.setattr(worker_module, "consume_ticket_issued", fake_consume_ticket_issued)
     monkeypatch.setattr(worker_module.engine, "dispose", lambda: calls.append("dispose"))
@@ -106,6 +113,7 @@ def test_worker_cancels_ticket_issued_consumer_after_shutdown_timeout(monkeypatc
     asyncio.run(worker_module.run_worker())
 
     assert calls == [
+        "observability",
         "init-db",
         "consumer-start",
         "consumer-cancelled",

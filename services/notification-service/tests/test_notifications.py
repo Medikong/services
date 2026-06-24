@@ -399,13 +399,18 @@ def test_worker_awaits_consumer_before_closing_db(monkeypatch: pytest.MonkeyPatc
         calls.append("close")
 
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(
+        worker_module,
+        "configure_worker_observability",
+        lambda config: calls.append(("observability", config.service_name)),
+    )
     monkeypatch.setattr(worker_module, "connect_db", fake_connect_db)
     monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
     monkeypatch.setattr(worker_module, "close_db", fake_close_db)
 
     asyncio.run(worker_module.run_worker())
 
-    assert calls == ["connect", "consumer-start", "close"]
+    assert calls == [("observability", "notification-service"), "connect", "consumer-start", "close"]
 
 
 def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -427,13 +432,14 @@ def test_worker_cancels_consumer_after_shutdown_timeout(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module, "configure_worker_observability", lambda config: calls.append("observability"))
     monkeypatch.setattr(worker_module, "connect_db", fake_connect_db)
     monkeypatch.setattr(worker_module, "consume_events", fake_consume_events)
     monkeypatch.setattr(worker_module, "close_db", fake_close_db)
 
     asyncio.run(worker_module.run_worker())
 
-    assert calls == ["connect", "consumer-start", "consumer-cancelled", "close"]
+    assert calls == ["observability", "connect", "consumer-start", "consumer-cancelled", "close"]
 
 
 def test_readyz() -> None:

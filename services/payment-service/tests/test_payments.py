@@ -249,6 +249,11 @@ def test_worker_creates_producer_starts_dispatcher_and_disposes_engine(monkeypat
         stop_event.set()
 
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: None)
+    monkeypatch.setattr(
+        worker_module,
+        "configure_worker_observability",
+        lambda config: calls.append(("observability", config.service_name)),
+    )
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: calls.append("create-all"))
     monkeypatch.setattr(worker_module, "run_schema_migrations", lambda bind: calls.append("migrate"))
     monkeypatch.setattr(worker_module, "create_producer", fake_create_producer)
@@ -259,6 +264,7 @@ def test_worker_creates_producer_starts_dispatcher_and_disposes_engine(monkeypat
 
     assert producer.stopped is True
     assert calls == [
+        ("observability", "payment-service"),
         "create-all",
         "migrate",
         "create-producer",
@@ -289,6 +295,7 @@ def test_worker_cancels_dispatcher_after_shutdown_timeout(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(worker_module, "_BACKGROUND_TASK_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(worker_module, "_install_signal_handlers", lambda stop_event: stop_event.set())
+    monkeypatch.setattr(worker_module, "configure_worker_observability", lambda config: calls.append("observability"))
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
     monkeypatch.setattr(worker_module, "run_schema_migrations", lambda bind: None)
     monkeypatch.setattr(worker_module, "create_producer", lambda: WorkerKafkaProducer())
@@ -298,6 +305,7 @@ def test_worker_cancels_dispatcher_after_shutdown_timeout(monkeypatch: pytest.Mo
     asyncio.run(worker_module.run_worker())
 
     assert calls == [
+        "observability",
         "producer-start",
         "dispatcher-start",
         "dispatcher-cancelled",

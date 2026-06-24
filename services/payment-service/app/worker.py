@@ -5,6 +5,7 @@ from app import models
 from app.config import settings
 from app.database import SessionLocal, engine
 from app.kafka import create_producer
+from app.observability import configure_worker_observability
 from app.schema_migrations import run_schema_migrations
 from app.services.payment_events import run_payment_event_dispatcher
 
@@ -38,6 +39,7 @@ async def _stop_background_task(task: asyncio.Task[None] | None, stop_event: asy
 
 async def run_worker() -> None:
     """payment outbox dispatcher를 HTTP app과 별도 프로세스로 실행한다."""
+    configure_worker_observability(settings.observability_config())
     models.Base.metadata.create_all(bind=engine)
     run_schema_migrations(engine)
 

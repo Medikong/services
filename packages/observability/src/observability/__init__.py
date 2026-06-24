@@ -37,6 +37,7 @@ from observability.observation import (
     SpanTreatment,
 )
 from observability.profiling import configure_process_profiling
+from observability.process import configure_process_observability
 from observability.tracing import (
     CallsiteSpanProcessor,
     NoopTraceRecorder,
@@ -72,6 +73,7 @@ __all__ = [
     "ErrorKind",
     "ErrorObservation",
     "configure_process_logging",
+    "configure_process_observability",
     "configure_process_profiling",
     "configure_process_tracing",
     "configure_structured_logging",
