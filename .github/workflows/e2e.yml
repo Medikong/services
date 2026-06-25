@@ -12,8 +12,8 @@ on:
       - 'uv.lock'
       - 'Taskfile.yml'
       - '.github/workflows/e2e.yml'
-  schedule:
-    - cron: "0 18 * * *"
+  # schedule:
+  #   - cron: "0 18 * * *"
   workflow_dispatch:
 
 permissions:
