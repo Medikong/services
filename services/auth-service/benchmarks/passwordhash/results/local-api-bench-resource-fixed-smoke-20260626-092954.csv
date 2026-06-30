@@ -1,0 +1,7 @@
+mode,language,server,worker_model,workers,processes,cpu_control,total_cpu_slots,per_process_cpu_slots,runtime_slots,gomaxprocs,requests,concurrency,throughput_rps,mean_ms,min_ms,p50_ms,p95_ms,p99_ms,max_ms,errors,elapsed_ms,startup_time_ms,binary_size_mb,server_cpu_percent_avg,server_cpu_percent_max,server_rss_mb_avg,server_rss_mb_max,server_process_count_max,resource_sample_count,resource_sampler
+fixed_cpu,python,uvicorn,process,1,1,not_strict,1,1,,,1,1,18.902,52.58,52.58,52.58,52.58,52.58,52.58,0,52.903,641.0,,49.3,49.3,86.25,86.25,3,1,ps
+fixed_cpu,go,net/http,process-fanout,1,1,runtime_slots,1,1,1,1,1,1,37.342,26.633,26.633,26.633,26.633,26.633,26.633,0,26.779,429.0,8.01,2.5,2.5,10.312,10.312,1,1,ps
+fixed_cpu,nodejs,node:http,process-fanout,1,1,runtime_slots,1,1,1,,1,1,17.604,56.519,56.519,56.519,56.519,56.519,56.519,0,56.804,121.0,,15.7,15.7,50.891,50.891,1,1,ps
+fixed_cpu,nodejs,fastify,process-fanout,1,1,runtime_slots,1,1,1,,1,1,17.357,57.511,57.511,57.511,57.511,57.511,57.511,0,57.613,210.0,6.896,38.9,38.9,64.469,64.469,1,1,ps
+fixed_cpu,rust,tiny_http,process-fanout,1,1,not_strict,1,1,,,1,1,40.786,24.418,24.418,24.418,24.418,24.418,24.418,0,24.518,313.0,0.987,0.7,0.7,1.844,1.844,1,1,ps
+fixed_cpu,rust,axum,process-fanout,1,1,runtime_slots,1,1,1,,1,1,41.726,23.864,23.864,23.864,23.864,23.864,23.864,0,23.965,309.0,1.709,0.0,0.0,2.359,2.359,1,1,ps

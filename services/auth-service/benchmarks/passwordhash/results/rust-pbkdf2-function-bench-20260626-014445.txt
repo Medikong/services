@@ -1,0 +1,46 @@
+   Compiling version_check v0.9.5
+   Compiling typenum v1.20.1
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.46
+   Compiling subtle v2.6.1
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.186
+   Compiling zmij v1.0.21
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.150
+   Compiling cfg-if v1.0.4
+   Compiling httpdate v1.0.3
+   Compiling generic-array v0.14.7
+   Compiling chunked_transfer v1.5.0
+   Compiling ascii v1.1.0
+   Compiling log v0.4.33
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.2
+   Compiling tiny_http v0.12.0
+   Compiling base64 v0.22.1
+   Compiling syn v2.0.118
+   Compiling cpufeatures v0.2.17
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling pbkdf2 v0.12.2
+   Compiling serde_derive v1.0.228
+   Compiling medikong-auth-passwordhash-rust-server v0.1.0 (/Users/danghamo/Documents/gituhb/medikong/service/services/auth-service/benchmarks/passwordhash/rust-server)
+    Finished `release` profile [optimized] target(s) in 7.62s
+     Running unittests src/main.rs (/var/folders/71/g8r1q34n1_7dnyt30v2221kc0000gn/T/tmp.HXEcjItVwR/release/deps/medikong_auth_passwordhash_rust_server-7470ffd2b7d1e766)
+
+running 1 test
+{"language":"rust","benchmark":"verify_legacy_pbkdf2","requests":100,"throughput_per_second":11.574,"mean_ms":86.397,"min_ms":82.729,"p50_ms":84.994,"p95_ms":88.471,"p99_ms":127.268,"max_ms":139.364,"total_ms":8639.744}
+test tests::benchmark_verify_legacy_pbkdf2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 8.64s
+
+     Running tests/api_contract.rs (/var/folders/71/g8r1q34n1_7dnyt30v2221kc0000gn/T/tmp.HXEcjItVwR/release/deps/api_contract-6b0609960779e52c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
