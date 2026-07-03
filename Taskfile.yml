@@ -16,6 +16,8 @@ vars:
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
+  GO_TEST_PACKAGES: '{{default "./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/user-service/..." .GO_TEST_PACKAGES}}'
+  GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
 includes:
   tests:
@@ -99,6 +101,21 @@ tasks:
     desc: Run the default test target.
     cmds:
       - task: tests:test-unit
+
+  test-go-unit:
+    desc: Run Go unit tests for shared packages and Go services.
+    cmds:
+      - go test {{.GO_TEST_PACKAGES}}
+
+  test-go-integration:
+    desc: Run Go integration tests with the integration build tag.
+    cmds:
+      - go test -tags=integration {{.GO_TEST_PACKAGES}}
+
+  test-go-benchmark:
+    desc: Run Go benchmarks with the benchmark build tag.
+    cmds:
+      - go test -tags=benchmark -run '^$' -bench . -benchmem -benchtime '{{.GO_BENCH_TIME}}' {{.GO_TEST_PACKAGES}}
 
   test-all:
     desc: Run unit tests and Docker Compose E2E tests.

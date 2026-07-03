@@ -1,0 +1,12 @@
+get:
+  tags:
+    - operational
+  summary: Service process health.
+  description: Checks whether the user-service process is alive. External dependencies are not checked here.
+  responses:
+    "200":
+      description: Service process is alive.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../contracts/common/components.yaml#/components/schemas/HealthResponse

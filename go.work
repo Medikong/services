@@ -1,0 +1,9 @@
+go 1.26
+
+use (
+	./packages/go-authz
+	./packages/go-contracts
+	./packages/go-platform
+	./services/auth-service
+	./services/user-service
+)

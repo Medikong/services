@@ -9,5 +9,7 @@
 # tests:
 #   - order-service
 
-images: []
+images:
+  - auth-service
+  - user-service
 tests: []

@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: User Service API
+  version: 0.1.0
+  description: User service skeleton API. Business user routes are intentionally deferred.
+paths:
+  /healthz:
+    $ref: ./operational/healthz.yaml
+  /readyz:
+    $ref: ./operational/readyz.yaml
+  /metrics:
+    $ref: ./observability/metrics.yaml

@@ -9,6 +9,9 @@
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
 | 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `concert-service`, `notification-service`, `payment-service`, `reservation-service`, `ticket-service` |
+| Go 단위 테스트 | Go test | `packages/go-*`, `services/auth-service`, `services/user-service` |
+| Go 통합 테스트 | Go test + `integration` build tag | Go 서비스와 공용 패키지의 조립 경계 |
+| Go 벤치마크 | Go test + `benchmark` build tag | Go handler, 공용 패키지, 핵심 경로 성능 |
 | Service E2E | Docker Compose, PostgreSQL, MongoDB, Kafka, Docker Newman 컨테이너 | 시나리오 파일 단위로 티켓팅 서비스 DNS를 직접 호출해 기능 흐름 검증 |
 | Observability E2E | Docker Compose, OpenTelemetry Collector, Tempo, Grafana, Python smoke 컨테이너 | FastAPI inbound request span이 OTLP -> Collector -> Tempo 경로로 적재되는지 검증 |
 | Gateway E2E | 별도 future/Kubernetes scope | Kong/JWT/Ingress 라우팅, MetalLB 노출, gateway trace boundary 검증 |
@@ -52,6 +55,26 @@ services/reservation-service/tests/
 services/ticket-service/tests/
 ```
 
+Go 서비스와 공용 Go 패키지는 다음 구조를 사용한다.
+
+```text
+services/<go-service>/
+  internal/<package>/*_test.go # 패키지 내부 단위 테스트
+  tests/
+    integration/               # integration 태그로 실행하는 통합 테스트
+    benchmark/                 # benchmark 태그로 실행하는 벤치마크
+    fixtures/                  # fixture와 test helper
+    testdata/                  # Go 테스트용 정적 데이터
+
+packages/go-<package>/
+  <package>/*_test.go
+  tests/
+    integration/
+    benchmark/
+    fixtures/
+    testdata/
+```
+
 ## 로컬 단위 테스트
 
 루트에서 전체 서비스 테스트를 실행한다. `task test-unit`은 `tests/docker/Dockerfile` 템플릿으로 서비스별 Python 테스트 러너 이미지를 빌드한 뒤, 현재 소스 트리를 컨테이너에 마운트해 서비스별 pytest를 실행한다.
@@ -74,6 +97,27 @@ task test-services SERVICES="auth-service ticket-service"
 ```
 
 단위 테스트 리포트는 실행할 때마다 `tests/tmp/reports/unit/<service>/` 아래에 서비스별로 생성된다. 실패 원인과 assertion diff는 `pytest.log`에서 확인하고, CI 테스트 요약 도구는 `junit.xml`을 사용할 수 있다. Coverage는 `coverage.xml`과 `htmlcov/`로 남기지만 현재 단계에서는 coverage threshold로 CI를 실패시키지 않는다. 서비스별 `summary.json`과 전체 `tests/tmp/reports/unit/summary.json`에는 테스트 총계, 성공, 실패, 에러, skip, coverage 수치가 기록된다.
+
+## 로컬 Go 테스트
+
+Go 단위 테스트는 루트에서 실행한다.
+
+```bash
+task test-go-unit
+```
+
+통합 테스트는 `integration` build tag로 분리한다. 데이터베이스나 외부 의존성이 붙는 테스트는 이 범위에 둔다.
+
+```bash
+task test-go-integration
+```
+
+벤치마크는 `benchmark` build tag로 분리한다. 실행 시간은 `GO_BENCH_TIME`으로 조정할 수 있다.
+
+```bash
+task test-go-benchmark
+task test-go-benchmark GO_BENCH_TIME=3s
+```
 
 ## Service E2E 테스트 흐름
 

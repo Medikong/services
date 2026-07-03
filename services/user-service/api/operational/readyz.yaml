@@ -1,0 +1,18 @@
+get:
+  tags:
+    - operational
+  summary: Service readiness.
+  description: Checks whether user-service can receive traffic. No dependency check is registered in the skeleton yet.
+  responses:
+    "200":
+      description: Service is ready.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../contracts/common/components.yaml#/components/schemas/ReadinessResponse
+    "503":
+      description: Service is not ready.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../contracts/common/components.yaml#/components/schemas/ReadinessResponse
