@@ -5,8 +5,7 @@ vars:
   TEST_RUNNER_IMAGE_PREFIX: '{{default "ticketing-test-runner" .TEST_RUNNER_IMAGE_PREFIX}}'
   TEST_RUNNER_DOCKERFILE: '{{default "tests/docker/Dockerfile" .TEST_RUNNER_DOCKERFILE}}'
   PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
-  TEST_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
-  API_BENCHMARK_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
+  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
   API_BENCHMARK_REPORT_ROOT: '{{default "tests/tmp/reports/api-integration" .API_BENCHMARK_REPORT_ROOT}}'
   API_BENCHMARK_DOC_DIR: '{{default "../workspace/docs/evidence/services/api-integration-test-benchmark/half-year-early-growth" .API_BENCHMARK_DOC_DIR}}'
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
@@ -43,16 +42,19 @@ tasks:
       - |
         set -eu
         requested_service='{{default "" .SERVICE}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        python_bin='{{.PYTHON_BIN}}'
+        service_list="${repo_root}/{{.SERVICE_LIST_SCRIPT}}"
+        managed_services="$(sh "${service_list}" list --mode tests --format shell)"
         normalize_service() {
-          case "$1" in
-            auth|auth-service) printf '%s\n' 'auth-service' ;;
-            concert|concert-service) printf '%s\n' 'concert-service' ;;
-            notification|notification-service) printf '%s\n' 'notification-service' ;;
-            payment|payment-service) printf '%s\n' 'payment-service' ;;
-            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
-            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
-            *) return 1 ;;
-          esac
+          raw="$1"
+          for candidate in ${managed_services}; do
+            if [ "${raw}" = "${candidate}" ] || [ "${raw}-service" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+          done
+          return 1
         }
         image_for_service() {
           printf '%s-%s:local\n' '{{.TEST_RUNNER_IMAGE_PREFIX}}' "$1"
@@ -69,15 +71,19 @@ tasks:
         }
         if [ -n "${requested_service}" ]; then
           if ! service="$(normalize_service "${requested_service}")"; then
-            printf 'Unknown SERVICE=%s (expected one of: {{.TEST_SERVICES}}).\n' "${requested_service}" >&2
+            printf 'Unknown SERVICE=%s. Add services/%s/pyproject.toml and tests/ or adjust SERVICE_INCLUDE/SERVICE_EXCLUDE.\n' "${requested_service}" "${requested_service}" >&2
             exit 2
           fi
           build_service_image "${service}"
           exit 0
         fi
+        if [ -z "${managed_services}" ]; then
+          printf '%s\n' 'No managed service test suites found; test runner image build skipped.'
+          exit 0
+        fi
         pids=""
         failed=0
-        for service in {{.TEST_SERVICES}}; do
+        for service in ${managed_services}; do
           build_service_image "${service}" &
           pids="${pids} $!"
         done
@@ -101,20 +107,26 @@ tasks:
       - |
         set -eu
         requested_services='{{default "" .SERVICES}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        python_bin='{{.PYTHON_BIN}}'
+        service_list="${repo_root}/{{.SERVICE_LIST_SCRIPT}}"
+        managed_services="$(sh "${service_list}" list --mode tests --format shell)"
         if [ -z "${requested_services}" ]; then
-          printf '%s\n' 'SERVICES is required, for example: task test-services SERVICES="auth-service ticket-service"' >&2
-          exit 2
+          requested_services="${managed_services}"
+        fi
+        if [ -z "${requested_services}" ]; then
+          printf '%s\n' 'No managed service test suites found; unit tests skipped.'
+          exit 0
         fi
         normalize_service() {
-          case "$1" in
-            auth|auth-service) printf '%s\n' 'auth-service' ;;
-            concert|concert-service) printf '%s\n' 'concert-service' ;;
-            notification|notification-service) printf '%s\n' 'notification-service' ;;
-            payment|payment-service) printf '%s\n' 'payment-service' ;;
-            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
-            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
-            *) return 1 ;;
-          esac
+          raw="$1"
+          for candidate in ${managed_services}; do
+            if [ "${raw}" = "${candidate}" ] || [ "${raw}-service" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+          done
+          return 1
         }
         image_for_service() {
           printf '%s-%s:local\n' '{{.TEST_RUNNER_IMAGE_PREFIX}}' "$1"
@@ -132,7 +144,7 @@ tasks:
         services=""
         for requested in ${requested_services}; do
           if ! service="$(normalize_service "${requested}")"; then
-            printf 'Unknown SERVICE=%s (expected one of: {{.TEST_SERVICES}}).\n' "${requested}" >&2
+            printf 'Unknown SERVICE=%s. Add services/%s/pyproject.toml and tests/ or adjust SERVICE_INCLUDE/SERVICE_EXCLUDE.\n' "${requested}" "${requested}" >&2
             exit 2
           fi
           case " ${services} " in
@@ -140,11 +152,9 @@ tasks:
             *) services="${services} ${service}" ;;
           esac
         done
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         reports_root="${repo_root}/{{.UNIT_REPORT_DIR}}"
         rm -rf "${reports_root}"
         mkdir -p "${reports_root}"
-        python_bin='{{.PYTHON_BIN}}'
         pids=""
         failed=0
         for service in ${services}; do
@@ -215,8 +225,6 @@ tasks:
     desc: Run all managed service pytest suites in service-scoped Docker runners.
     cmds:
       - task: test-services
-        vars:
-          SERVICES: '{{.TEST_SERVICES}}'
 
   benchmark-concert-public-api:
     cmds:
@@ -246,7 +254,12 @@ tasks:
     cmds:
       - |
         set -eu
-        for service in {{.API_BENCHMARK_SERVICES}}; do
+        services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
+        if [ -z "${services}" ]; then
+          printf '%s\n' 'No managed service test suites found; API benchmark smoke skipped.'
+          exit 0
+        fi
+        for service in ${services}; do
           task --dir "{{.ROOT_DIR}}/tests" benchmark-api-smoke-service SERVICE="${service}" PRESET='{{default "smoke" .PRESET}}' SAMPLES='{{default "5" .SAMPLES}}' WARMUP='{{default "1" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
         done
 
@@ -263,7 +276,12 @@ tasks:
     cmds:
       - |
         set -eu
-        for service in {{.API_BENCHMARK_SERVICES}}; do
+        services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
+        if [ -z "${services}" ]; then
+          printf '%s\n' 'No managed service test suites found; API benchmark large skipped.'
+          exit 0
+        fi
+        for service in ${services}; do
           task --dir "{{.ROOT_DIR}}/tests" benchmark-api-large-service SERVICE="${service}" PRESET='{{default "half-year-early-growth" .PRESET}}' SAMPLES='{{default "100" .SAMPLES}}' WARMUP='{{default "2" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
         done
 
@@ -285,23 +303,23 @@ tasks:
         preset='{{default "smoke" .PRESET}}'
         samples='{{default "5" .SAMPLES}}'
         warmup='{{default "1" .WARMUP}}'
+        managed_services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
         normalize_service() {
-          case "$1" in
-            auth|auth-service) printf '%s\n' 'auth-service' ;;
-            concert|concert-service) printf '%s\n' 'concert-service' ;;
-            reservation|reservation-service) printf '%s\n' 'reservation-service' ;;
-            payment|payment-service) printf '%s\n' 'payment-service' ;;
-            ticket|ticket-service) printf '%s\n' 'ticket-service' ;;
-            notification|notification-service) printf '%s\n' 'notification-service' ;;
-            *) return 1 ;;
-          esac
+          raw="$1"
+          for candidate in ${managed_services}; do
+            if [ "${raw}" = "${candidate}" ] || [ "${raw}-service" = "${candidate}" ]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+          done
+          return 1
         }
         if [ -z "${requested}" ]; then
           printf '%s\n' 'SERVICE is required, for example: task benchmark-api-smoke-service SERVICE=reservation-service PRESET=smoke' >&2
           exit 2
         fi
         if ! service="$(normalize_service "${requested}")"; then
-          printf 'Unknown SERVICE=%s (expected one of: {{.API_BENCHMARK_SERVICES}}).\n' "${requested}" >&2
+          printf 'Unknown SERVICE=%s. Add services/%s/pyproject.toml and tests/ or adjust SERVICE_INCLUDE/SERVICE_EXCLUDE.\n' "${requested}" "${requested}" >&2
           exit 2
         fi
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
@@ -454,6 +472,11 @@ tasks:
         compose_services='{{.E2E_COMPOSE_SERVICES}}'
         scenario_key='{{.E2E_SCENARIO}}'
         report_name='{{.E2E_REPORT_NAME}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        if ! find "${repo_root}/tests/e2e/scenarios" -name '*.postman_collection.json' -print -quit 2>/dev/null | grep -q .; then
+          printf '%s\n' 'No E2E Postman scenarios found; E2E skipped.'
+          exit 0
+        fi
         if [ -n "${scenario}" ]; then
           scenario_key="${scenario}"
         fi
@@ -492,7 +515,6 @@ tasks:
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}'
         file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         mkdir -p "${repo_root}/tests/e2e/newman/reports"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
         ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}

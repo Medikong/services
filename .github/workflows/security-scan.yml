@@ -7,6 +7,8 @@ on:
     paths:
       - 'services/**'
       - 'packages/**'
+      - 'config/services.yml'
+      - 'scripts/list_services.sh'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
@@ -18,6 +20,8 @@ on:
     paths:
       - 'services/**'
       - 'packages/**'
+      - 'config/services.yml'
+      - 'scripts/list_services.sh'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
@@ -53,44 +57,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 변경 경로 감지
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            auth-service:
-              - 'services/auth-service/**'
-            concert-service:
-              - 'services/concert-service/**'
-            notification-service:
-              - 'services/notification-service/**'
-            payment-service:
-              - 'services/payment-service/**'
-            reservation-service:
-              - 'services/reservation-service/**'
-            ticket-service:
-              - 'services/ticket-service/**'
-            security-common:
-              - 'packages/**'
-              - 'pyproject.toml'
-              - 'uv.lock'
-              - 'Taskfile.yml'
-              - '.dockerignore'
-              - '.github/workflows/security-scan.yml'
-
       - name: 스캔 matrix 생성
         id: matrix
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          all_services='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
-          changed='${{ steps.changes.outputs.changes }}'
-          service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['security-common'] }}" = "true" ]; then
-            services="${all_services}"
+          base="${BASE_SHA:-${BEFORE_SHA:-}}"
+          if [ -z "${base}" ] || [[ "${base}" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || true)"
+          fi
+          if [ -n "${base}" ]; then
+            git diff --name-only "${base}" HEAD > changed-files.txt
           else
-            services="$(jq -c --argjson allowed "${service_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
+            git ls-files > changed-files.txt
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            services="$(sh scripts/list_services.sh select --mode images --all --format json)"
+          else
+            services="$(sh scripts/list_services.sh select \
+              --mode images \
+              --changed-files changed-files.txt \
+              --common packages \
+              --common pyproject.toml \
+              --common uv.lock \
+              --common Taskfile.yml \
+              --common .dockerignore \
+              --common config/services.yml \
+              --common scripts/list_services.sh \
+              --common .github/workflows/security-scan.yml \
+              --format json)"
           fi
 
           service_count="$(jq 'length' <<<"${services}")"

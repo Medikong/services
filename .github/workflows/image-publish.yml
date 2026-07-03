@@ -6,12 +6,7 @@ name: Image Publish
 on:
   push:
     tags:
-      - 'deploy/dev/auth-service/v*.*.*'
-      - 'deploy/dev/concert-service/v*.*.*'
-      - 'deploy/dev/reservation-service/v*.*.*'
-      - 'deploy/dev/payment-service/v*.*.*'
-      - 'deploy/dev/ticket-service/v*.*.*'
-      - 'deploy/dev/notification-service/v*.*.*'
+      - 'deploy/dev/*/v*.*.*'
       - 'deploy/dev/changed/*.*.*-*'
       - 'deploy/dev/all/*.*.*-*'
 
@@ -52,7 +47,7 @@ jobs:
           DEPLOY_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
+          all_images="$(sh scripts/list_services.sh list --mode images --format json)"
 
           IFS=/ read -r deploy_prefix deploy_environment deploy_target deploy_value deploy_extra <<EOF
           ${DEPLOY_TAG}
@@ -63,15 +58,15 @@ jobs:
             exit 2
           fi
 
-          case "${deploy_target}" in
-            auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
+          if jq -e --arg target "${deploy_target}" 'index($target)' <<<"${all_images}" >/dev/null; then
               if ! [[ "${deploy_value}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                 printf '서비스 deploy tag의 버전이 SemVer가 아닙니다: %s\n' "${DEPLOY_TAG}" >&2
                 exit 2
               fi
               images="$(jq -nc --arg image "${deploy_target}" --arg tag "${deploy_value}" '[{image: $image, tag: $tag}]')"
-              ;;
-            changed|all)
+          else
+            case "${deploy_target}" in
+              changed|all)
               git fetch --tags --force
               tag_contents="$(git for-each-ref "refs/tags/${DEPLOY_TAG}" --format='%(contents)')"
               if ! jq -e . >/dev/null <<<"${tag_contents}"; then
@@ -107,12 +102,14 @@ jobs:
                 ' <<<"${tag_contents}" >/dev/null
 
               images="$(jq -c '.services | map({image, tag})' <<<"${tag_contents}")"
-              ;;
-            *)
-              printf '지원하지 않는 deploy target입니다: %s\n' "${deploy_target}" >&2
-              exit 2
-              ;;
-          esac
+                ;;
+              *)
+                printf '지원하지 않는 deploy target입니다: %s\n' "${deploy_target}" >&2
+                printf '현재 서비스 이미지 후보: %s\n' "${all_images}" >&2
+                exit 2
+                ;;
+            esac
+          fi
 
           image_count="$(jq 'length' <<<"${images}")"
           printf 'images=%s\n' "${images}" >> "${GITHUB_OUTPUT}"
@@ -310,7 +307,10 @@ jobs:
           while IFS= read -r item; do
             image="$(jq -r '.image' <<<"${item}")"
             tag="$(jq -r '.tag' <<<"${item}")"
-            service_file="values/services/${image%-service}.yaml"
+            service_file="values/services/${image}.yaml"
+            if [ ! -f "${service_file}" ] && [[ "${image}" == *-service ]]; then
+              service_file="values/services/${image%-service}.yaml"
+            fi
 
             if [ ! -f "${service_file}" ]; then
               printf 'GitOps values 파일을 찾을 수 없습니다: %s\n' "${service_file}" >&2

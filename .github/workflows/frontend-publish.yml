@@ -36,7 +36,19 @@ jobs:
       - name: 소스 내려받기
         uses: actions/checkout@v4
 
+      - name: 프론트엔드 이미지 대상 확인
+        id: frontend
+        shell: bash
+        run: |
+          if [ -f frontend/Dockerfile ]; then
+            printf 'enabled=true\n' >> "${GITHUB_OUTPUT}"
+          else
+            printf 'enabled=false\n' >> "${GITHUB_OUTPUT}"
+            printf '%s\n' 'frontend/Dockerfile이 없어 프론트엔드 이미지 publish를 건너뜁니다.'
+          fi
+
       - name: 이미지 태그 결정
+        if: steps.frontend.outputs.enabled == 'true'
         id: meta
         shell: bash
         run: |
@@ -56,18 +68,22 @@ jobs:
           printf '선택된 태그: %s\n' "${tag}"
 
       - name: AWS 인증 (OIDC)
+        if: steps.frontend.outputs.enabled == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::941141115079:role/github-actions-ecr-role
           aws-region: ap-northeast-2
 
       - name: ECR 로그인
+        if: steps.frontend.outputs.enabled == 'true'
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Docker Buildx 설정
+        if: steps.frontend.outputs.enabled == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: 이미지 빌드 및 push
+        if: steps.frontend.outputs.enabled == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -81,6 +97,7 @@ jobs:
           cache-to: type=gha,scope=frontend,mode=max
 
       - name: 배포 요약
+        if: steps.frontend.outputs.enabled == 'true'
         shell: bash
         run: |
           {

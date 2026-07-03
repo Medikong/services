@@ -5,15 +5,10 @@ DEPLOY_ENV="${DEPLOY_ENV:-dev}"
 SERVICE="${SERVICE:-}"
 BUMP="${BUMP:-patch}"
 DRY_RUN="${DRY_RUN:-false}"
-
-SERVICES=(
-  auth-service
-  concert-service
-  reservation-service
-  payment-service
-  ticket-service
-  notification-service
-)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+SERVICE_LIST_SCRIPT="${SERVICE_LIST_SCRIPT:-${REPO_ROOT}/scripts/list_services.sh}"
+SERVICES_TEXT=""
 
 usage() {
   cat >&2 <<'EOF'
@@ -21,8 +16,10 @@ Usage:
   task deploy:tag SERVICE=<service|changed|all> BUMP=<patch|minor|major> [DRY_RUN=true]
 
 SERVICE:
-  auth-service | concert-service | reservation-service | payment-service |
-  ticket-service | notification-service | changed | all
+  <service-name> | changed | all
+
+Services are read from config/services.yml. Use SERVICE_INCLUDE or SERVICE_EXCLUDE
+to narrow the managed service set temporarily.
 EOF
 }
 
@@ -33,15 +30,13 @@ require_cmd() {
   fi
 }
 
+load_services() {
+  SERVICES_TEXT="$(sh "${SERVICE_LIST_SCRIPT}" list --mode images)"
+}
+
 is_service() {
   local candidate="$1"
-  local service
-  for service in "${SERVICES[@]}"; do
-    if [ "${candidate}" = "${service}" ]; then
-      return 0
-    fi
-  done
-  return 1
+  printf '%s\n' "${SERVICES_TEXT}" | grep -qx -- "${candidate}"
 }
 
 validate_inputs() {
@@ -139,10 +134,7 @@ latest_group_baseline() {
 }
 
 write_all_services() {
-  local service
-  for service in "${SERVICES[@]}"; do
-    printf '%s\n' "${service}"
-  done
+  printf '%s\n' "${SERVICES_TEXT}" | sed '/^$/d'
 }
 
 add_service_once() {
@@ -158,11 +150,21 @@ write_ordered_services() {
   local source_file="$1"
   local service
 
-  for service in "${SERVICES[@]}"; do
+  while IFS= read -r service; do
+    [ -n "${service}" ] || continue
     if grep -qx "${service}" "${source_file}"; then
       printf '%s\n' "${service}"
     fi
-  done
+  done <<EOF
+${SERVICES_TEXT}
+EOF
+}
+
+ensure_services_available() {
+  if [ -z "$(printf '%s\n' "${SERVICES_TEXT}" | sed '/^$/d')" ]; then
+    printf '%s\n' 'No managed service Docker images found. Add service names to config/services.yml before creating deploy tags.' >&2
+    exit 1
+  fi
 }
 
 select_changed_services() {
@@ -183,26 +185,16 @@ select_changed_services() {
   git diff --name-only "${base_ref}..HEAD" > "${changes_file}"
 
   while IFS= read -r path; do
+    if [[ "${path}" =~ ^services/([^/]+)/ ]] && is_service "${BASH_REMATCH[1]}"; then
+      add_service_once "${BASH_REMATCH[1]}" "${raw_services_file}"
+      continue
+    fi
+    if [[ "${path}" =~ ^contracts/services/([^/]+)/ ]] && is_service "${BASH_REMATCH[1]}"; then
+      add_service_once "${BASH_REMATCH[1]}" "${raw_services_file}"
+      continue
+    fi
     case "${path}" in
-      services/auth-service/*|contracts/services/auth-service/*)
-        add_service_once auth-service "${raw_services_file}"
-        ;;
-      services/concert-service/*|contracts/services/concert-service/*)
-        add_service_once concert-service "${raw_services_file}"
-        ;;
-      services/reservation-service/*|contracts/services/reservation-service/*)
-        add_service_once reservation-service "${raw_services_file}"
-        ;;
-      services/payment-service/*|contracts/services/payment-service/*)
-        add_service_once payment-service "${raw_services_file}"
-        ;;
-      services/ticket-service/*|contracts/services/ticket-service/*)
-        add_service_once ticket-service "${raw_services_file}"
-        ;;
-      services/notification-service/*|contracts/services/notification-service/*)
-        add_service_once notification-service "${raw_services_file}"
-        ;;
-      packages/*|pyproject.toml|uv.lock|requirements-dev-overrides.txt|Taskfile.yml|.dockerignore|.github/workflows/image-build.yml|.github/workflows/image-publish.yml)
+      packages/*|pyproject.toml|uv.lock|requirements-dev-overrides.txt|Taskfile.yml|.dockerignore|config/services.yml|scripts/list_services.sh|.github/workflows/image-build.yml|.github/workflows/image-publish.yml)
         common_changed=true
         ;;
     esac
@@ -335,6 +327,7 @@ main() {
 
   require_cmd git
   require_cmd jq
+  load_services
   validate_inputs
 
   tmp_dir="$(mktemp -d)"
@@ -350,13 +343,16 @@ main() {
   git fetch --tags --force
 
   if is_service "${SERVICE}"; then
+    ensure_services_available
     printf '%s\n' "${SERVICE}" > "${services_file}"
     tag_name="deploy/${DEPLOY_ENV}/${SERVICE}/$(bump_version "$(latest_service_version "${SERVICE}")" "${BUMP}")"
     reason="single service deploy"
   elif [ "${SERVICE}" = "changed" ]; then
+    ensure_services_available
     reason="$(select_changed_services "${services_file}" "${raw_services_file}" "${changes_file}")"
     tag_name="$(next_group_tag changed)"
   else
+    ensure_services_available
     write_all_services > "${services_file}"
     tag_name="$(next_group_tag all)"
     reason="forced full deploy"

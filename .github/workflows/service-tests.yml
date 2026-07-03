@@ -8,6 +8,8 @@ on:
       - 'services/**'
       - 'tests/**'
       - 'packages/**'
+      - 'config/services.yml'
+      - 'scripts/list_services.sh'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
@@ -19,6 +21,8 @@ on:
       - 'services/**'
       - 'tests/**'
       - 'packages/**'
+      - 'config/services.yml'
+      - 'scripts/list_services.sh'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
@@ -47,42 +51,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed paths
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            auth-service:
-              - 'services/auth-service/**'
-            concert-service:
-              - 'services/concert-service/**'
-            notification-service:
-              - 'services/notification-service/**'
-            payment-service:
-              - 'services/payment-service/**'
-            reservation-service:
-              - 'services/reservation-service/**'
-            ticket-service:
-              - 'services/ticket-service/**'
-            test-common:
-              - 'tests/**'
-              - 'packages/**'
-              - 'Taskfile.yml'
-              - '.github/workflows/service-tests.yml'
-
       - name: Build test matrix
         id: matrix
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          all_test_services='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-          changed='${{ steps.changes.outputs.changes }}'
-          service_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs['test-common'] }}" = "true" ]; then
-            test_services="${all_test_services}"
+          base="${BASE_SHA:-${BEFORE_SHA:-}}"
+          if [ -z "${base}" ] || [[ "${base}" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || true)"
+          fi
+          if [ -n "${base}" ]; then
+            git diff --name-only "${base}" HEAD > changed-files.txt
           else
-            test_services="$(jq -c --argjson allowed "${service_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
+            git ls-files > changed-files.txt
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            test_services="$(sh scripts/list_services.sh select --mode tests --all --format json)"
+          else
+            test_services="$(sh scripts/list_services.sh select \
+              --mode tests \
+              --changed-files changed-files.txt \
+              --common tests \
+              --common packages \
+              --common pyproject.toml \
+              --common uv.lock \
+              --common Taskfile.yml \
+              --common config/services.yml \
+              --common scripts/list_services.sh \
+              --common .github/workflows/service-tests.yml \
+              --format json)"
           fi
 
           test_count="$(jq 'length' <<<"${test_services}")"

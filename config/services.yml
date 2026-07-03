@@ -1,0 +1,13 @@
+# Managed service inventory.
+#
+# Add a service name under images when it should be built and published.
+# Add a service name under tests when it should run service-scoped unit tests.
+#
+# Example:
+# images:
+#   - order-service
+# tests:
+#   - order-service
+
+images: []
+tests: []

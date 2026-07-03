@@ -14,10 +14,8 @@ vars:
   DOCKER_BUILD_PLATFORMS: '{{default "linux/amd64,linux/arm64" .DOCKER_BUILD_PLATFORMS}}'
   DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
-  APP_SERVICES: auth-service concert-service notification-service payment-service reservation-service ticket-service
-  APP_IMAGE_SERVICES: auth-service concert-service reservation-service payment-service ticket-service notification-service
-  DEV_SERVICE_PYPROJECTS: services/auth-service/pyproject.toml services/concert-service/pyproject.toml services/reservation-service/pyproject.toml services/payment-service/pyproject.toml services/ticket-service/pyproject.toml services/notification-service/pyproject.toml
-  DASHBOARD_SERVICE: '{{default "dashboard" .DASHBOARD_SERVICE}}'
+  PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
+  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
 
 includes:
   tests:
@@ -58,10 +56,16 @@ tasks:
         if [ ! -x "${venv_python}" ]; then
           venv_python="${venv_dir}/Scripts/python.exe"
         fi
+        python_bin='{{.PYTHON_BIN}}'
+        service_list='{{.SERVICE_LIST_SCRIPT}}'
         install_args=""
-        for project in {{.DEV_SERVICE_PYPROJECTS}}; do
+        for project in $(find packages -mindepth 2 -maxdepth 2 -name pyproject.toml | sort) $(sh "${service_list}" list --mode pyprojects --format shell); do
           install_args="${install_args} -r ${project} --group ${project}:test"
         done
+        if [ -z "${install_args}" ]; then
+          printf '%s\n' 'No package or service pyproject.toml files found; uv install skipped.'
+          exit 0
+        fi
         "${uv_cmd}" pip install --python "${venv_python}" --exact --strict --overrides "${overrides}" ${install_args}
         printf 'Unified uv development environment is ready at %s.\n' "${venv_dir}"
 
@@ -181,7 +185,7 @@ tasks:
         image_registry='{{.IMAGE_REGISTRY}}'
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
-        dashboard='{{.DASHBOARD_SERVICE}}'
+        service_list='{{.SERVICE_LIST_SCRIPT}}'
         if [ -z "${image_registry}" ]; then
           printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
@@ -219,25 +223,18 @@ tasks:
         build_image() {
           service="$1"
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
-          case "${service}" in
-            auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-              docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
-              ;;
-            "${dashboard}")
-              docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
-              ;;
-            *)
-              docker build -t "${image_prefix}/${service}:${image_tag}" "services/${service}"
-              ;;
-          esac
+          docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
         }
+        services="$(sh "${service_list}" list --mode images --format shell)"
+        if [ -z "${services}" ]; then
+          printf '%s\n' 'No managed service Docker images found; image build skipped.'
+          exit 0
+        fi
         pids=""
-        for service in {{.APP_IMAGE_SERVICES}}; do
+        for service in ${services}; do
           build_image "${service}" &
           pids="${pids} $!"
         done
-        build_image "${dashboard}" &
-        pids="${pids} $!"
         failed=0
         for pid in ${pids}; do
           if ! wait "${pid}"; then
@@ -258,13 +255,18 @@ tasks:
         image_registry='{{.IMAGE_REGISTRY}}'
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
-        dashboard='{{.DASHBOARD_SERVICE}}'
+        service_list='{{.SERVICE_LIST_SCRIPT}}'
         image_prefix="${image_registry}"
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
         pids=""
-        for service in {{.APP_IMAGE_SERVICES}} ${dashboard}; do
+        services="$(sh "${service_list}" list --mode images --format shell)"
+        if [ -z "${services}" ]; then
+          printf '%s\n' 'No managed service Docker images found; image push skipped.'
+          exit 0
+        fi
+        for service in ${services}; do
           (
             printf 'pushing %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
             docker push "${image_prefix}/${service}:${image_tag}"
@@ -290,26 +292,22 @@ tasks:
         image_registry='{{.IMAGE_REGISTRY}}'
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
-        dashboard='{{.DASHBOARD_SERVICE}}'
+        service_list='{{.SERVICE_LIST_SCRIPT}}'
         if [ -z "${requested}" ]; then
-          printf '%s\n' 'SERVICE is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          printf '%s\n' 'SERVICE is required, for example: task app-image-build SERVICE=<service-name> IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
         fi
         if [ -z "${image_registry}" ]; then
-          printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-image-build SERVICE=<service-name> IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
         fi
         if [ -z "${image_tag}" ]; then
-          printf '%s\n' 'IMAGE_TAG is required, for example: task app-image-build SERVICE=concert-service IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
+          printf '%s\n' 'IMAGE_TAG is required, for example: task app-image-build SERVICE=<service-name> IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
         fi
         normalize_service() {
           raw="$1"
-          if [ "${raw}" = "${dashboard}" ]; then
-            printf '%s\n' "${raw}"
-            return 0
-          fi
-          for candidate in {{.APP_IMAGE_SERVICES}}; do
+          for candidate in $(sh "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
@@ -322,7 +320,7 @@ tasks:
           return 1
         }
         if ! service="$(normalize_service "${requested}")"; then
-          printf 'Unknown SERVICE=%s (expected one of: {{.APP_IMAGE_SERVICES}} %s).\n' "${requested}" "${dashboard}" >&2
+          printf 'Unknown SERVICE=%s. Add services/%s/Dockerfile or adjust SERVICE_INCLUDE/SERVICE_EXCLUDE.\n' "${requested}" "${requested}" >&2
           exit 2
         fi
         image_prefix="${image_registry}"
@@ -357,17 +355,7 @@ tasks:
           build_output_arg="--output ${build_output}"
         fi
         printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
-        case "${service}" in
-          auth-service|concert-service|reservation-service|payment-service|ticket-service|notification-service)
-            docker buildx build ${cache_args} --platform "${build_platforms}" ${build_output_arg} -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
-            ;;
-          "${dashboard}")
-            docker build -t "${image_prefix}/${service}:${image_tag}" "${dashboard}"
-            ;;
-          *)
-            docker build -t "${image_prefix}/${service}:${image_tag}" "services/${service}"
-            ;;
-        esac
+        docker buildx build ${cache_args} --platform "${build_platforms}" ${build_output_arg} -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
 
   app-image-push:
     desc: Build and push one service or dashboard Docker image with SERVICE=<image-name>.
@@ -379,14 +367,10 @@ tasks:
         image_registry='{{.IMAGE_REGISTRY}}'
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
-        dashboard='{{.DASHBOARD_SERVICE}}'
+        service_list='{{.SERVICE_LIST_SCRIPT}}'
         normalize_service() {
           raw="$1"
-          if [ "${raw}" = "${dashboard}" ]; then
-            printf '%s\n' "${raw}"
-            return 0
-          fi
-          for candidate in {{.APP_IMAGE_SERVICES}}; do
+          for candidate in $(sh "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
@@ -399,7 +383,7 @@ tasks:
           return 1
         }
         if ! service="$(normalize_service "${requested}")"; then
-          printf 'Unknown SERVICE=%s (expected one of: {{.APP_IMAGE_SERVICES}} %s).\n' "${requested}" "${dashboard}" >&2
+          printf 'Unknown SERVICE=%s. Add services/%s/Dockerfile or adjust SERVICE_INCLUDE/SERVICE_EXCLUDE.\n' "${requested}" "${requested}" >&2
           exit 2
         fi
         image_prefix="${image_registry}"

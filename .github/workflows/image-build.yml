@@ -10,6 +10,8 @@ on:
     paths:
       - 'services/**'
       - 'packages/**'
+      - 'config/services.yml'
+      - 'scripts/list_services.sh'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
@@ -20,17 +22,9 @@ on:
     inputs:
       image:
         description: build할 이미지
-        required: true
-        type: choice
+        required: false
+        type: string
         default: all
-        options:
-          - all
-          - auth-service
-          - concert-service
-          - reservation-service
-          - payment-service
-          - ticket-service
-          - notification-service
 
 permissions:
   contents: read
@@ -59,54 +53,45 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed paths
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            auth-service:
-              - 'services/auth-service/**'
-            concert-service:
-              - 'services/concert-service/**'
-            notification-service:
-              - 'services/notification-service/**'
-            payment-service:
-              - 'services/payment-service/**'
-            reservation-service:
-              - 'services/reservation-service/**'
-            ticket-service:
-              - 'services/ticket-service/**'
-            image-common:
-              - 'packages/**'
-              - 'Taskfile.yml'
-              - '.github/workflows/image-build.yml'
-              - '.github/workflows/image-publish.yml'
-
       - name: Build image matrix
         id: matrix
         shell: bash
         env:
           REQUESTED_IMAGE: ${{ github.event.inputs.image || 'all' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          all_images='["auth-service","concert-service","reservation-service","payment-service","ticket-service","notification-service"]'
-          changed='${{ steps.changes.outputs.changes }}'
-          image_filters='["auth-service","concert-service","notification-service","payment-service","reservation-service","ticket-service"]'
+          base="${BASE_SHA:-${BEFORE_SHA:-}}"
+          if [ -z "${base}" ] || [[ "${base}" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || true)"
+          fi
+          if [ -n "${base}" ]; then
+            git diff --name-only "${base}" HEAD > changed-files.txt
+          else
+            git ls-files > changed-files.txt
+          fi
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${REQUESTED_IMAGE}" = "all" ]; then
-              images="${all_images}"
-            else
-              images="$(jq -c --arg requested "${REQUESTED_IMAGE}" 'map(select(. == $requested))' <<<"${all_images}")"
-            fi
-          elif [ "${{ steps.changes.outputs['image-common'] }}" = "true" ]; then
-            images="${all_images}"
+            images="$(sh scripts/list_services.sh select --mode images --requested "${REQUESTED_IMAGE}" --format json)"
           else
-            images="$(jq -c --argjson allowed "${image_filters}" '[.[] | select(. as $name | $allowed | index($name))]' <<<"${changed}")"
+            images="$(sh scripts/list_services.sh select \
+              --mode images \
+              --changed-files changed-files.txt \
+              --common packages \
+              --common pyproject.toml \
+              --common uv.lock \
+              --common Taskfile.yml \
+              --common .dockerignore \
+              --common config/services.yml \
+              --common scripts/list_services.sh \
+              --common .github/workflows/image-build.yml \
+              --common .github/workflows/image-publish.yml \
+              --format json)"
           fi
 
           image_count="$(jq 'length' <<<"${images}")"
-          if [ "${image_count}" = "0" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${image_count}" = "0" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${REQUESTED_IMAGE}" != "all" ]; then
             printf '알 수 없는 이미지 선택값입니다: %s\n' "${REQUESTED_IMAGE}" >&2
             exit 2
           fi
