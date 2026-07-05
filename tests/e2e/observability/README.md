@@ -5,7 +5,7 @@
 ## 검증 범위
 
 ```text
-concert-service FastAPI instrumentation
+coupon-service Go OpenTelemetry instrumentation
 -> OTLP gRPC
 -> OpenTelemetry Collector OTLP receiver
 -> Tempo
@@ -47,22 +47,22 @@ GRAFANA_PORT=13001 TEMPO_PORT=13200 task tests:test-observability-e2e
 
 ## Smoke 기준
 
-1. `concert-service`의 `/healthz`, `/readyz`가 응답하는지 readiness 대기용으로 확인한다. 이 공용 endpoint와 `/metrics`는 FastAPI trace 제외 기본값이다.
+1. `coupon-service`의 `/healthz`, `/readyz`가 응답하는지 readiness 대기용으로 확인한다. 이 공용 endpoint와 `/metrics`는 trace 제외 기본값이다.
 2. Tempo와 Collector readiness endpoint가 응답하는지 확인한다.
 3. 고유 `X-Request-Id`를 붙여 `/healthz`, `/readyz`, `/metrics`를 호출하고 Tempo에 trace가 생기지 않는지 확인한다.
-4. 고유 `X-Request-Id`를 붙여 `concert-service`의 public API인 `GET /concerts`를 호출한다.
-5. Tempo `/api/search`에서 `service.name=concert-service request_id=<id>` 조건으로 trace를 찾는다.
+4. 고유 `X-Request-Id`를 붙여 `coupon-service`의 `GET /internal/coupon-policies/{policyId}`를 호출한다.
+5. Tempo `/api/search`에서 `service.name=coupon-service request_id=<id>` 조건으로 trace를 찾는다.
 6. trace 상세에서 `service.name`, `request_id`, span name, trace id가 모두 존재하는지 확인한다.
 
 ## Trace 제외 endpoint
 
-공통 observability 설정은 기본적으로 다음 FastAPI endpoint를 trace에서 제외한다.
+공통 observability 설정은 기본적으로 다음 operational endpoint를 trace에서 제외한다.
 
 ```text
 /healthz,/readyz,/metrics
 ```
 
-이 값은 `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS`로 덮어쓸 수 있다. 운영 probe와 Prometheus scrape는 그대로 응답하지만 Tempo에는 업무 요청 중심의 span만 남긴다.
+Go middleware가 이 endpoint들을 span 생성 전에 제외한다. 운영 probe와 Prometheus scrape는 그대로 응답하지만 Tempo에는 업무 요청 중심의 span만 남긴다.
 
 ## 제외 범위
 
@@ -70,6 +70,6 @@ GRAFANA_PORT=13001 TEMPO_PORT=13200 task tests:test-observability-e2e
 - stdout JSON 로그 수집과 Loki 저장
 - 감사 로그 저장 또는 trace backend 저장
 - Kong/Ingress/Gateway trace boundary
-- Kafka publish/consume trace 전파의 전체 E2E
+- 메시징 publish/consume trace 전파의 전체 E2E
 
-Kafka 흐름은 `packages/kafka-utils`의 header/span helper와 각 서비스 producer/consumer wiring을 기준으로 별도 확장한다. 이 폴더는 우선 FastAPI inbound request span이 실제 Collector/Tempo 경로로 들어가는지 보장한다.
+메시징 흐름이 추가되면 각 서비스의 producer/consumer wiring을 기준으로 별도 확장한다. 이 폴더는 우선 Go inbound request span이 실제 Collector/Tempo 경로로 들어가는지 보장한다.

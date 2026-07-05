@@ -16,7 +16,7 @@ vars:
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
-  GO_TEST_PACKAGES: '{{default "./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/user-service/..." .GO_TEST_PACKAGES}}'
+  GO_TEST_PACKAGES: '{{default "./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/user-service/... ./services/coupon-service/... ./services/backoffice-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
 includes:
@@ -144,7 +144,7 @@ tasks:
   benchmark-api-smoke:
     desc: Run smoke API integration benchmarks for managed services.
     cmds:
-      - task: tests:benchmark-api-smoke
+      - task: tests:benchmark-dropmong-api
         vars:
           PRESET: '{{default "smoke" .PRESET}}'
           SAMPLES: '{{default "5" .SAMPLES}}'
@@ -166,7 +166,7 @@ tasks:
   benchmark-api-large:
     desc: Run large API integration benchmarks for managed services.
     cmds:
-      - task: tests:benchmark-api-large
+      - task: tests:benchmark-dropmong-api
         vars:
           PRESET: '{{default "half-year-early-growth" .PRESET}}'
           SAMPLES: '{{default "100" .SAMPLES}}'

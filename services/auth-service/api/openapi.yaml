@@ -2,11 +2,251 @@ openapi: 3.1.0
 info:
   title: Auth Service API
   version: 0.1.0
-  description: Auth service skeleton API. Business authentication routes are intentionally deferred.
+  description: Issues DropMong access tokens and normalized Principal headers for service-to-service calls.
 paths:
+  /auth/signup:
+    post:
+      tags:
+        - auth
+      summary: Register an email account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: Account and session are created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          description: Signup request is invalid.
+        "409":
+          description: Email already exists.
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Create a session for an email account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Session is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Credentials are invalid.
+  /auth/introspect:
+    post:
+      tags:
+        - auth
+      summary: Resolve a bearer token into a Principal.
+      parameters:
+        - $ref: "#/components/parameters/Authorization"
+      responses:
+        "200":
+          description: Principal is resolved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - principal
+                properties:
+                  principal:
+                    $ref: "#/components/schemas/Principal"
+        "401":
+          description: Bearer token is missing or invalid.
+  /auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Rotate a refresh token and issue a new access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Session tokens are rotated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          description: Refresh token is missing.
+        "401":
+          description: Refresh token is invalid or revoked.
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Revoke the current bearer session.
+      parameters:
+        - $ref: "#/components/parameters/Authorization"
+      responses:
+        "200":
+          description: Session is revoked.
+        "401":
+          description: Bearer token is missing or invalid.
+  /internal/auth/sessions/{sessionId}/revoke:
+    post:
+      tags:
+        - auth
+      summary: Revoke a session by id.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session is revoked.
+        "400":
+          description: sessionId is missing.
+        "401":
+          description: Session is missing or already inactive.
+  /internal/dev/test-token:
+    post:
+      tags:
+        - auth
+      summary: Issue a deterministic test token for local E2E scenarios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestTokenRequest"
+      responses:
+        "201":
+          description: Test token session is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
   /healthz:
     $ref: ./operational/healthz.yaml
   /readyz:
     $ref: ./operational/readyz.yaml
   /metrics:
     $ref: ./observability/metrics.yaml
+components:
+  parameters:
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema:
+        type: string
+      example: Bearer test-customer
+  schemas:
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    TestTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        userId:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+    AuthResult:
+      type: object
+      required:
+        - authAccountId
+        - userId
+        - accessToken
+        - refreshToken
+        - principal
+        - principalHeader
+      properties:
+        authAccountId:
+          type: string
+        userId:
+          type: string
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        principal:
+          $ref: "#/components/schemas/Principal"
+        principalHeader:
+          type: string
+          description: Base64url encoded Principal JSON for X-Principal.
+    Principal:
+      type: object
+      required:
+        - type
+        - userId
+        - roles
+        - authMethods
+        - authLevel
+        - sessionId
+        - clientType
+      properties:
+        type:
+          type: string
+          enum:
+            - user
+            - service
+        userId:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        authMethods:
+          type: array
+          items:
+            type: string
+        authLevel:
+          type: string
+        sessionId:
+          type: string
+        clientType:
+          type: string

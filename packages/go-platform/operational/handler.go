@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"time"
@@ -14,19 +15,25 @@ const metricsContentType = "text/plain; version=0.0.4; charset=utf-8"
 type Check func(ctx context.Context) error
 
 type Handler struct {
-	service string
-	checks  map[string]Check
-	now     func() time.Time
+	service          string
+	checks           map[string]Check
+	metricCollectors []func(io.Writer)
+	now              func() time.Time
 }
 
 func New(service string, checks map[string]Check) Handler {
+	return NewWithMetrics(service, checks, nil)
+}
+
+func NewWithMetrics(service string, checks map[string]Check, collectors []func(io.Writer)) Handler {
 	if checks == nil {
 		checks = map[string]Check{}
 	}
 	return Handler{
-		service: service,
-		checks:  checks,
-		now:     func() time.Time { return time.Now().UTC() },
+		service:          service,
+		checks:           checks,
+		metricCollectors: collectors,
+		now:              func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -79,6 +86,9 @@ func (h Handler) Metrics(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprintf(w, "# HELP service_ready Service readiness state.\n")
 	_, _ = fmt.Fprintf(w, "# TYPE service_ready gauge\n")
 	_, _ = fmt.Fprintf(w, "service_ready{service=%q} 1\n", h.service)
+	for _, collect := range h.metricCollectors {
+		collect(w)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

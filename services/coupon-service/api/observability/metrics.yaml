@@ -1,0 +1,12 @@
+get:
+  tags:
+    - observability
+  summary: Prometheus metrics.
+  description: Exposes coupon-service HTTP, coupon issue, Redis gate, and DB finalize metrics in Prometheus text exposition format.
+  responses:
+    "200":
+      description: Prometheus text exposition format.
+      content:
+        text/plain:
+          schema:
+            type: string

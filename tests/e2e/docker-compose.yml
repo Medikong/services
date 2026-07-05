@@ -1,9 +1,16 @@
 x-service-e2e-env: &service-e2e-env
-  # E2E에서는 모든 서비스가 같은 환경/버전 label을 노출해 healthcheck와 metric 확인 기준을 맞춘다.
   SERVICE_ENVIRONMENT: e2e
   SERVICE_VERSION: e2e
 
 services:
+  redis:
+    image: valkey/valkey:8-alpine
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -18,170 +25,82 @@ services:
       timeout: 5s
       retries: 20
 
-  kafka:
-    image: apache/kafka:3.8.1
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_NUM_PARTITIONS: 1
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list >/dev/null 2>&1"]
-      interval: 10s
-      timeout: 10s
-      retries: 20
-
-  kafka-init:
-    image: apache/kafka:3.8.1
-    depends_on:
-      kafka:
-        condition: service_healthy
-    command:
-      - sh
-      - -c
-      - |
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic reservation-created --partitions 1 --replication-factor 1
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic reservation-expired --partitions 1 --replication-factor 1
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment-approved --partitions 1 --replication-factor 1
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment-failed --partitions 1 --replication-factor 1
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic ticket-issued --partitions 1 --replication-factor 1
-
-  notification-db:
-    image: mongo:7
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  # 사용자 관점 happy path는 실제 로그인에서 받은 JWT claim을 gateway header로 넘긴다.
-  # downstream 서비스는 JWT를 직접 검증하지 않고 X-User-* header를 신뢰하므로 auth-service가 claim의 출처 역할을 한다.
   auth-service:
     build:
       context: ../..
       dockerfile: services/auth-service/Dockerfile
     environment:
       <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/auth_service
+      DATABASE_URL: postgres://app:app@postgres:5432/auth_service?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "${AUTH_SERVICE_PORT:-18080}:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz').read()"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  concert-service:
+  user-service:
     build:
       context: ../..
-      dockerfile: services/concert-service/Dockerfile
+      dockerfile: services/user-service/Dockerfile
     environment:
       <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/concert_service
+      DATABASE_URL: postgres://app:app@postgres:5432/user_service?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "${USER_SERVICE_PORT:-18081}:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/readyz').read()"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  reservation-service:
+  coupon-service:
     build:
       context: ../..
-      dockerfile: services/reservation-service/Dockerfile
+      dockerfile: services/coupon-service/Dockerfile
     environment:
       <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/reservation_service
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
+      COUPON_REDIS_GATE_ENABLED: "${COUPON_REDIS_GATE_ENABLED:-false}"
+      COUPON_REDIS_GATE_FAILURE_MODE: "${COUPON_REDIS_GATE_FAILURE_MODE:-db_fallback}"
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      redis:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+    ports:
+      - "${COUPON_SERVICE_PORT:-18082}:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/readyz').read()"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  payment-service:
+  backoffice-service:
     build:
       context: ../..
-      dockerfile: services/payment-service/Dockerfile
+      dockerfile: services/backoffice-service/Dockerfile
     environment:
       <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgres://app:app@postgres:5432/backoffice_service?sslmode=disable
+      COUPON_SERVICE_URL: http://coupon-service:8080
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      coupon-service:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+    ports:
+      - "${BACKOFFICE_SERVICE_PORT:-18083}:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz').read()"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  ticket-service:
-    build:
-      context: ../..
-      dockerfile: services/ticket-service/Dockerfile
-    environment:
-      <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/ticket_service
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      AWS_REGION: ap-northeast-2
-      S3_BUCKET: ticketing-e2e
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/readyz').read()"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  notification-service:
-    build:
-      context: ../..
-      dockerfile: services/notification-service/Dockerfile
-    environment:
-      <<: *service-e2e-env
-      MONGODB_URL: mongodb://notification-db:27017
-      MONGODB_DB_NAME: notification_db
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-    depends_on:
-      notification-db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/readyz').read()"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20

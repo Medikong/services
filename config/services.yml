@@ -11,5 +11,7 @@
 
 images:
   - auth-service
+  - backoffice-service
+  - coupon-service
   - user-service
 tests: []

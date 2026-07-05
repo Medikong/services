@@ -5,5 +5,7 @@ use (
 	./packages/go-contracts
 	./packages/go-platform
 	./services/auth-service
+	./services/backoffice-service
+	./services/coupon-service
 	./services/user-service
 )

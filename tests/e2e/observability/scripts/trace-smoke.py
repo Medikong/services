@@ -25,8 +25,8 @@ class Settings:
 
 def main() -> int:
     settings = Settings(
-        service_name=os.getenv("OBS_E2E_SERVICE_NAME", "concert-service"),
-        service_url=os.getenv("OBS_E2E_SERVICE_URL", "http://concert-service:8082").rstrip("/"),
+        service_name=os.getenv("OBS_E2E_SERVICE_NAME", "coupon-service"),
+        service_url=os.getenv("OBS_E2E_SERVICE_URL", "http://coupon-service:8080").rstrip("/"),
         trace_path=_trace_path(),
         tempo_url=os.getenv("OBS_E2E_TEMPO_URL", "http://tempo:3200").rstrip("/"),
         timeout_seconds=int(os.getenv("OBS_E2E_TIMEOUT_SECONDS", "90")),
@@ -42,6 +42,7 @@ def main() -> int:
     wait_for_http(os.getenv("OBS_E2E_COLLECTOR_HEALTH_URL", "http://otel-collector:13133/"), settings, "collector health")
 
     excluded_request_ids = call_excluded_endpoints(settings)
+    setup_coupon_policy(settings)
     call_json(f"{settings.service_url}{settings.trace_path}", headers={"X-Request-Id": request_id})
     deadline = time.monotonic() + settings.timeout_seconds
     last_error = ""
@@ -65,9 +66,9 @@ def main() -> int:
         f"- service.name: {settings.service_name}\n"
         f"- last_error: {last_error or 'no trace matched'}\n"
         "- 점검 힌트:\n"
-        "  docker compose -p ticketing-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector\n"
-        "  docker compose -p ticketing-observability-e2e -f tests/e2e/observability/docker-compose.yml logs tempo\n"
-        "  docker compose -p ticketing-observability-e2e -f tests/e2e/observability/docker-compose.yml logs concert-service",
+        "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector\n"
+        "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs tempo\n"
+        "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs coupon-service",
         file=sys.stderr,
     )
     return 1
@@ -93,10 +94,26 @@ def wait_for_json(url: str, settings: Settings, label: str) -> dict[str, Any]:
 
 
 def _trace_path() -> str:
-    raw_path = os.getenv("OBS_E2E_TRACE_PATH", "/concerts")
+    raw_path = os.getenv("OBS_E2E_TRACE_PATH", "/internal/coupon-policies/obs-policy")
     if not raw_path.startswith("/"):
         raise ValueError("OBS_E2E_TRACE_PATH must start with /")
     return raw_path
+
+
+def setup_coupon_policy(settings: Settings) -> None:
+    if os.getenv("OBS_E2E_SETUP_COUPON_POLICY", "true").lower() not in {"1", "true", "yes"}:
+        return
+    call_json(
+        f"{settings.service_url}/internal/coupon-policies",
+        method="POST",
+        payload={
+            "policyId": "obs-policy",
+            "dropId": "obs-drop",
+            "name": "observability smoke",
+            "totalQuantity": 1,
+            "status": "ready",
+        },
+    )
 
 
 def call_excluded_endpoints(settings: Settings) -> dict[str, str]:
@@ -235,16 +252,18 @@ def decode_attribute_value(value: dict[str, Any]) -> str | None:
     return None
 
 
-def call_json(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
-    raw = call_text(url, headers=headers)
+def call_json(url: str, headers: dict[str, str] | None = None, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    raw = call_text(url, headers=headers, method=method, payload=payload)
     data = json.loads(raw)
     if not isinstance(data, dict):
         raise RuntimeError(f"expected JSON object from {url}")
     return data
 
 
-def call_text(url: str, headers: dict[str, str] | None = None) -> str:
-    request = Request(url, headers=headers or {})
+def call_text(url: str, headers: dict[str, str] | None = None, method: str = "GET", payload: dict[str, Any] | None = None) -> str:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request_headers = {"Content-Type": "application/json", **(headers or {})}
+    request = Request(url, data=data, headers=request_headers, method=method)
     try:
         with urlopen(request, timeout=5) as response:
             if response.status < 200 or response.status >= 300:

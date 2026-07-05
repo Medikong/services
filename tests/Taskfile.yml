@@ -12,26 +12,24 @@ vars:
   PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
-  E2E_COMPOSE_PROJECT: '{{default "ticketing-e2e" .E2E_COMPOSE_PROJECT}}'
+  E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
   E2E_COMPOSE_SERVICES: '{{default "" .E2E_COMPOSE_SERVICES}}'
-  E2E_NETWORK: '{{default "ticketing-e2e_default" .E2E_NETWORK}}'
+  E2E_NETWORK: '{{default "dropmong-e2e_default" .E2E_NETWORK}}'
   NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
   E2E_WAIT_TIMEOUT_SECONDS: '{{default "180" .E2E_WAIT_TIMEOUT_SECONDS}}'
-  E2E_AUTH_SERVICE_URL: '{{default "http://auth-service:8080" .E2E_AUTH_SERVICE_URL}}'
-  E2E_CONCERT_SERVICE_URL: '{{default "http://concert-service:8082" .E2E_CONCERT_SERVICE_URL}}'
-  E2E_RESERVATION_SERVICE_URL: '{{default "http://reservation-service:8083" .E2E_RESERVATION_SERVICE_URL}}'
-  E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8080" .E2E_PAYMENT_SERVICE_URL}}'
-  E2E_TICKET_SERVICE_URL: '{{default "http://ticket-service:8085" .E2E_TICKET_SERVICE_URL}}'
-  E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .E2E_NOTIFICATION_SERVICE_URL}}'
+  E2E_AUTH_SERVICE_URL: '{{default "http://127.0.0.1:18080" .E2E_AUTH_SERVICE_URL}}'
+  E2E_USER_SERVICE_URL: '{{default "http://127.0.0.1:18081" .E2E_USER_SERVICE_URL}}'
+  E2E_COUPON_SERVICE_URL: '{{default "http://127.0.0.1:18082" .E2E_COUPON_SERVICE_URL}}'
+  E2E_BACKOFFICE_SERVICE_URL: '{{default "http://127.0.0.1:18083" .E2E_BACKOFFICE_SERVICE_URL}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
   OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
-  OBS_E2E_COMPOSE_PROJECT: '{{default "ticketing-observability-e2e" .OBS_E2E_COMPOSE_PROJECT}}'
-  OBS_E2E_NETWORK: '{{default "ticketing-observability-e2e_default" .OBS_E2E_NETWORK}}'
+  OBS_E2E_COMPOSE_PROJECT: '{{default "dropmong-observability-e2e" .OBS_E2E_COMPOSE_PROJECT}}'
+  OBS_E2E_NETWORK: '{{default "dropmong-observability-e2e_default" .OBS_E2E_NETWORK}}'
   OBS_E2E_SMOKE_IMAGE: '{{default "python:3.12-slim" .OBS_E2E_SMOKE_IMAGE}}'
-  OBS_E2E_SERVICE_NAME: '{{default "concert-service" .OBS_E2E_SERVICE_NAME}}'
-  OBS_E2E_SERVICE_URL: '{{default "http://concert-service:8082" .OBS_E2E_SERVICE_URL}}'
-  OBS_E2E_TRACE_PATH: '{{default "/concerts" .OBS_E2E_TRACE_PATH}}'
+  OBS_E2E_SERVICE_NAME: '{{default "coupon-service" .OBS_E2E_SERVICE_NAME}}'
+  OBS_E2E_SERVICE_URL: '{{default "http://coupon-service:8080" .OBS_E2E_SERVICE_URL}}'
+  OBS_E2E_TRACE_PATH: '{{default "/internal/coupon-policies/obs-policy" .OBS_E2E_TRACE_PATH}}'
   OBS_E2E_TEMPO_URL: '{{default "http://tempo:3200" .OBS_E2E_TEMPO_URL}}'
   OBS_E2E_EXCLUSION_CHECK_SECONDS: '{{default "8" .OBS_E2E_EXCLUSION_CHECK_SECONDS}}'
 
@@ -263,6 +261,27 @@ tasks:
           task --dir "{{.ROOT_DIR}}/tests" benchmark-api-smoke-service SERVICE="${service}" PRESET='{{default "smoke" .PRESET}}' SAMPLES='{{default "5" .SAMPLES}}' WARMUP='{{default "1" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
         done
 
+  benchmark-dropmong-api:
+    desc: Run DropMong API benchmark against the Docker Compose E2E stack and write Markdown report.
+    cmds:
+      - |
+        set -e
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        project='{{.E2E_COMPOSE_PROJECT}}-benchmark'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres auth-service user-service coupon-service backoffice-service
+        "{{.PYTHON_BIN}}" "${repo_root}/tests/scripts/dropmong_api_benchmark.py" \
+          --preset '{{default "smoke" .PRESET}}' \
+          --samples '{{default "5" .SAMPLES}}' \
+          --warmup '{{default "1" .WARMUP}}' \
+          --reports-root '{{.API_BENCHMARK_REPORT_ROOT}}' \
+          --auth-url '{{.E2E_AUTH_SERVICE_URL}}' \
+          --user-url '{{.E2E_USER_SERVICE_URL}}' \
+          --coupon-url '{{.E2E_COUPON_SERVICE_URL}}' \
+          --backoffice-url '{{.E2E_BACKOFFICE_SERVICE_URL}}'
+
   benchmark-api-smoke-service:
     cmds:
       - task: benchmark-api-service
@@ -468,77 +487,24 @@ tasks:
     cmds:
       - |
         set -e
-        scenario='{{default "" .SCENARIO}}'
         compose_services='{{.E2E_COMPOSE_SERVICES}}'
-        scenario_key='{{.E2E_SCENARIO}}'
-        report_name='{{.E2E_REPORT_NAME}}'
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        if ! find "${repo_root}/tests/e2e/scenarios" -name '*.postman_collection.json' -print -quit 2>/dev/null | grep -q .; then
-          printf '%s\n' 'No E2E Postman scenarios found; E2E skipped.'
-          exit 0
-        fi
-        if [ -n "${scenario}" ]; then
-          scenario_key="${scenario}"
-        fi
-        scenario_key="${scenario_key#scenarios/}"
-        scenario_key="${scenario_key%.postman_collection.json}"
-        case "${scenario_key}" in
-          all|"")
-            compose_services="${compose_services:-postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service}"
-            collections="01-concert-seat-setup 02-reservation-create 03-ticket-issue 04-user-booking-happy-path"
-            ;;
-          01-concert-seat-setup)
-            compose_services="${compose_services:-postgres concert-service}"
-            collections="01-concert-seat-setup"
-            ;;
-          02-reservation-create)
-            compose_services="${compose_services:-postgres reservation-service}"
-            collections="02-reservation-create"
-            ;;
-          03-ticket-issue)
-            compose_services="${compose_services:-postgres kafka kafka-init ticket-service}"
-            collections="03-ticket-issue"
-            ;;
-          04-user-booking-happy-path)
-            compose_services="${compose_services:-postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service}"
-            collections="04-user-booking-happy-path"
-            ;;
-          05-concert-public-api-benchmark)
-            compose_services="${compose_services:-postgres concert-service}"
-            collections="05-concert-public-api-benchmark"
-            ;;
-          *)
-            printf 'Unknown E2E SCENARIO=%s (expected: all, 01-concert-seat-setup, 02-reservation-create, 03-ticket-issue, 04-user-booking-happy-path, 05-concert-public-api-benchmark).\n' "${scenario_key}" >&2
-            exit 2
-            ;;
-        esac
+        compose_services="${compose_services:-postgres auth-service user-service coupon-service backoffice-service}"
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}'
         file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
-        mkdir -p "${repo_root}/tests/e2e/newman/reports"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
         ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}
-        for collection in ${collections}; do
-          docker run --rm --network {{.E2E_NETWORK}} \
-            -v "${repo_root}/tests/e2e":/etc/newman \
-            -w /etc/newman \
-            {{.NEWMAN_IMAGE}} run "scenarios/${collection}.postman_collection.json" \
-            -e newman/docker.postman_environment.json \
-            --env-var authServiceUrl="{{.E2E_AUTH_SERVICE_URL}}" \
-            --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
-            --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
-            --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
-            --env-var ticketServiceUrl="{{.E2E_TICKET_SERVICE_URL}}" \
-            --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-            --reporters cli,junit \
-            --delay-request 1000 \
-            --reporter-junit-export "newman/reports/${report_name}-${collection}.xml"
-        done
+        E2E_AUTH_SERVICE_URL='{{.E2E_AUTH_SERVICE_URL}}' \
+        E2E_USER_SERVICE_URL='{{.E2E_USER_SERVICE_URL}}' \
+        E2E_COUPON_SERVICE_URL='{{.E2E_COUPON_SERVICE_URL}}' \
+        E2E_BACKOFFICE_SERVICE_URL='{{.E2E_BACKOFFICE_SERVICE_URL}}' \
+          "{{.PYTHON_BIN}}" "${repo_root}/tests/e2e/scripts/dropmong_scenarios.py"
 
   e2e-up:
     desc: Start the service E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service'
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres auth-service user-service coupon-service backoffice-service'
 
   e2e-wait:
     desc: Wait for service E2E services to become healthy through Docker Compose.
@@ -546,27 +512,15 @@ tasks:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}}'
 
   e2e-newman:
-    desc: Run service E2E Newman collections against an already running stack.
+    desc: Run DropMong service E2E scenarios against an already running stack.
     cmds:
-      - mkdir -p "{{.ROOT_DIR}}/tests/e2e/newman/reports"
       - |
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        for collection in 01-concert-seat-setup 02-reservation-create 03-ticket-issue 04-user-booking-happy-path; do
-          docker run --rm --network {{.E2E_NETWORK}} \
-            -v "${repo_root}/tests/e2e":/etc/newman \
-            -w /etc/newman \
-            {{.NEWMAN_IMAGE}} run "scenarios/${collection}.postman_collection.json" \
-            -e newman/docker.postman_environment.json \
-            --env-var authServiceUrl="{{.E2E_AUTH_SERVICE_URL}}" \
-            --env-var concertServiceUrl="{{.E2E_CONCERT_SERVICE_URL}}" \
-            --env-var reservationServiceUrl="{{.E2E_RESERVATION_SERVICE_URL}}" \
-            --env-var paymentServiceUrl="{{.E2E_PAYMENT_SERVICE_URL}}" \
-            --env-var ticketServiceUrl="{{.E2E_TICKET_SERVICE_URL}}" \
-            --env-var notificationServiceUrl="{{.E2E_NOTIFICATION_SERVICE_URL}}" \
-            --reporters cli,junit \
-            --delay-request 1000 \
-            --reporter-junit-export "newman/reports/{{.E2E_REPORT_NAME}}-${collection}.xml"
-        done
+        E2E_AUTH_SERVICE_URL='{{.E2E_AUTH_SERVICE_URL}}' \
+        E2E_USER_SERVICE_URL='{{.E2E_USER_SERVICE_URL}}' \
+        E2E_COUPON_SERVICE_URL='{{.E2E_COUPON_SERVICE_URL}}' \
+        E2E_BACKOFFICE_SERVICE_URL='{{.E2E_BACKOFFICE_SERVICE_URL}}' \
+          "{{.PYTHON_BIN}}" "${repo_root}/tests/e2e/scripts/dropmong_scenarios.py"
 
   e2e-down:
     desc: Stop the service E2E Docker Compose stack.
@@ -583,7 +537,7 @@ tasks:
         file='{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}'
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build postgres tempo otel-collector grafana concert-service
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build postgres tempo otel-collector grafana coupon-service
         docker run --rm --network {{.OBS_E2E_NETWORK}} \
           -v "${repo_root}/tests/e2e/observability/scripts":/scripts:ro \
           -e OBS_E2E_SERVICE_NAME="{{.OBS_E2E_SERVICE_NAME}}" \
@@ -598,7 +552,7 @@ tasks:
   observability-e2e-up:
     desc: Start the observability E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" up -d --build postgres tempo otel-collector grafana concert-service'
+      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" up -d --build postgres tempo otel-collector grafana coupon-service'
 
   observability-e2e-smoke:
     desc: Run observability E2E trace smoke against an already running stack.

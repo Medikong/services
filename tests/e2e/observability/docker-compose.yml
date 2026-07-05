@@ -52,12 +52,12 @@ services:
     ports:
       - "${GRAFANA_PORT:-3001}:3000"
 
-  concert-service:
+  coupon-service:
     build:
       context: ../../..
-      dockerfile: services/concert-service/Dockerfile
+      dockerfile: services/coupon-service/Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/concert_service
+      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
       SERVICE_ENVIRONMENT: observability-e2e
       SERVICE_VERSION: observability-e2e
       OTEL_TRACES_EXPORTER: otlp
@@ -68,7 +68,7 @@ services:
       otel-collector:
         condition: service_started
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/healthz').read()"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20

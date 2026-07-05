@@ -2,7 +2,7 @@ get:
   tags:
     - operational
   summary: Service readiness.
-  description: Checks whether auth-service can receive traffic. No dependency check is registered in the skeleton yet.
+  description: Checks whether auth-service can receive traffic.
   responses:
     "200":
       description: Service is ready.

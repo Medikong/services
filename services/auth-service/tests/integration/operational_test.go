@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/Medikong/services/services/auth-service/internal/handler"
+	authservice "github.com/Medikong/services/services/auth-service/internal/service"
+	"github.com/Medikong/services/services/auth-service/internal/store/memory"
 )
 
 func TestOperationalRoutesIntegration(t *testing.T) {
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.RegisterRoutes(mux, authservice.New(memory.New()))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
