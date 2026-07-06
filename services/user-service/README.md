@@ -23,10 +23,10 @@ go run ./cmd/server
 
 ## 사용자 API
 
-- `POST /internal/users/ensure`
-- `GET /users/me`
-- `PATCH /users/me/profile`
-- `GET /users/{userId}`
+- `POST /v1/internal/users/ensure`
+- `GET /v1/users/me`
+- `PATCH /v1/users/me/profile`
+- `GET /v1/users/{userId}`
 
 ## 운영 엔드포인트
 

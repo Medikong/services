@@ -29,13 +29,13 @@ go run ./cmd/server
 
 ## 인증 API
 
-- `POST /auth/signup`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `POST /auth/introspect`
-- `POST /internal/auth/sessions/{sessionId}/revoke`
-- `POST /internal/dev/test-token`
+- `POST /v1/auth/signup`
+- `POST /v1/auth/login`
+- `POST /v1/auth/refresh`
+- `POST /v1/auth/logout`
+- `POST /v1/auth/introspect`
+- `POST /v1/internal/auth/sessions/{sessionId}/revoke`
+- `POST /v1/internal/dev/test-token`
 
 ## 운영 엔드포인트
 

@@ -2,17 +2,9 @@ package session
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/Medikong/services/services/auth-service/internal/domain/principal"
-)
-
-var (
-	ErrMissingBearerToken  = errors.New("missing bearer token")
-	ErrMissingRefreshToken = errors.New("missing refresh token")
-	ErrMissingSessionID    = errors.New("missing session id")
-	ErrMissingUserID       = errors.New("missing user id")
 )
 
 type RefreshInput struct {
@@ -32,7 +24,7 @@ func NewService(repo Repository, builder principal.Builder, cache principal.Auth
 func (s Service) Introspect(ctx context.Context, authorization string) (principal.AuthResult, error) {
 	token := bearerToken(authorization)
 	if token == "" {
-		return principal.AuthResult{}, ErrMissingBearerToken
+		return principal.AuthResult{}, ErrMissingBearerToken.New("missing bearer token")
 	}
 	if s.cache != nil {
 		if p, ok := s.cache.Get(token); ok {
@@ -44,11 +36,11 @@ func (s Service) Introspect(ctx context.Context, authorization string) (principa
 		return principal.AuthResult{}, err
 	}
 	if strings.TrimSpace(record.UserID) == "" {
-		return principal.AuthResult{}, ErrMissingUserID
+		return principal.AuthResult{}, ErrMissingUserID.New("missing user id")
 	}
 	result, err := s.authResult(ctx, record)
 	if err != nil {
-		return principal.AuthResult{}, err
+		return principal.AuthResult{}, ErrInternal.With("operation", "introspect.build_principal").Wrap(err)
 	}
 	if s.cache != nil {
 		s.cache.Set(token, result.Principal)
@@ -59,7 +51,7 @@ func (s Service) Introspect(ctx context.Context, authorization string) (principa
 func (s Service) Refresh(ctx context.Context, input RefreshInput) (principal.AuthResult, error) {
 	refreshToken := strings.TrimSpace(input.RefreshToken)
 	if refreshToken == "" {
-		return principal.AuthResult{}, ErrMissingRefreshToken
+		return principal.AuthResult{}, ErrMissingRefreshToken.New("missing refresh token")
 	}
 	rotation, err := s.repo.Refresh(ctx, refreshToken)
 	if err != nil {
@@ -74,7 +66,7 @@ func (s Service) Refresh(ctx context.Context, input RefreshInput) (principal.Aut
 func (s Service) Logout(ctx context.Context, authorization string) error {
 	token := bearerToken(authorization)
 	if token == "" {
-		return ErrMissingBearerToken
+		return ErrMissingBearerToken.New("missing bearer token")
 	}
 	record, err := s.repo.RevokeByAccessToken(ctx, token)
 	if err != nil {
@@ -90,7 +82,7 @@ func (s Service) Logout(ctx context.Context, authorization string) error {
 func (s Service) Revoke(ctx context.Context, sessionID string) error {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return ErrMissingSessionID
+		return ErrMissingSessionID.New("missing session id")
 	}
 	record, err := s.repo.RevokeBySessionID(ctx, sessionID)
 	if err != nil {
@@ -110,7 +102,7 @@ func (s Service) authResult(ctx context.Context, record Record) (principal.AuthR
 		AuthMethods:   record.AuthMethods,
 	})
 	if err != nil {
-		return principal.AuthResult{}, err
+		return principal.AuthResult{}, ErrInternal.With("operation", "build_principal").Wrap(err)
 	}
 	return principal.AuthResult{
 		AuthAccountID:   record.AuthAccountID,

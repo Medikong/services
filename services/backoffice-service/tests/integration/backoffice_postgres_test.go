@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Medikong/services/packages/go-authz/principal"
+	"github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/services/backoffice-service/internal/domain/drop"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -35,7 +36,7 @@ func TestBackofficePostgresPrepareReadiness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connection string: %v", err)
 	}
-	store, err := drop.OpenPostgresRepository(ctx, dsn)
+	store, err := drop.OpenPostgresRepository(ctx, database.DefaultPostgresConfig(dsn))
 	if err != nil {
 		t.Fatalf("store open: %v", err)
 	}

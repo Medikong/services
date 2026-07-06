@@ -52,6 +52,10 @@ func Init(ctx context.Context, serviceName string) (func(context.Context) error,
 }
 
 func Middleware(serviceName string, next http.Handler) http.Handler {
+	return MiddlewareWithRoute(serviceName, next, nil)
+}
+
+func MiddlewareWithRoute(serviceName string, next http.Handler, routePattern func(*http.Request) string) http.Handler {
 	tracer := otel.Tracer(serviceName)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isOperationalPath(r.URL.Path) {
@@ -68,7 +72,12 @@ func Middleware(serviceName string, next http.Handler) http.Handler {
 				attribute.String("request_id", requestID),
 			),
 		)
-		defer span.End()
+		defer func() {
+			route := routeFromRequest(routePattern, r)
+			span.SetName(r.Method + " " + route)
+			span.SetAttributes(attribute.String("http.route", route))
+			span.End()
+		}()
 
 		traceID := span.SpanContext().TraceID().String()
 		if span.SpanContext().IsValid() {
@@ -92,6 +101,17 @@ func SleepFlush() {
 
 func isOperationalPath(path string) bool {
 	return path == "/healthz" || path == "/readyz" || path == "/metrics"
+}
+
+func routeFromRequest(routePattern func(*http.Request) string, r *http.Request) string {
+	if routePattern == nil {
+		return "unmatched"
+	}
+	route := routePattern(r)
+	if route == "" {
+		return "unmatched"
+	}
+	return route
 }
 
 func getenv(key string, fallback string) string {

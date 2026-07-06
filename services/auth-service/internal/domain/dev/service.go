@@ -2,9 +2,14 @@ package dev
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/Medikong/services/packages/go-authz/rbac"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/Medikong/services/packages/go-platform/telemetry"
@@ -13,7 +18,6 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/domain/userlink"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
-	"github.com/Medikong/services/services/auth-service/internal/platform/database"
 )
 
 type TestTokenInput struct {
@@ -23,13 +27,13 @@ type TestTokenInput struct {
 }
 
 type Service struct {
-	transactor  account.Transactor
+	pool        *pgxpool.Pool
 	repoFactory account.RepositoryFactory
 	builder     principal.Builder
 }
 
-func NewService(transactor account.Transactor, repoFactory account.RepositoryFactory, builder principal.Builder) Service {
-	return Service{transactor: transactor, repoFactory: repoFactory, builder: builder}
+func NewService(pool *pgxpool.Pool, repoFactory account.RepositoryFactory, builder principal.Builder) Service {
+	return Service{pool: pool, repoFactory: repoFactory, builder: builder}
 }
 
 func (s Service) IssueTestToken(ctx context.Context, input TestTokenInput) (principal.AuthResult, error) {
@@ -38,7 +42,7 @@ func (s Service) IssueTestToken(ctx context.Context, input TestTokenInput) (prin
 
 	token := strings.TrimSpace(input.Token)
 	if token == "" {
-		token = "test-" + database.RandomHex(12)
+		token = "test-" + randomHex(12)
 	}
 	userID := strings.TrimSpace(input.UserID)
 	if userID == "" {
@@ -51,9 +55,13 @@ func (s Service) IssueTestToken(ctx context.Context, input TestTokenInput) (prin
 	authAccountID := "test-auth-" + userID
 
 	var created session.Record
-	err := s.transactor.WithTx(ctx, func(exec database.Executor) error {
-		repos := s.repoFactory(exec)
-		if err := repos.Accounts.Create(ctx, account.Account{AuthAccountID: authAccountID}); err != nil {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		repos := s.repoFactory(tx)
+		authAccount, err := account.New(authAccountID)
+		if err != nil {
+			return err
+		}
+		if _, err := repos.Accounts.Ensure(ctx, authAccount); err != nil {
 			return err
 		}
 		if err := repos.UserLinks.Upsert(ctx, userlink.Link{AuthAccountID: authAccountID, UserID: userID}); err != nil {
@@ -62,19 +70,19 @@ func (s Service) IssueTestToken(ctx context.Context, input TestTokenInput) (prin
 		if err := repos.RoleGrants.Replace(ctx, authAccountID, roles); err != nil {
 			return err
 		}
-		if err := revokeFixedToken(ctx, exec, token); err != nil {
+		if err := revokeFixedToken(ctx, tx, token); err != nil {
 			return err
 		}
-		var err error
-		created, err = repos.Sessions.CreateFixedAccess(ctx, session.Input{
+		sessionRecord, err := repos.Sessions.CreateFixedAccess(ctx, session.Input{
 			AuthAccountID: authAccountID,
 			UserID:        userID,
 			AuthMethods:   []string{session.AuthMethodTestToken},
 		}, token)
+		created = sessionRecord
 		return err
 	})
 	if err != nil {
-		return principal.AuthResult{}, err
+		return principal.AuthResult{}, ErrInternal.With("operation", "issue_test_token").Wrap(err)
 	}
 	return s.authResult(ctx, created)
 }
@@ -87,7 +95,7 @@ func (s Service) authResult(ctx context.Context, record session.Record) (princip
 		AuthMethods:   record.AuthMethods,
 	})
 	if err != nil {
-		return principal.AuthResult{}, err
+		return principal.AuthResult{}, ErrInternal.With("operation", "build_principal").Wrap(err)
 	}
 	return principal.AuthResult{
 		AuthAccountID:   record.AuthAccountID,
@@ -99,7 +107,15 @@ func (s Service) authResult(ctx context.Context, record session.Record) (princip
 	}, nil
 }
 
-func revokeFixedToken(ctx context.Context, exec database.Executor, accessToken string) error {
-	_, err := exec.ExecContext(ctx, `DELETE FROM auth_sessions WHERE access_token = $1`, accessToken)
+func revokeFixedToken(ctx context.Context, tx pgx.Tx, accessToken string) error {
+	_, err := tx.Exec(ctx, `DELETE FROM auth_sessions WHERE access_token = $1`, accessToken)
 	return err
+}
+
+func randomHex(bytes int) string {
+	buf := make([]byte, bytes)
+	if _, err := rand.Read(buf); err != nil {
+		panic(fmt.Sprintf("crypto random failed: %v", err))
+	}
+	return hex.EncodeToString(buf)
 }

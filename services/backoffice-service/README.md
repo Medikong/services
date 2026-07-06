@@ -23,8 +23,8 @@ go run ./cmd/server
 
 ## API
 
-- `POST /admin/drops/prepare`
-- `GET /admin/drops/{dropId}/readiness`
+- `POST /v1/admin/drops/prepare`
+- `GET /v1/admin/drops/{dropId}/readiness`
 - `GET /healthz`
 - `GET /readyz`
 - `GET /metrics`

@@ -2,10 +2,11 @@ package coupon
 
 import (
 	"context"
-	"errors"
 	"testing"
+	"time"
 
 	"github.com/Medikong/services/packages/go-authz/principal"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestIssueDuplicateAndSoldOut(t *testing.T) {
@@ -35,74 +36,26 @@ func TestIssueDuplicateAndSoldOut(t *testing.T) {
 	}
 }
 
-func TestIssueUsesGateSoldOutBeforeStore(t *testing.T) {
-	store := NewMemoryRepository()
-	gate := &fakeGate{admit: Decision{Result: ResultSoldOut, PolicyID: "policy-1", UserID: "user-1"}}
-	svc := NewService(store, WithIssueGate(gate))
+func TestIssueFallsBackToStoreWhenRedisUnavailable(t *testing.T) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:1",
+		DialTimeout:  time.Millisecond,
+		ReadTimeout:  time.Millisecond,
+		WriteTimeout: time.Millisecond,
+		MaxRetries:   -1,
+	})
+	t.Cleanup(func() { _ = redisClient.Close() })
 
-	_, err := svc.Issue(context.Background(), principal.Principal{Type: principal.TypeUser, UserID: "user-1"}, IssueInput{PolicyID: "policy-1"}, "idem-1")
-	if !errors.Is(err, ErrSoldOut) {
-		t.Fatalf("Issue() error = %v, want sold out", err)
+	svc := NewService(NewMemoryRepository(), WithRedis(redisClient, time.Second, time.Hour))
+	ctx := context.Background()
+	if _, err := svc.PreparePolicy(ctx, PreparePolicyInput{PolicyID: "policy-redis-down", DropID: "drop-1", Name: "Launch", TotalQuantity: 1}); err != nil {
+		t.Fatalf("PreparePolicy() error = %v", err)
 	}
-	if gate.compensated {
-		t.Fatalf("Compensate() called for sold_out decision")
-	}
-}
-
-func TestIssueCompensatesGateCandidateWhenStoreFinalizeFails(t *testing.T) {
-	gate := &fakeGate{admit: Decision{Result: ResultIssuedCandidate, PolicyID: "policy-1", UserID: "user-1"}}
-	svc := NewService(NewMemoryRepository(), WithIssueGate(gate))
-
-	_, err := svc.Issue(context.Background(), principal.Principal{Type: principal.TypeUser, UserID: "user-1"}, IssueInput{PolicyID: "policy-1"}, "idem-1")
-	if !errors.Is(err, ErrPolicyNotFound) {
-		t.Fatalf("Issue() error = %v, want policy not found", err)
-	}
-	if !gate.compensated {
-		t.Fatalf("Compensate() was not called")
-	}
-	if gate.completed {
-		t.Fatalf("Complete() called after failed finalize")
-	}
-}
-
-func TestIssueReturnsRedisDuplicateWithoutStoreLockPath(t *testing.T) {
-	coupon := Coupon{CouponID: "coupon-redis-1", PolicyID: "policy-1", DropID: "drop-1", UserID: "user-1", Status: "issued"}
-	gate := &fakeGate{admit: Decision{Result: ResultDuplicate, PolicyID: "policy-1", UserID: "user-1", Coupon: coupon}}
-	svc := NewService(NewMemoryRepository(), WithIssueGate(gate))
-
-	result, err := svc.Issue(context.Background(), principal.Principal{Type: principal.TypeUser, UserID: "user-1"}, IssueInput{PolicyID: "policy-1"}, "idem-1")
+	result, err := svc.Issue(ctx, principal.Principal{Type: principal.TypeUser, UserID: "user-1"}, IssueInput{PolicyID: "policy-redis-down"}, "idem-1")
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}
-	if result.Result != "duplicate" || result.Coupon.CouponID != coupon.CouponID {
-		t.Fatalf("Issue() = %#v, want redis duplicate coupon", result)
+	if result.Result != "issued" {
+		t.Fatalf("result = %q, want issued", result.Result)
 	}
-}
-
-type fakeGate struct {
-	admit       Decision
-	err         error
-	completed   bool
-	compensated bool
-}
-
-func (g *fakeGate) PreparePolicy(context.Context, Policy) error {
-	return nil
-}
-
-func (g *fakeGate) Admit(context.Context, IssueRequest) (Decision, error) {
-	if g.err != nil {
-		return Decision{}, g.err
-	}
-	return g.admit, nil
-}
-
-func (g *fakeGate) Complete(context.Context, Decision, IssueResult) error {
-	g.completed = true
-	return nil
-}
-
-func (g *fakeGate) Compensate(context.Context, Decision) error {
-	g.compensated = true
-	return nil
 }

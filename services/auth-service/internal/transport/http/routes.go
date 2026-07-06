@@ -1,8 +1,12 @@
 package http
 
 import (
+	"io"
 	nethttp "net/http"
 
+	"github.com/go-chi/chi/v5"
+
+	platformmetrics "github.com/Medikong/services/packages/go-platform/metrics"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/auth-service/internal/domain/account"
 	"github.com/Medikong/services/services/auth-service/internal/domain/dev"
@@ -16,18 +20,37 @@ type Services struct {
 	Dev      dev.Service
 }
 
-type Handler struct {
-	services Services
+func RegisterRoutes(mux *nethttp.ServeMux, services Services, checks map[string]operational.Check) {
+	mux.Handle("/", NewRouter(services, checks, platformmetrics.NewRegistry()))
 }
 
-func RegisterRoutes(mux *nethttp.ServeMux, services Services, checks map[string]operational.Check) {
-	h := Handler{services: services}
-	operational.New(config.ServiceName, checks).Register(mux)
-	mux.HandleFunc("POST /auth/signup", h.Signup)
-	mux.HandleFunc("POST /auth/login", h.Login)
-	mux.HandleFunc("POST /auth/refresh", h.Refresh)
-	mux.HandleFunc("POST /auth/logout", h.Logout)
-	mux.HandleFunc("POST /auth/introspect", h.Introspect)
-	mux.HandleFunc("POST /internal/auth/sessions/{sessionId}/revoke", h.Revoke)
-	mux.HandleFunc("POST /internal/dev/test-token", h.IssueTestToken)
+func NewRouter(services Services, checks map[string]operational.Check, registry *platformmetrics.Registry) nethttp.Handler {
+	r := chi.NewRouter()
+	ops := operational.NewWithMetrics(config.ServiceName, checks, metricCollectors(registry))
+	r.Get("/healthz", ops.Healthz)
+	r.Get("/readyz", ops.Readyz)
+	r.Get("/metrics", ops.Metrics)
+	account.NewController(services.Accounts).RegisterRoutes(r)
+	session.NewController(services.Sessions).RegisterRoutes(r)
+	dev.NewController(services.Dev).RegisterRoutes(r)
+	return r
+}
+
+func RoutePattern(r *nethttp.Request) string {
+	routeContext := chi.RouteContext(r.Context())
+	if routeContext == nil {
+		return "unmatched"
+	}
+	pattern := routeContext.RoutePattern()
+	if pattern == "" {
+		return "unmatched"
+	}
+	return pattern
+}
+
+func metricCollectors(registry *platformmetrics.Registry) []func(io.Writer) {
+	if registry == nil {
+		return nil
+	}
+	return []func(io.Writer){registry.WritePrometheus}
 }

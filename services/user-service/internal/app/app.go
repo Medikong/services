@@ -18,7 +18,7 @@ type App struct {
 func New(ctx context.Context, cfg config.Config) (App, error) {
 	var store user.Repository
 	if cfg.DatabaseURL != "" {
-		postgres, err := user.OpenPostgresRepository(ctx, cfg.DatabaseURL)
+		postgres, err := user.OpenPostgresRepository(ctx, cfg.Postgres)
 		if err != nil {
 			return App{}, err
 		}

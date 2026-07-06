@@ -12,131 +12,90 @@ import (
 
 const pendingValue = "__pending__"
 
-type Redis struct {
-	client        redis.Cmdable
-	keyPrefix     string
-	pendingTTL    time.Duration
-	idempotentTTL time.Duration
+const (
+	resultIssuedCandidate = "issued_candidate"
+	resultDuplicate       = "duplicate"
+	resultSoldOut         = "sold_out"
+	resultNotReady        = "not_ready"
+	resultPending         = "pending"
+)
+
+type redisDecision struct {
+	Result         string
+	PolicyID       string
+	UserID         string
+	IdempotencyKey string
+	Coupon         Coupon
 }
 
-type RedisConfig struct {
-	Client        redis.Cmdable
-	KeyPrefix     string
-	PendingTTL    time.Duration
-	IdempotentTTL time.Duration
+func redisRemainingKey(prefix string, policyID string) string {
+	return fmt.Sprintf("%s:%s:remaining", prefix, policyID)
 }
 
-func NewRedis(config RedisConfig) *Redis {
-	prefix := config.KeyPrefix
-	if prefix == "" {
-		prefix = "coupon"
-	}
-	pendingTTL := config.PendingTTL
-	if pendingTTL <= 0 {
-		pendingTTL = 30 * time.Second
-	}
-	idempotentTTL := config.IdempotentTTL
-	if idempotentTTL <= 0 {
-		idempotentTTL = 24 * time.Hour
-	}
-	return &Redis{
-		client:        config.Client,
-		keyPrefix:     prefix,
-		pendingTTL:    pendingTTL,
-		idempotentTTL: idempotentTTL,
-	}
+func redisIssuedKey(prefix string, policyID string, userID string) string {
+	return fmt.Sprintf("%s:%s:issued:%s", prefix, policyID, userID)
 }
 
-func NewRedisClient(rawURL string) (*redis.Client, error) {
-	if rawURL == "" {
-		return nil, fmt.Errorf("redis url is required")
+func redisIdempotencyKey(prefix string, policyID string, userID string, key string) string {
+	if key == "" {
+		return fmt.Sprintf("%s:%s:idem:%s:-", prefix, policyID, userID)
 	}
-	options, err := redis.ParseURL(rawURL)
-	if err == nil {
-		return redis.NewClient(options), nil
-	}
-	return redis.NewClient(&redis.Options{Addr: rawURL}), nil
+	return fmt.Sprintf("%s:%s:idem:%s:%s", prefix, policyID, userID, key)
 }
 
-func (r *Redis) PreparePolicy(ctx context.Context, policy Policy) error {
-	remaining := policy.TotalQuantity - policy.IssuedCount
-	if remaining < 0 {
-		remaining = 0
-	}
-	return r.client.Set(ctx, r.remainingKey(policy.PolicyID), remaining, 0).Err()
-}
-
-func (r *Redis) Admit(ctx context.Context, request IssueRequest) (Decision, error) {
-	values, err := admitScript.Run(ctx, r.client, []string{
-		r.remainingKey(request.PolicyID),
-		r.issuedKey(request.PolicyID, request.UserID),
-		r.idempotencyKey(request.PolicyID, request.UserID, request.IdempotencyKey),
-	}, request.IdempotencyKey, strconv.Itoa(int(r.pendingTTL.Seconds()))).Slice()
+func runRedisAdmitScript(ctx context.Context, client redis.Cmdable, prefix string, policyID string, userID string, idempotencyKey string, pendingTTL time.Duration) (redisDecision, error) {
+	values, err := admitScript.Run(ctx, client, []string{
+		redisRemainingKey(prefix, policyID),
+		redisIssuedKey(prefix, policyID, userID),
+		redisIdempotencyKey(prefix, policyID, userID, idempotencyKey),
+	}, idempotencyKey, strconv.Itoa(int(pendingTTL.Seconds()))).Slice()
 	if err != nil {
-		return Decision{}, err
+		return redisDecision{}, err
 	}
 	if len(values) != 2 {
-		return Decision{}, fmt.Errorf("redis gate admit returned %d values", len(values))
+		return redisDecision{}, fmt.Errorf("redis gate admit returned %d values", len(values))
 	}
 	result, ok := values[0].(string)
 	if !ok {
-		return Decision{}, fmt.Errorf("redis gate admit result has type %T", values[0])
+		return redisDecision{}, fmt.Errorf("redis gate admit result has type %T", values[0])
 	}
-	decision := Decision{
+	decision := redisDecision{
 		Result:         result,
-		PolicyID:       request.PolicyID,
-		UserID:         request.UserID,
-		IdempotencyKey: request.IdempotencyKey,
+		PolicyID:       policyID,
+		UserID:         userID,
+		IdempotencyKey: idempotencyKey,
 	}
 	rawCoupon, ok := values[1].(string)
+	if ok && rawCoupon == pendingValue {
+		decision.Result = resultPending
+	}
 	if ok && rawCoupon != "" && rawCoupon != pendingValue {
 		if err := json.Unmarshal([]byte(rawCoupon), &decision.Coupon); err != nil {
-			return Decision{}, fmt.Errorf("decode redis gate coupon: %w", err)
+			return redisDecision{}, fmt.Errorf("decode redis gate coupon: %w", err)
 		}
 	}
 	return decision, nil
 }
 
-func (r *Redis) Complete(ctx context.Context, decision Decision, result IssueResult) error {
-	if decision.Result != ResultIssuedCandidate {
-		return nil
-	}
+func runRedisCompleteScript(ctx context.Context, client redis.Cmdable, prefix string, decision redisDecision, result IssueResult, idempotentTTL time.Duration) error {
 	couponJSON, err := json.Marshal(result.Coupon)
 	if err != nil {
 		return err
 	}
-	restoreRemaining := result.Result == ResultDuplicate
-	return completeScript.Run(ctx, r.client, []string{
-		r.remainingKey(decision.PolicyID),
-		r.issuedKey(decision.PolicyID, decision.UserID),
-		r.idempotencyKey(decision.PolicyID, decision.UserID, decision.IdempotencyKey),
-	}, string(couponJSON), decision.IdempotencyKey, strconv.Itoa(int(r.idempotentTTL.Seconds())), strconv.FormatBool(restoreRemaining)).Err()
+	restoreRemaining := result.Result == "duplicate"
+	return completeScript.Run(ctx, client, []string{
+		redisRemainingKey(prefix, decision.PolicyID),
+		redisIssuedKey(prefix, decision.PolicyID, decision.UserID),
+		redisIdempotencyKey(prefix, decision.PolicyID, decision.UserID, decision.IdempotencyKey),
+	}, string(couponJSON), decision.IdempotencyKey, strconv.Itoa(int(idempotentTTL.Seconds())), strconv.FormatBool(restoreRemaining)).Err()
 }
 
-func (r *Redis) Compensate(ctx context.Context, decision Decision) error {
-	if decision.Result != ResultIssuedCandidate {
-		return nil
-	}
-	return compensateScript.Run(ctx, r.client, []string{
-		r.remainingKey(decision.PolicyID),
-		r.issuedKey(decision.PolicyID, decision.UserID),
-		r.idempotencyKey(decision.PolicyID, decision.UserID, decision.IdempotencyKey),
+func runRedisCompensateScript(ctx context.Context, client redis.Cmdable, prefix string, decision redisDecision) error {
+	return compensateScript.Run(ctx, client, []string{
+		redisRemainingKey(prefix, decision.PolicyID),
+		redisIssuedKey(prefix, decision.PolicyID, decision.UserID),
+		redisIdempotencyKey(prefix, decision.PolicyID, decision.UserID, decision.IdempotencyKey),
 	}, decision.IdempotencyKey).Err()
-}
-
-func (r *Redis) remainingKey(policyID string) string {
-	return fmt.Sprintf("%s:%s:remaining", r.keyPrefix, policyID)
-}
-
-func (r *Redis) issuedKey(policyID string, userID string) string {
-	return fmt.Sprintf("%s:%s:issued:%s", r.keyPrefix, policyID, userID)
-}
-
-func (r *Redis) idempotencyKey(policyID string, userID string, key string) string {
-	if key == "" {
-		return fmt.Sprintf("%s:%s:idem:%s:-", r.keyPrefix, policyID, userID)
-	}
-	return fmt.Sprintf("%s:%s:idem:%s:%s", r.keyPrefix, policyID, userID, key)
 }
 
 var admitScript = redis.NewScript(`

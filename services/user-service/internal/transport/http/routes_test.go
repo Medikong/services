@@ -34,7 +34,7 @@ func TestMeInvalidPrincipalReturnsUnauthorized(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, user.NewService(user.NewMemoryRepository()))
 
-	request := httptest.NewRequest(http.MethodGet, "/users/me", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
 	request.Header.Set(headers.Principal, "not-base64")
 	response := httptest.NewRecorder()
 
@@ -55,7 +55,7 @@ func TestGetOtherUserWithoutRoleReturnsForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeHeader() error = %v", err)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/users/user-2", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/users/user-2", nil)
 	request.Header.Set(headers.Principal, header)
 	response := httptest.NewRecorder()
 
@@ -71,7 +71,7 @@ func TestMeMissingUserIDReturnsUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeHeader() error = %v", err)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/users/me", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
 	request.Header.Set(headers.Principal, header)
 	response := httptest.NewRecorder()
 

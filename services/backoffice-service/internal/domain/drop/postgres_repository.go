@@ -2,27 +2,28 @@ package drop
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/Medikong/services/packages/go-platform/database"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
-func OpenPostgresRepository(ctx context.Context, databaseURL string) (*PostgresRepository, error) {
-	db, err := database.OpenPostgres(ctx, databaseURL)
+func OpenPostgresRepository(ctx context.Context, config database.PostgresConfig) (*PostgresRepository, error) {
+	db, err := database.OpenPostgres(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 	store := NewPostgresRepository(db)
 	if err := store.Migrate(ctx); err != nil {
-		_ = db.Close()
+		db.Close()
 		return nil, err
 	}
 	return store, nil
@@ -33,18 +34,18 @@ func (s *PostgresRepository) Migrate(ctx context.Context) error {
 }
 
 func (s *PostgresRepository) PrepareLocal(ctx context.Context, input PrepareDropInput) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO products (product_id, name)
 		VALUES ($1, $2)
 		ON CONFLICT (product_id) DO UPDATE SET name = EXCLUDED.name`, input.ProductID, input.ProductName); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO drops (drop_id, product_id, sale_starts_at, status, coupon_policy_id)
 		VALUES ($1, $2, $3, 'prepared_local', $4)
 		ON CONFLICT (drop_id) DO UPDATE
@@ -55,18 +56,18 @@ func (s *PostgresRepository) PrepareLocal(ctx context.Context, input PrepareDrop
 		input.DropID, input.ProductID, input.SaleStartsAt, input.CouponPolicy.PolicyID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO inventories (drop_id, stock_quantity)
 		VALUES ($1, $2)
 		ON CONFLICT (drop_id) DO UPDATE SET stock_quantity = EXCLUDED.stock_quantity`,
 		input.DropID, input.StockQuantity); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
 
 func (s *PostgresRepository) MarkCouponPrepared(ctx context.Context, dropID string, policyID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE drops SET status = 'ready', coupon_policy_id = $2 WHERE drop_id = $1`, dropID, policyID)
+	_, err := s.db.Exec(ctx, `UPDATE drops SET status = 'ready', coupon_policy_id = $2 WHERE drop_id = $1`, dropID, policyID)
 	return err
 }
 
@@ -80,7 +81,7 @@ func (s *PostgresRepository) Readiness(ctx context.Context, dropID string) (Read
 			"coupon":    {Ready: false, Reason: "coupon policy not prepared"},
 		},
 	}
-	row := s.db.QueryRowContext(ctx, `
+	row := s.db.QueryRow(ctx, `
 		SELECT p.product_id IS NOT NULL, d.drop_id IS NOT NULL, i.stock_quantity > 0, d.status = 'ready'
 		FROM drops d
 		LEFT JOIN products p ON p.product_id = d.product_id
@@ -88,7 +89,7 @@ func (s *PostgresRepository) Readiness(ctx context.Context, dropID string) (Read
 		WHERE d.drop_id = $1`, dropID)
 	var productReady, dropReady, inventoryReady, couponReady bool
 	if err := row.Scan(&productReady, &dropReady, &inventoryReady, &couponReady); err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return readiness, nil
 		}
 		return Readiness{}, err

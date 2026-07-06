@@ -3,19 +3,26 @@ package rolegrant
 import (
 	"context"
 
-	"github.com/Medikong/services/services/auth-service/internal/platform/database"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresRepository struct {
-	exec database.Executor
+	pool *pgxpool.Pool
+	tx   pgx.Tx
 }
 
-func NewPostgresRepository(exec database.Executor) PostgresRepository {
-	return PostgresRepository{exec: exec}
+func NewPostgresRepository(pool *pgxpool.Pool) PostgresRepository {
+	return PostgresRepository{pool: pool}
+}
+
+func NewPostgresTxRepository(tx pgx.Tx) PostgresRepository {
+	return PostgresRepository{tx: tx}
 }
 
 func (r PostgresRepository) Grant(ctx context.Context, grant Grant) error {
-	_, err := r.exec.ExecContext(ctx, `
+	_, err := r.exec(ctx, `
 		INSERT INTO role_grants (auth_account_id, role)
 		VALUES ($1, $2)
 		ON CONFLICT DO NOTHING`, grant.AuthAccountID, grant.Role)
@@ -23,7 +30,7 @@ func (r PostgresRepository) Grant(ctx context.Context, grant Grant) error {
 }
 
 func (r PostgresRepository) Replace(ctx context.Context, authAccountID string, roles []string) error {
-	if _, err := r.exec.ExecContext(ctx, `DELETE FROM role_grants WHERE auth_account_id = $1`, authAccountID); err != nil {
+	if _, err := r.exec(ctx, `DELETE FROM role_grants WHERE auth_account_id = $1`, authAccountID); err != nil {
 		return err
 	}
 	for _, role := range roles {
@@ -35,7 +42,7 @@ func (r PostgresRepository) Replace(ctx context.Context, authAccountID string, r
 }
 
 func (r PostgresRepository) ListByAuthAccountID(ctx context.Context, authAccountID string) ([]string, error) {
-	rows, err := r.exec.QueryContext(ctx, `SELECT role FROM role_grants WHERE auth_account_id = $1 ORDER BY role`, authAccountID)
+	rows, err := r.query(ctx, `SELECT role FROM role_grants WHERE auth_account_id = $1 ORDER BY role`, authAccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +59,20 @@ func (r PostgresRepository) ListByAuthAccountID(ctx context.Context, authAccount
 		return nil, err
 	}
 	return roles, nil
+}
+
+func (r PostgresRepository) exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	if r.tx != nil {
+		return r.tx.Exec(ctx, sql, args...)
+	}
+	return r.pool.Exec(ctx, sql, args...)
+}
+
+func (r PostgresRepository) query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	if r.tx != nil {
+		return r.tx.Query(ctx, sql, args...)
+	}
+	return r.pool.Query(ctx, sql, args...)
 }
 
 var Migrations = []string{

@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Issues DropMong opaque access tokens and normalized Principal headers for service-to-service calls. JWT alignment remains a contract decision.
 paths:
-  /auth/signup:
+  /v1/auth/signup:
     post:
       tags:
         - auth
@@ -26,7 +26,7 @@ paths:
           description: Signup request is invalid.
         "409":
           description: Email already exists.
-  /auth/login:
+  /v1/auth/login:
     post:
       tags:
         - auth
@@ -46,7 +46,7 @@ paths:
                 $ref: "#/components/schemas/AuthResult"
         "401":
           description: Credentials are invalid.
-  /auth/introspect:
+  /v1/auth/introspect:
     post:
       tags:
         - auth
@@ -67,7 +67,7 @@ paths:
                     $ref: "#/components/schemas/Principal"
         "401":
           description: Bearer token is missing or invalid.
-  /auth/refresh:
+  /v1/auth/refresh:
     post:
       tags:
         - auth
@@ -89,7 +89,7 @@ paths:
           description: Refresh token is missing.
         "401":
           description: Refresh token is invalid or revoked.
-  /auth/logout:
+  /v1/auth/logout:
     post:
       tags:
         - auth
@@ -101,7 +101,7 @@ paths:
           description: Session is revoked.
         "401":
           description: Bearer token is missing or invalid.
-  /internal/auth/sessions/{sessionId}/revoke:
+  /v1/internal/auth/sessions/{sessionId}/revoke:
     post:
       tags:
         - auth
@@ -119,7 +119,7 @@ paths:
           description: sessionId is missing.
         "401":
           description: Session is missing or already inactive.
-  /internal/dev/test-token:
+  /v1/internal/dev/test-token:
     post:
       tags:
         - auth

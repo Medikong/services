@@ -3,32 +3,33 @@ package coupon
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Medikong/services/packages/go-platform/database"
 )
 
 type PostgresRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
-func OpenPostgresRepository(ctx context.Context, databaseURL string) (*PostgresRepository, error) {
-	db, err := database.OpenPostgres(ctx, databaseURL)
+func OpenPostgresRepository(ctx context.Context, config database.PostgresConfig) (*PostgresRepository, error) {
+	db, err := database.OpenPostgres(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 	store := NewPostgresRepository(db)
 	if err := store.Migrate(ctx); err != nil {
-		_ = db.Close()
+		db.Close()
 		return nil, err
 	}
 	return store, nil
@@ -38,11 +39,15 @@ func (s *PostgresRepository) Migrate(ctx context.Context) error {
 	return database.RunMigrations(ctx, s.db, migrations)
 }
 
+func (s *PostgresRepository) Ping(ctx context.Context) error {
+	return s.db.Ping(ctx)
+}
+
 func (s *PostgresRepository) UpsertPolicy(ctx context.Context, input PolicyInput) (Policy, error) {
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO coupon_policies (policy_id, drop_id, name, total_quantity, issued_count, status)
-		VALUES ($1, $2, $3, $4, 0, $5)
-		ON CONFLICT (policy_id) DO UPDATE
+	_, err := s.db.Exec(ctx, `
+			INSERT INTO coupon_policies (policy_id, drop_id, name, total_quantity, issued_count, status)
+			VALUES ($1, $2, $3, $4, 0, $5)
+			ON CONFLICT (policy_id) DO UPDATE
 		SET drop_id = EXCLUDED.drop_id,
 		    name = EXCLUDED.name,
 		    total_quantity = EXCLUDED.total_quantity,
@@ -56,10 +61,10 @@ func (s *PostgresRepository) UpsertPolicy(ctx context.Context, input PolicyInput
 }
 
 func (s *PostgresRepository) GetPolicy(ctx context.Context, policyID string) (Policy, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT policy_id, drop_id, name, total_quantity, issued_count, status FROM coupon_policies WHERE policy_id = $1`, policyID)
+	row := s.db.QueryRow(ctx, `SELECT policy_id, drop_id, name, total_quantity, issued_count, status FROM coupon_policies WHERE policy_id = $1`, policyID)
 	var policy Policy
 	if err := row.Scan(&policy.PolicyID, &policy.DropID, &policy.Name, &policy.TotalQuantity, &policy.IssuedCount, &policy.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Policy{}, ErrPolicyNotFound
 		}
 		return Policy{}, err
@@ -68,17 +73,17 @@ func (s *PostgresRepository) GetPolicy(ctx context.Context, policyID string) (Po
 }
 
 func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID string, idempotencyKey string) (IssueResult, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return IssueResult{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if idempotencyKey != "" {
 		if coupon, ok, err := findByIdempotencyKey(ctx, tx, policyID, userID, idempotencyKey); err != nil {
 			return IssueResult{}, err
 		} else if ok {
-			if err := tx.Commit(); err != nil {
+			if err := tx.Commit(ctx); err != nil {
 				return IssueResult{}, err
 			}
 			return IssueResult{Result: "duplicate", Coupon: coupon}, nil
@@ -86,9 +91,9 @@ func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID 
 	}
 
 	var policy Policy
-	row := tx.QueryRowContext(ctx, `SELECT policy_id, drop_id, name, total_quantity, issued_count, status FROM coupon_policies WHERE policy_id = $1 FOR UPDATE`, policyID)
+	row := tx.QueryRow(ctx, `SELECT policy_id, drop_id, name, total_quantity, issued_count, status FROM coupon_policies WHERE policy_id = $1 FOR UPDATE`, policyID)
 	if err := row.Scan(&policy.PolicyID, &policy.DropID, &policy.Name, &policy.TotalQuantity, &policy.IssuedCount, &policy.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return IssueResult{}, ErrPolicyNotFound
 		}
 		return IssueResult{}, err
@@ -105,7 +110,7 @@ func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID 
 				return IssueResult{}, err
 			}
 		}
-		if err := tx.Commit(); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			return IssueResult{}, err
 		}
 		return IssueResult{Result: "duplicate", Coupon: coupon}, nil
@@ -122,16 +127,16 @@ func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID 
 		UserID:   userID,
 		Status:   "issued",
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO coupon_issuances (coupon_id, policy_id, drop_id, user_id, status)
-		VALUES ($1, $2, $3, $4, $5)`, coupon.CouponID, coupon.PolicyID, coupon.DropID, coupon.UserID, coupon.Status); err != nil {
+	if _, err := tx.Exec(ctx, `
+			INSERT INTO coupon_issuances (coupon_id, policy_id, drop_id, user_id, status)
+			VALUES ($1, $2, $3, $4, $5)`, coupon.CouponID, coupon.PolicyID, coupon.DropID, coupon.UserID, coupon.Status); err != nil {
 		if isUniqueViolation(err) {
 			existing, ok, findErr := findIssuedCoupon(ctx, tx, policyID, userID)
 			if findErr != nil {
 				return IssueResult{}, findErr
 			}
 			if ok {
-				if err := tx.Commit(); err != nil {
+				if err := tx.Commit(ctx); err != nil {
 					return IssueResult{}, err
 				}
 				return IssueResult{Result: "duplicate", Coupon: existing}, nil
@@ -139,7 +144,7 @@ func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID 
 		}
 		return IssueResult{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE coupon_policies SET issued_count = issued_count + 1, updated_at = now() WHERE policy_id = $1`, policyID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE coupon_policies SET issued_count = issued_count + 1, updated_at = now() WHERE policy_id = $1`, policyID); err != nil {
 		return IssueResult{}, err
 	}
 	if idempotencyKey != "" {
@@ -147,14 +152,14 @@ func (s *PostgresRepository) Issue(ctx context.Context, policyID string, userID 
 			return IssueResult{}, err
 		}
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return IssueResult{}, err
 	}
 	return IssueResult{Result: "issued", Coupon: coupon}, nil
 }
 
 func (s *PostgresRepository) ListByUser(ctx context.Context, userID string) ([]Coupon, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT coupon_id, policy_id, drop_id, user_id, status FROM coupon_issuances WHERE user_id = $1 ORDER BY issued_at`, userID)
+	rows, err := s.db.Query(ctx, `SELECT coupon_id, policy_id, drop_id, user_id, status FROM coupon_issuances WHERE user_id = $1 ORDER BY issued_at`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,15 +175,15 @@ func (s *PostgresRepository) ListByUser(ctx context.Context, userID string) ([]C
 	return coupons, rows.Err()
 }
 
-func findByIdempotencyKey(ctx context.Context, tx *sql.Tx, policyID string, userID string, key string) (Coupon, bool, error) {
-	row := tx.QueryRowContext(ctx, `
-		SELECT i.coupon_id, i.policy_id, i.drop_id, i.user_id, i.status
-		FROM coupon_idempotency_keys k
-		JOIN coupon_issuances i ON i.coupon_id = k.coupon_id
-		WHERE k.policy_id = $1 AND k.user_id = $2 AND k.idempotency_key = $3`, policyID, userID, key)
+func findByIdempotencyKey(ctx context.Context, tx pgx.Tx, policyID string, userID string, key string) (Coupon, bool, error) {
+	row := tx.QueryRow(ctx, `
+			SELECT i.coupon_id, i.policy_id, i.drop_id, i.user_id, i.status
+			FROM coupon_idempotency_keys k
+			JOIN coupon_issuances i ON i.coupon_id = k.coupon_id
+			WHERE k.policy_id = $1 AND k.user_id = $2 AND k.idempotency_key = $3`, policyID, userID, key)
 	var coupon Coupon
 	if err := row.Scan(&coupon.CouponID, &coupon.PolicyID, &coupon.DropID, &coupon.UserID, &coupon.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Coupon{}, false, nil
 		}
 		return Coupon{}, false, err
@@ -186,11 +191,11 @@ func findByIdempotencyKey(ctx context.Context, tx *sql.Tx, policyID string, user
 	return coupon, true, nil
 }
 
-func findIssuedCoupon(ctx context.Context, tx *sql.Tx, policyID string, userID string) (Coupon, bool, error) {
-	row := tx.QueryRowContext(ctx, `SELECT coupon_id, policy_id, drop_id, user_id, status FROM coupon_issuances WHERE policy_id = $1 AND user_id = $2`, policyID, userID)
+func findIssuedCoupon(ctx context.Context, tx pgx.Tx, policyID string, userID string) (Coupon, bool, error) {
+	row := tx.QueryRow(ctx, `SELECT coupon_id, policy_id, drop_id, user_id, status FROM coupon_issuances WHERE policy_id = $1 AND user_id = $2`, policyID, userID)
 	var coupon Coupon
 	if err := row.Scan(&coupon.CouponID, &coupon.PolicyID, &coupon.DropID, &coupon.UserID, &coupon.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Coupon{}, false, nil
 		}
 		return Coupon{}, false, err
@@ -198,11 +203,11 @@ func findIssuedCoupon(ctx context.Context, tx *sql.Tx, policyID string, userID s
 	return coupon, true, nil
 }
 
-func insertIdempotencyKey(ctx context.Context, tx *sql.Tx, policyID string, userID string, key string, couponID string) error {
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO coupon_idempotency_keys (policy_id, user_id, idempotency_key, coupon_id)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT DO NOTHING`, policyID, userID, key, couponID)
+func insertIdempotencyKey(ctx context.Context, tx pgx.Tx, policyID string, userID string, key string, couponID string) error {
+	_, err := tx.Exec(ctx, `
+			INSERT INTO coupon_idempotency_keys (policy_id, user_id, idempotency_key, coupon_id)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT DO NOTHING`, policyID, userID, key, couponID)
 	return err
 }
 

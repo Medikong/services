@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Owns first-come coupon policies, issuance transactions, idempotency, and user coupon state.
 paths:
-  /internal/coupon-policies:
+  /v1/internal/coupon-policies:
     post:
       tags:
         - coupon-policies
@@ -24,7 +24,7 @@ paths:
                 $ref: "#/components/schemas/Policy"
         "400":
           description: Coupon policy request is invalid.
-  /internal/coupon-policies/{policyId}:
+  /v1/internal/coupon-policies/{policyId}:
     get:
       tags:
         - coupon-policies
@@ -44,7 +44,7 @@ paths:
                 $ref: "#/components/schemas/Policy"
         "422":
           description: Coupon policy is not found.
-  /coupons/issue:
+  /v1/coupons/issue:
     post:
       tags:
         - coupons
@@ -71,7 +71,7 @@ paths:
           description: Coupon inventory is sold out.
         "422":
           description: Coupon policy is missing or not ready.
-  /coupons/me:
+  /v1/coupons/me:
     get:
       tags:
         - coupons

@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/services/coupon-service/internal/domain/coupon"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -31,7 +32,7 @@ func TestCouponPostgresConcurrentIssueRespectsQuantity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connection string: %v", err)
 	}
-	store, err := coupon.OpenPostgresRepository(ctx, dsn)
+	store, err := coupon.OpenPostgresRepository(ctx, database.DefaultPostgresConfig(dsn))
 	if err != nil {
 		t.Fatalf("store open: %v", err)
 	}

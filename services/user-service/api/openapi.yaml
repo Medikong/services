@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Owns DropMong member profiles and status. The historical service name remains user-service.
 paths:
-  /internal/users/ensure:
+  /v1/internal/users/ensure:
     post:
       tags:
         - users
@@ -24,7 +24,7 @@ paths:
                 $ref: "#/components/schemas/User"
         "400":
           description: userId is missing.
-  /users/me:
+  /v1/users/me:
     get:
       tags:
         - users
@@ -40,7 +40,7 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           description: Principal header is missing or invalid.
-  /users/me/profile:
+  /v1/users/me/profile:
     patch:
       tags:
         - users
@@ -64,7 +64,7 @@ paths:
           description: Profile values are invalid.
         "401":
           description: Principal header is missing or invalid.
-  /users/{userId}:
+  /v1/users/{userId}:
     get:
       tags:
         - users

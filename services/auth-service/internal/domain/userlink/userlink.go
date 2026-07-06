@@ -1,14 +1,13 @@
 package userlink
 
-import "context"
+import (
+	"time"
+)
 
 type Link struct {
-	AuthAccountID string
-	UserID        string
-}
-
-type Repository interface {
-	Create(ctx context.Context, link Link) error
-	Upsert(ctx context.Context, link Link) error
-	FindByAuthAccountID(ctx context.Context, authAccountID string) (Link, error)
+	AuthUserLinkID int64
+	AuthAccountID  string
+	UserID         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }

@@ -2,29 +2,30 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
 	"github.com/Medikong/services/packages/go-platform/database"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
-func OpenPostgresRepository(ctx context.Context, databaseURL string) (*PostgresRepository, error) {
-	db, err := database.OpenPostgres(ctx, databaseURL)
+func OpenPostgresRepository(ctx context.Context, config database.PostgresConfig) (*PostgresRepository, error) {
+	db, err := database.OpenPostgres(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 	store := NewPostgresRepository(db)
 	if err := store.Migrate(ctx); err != nil {
-		_ = db.Close()
+		db.Close()
 		return nil, err
 	}
 	return store, nil
@@ -35,7 +36,7 @@ func (s *PostgresRepository) Migrate(ctx context.Context) error {
 }
 
 func (s *PostgresRepository) Ensure(ctx context.Context, userID string) (User, error) {
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.db.Exec(ctx, `
 		INSERT INTO users (user_id, real_name, nickname, profile_icon, status)
 		VALUES ($1, $2, $1, '', 'active')
 		ON CONFLICT (user_id) DO NOTHING`, userID, userID)
@@ -46,10 +47,10 @@ func (s *PostgresRepository) Ensure(ctx context.Context, userID string) (User, e
 }
 
 func (s *PostgresRepository) Get(ctx context.Context, userID string) (User, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT user_id, real_name, nickname, profile_icon, status FROM users WHERE user_id = $1`, userID)
+	row := s.db.QueryRow(ctx, `SELECT user_id, real_name, nickname, profile_icon, status FROM users WHERE user_id = $1`, userID)
 	var user User
 	if err := row.Scan(&user.UserID, &user.RealName, &user.Nickname, &user.ProfileIcon, &user.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return User{}, ErrUserNotFound
 		}
 		return User{}, err
@@ -74,14 +75,14 @@ func (s *PostgresRepository) UpdateProfile(ctx context.Context, userID string, u
 	if update.ProfileIcon != nil {
 		profileIcon = strings.TrimSpace(*update.ProfileIcon)
 	}
-	row := s.db.QueryRowContext(ctx, `
+	row := s.db.QueryRow(ctx, `
 		UPDATE users
 		SET real_name = $2, nickname = $3, profile_icon = $4, updated_at = now()
 		WHERE user_id = $1
 		RETURNING user_id, real_name, nickname, profile_icon, status`, userID, realName, nickname, profileIcon)
 	var user User
 	if err := row.Scan(&user.UserID, &user.RealName, &user.Nickname, &user.ProfileIcon, &user.Status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return User{}, ErrUserNotFound
 		}
 		return User{}, err

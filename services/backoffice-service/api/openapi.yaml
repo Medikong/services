@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Prepares DropMong product, stock, sale window, and coupon policy readiness for operator scenarios.
 paths:
-  /admin/drops/prepare:
+  /v1/admin/drops/prepare:
     post:
       tags:
         - drops
@@ -30,7 +30,7 @@ paths:
           description: Principal header is missing or invalid.
         "403":
           description: Operator role is required.
-  /admin/drops/{dropId}/readiness:
+  /v1/admin/drops/{dropId}/readiness:
     get:
       tags:
         - drops

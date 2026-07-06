@@ -40,7 +40,7 @@ func (c HTTPCouponClient) PreparePolicy(ctx context.Context, input PrepareDropIn
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/internal/coupon-policies", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/internal/coupon-policies", bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
