@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/Medikong/services/packages/go-platform/operational"
-	authhttp "github.com/Medikong/services/services/auth-service/internal/http"
+	authhttp "github.com/Medikong/services/services/auth-service/internal/transport/http"
 )
 
 func TestReadyzChecksDatabase(t *testing.T) {

@@ -6,14 +6,17 @@ auth-service는 `user_id`와 인증/세션/권한만 다룹니다. 사용자 프
 
 ## 구조
 
-- `internal/account`: auth account 생성, 이메일 가입/로그인 오케스트레이션
-- `internal/credential`: password credential 저장과 이메일 credential 조회
-- `internal/userlink`: `auth_account_id -> user_id` 연결
-- `internal/session`: access/refresh session, refresh rotation, revoke, introspection
-- `internal/rolegrant`: account role grant 저장과 조회
-- `internal/principal`: Principal 생성과 authz cache
-- `internal/dev`: local E2E용 deterministic test token 발급
-- `internal/http`: public auth, session, introspection, dev, operational route
+- `internal/app`: DB, migration, repository, service, HTTP route wiring
+- `internal/domain/account`: auth account 생성, 이메일 가입/로그인 오케스트레이션
+- `internal/domain/credential`: password credential 저장과 이메일 credential 조회
+- `internal/domain/userlink`: `auth_account_id -> user_id` 연결
+- `internal/domain/session`: access/refresh session, refresh rotation, revoke, introspection
+- `internal/domain/rolegrant`: account role grant 저장과 조회
+- `internal/domain/principal`: Principal 생성과 authz cache
+- `internal/domain/dev`: local E2E용 deterministic test token 발급
+- `internal/platform/config`: 환경 설정 로딩
+- `internal/platform/database`: PostgreSQL 연결, migration, transaction boundary helper, token/id helper
+- `internal/transport/http`: public auth, session, introspection, dev, operational route
 
 ## 실행
 

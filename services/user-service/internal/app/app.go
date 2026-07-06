@@ -2,35 +2,33 @@ package app
 
 import (
 	"context"
-	"net/http"
+	nethttp "net/http"
 
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/telemetry"
-	"github.com/Medikong/services/services/user-service/internal/config"
-	"github.com/Medikong/services/services/user-service/internal/handler"
-	"github.com/Medikong/services/services/user-service/internal/service"
-	"github.com/Medikong/services/services/user-service/internal/store/memory"
-	postgresstore "github.com/Medikong/services/services/user-service/internal/store/postgres"
+	"github.com/Medikong/services/services/user-service/internal/domain/user"
+	"github.com/Medikong/services/services/user-service/internal/platform/config"
+	userhttp "github.com/Medikong/services/services/user-service/internal/transport/http"
 )
 
 type App struct {
-	server *http.Server
+	server *nethttp.Server
 }
 
 func New(ctx context.Context, cfg config.Config) (App, error) {
-	var store service.Store
+	var store user.Repository
 	if cfg.DatabaseURL != "" {
-		postgres, err := postgresstore.Open(ctx, cfg.DatabaseURL)
+		postgres, err := user.OpenPostgresRepository(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return App{}, err
 		}
 		store = postgres
 	} else {
-		store = memory.New()
+		store = user.NewMemoryRepository()
 	}
 
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux, service.New(store))
+	mux := nethttp.NewServeMux()
+	userhttp.RegisterRoutes(mux, user.NewService(store))
 
 	return App{
 		server: httpserver.New(cfg.HTTPAddr, telemetry.Middleware(config.ServiceName, mux)),

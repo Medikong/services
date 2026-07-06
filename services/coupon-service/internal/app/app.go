@@ -3,48 +3,45 @@ package app
 import (
 	"context"
 	"fmt"
-	"net/http"
+	nethttp "net/http"
 	"time"
 
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/metrics"
 	"github.com/Medikong/services/packages/go-platform/telemetry"
-	"github.com/Medikong/services/services/coupon-service/internal/config"
-	"github.com/Medikong/services/services/coupon-service/internal/gate"
-	"github.com/Medikong/services/services/coupon-service/internal/handler"
-	"github.com/Medikong/services/services/coupon-service/internal/service"
-	"github.com/Medikong/services/services/coupon-service/internal/store/memory"
-	postgresstore "github.com/Medikong/services/services/coupon-service/internal/store/postgres"
+	"github.com/Medikong/services/services/coupon-service/internal/domain/coupon"
+	"github.com/Medikong/services/services/coupon-service/internal/platform/config"
+	couponhttp "github.com/Medikong/services/services/coupon-service/internal/transport/http"
 )
 
 type App struct {
-	server *http.Server
+	server *nethttp.Server
 }
 
 func New(ctx context.Context, cfg config.Config) (App, error) {
-	var store service.Store
+	var store coupon.Repository
 	if cfg.DatabaseURL != "" {
-		postgres, err := postgresstore.Open(ctx, cfg.DatabaseURL)
+		postgres, err := coupon.OpenPostgresRepository(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return App{}, err
 		}
 		store = postgres
 	} else {
-		store = memory.New()
+		store = coupon.NewMemoryRepository()
 	}
 
 	registry := metrics.NewRegistry()
-	options := []service.Option{service.WithMetrics(registry)}
+	options := []coupon.Option{coupon.WithMetrics(registry)}
 	if cfg.RedisGateEnabled == "true" {
 		redisGate, err := buildRedisGate(cfg)
 		if err != nil {
 			return App{}, err
 		}
-		options = append(options, service.WithIssueGate(redisGate), service.WithGateFailureMode(cfg.RedisGateFailureMode))
+		options = append(options, coupon.WithIssueGate(redisGate), coupon.WithGateFailureMode(cfg.RedisGateFailureMode))
 	}
 
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux, service.New(store, options...), registry)
+	mux := nethttp.NewServeMux()
+	couponhttp.RegisterRoutes(mux, coupon.NewService(store, options...), registry)
 	return App{server: httpserver.New(cfg.HTTPAddr, telemetry.Middleware(config.ServiceName, mux))}, nil
 }
 
@@ -52,8 +49,8 @@ func (a App) Run(ctx context.Context) error {
 	return httpserver.ListenAndServe(ctx, a.server)
 }
 
-func buildRedisGate(cfg config.Config) (*gate.Redis, error) {
-	client, err := gate.NewRedisClient(cfg.RedisURL)
+func buildRedisGate(cfg config.Config) (*coupon.Redis, error) {
+	client, err := coupon.NewRedisClient(cfg.RedisURL)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +62,7 @@ func buildRedisGate(cfg config.Config) (*gate.Redis, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse COUPON_REDIS_GATE_IDEMPOTENCY_TTL: %w", err)
 	}
-	return gate.NewRedis(gate.RedisConfig{
+	return coupon.NewRedis(coupon.RedisConfig{
 		Client:        client,
 		PendingTTL:    pendingTTL,
 		IdempotentTTL: idempotencyTTL,

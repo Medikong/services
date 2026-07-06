@@ -9,16 +9,16 @@ import (
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/packages/go-platform/telemetry"
-	"github.com/Medikong/services/services/auth-service/internal/account"
-	"github.com/Medikong/services/services/auth-service/internal/config"
-	"github.com/Medikong/services/services/auth-service/internal/credential"
-	"github.com/Medikong/services/services/auth-service/internal/dev"
-	authhttp "github.com/Medikong/services/services/auth-service/internal/http"
-	"github.com/Medikong/services/services/auth-service/internal/postgres"
-	"github.com/Medikong/services/services/auth-service/internal/principal"
-	"github.com/Medikong/services/services/auth-service/internal/rolegrant"
-	"github.com/Medikong/services/services/auth-service/internal/session"
-	"github.com/Medikong/services/services/auth-service/internal/userlink"
+	"github.com/Medikong/services/services/auth-service/internal/domain/account"
+	"github.com/Medikong/services/services/auth-service/internal/domain/credential"
+	"github.com/Medikong/services/services/auth-service/internal/domain/dev"
+	"github.com/Medikong/services/services/auth-service/internal/domain/principal"
+	"github.com/Medikong/services/services/auth-service/internal/domain/rolegrant"
+	"github.com/Medikong/services/services/auth-service/internal/domain/session"
+	"github.com/Medikong/services/services/auth-service/internal/domain/userlink"
+	"github.com/Medikong/services/services/auth-service/internal/platform/config"
+	"github.com/Medikong/services/services/auth-service/internal/platform/database"
+	authhttp "github.com/Medikong/services/services/auth-service/internal/transport/http"
 )
 
 type App struct {
@@ -30,11 +30,11 @@ func New(ctx context.Context, cfg config.Config) (App, error) {
 		return App{}, fmt.Errorf("DATABASE_URL is required for auth-service")
 	}
 
-	db, err := postgres.Open(ctx, cfg.DatabaseURL)
+	db, err := database.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return App{}, err
 	}
-	migrations := postgres.MergeMigrations(
+	migrations := database.MergeMigrations(
 		account.Migrations,
 		credential.Migrations,
 		userlink.Migrations,
@@ -46,7 +46,7 @@ func New(ctx context.Context, cfg config.Config) (App, error) {
 		return App{}, err
 	}
 
-	repoFactory := func(exec postgres.Executor) account.Repositories {
+	repoFactory := func(exec database.Executor) account.Repositories {
 		return account.Repositories{
 			Accounts:    account.NewPostgresRepository(exec),
 			Credentials: credential.NewPostgresRepository(exec),

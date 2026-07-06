@@ -9,7 +9,7 @@ import (
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/telemetry"
 	"github.com/Medikong/services/services/coupon-service/internal/app"
-	"github.com/Medikong/services/services/coupon-service/internal/config"
+	"github.com/Medikong/services/services/coupon-service/internal/platform/config"
 )
 
 func main() {

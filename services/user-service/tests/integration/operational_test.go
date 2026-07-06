@@ -8,14 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Medikong/services/services/user-service/internal/handler"
-	userservice "github.com/Medikong/services/services/user-service/internal/service"
-	"github.com/Medikong/services/services/user-service/internal/store/memory"
+	"github.com/Medikong/services/services/user-service/internal/domain/user"
+	userhttp "github.com/Medikong/services/services/user-service/internal/transport/http"
 )
 
 func TestOperationalRoutesIntegration(t *testing.T) {
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux, userservice.New(memory.New()))
+	userhttp.RegisterRoutes(mux, user.NewService(user.NewMemoryRepository()))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)

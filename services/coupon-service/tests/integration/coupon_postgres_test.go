@@ -9,8 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Medikong/services/services/coupon-service/internal/repository"
-	postgresstore "github.com/Medikong/services/services/coupon-service/internal/store/postgres"
+	"github.com/Medikong/services/services/coupon-service/internal/domain/coupon"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -32,11 +31,11 @@ func TestCouponPostgresConcurrentIssueRespectsQuantity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connection string: %v", err)
 	}
-	store, err := postgresstore.Open(ctx, dsn)
+	store, err := coupon.OpenPostgresRepository(ctx, dsn)
 	if err != nil {
 		t.Fatalf("store open: %v", err)
 	}
-	if _, err := store.UpsertPolicy(ctx, repository.PolicyInput{PolicyID: "policy-pg-1", DropID: "drop-pg-1", Name: "Launch", TotalQuantity: 5, Status: "ready"}); err != nil {
+	if _, err := store.UpsertPolicy(ctx, coupon.PolicyInput{PolicyID: "policy-pg-1", DropID: "drop-pg-1", Name: "Launch", TotalQuantity: 5, Status: "ready"}); err != nil {
 		t.Fatalf("UpsertPolicy() error = %v", err)
 	}
 
@@ -52,7 +51,7 @@ func TestCouponPostgresConcurrentIssueRespectsQuantity(t *testing.T) {
 				issued.Add(1)
 				return
 			}
-			if errors.Is(err, repository.ErrSoldOut) {
+			if errors.Is(err, coupon.ErrSoldOut) {
 				soldOut.Add(1)
 				return
 			}

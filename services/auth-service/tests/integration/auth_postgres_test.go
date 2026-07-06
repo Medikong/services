@@ -11,14 +11,14 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/Medikong/services/services/auth-service/internal/account"
-	"github.com/Medikong/services/services/auth-service/internal/credential"
-	"github.com/Medikong/services/services/auth-service/internal/dev"
-	authpostgres "github.com/Medikong/services/services/auth-service/internal/postgres"
-	"github.com/Medikong/services/services/auth-service/internal/principal"
-	"github.com/Medikong/services/services/auth-service/internal/rolegrant"
-	"github.com/Medikong/services/services/auth-service/internal/session"
-	"github.com/Medikong/services/services/auth-service/internal/userlink"
+	"github.com/Medikong/services/services/auth-service/internal/domain/account"
+	"github.com/Medikong/services/services/auth-service/internal/domain/credential"
+	"github.com/Medikong/services/services/auth-service/internal/domain/dev"
+	"github.com/Medikong/services/services/auth-service/internal/domain/principal"
+	"github.com/Medikong/services/services/auth-service/internal/domain/rolegrant"
+	"github.com/Medikong/services/services/auth-service/internal/domain/session"
+	"github.com/Medikong/services/services/auth-service/internal/domain/userlink"
+	authpostgres "github.com/Medikong/services/services/auth-service/internal/platform/database"
 )
 
 type testAuthServices struct {

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	authhttp "github.com/Medikong/services/services/auth-service/internal/http"
+	authhttp "github.com/Medikong/services/services/auth-service/internal/transport/http"
 )
 
 func BenchmarkHealthzRoute(b *testing.B) {
