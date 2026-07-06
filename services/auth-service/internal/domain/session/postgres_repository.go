@@ -28,42 +28,50 @@ func NewPostgresTxRepository(tx pgx.Tx) PostgresRepository {
 }
 
 func (r PostgresRepository) Create(ctx context.Context, input Input) (Record, error) {
-	return r.create(ctx, input, "atk_"+randomHex(24), "rtk_"+randomHex(24))
+	return r.create(ctx, input, NewRefreshToken())
 }
 
-func (r PostgresRepository) CreateFixedAccess(ctx context.Context, input Input, accessToken string) (Record, error) {
-	return r.create(ctx, input, accessToken, "rtk_"+randomHex(24))
-}
-
-func (r PostgresRepository) create(ctx context.Context, input Input, accessToken string, refreshToken string) (Record, error) {
+func (r PostgresRepository) create(ctx context.Context, input Input, refreshToken string) (Record, error) {
 	record := Record{
-		SessionID:     newID("session"),
-		AccessToken:   accessToken,
-		RefreshToken:  refreshToken,
-		AuthAccountID: input.AuthAccountID,
-		UserID:        input.UserID,
-		AuthMethods:   append([]string(nil), input.AuthMethods...),
+		SessionID:        newID("session"),
+		AccessJTI:        strings.TrimSpace(input.AccessJTI),
+		RefreshToken:     refreshToken,
+		AuthAccountID:    input.AuthAccountID,
+		UserID:           input.UserID,
+		Email:            strings.TrimSpace(input.Email),
+		AccessExpiresAt:  input.AccessExpiresAt,
+		RefreshExpiresAt: input.RefreshExpiresAt,
+		AuthMethods:      append([]string(nil), input.AuthMethods...),
 	}
 	_, err := r.exec(ctx, `
-		INSERT INTO auth_sessions (session_id, auth_account_id, user_id, access_token, refresh_token_hash, auth_methods, status)
-		VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
-		record.SessionID, record.AuthAccountID, record.UserID, record.AccessToken, hashToken(record.RefreshToken), strings.Join(record.AuthMethods, ","))
+		INSERT INTO auth_sessions (
+			session_id, auth_account_id, user_id, email, access_token, access_jti,
+			access_expires_at, refresh_token_hash, refresh_expires_at, auth_methods, status
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')`,
+		record.SessionID, record.AuthAccountID, record.UserID, record.Email, record.AccessJTI, record.AccessJTI,
+		record.AccessExpiresAt, hashToken(record.RefreshToken), record.RefreshExpiresAt, strings.Join(record.AuthMethods, ","))
 	if err != nil {
 		return Record{}, err
 	}
 	return record, nil
 }
 
-func (r PostgresRepository) FindByAccessToken(ctx context.Context, token string) (Record, error) {
+func (r PostgresRepository) FindByAccessJTI(ctx context.Context, jti string) (Record, error) {
 	row := r.queryRow(ctx, `
-		SELECT session_id, access_token, auth_account_id, user_id, auth_methods
-		FROM auth_sessions
-		WHERE access_token = $1 AND status = 'active'`, token)
+		SELECT s.session_id, s.access_jti, s.auth_account_id, s.user_id, s.email, s.access_expires_at, s.refresh_expires_at, s.auth_methods
+		FROM auth_sessions s
+		JOIN auth_accounts a ON a.auth_account_id = s.auth_account_id
+		WHERE s.access_jti = $1
+			AND s.status = 'active'
+			AND a.status = 'active'
+			AND s.access_expires_at > now()
+			AND s.refresh_expires_at > now()`, jti)
 	var record Record
 	var methods string
-	if err := row.Scan(&record.SessionID, &record.AccessToken, &record.AuthAccountID, &record.UserID, &methods); err != nil {
+	if err := row.Scan(&record.SessionID, &record.AccessJTI, &record.AuthAccountID, &record.UserID, &record.Email, &record.AccessExpiresAt, &record.RefreshExpiresAt, &methods); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Record{}, ErrSessionNotFound.New("session not found")
+			return Record{}, ErrTokenRevoked.New("session not found")
 		}
 		return Record{}, err
 	}
@@ -71,32 +79,40 @@ func (r PostgresRepository) FindByAccessToken(ctx context.Context, token string)
 	return record, nil
 }
 
-func (r PostgresRepository) Refresh(ctx context.Context, refreshToken string) (Rotation, error) {
-	newAccessToken := "atk_" + randomHex(24)
-	newRefreshToken := "rtk_" + randomHex(24)
+func (r PostgresRepository) Refresh(ctx context.Context, refreshToken string, input Input) (Rotation, error) {
+	newRefreshToken := NewRefreshToken()
 	row := r.queryRow(ctx, `
 		WITH current AS (
-			SELECT session_id, access_token, auth_account_id, user_id, auth_methods
-			FROM auth_sessions
-			WHERE refresh_token_hash = $1 AND status = 'active'
+			SELECT s.session_id, s.access_jti, s.auth_account_id, s.user_id, s.email, s.auth_methods
+			FROM auth_sessions s
+			JOIN auth_accounts a ON a.auth_account_id = s.auth_account_id
+			WHERE s.refresh_token_hash = $1
+				AND s.status = 'active'
+				AND a.status = 'active'
+				AND s.refresh_expires_at > now()
 			FOR UPDATE
 		),
 		updated AS (
 			UPDATE auth_sessions s
-			SET access_token = $2, refresh_token_hash = $3, rotated_at = now()
+			SET access_token = $2,
+				access_jti = $2,
+				access_expires_at = $3,
+				refresh_token_hash = $4,
+				refresh_expires_at = $5,
+				rotated_at = now()
 			FROM current
 			WHERE s.session_id = current.session_id
-			RETURNING current.access_token AS previous_access_token, s.session_id, s.access_token, s.auth_account_id, s.user_id, s.auth_methods
+			RETURNING current.access_jti AS previous_access_jti, s.session_id, s.access_jti, s.auth_account_id, s.user_id, s.email, s.access_expires_at, s.refresh_expires_at, s.auth_methods
 		)
-		SELECT previous_access_token, session_id, access_token, auth_account_id, user_id, auth_methods
+		SELECT previous_access_jti, session_id, access_jti, auth_account_id, user_id, email, access_expires_at, refresh_expires_at, auth_methods
 		FROM updated`,
-		hashToken(refreshToken), newAccessToken, hashToken(newRefreshToken))
+		hashToken(refreshToken), input.AccessJTI, input.AccessExpiresAt, hashToken(newRefreshToken), input.RefreshExpiresAt)
 	var previousAccessToken string
 	var record Record
 	var methods string
-	if err := row.Scan(&previousAccessToken, &record.SessionID, &record.AccessToken, &record.AuthAccountID, &record.UserID, &methods); err != nil {
+	if err := row.Scan(&previousAccessToken, &record.SessionID, &record.AccessJTI, &record.AuthAccountID, &record.UserID, &record.Email, &record.AccessExpiresAt, &record.RefreshExpiresAt, &methods); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Rotation{}, ErrSessionNotFound.New("session not found")
+			return Rotation{}, ErrInvalidRefreshToken.New("refresh token not found")
 		}
 		return Rotation{}, err
 	}
@@ -110,12 +126,12 @@ func (r PostgresRepository) RevokeBySessionID(ctx context.Context, sessionID str
 		UPDATE auth_sessions
 		SET status = 'revoked', revoked_at = now()
 		WHERE session_id = $1 AND status = 'active'
-		RETURNING session_id, access_token, auth_account_id, user_id, auth_methods`, sessionID)
+		RETURNING session_id, access_jti, auth_account_id, user_id, email, access_expires_at, refresh_expires_at, auth_methods`, sessionID)
 	var record Record
 	var methods string
-	if err := row.Scan(&record.SessionID, &record.AccessToken, &record.AuthAccountID, &record.UserID, &methods); err != nil {
+	if err := row.Scan(&record.SessionID, &record.AccessJTI, &record.AuthAccountID, &record.UserID, &record.Email, &record.AccessExpiresAt, &record.RefreshExpiresAt, &methods); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Record{}, ErrSessionNotFound.New("session not found")
+			return Record{}, ErrTokenRevoked.New("session not found")
 		}
 		return Record{}, err
 	}
@@ -123,8 +139,8 @@ func (r PostgresRepository) RevokeBySessionID(ctx context.Context, sessionID str
 	return record, nil
 }
 
-func (r PostgresRepository) RevokeByAccessToken(ctx context.Context, token string) (Record, error) {
-	record, err := r.FindByAccessToken(ctx, token)
+func (r PostgresRepository) RevokeByAccessJTI(ctx context.Context, jti string) (Record, error) {
+	record, err := r.FindByAccessJTI(ctx, jti)
 	if err != nil {
 		return Record{}, err
 	}
@@ -194,7 +210,13 @@ var Migrations = []string{
 	)`,
 	`ALTER TABLE auth_sessions DROP COLUMN IF EXISTS refresh_token`,
 	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS refresh_token_hash TEXT`,
+	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS email TEXT`,
+	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS access_jti TEXT`,
+	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS access_expires_at TIMESTAMPTZ`,
+	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS refresh_expires_at TIMESTAMPTZ`,
+	`UPDATE auth_sessions SET access_jti = access_token WHERE access_jti IS NULL`,
 	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMPTZ`,
 	`ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS auth_sessions_refresh_token_hash_active_uq ON auth_sessions(refresh_token_hash) WHERE refresh_token_hash IS NOT NULL AND status = 'active'`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS auth_sessions_access_jti_active_uq ON auth_sessions(access_jti) WHERE access_jti IS NOT NULL AND status = 'active'`,
 }

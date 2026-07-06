@@ -3,12 +3,21 @@
 package integration_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/Medikong/services/packages/go-authz/rbac"
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
+	"github.com/Medikong/services/packages/go-platform/operational"
+	authhttp "github.com/Medikong/services/services/auth-service/internal/transport/http"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -30,7 +39,10 @@ type testAuthServices struct {
 	accounts account.Service
 	sessions session.Service
 	dev      dev.Service
+	tokens   session.TokenManager
 }
+
+const testJWTSecret = "integration-test-secret"
 
 func TestAuthPostgresCorePaths(t *testing.T) {
 	ctx := context.Background()
@@ -40,10 +52,15 @@ func TestAuthPostgresCorePaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Signup() error = %v", err)
 	}
+	signupClaims := assertJWT(t, signup.AccessToken, signup.UserID, string(rbac.RoleCustomer))
+	if signupClaims.Issuer != "auth-service" || signupClaims.ID == "" || signupClaims.IssuedAt == nil || signupClaims.ExpiresAt == nil {
+		t.Fatalf("signup claims = %+v", signupClaims)
+	}
 	login, err := services.accounts.Login(ctx, account.LoginInput{Email: "pg@example.com", Password: "secret-123"})
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
 	}
+	loginClaims := assertJWT(t, login.AccessToken, signup.UserID, string(rbac.RoleCustomer))
 	if login.UserID != signup.UserID {
 		t.Fatalf("login userID=%q want %q", login.UserID, signup.UserID)
 	}
@@ -91,6 +108,19 @@ func TestAuthPostgresCorePaths(t *testing.T) {
 	} else if result.Principal.UserID != signup.UserID || !result.Principal.HasRole(string(rbac.RoleCustomer)) {
 		t.Fatalf("principal = %+v", result.Principal)
 	}
+	expiredAccessToken, err := services.tokens.Issue(session.AccessTokenInput{
+		Subject:   loginClaims.Subject,
+		Role:      loginClaims.Role,
+		JTI:       loginClaims.ID,
+		IssuedAt:  time.Now().Add(-2 * time.Hour),
+		ExpiresAt: time.Now().Add(-1 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("issue expired access token: %v", err)
+	}
+	if _, err := services.sessions.Introspect(ctx, "Bearer "+expiredAccessToken); err == nil {
+		t.Fatal("expired access token introspected")
+	}
 
 	refreshed, err := services.sessions.Refresh(ctx, session.RefreshInput{RefreshToken: login.RefreshToken})
 	if err != nil {
@@ -122,9 +152,23 @@ func TestAuthPostgresCorePaths(t *testing.T) {
 	if _, err := services.sessions.Introspect(ctx, "Bearer "+revokeTarget.AccessToken); err == nil {
 		t.Fatal("introspect succeeded after session revoke")
 	}
+
+	disabled, err := services.accounts.Login(ctx, account.LoginInput{Email: "pg@example.com", Password: "secret-123"})
+	if err != nil {
+		t.Fatalf("Login() before disable error = %v", err)
+	}
+	if _, err := services.db.Exec(ctx, `UPDATE auth_accounts SET status = 'disabled' WHERE auth_account_id = $1`, signup.AuthAccountID); err != nil {
+		t.Fatalf("disable account: %v", err)
+	}
+	if _, err := services.accounts.Login(ctx, account.LoginInput{Email: "pg@example.com", Password: "secret-123"}); err == nil {
+		t.Fatal("disabled account logged in")
+	}
+	if _, err := services.sessions.Introspect(ctx, "Bearer "+disabled.AccessToken); err == nil {
+		t.Fatal("disabled account token introspected")
+	}
 }
 
-func TestDevTokenIsDeterministicOnPostgres(t *testing.T) {
+func TestDevTokenIssuesJWTOnPostgres(t *testing.T) {
 	ctx := context.Background()
 	services := newTestAuthServices(t, ctx)
 
@@ -136,10 +180,8 @@ func TestDevTokenIsDeterministicOnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IssueTestToken() error = %v", err)
 	}
-	if issued.AccessToken != "test-customer" {
-		t.Fatalf("access token = %q", issued.AccessToken)
-	}
-	result, err := services.sessions.Introspect(ctx, "Bearer test-customer")
+	assertJWT(t, issued.AccessToken, "user-test", string(rbac.RoleCustomer))
+	result, err := services.sessions.Introspect(ctx, "Bearer "+issued.AccessToken)
 	if err != nil {
 		t.Fatalf("Introspect(test token) error = %v", err)
 	}
@@ -148,7 +190,34 @@ func TestDevTokenIsDeterministicOnPostgres(t *testing.T) {
 	}
 }
 
+func TestDevTokenEndpointRequiresFlag(t *testing.T) {
+	ctx := context.Background()
+	services := newTestAuthServicesWithDev(t, ctx, false)
+	mux := http.NewServeMux()
+	authhttp.RegisterRoutes(mux, authhttp.Services{
+		Accounts: services.accounts,
+		Sessions: services.sessions,
+		Dev:      services.dev,
+	}, map[string]operational.Check{
+		"database": services.db.Ping,
+	})
+
+	response := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"userId":"user-test","roles":["CUSTOMER"]}`)
+	request := httptest.NewRequest(http.MethodPost, "/v1/internal/dev/test-token", body)
+
+	mux.ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d, body = %s", response.Code, http.StatusForbidden, response.Body.String())
+	}
+}
+
 func newTestAuthServices(t *testing.T, ctx context.Context) testAuthServices {
+	return newTestAuthServicesWithDev(t, ctx, true)
+}
+
+func newTestAuthServicesWithDev(t *testing.T, ctx context.Context, devEnabled bool) testAuthServices {
 	t.Helper()
 	container, err := tcpostgres.Run(ctx, "postgres:16-alpine",
 		tcpostgres.WithDatabase("auth_service"),
@@ -201,10 +270,45 @@ func newTestAuthServices(t *testing.T, ctx context.Context) testAuthServices {
 		Sessions:      session.NewPostgresRepository(db),
 	}
 	builder := principal.NewBuilder(repos.RoleGrants)
+	tokens, err := session.NewTokenManager(session.TokenConfig{
+		Issuer:          "auth-service",
+		Secret:          testJWTSecret,
+		AccessTokenTTL:  15 * time.Minute,
+		RefreshTokenTTL: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewTokenManager() error = %v", err)
+	}
 	return testAuthServices{
 		db:       db,
-		accounts: account.NewService(db, repos, repoFactory, builder),
-		sessions: session.NewService(repos.Sessions, builder, nil),
-		dev:      dev.NewService(db, repoFactory, builder),
+		accounts: account.NewService(db, repos, repoFactory, builder, tokens),
+		sessions: session.NewService(repos.Sessions, builder, tokens),
+		dev:      dev.NewService(db, repoFactory, builder, tokens, devEnabled),
+		tokens:   tokens,
 	}
+}
+
+func assertJWT(t *testing.T, token string, subject string, role string) session.AccessTokenClaims {
+	t.Helper()
+	if token == "" || strings.HasPrefix(token, "atk_") {
+		t.Fatalf("access token = %q, want JWT", token)
+	}
+	claims := session.AccessTokenClaims{}
+	parsed, err := jwt.ParseWithClaims(token, &claims, func(parsed *jwt.Token) (any, error) {
+		if parsed.Method != jwt.SigningMethodHS256 {
+			t.Fatalf("method = %v, want HS256", parsed.Method.Alg())
+		}
+		return []byte(testJWTSecret), nil
+	}, jwt.WithIssuer("auth-service"), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
+	if err != nil {
+		t.Fatalf("parse JWT: %v", err)
+	}
+	if parsed == nil || !parsed.Valid {
+		t.Fatal("JWT is invalid")
+	}
+	if claims.Subject != subject || claims.Role != role {
+		data, _ := json.Marshal(claims)
+		t.Fatalf("claims = %s", data)
+	}
+	return claims
 }

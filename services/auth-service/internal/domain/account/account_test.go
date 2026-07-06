@@ -21,3 +21,14 @@ func TestAccountValidateRejectsInvalidState(t *testing.T) {
 		t.Fatal("Validate() succeeded with invalid status")
 	}
 }
+
+func TestValidPasswordRequiresMinimumStrength(t *testing.T) {
+	for _, password := range []string{"", "        ", "short1", "password", "12345678", "secret 123", " secret123"} {
+		if validPassword(password) {
+			t.Fatalf("validPassword(%q) = true, want false", password)
+		}
+	}
+	if !validPassword("secret-123") {
+		t.Fatal("validPassword(secret-123) = false, want true")
+	}
+}

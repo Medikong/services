@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Auth Service API
   version: 0.1.0
-  description: Issues DropMong opaque access tokens and normalized Principal headers for service-to-service calls. JWT alignment remains a contract decision.
+  description: Issues DropMong HS256 JWT access tokens, opaque refresh tokens, and normalized Principal headers for service-to-service calls.
 paths:
   /v1/auth/signup:
     post:
@@ -123,7 +123,7 @@ paths:
     post:
       tags:
         - auth
-      summary: Issue a deterministic test token for local E2E scenarios.
+      summary: Issue a test JWT for local E2E scenarios when the dev flag is enabled.
       requestBody:
         required: true
         content:
@@ -151,7 +151,8 @@ components:
       required: true
       schema:
         type: string
-      example: Bearer test-customer
+      description: Bearer HS256 JWT access token issued by auth-service.
+      example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   schemas:
     SignupRequest:
       type: object
@@ -182,12 +183,20 @@ components:
       properties:
         token:
           type: string
+          description: Optional stable suffix used for test user defaults. The returned access token is still a JWT.
         userId:
           type: string
+        email:
+          type: string
+          format: email
         roles:
           type: array
           items:
             type: string
+            enum:
+              - CUSTOMER
+              - PROVIDER
+              - ADMIN
     RefreshRequest:
       type: object
       required:
@@ -211,9 +220,10 @@ components:
           type: string
         accessToken:
           type: string
-          description: Current implementation returns an opaque token such as atk_*. The shared JWT contract is not implemented yet.
+          description: HS256 JWT access token. Claims include iss, sub, role, iat, exp, and jti. Email is not exposed as an access-token claim.
         refreshToken:
           type: string
+          description: Opaque refresh token. The server stores only its hash and rotates it on refresh.
         principal:
           $ref: "#/components/schemas/Principal"
         principalHeader:

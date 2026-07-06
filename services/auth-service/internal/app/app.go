@@ -70,13 +70,19 @@ func New(ctx context.Context, cfg config.Config) (App, error) {
 		Sessions:      session.NewPostgresRepository(db),
 	}
 	builder := principal.NewBuilder(repos.RoleGrants)
-	var cache principal.AuthzCache
-	if cfg.AuthzCacheEnabled {
-		cache = principal.NewMemoryAuthzCache()
+	tokens, err := session.NewTokenManager(session.TokenConfig{
+		Issuer:          cfg.JWTIssuer,
+		Secret:          cfg.JWTSecret,
+		AccessTokenTTL:  cfg.AccessTokenTTL,
+		RefreshTokenTTL: cfg.RefreshTokenTTL,
+	})
+	if err != nil {
+		db.Close()
+		return App{}, err
 	}
-	accountService := account.NewService(db, repos, repoFactory, builder)
-	sessionService := session.NewService(repos.Sessions, builder, cache)
-	devService := dev.NewService(db, repoFactory, builder)
+	accountService := account.NewService(db, repos, repoFactory, builder, tokens)
+	sessionService := session.NewService(repos.Sessions, builder, tokens)
+	devService := dev.NewService(db, repoFactory, builder, tokens, cfg.DevTestToken)
 
 	runtimeMetrics := metrics.NewRegistry()
 	router := authhttp.NewRouter(authhttp.Services{

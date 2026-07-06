@@ -40,7 +40,6 @@ Access token은 다음 claim을 반드시 포함한다.
 {
   "iss": "auth-service",
   "sub": "1",
-  "email": "customer@example.com",
   "role": "CUSTOMER",
   "iat": 1779945000,
   "exp": 1779945900,
@@ -52,13 +51,12 @@ Access token은 다음 claim을 반드시 포함한다.
 | --- | --- | --- |
 | `iss` | Yes | 토큰 발급자. 기본값은 `auth-service`이다. |
 | `sub` | Yes | 인증 사용자 id를 문자열로 넣는다. |
-| `email` | Yes | 로그인 식별자이다. |
 | `role` | Yes | `CUSTOMER`, `PROVIDER`, `ADMIN` 중 하나이다. |
 | `iat` | Yes | 발급 시각 Unix epoch seconds이다. |
 | `exp` | Yes | 만료 시각 Unix epoch seconds이다. |
 | `jti` | Yes | access token 폐기와 추적에 사용하는 token id이다. |
 
-서비스 구현은 `sub`와 `role`을 우선 신뢰한다. `customerId`, `providerId` 같은 도메인별 id claim은 MVP 필수 claim에 포함하지 않는다. 필요한 서비스는 자체 DB에서 `sub`를 기준으로 도메인 리소스 소유권을 확인한다.
+서비스 구현은 `sub`와 `role`을 우선 신뢰한다. 이메일 같은 개인정보와 `customerId`, `providerId` 같은 도메인별 id claim은 MVP 필수 claim에 포함하지 않는다. 필요한 서비스는 자체 DB에서 `sub`를 기준으로 도메인 리소스 소유권을 확인한다.
 
 ## Refresh token 규칙
 

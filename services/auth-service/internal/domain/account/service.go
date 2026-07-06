@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/Medikong/services/packages/go-authz/rbac"
 	"github.com/jackc/pgx/v5"
@@ -51,14 +53,18 @@ type Service struct {
 	repos       Repositories
 	repoFactory RepositoryFactory
 	builder     principal.Builder
+	tokens      session.TokenManager
+	now         func() time.Time
 }
 
-func NewService(pool *pgxpool.Pool, repos Repositories, repoFactory RepositoryFactory, builder principal.Builder) Service {
+func NewService(pool *pgxpool.Pool, repos Repositories, repoFactory RepositoryFactory, builder principal.Builder, tokens session.TokenManager) Service {
 	return Service{
 		pool:        pool,
 		repos:       repos,
 		repoFactory: repoFactory,
 		builder:     builder,
+		tokens:      tokens,
+		now:         time.Now,
 	}
 }
 
@@ -67,7 +73,7 @@ func (s Service) Signup(ctx context.Context, input SignupInput) (principal.AuthR
 	defer span.End()
 
 	email := normalizeEmail(input.Email)
-	if email == "" || strings.TrimSpace(input.Password) == "" {
+	if email == "" || !validPassword(input.Password) {
 		return principal.AuthResult{}, ErrInvalidSignup.New("invalid signup input")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -103,11 +109,12 @@ func (s Service) Signup(ctx context.Context, input SignupInput) (principal.AuthR
 		if err := repos.RoleGrants.Grant(ctx, rolegrant.Grant{AuthAccountID: authAccountID, Role: string(rbac.RoleCustomer)}); err != nil {
 			return err
 		}
-		sessionRecord, err := repos.Sessions.Create(ctx, session.Input{
+		sessionRecord, err := repos.Sessions.Create(ctx, s.newSessionInput(session.Input{
 			AuthAccountID: authAccountID,
 			UserID:        userID,
+			Email:         email,
 			AuthMethods:   []string{session.AuthMethodPassword},
-		})
+		}))
 		created = sessionRecord
 		return err
 	})
@@ -131,15 +138,23 @@ func (s Service) Login(ctx context.Context, input LoginInput) (principal.AuthRes
 	if err := bcrypt.CompareHashAndPassword([]byte(password.PasswordHash), []byte(input.Password)); err != nil {
 		return principal.AuthResult{}, ErrInvalidCredentials.Wrap(err)
 	}
+	authAccount, err := s.repos.Accounts.FindByID(ctx, password.AuthAccountID)
+	if err != nil {
+		return principal.AuthResult{}, ErrInvalidCredentials.Wrap(err)
+	}
+	if authAccount.Status != StatusActive {
+		return principal.AuthResult{}, ErrInvalidCredentials.New("auth account is disabled")
+	}
 	link, err := s.repos.UserLinks.FindByAuthAccountID(ctx, password.AuthAccountID)
 	if err != nil {
 		return principal.AuthResult{}, ErrInvalidCredentials.Wrap(err)
 	}
-	record, err := s.repos.Sessions.Create(ctx, session.Input{
+	record, err := s.repos.Sessions.Create(ctx, s.newSessionInput(session.Input{
 		AuthAccountID: password.AuthAccountID,
 		UserID:        link.UserID,
+		Email:         password.Email,
 		AuthMethods:   []string{session.AuthMethodPassword},
-	})
+	}))
 	if err != nil {
 		return principal.AuthResult{}, ErrInternal.With("operation", "login.create_session").Wrap(err)
 	}
@@ -156,10 +171,24 @@ func (s Service) authResult(ctx context.Context, record session.Record) (princip
 	if err != nil {
 		return principal.AuthResult{}, ErrInternal.With("operation", "build_principal").Wrap(err)
 	}
+	role, err := session.JWTAccessRole(p.Roles)
+	if err != nil {
+		return principal.AuthResult{}, err
+	}
+	accessToken, err := s.tokens.Issue(session.AccessTokenInput{
+		Subject:   record.UserID,
+		Role:      role,
+		JTI:       record.AccessJTI,
+		IssuedAt:  record.AccessExpiresAt.Add(-s.tokens.AccessTokenTTL()),
+		ExpiresAt: record.AccessExpiresAt,
+	})
+	if err != nil {
+		return principal.AuthResult{}, err
+	}
 	return principal.AuthResult{
 		AuthAccountID:   record.AuthAccountID,
 		UserID:          record.UserID,
-		AccessToken:     record.AccessToken,
+		AccessToken:     accessToken,
 		RefreshToken:    record.RefreshToken,
 		Principal:       p,
 		PrincipalHeader: header,
@@ -168,6 +197,29 @@ func (s Service) authResult(ctx context.Context, record session.Record) (princip
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func (s Service) newSessionInput(input session.Input) session.Input {
+	return session.NewInput(s.tokens, s.now(), input)
+}
+
+func validPassword(password string) bool {
+	if len(password) < 8 || strings.TrimSpace(password) != password {
+		return false
+	}
+	var hasLetter, hasDigit bool
+	for _, r := range password {
+		if unicode.IsSpace(r) {
+			return false
+		}
+		if unicode.IsLetter(r) {
+			hasLetter = true
+		}
+		if unicode.IsDigit(r) {
+			hasDigit = true
+		}
+	}
+	return hasLetter && hasDigit
 }
 
 func newID(prefix string) string {

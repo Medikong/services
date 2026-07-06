@@ -114,7 +114,6 @@ components:
       required:
         - iss
         - sub
-        - email
         - role
         - iat
         - exp
@@ -130,10 +129,6 @@ components:
           description: Auth user id encoded as a string.
           examples:
             - "1"
-        email:
-          type: string
-          examples:
-            - customer@example.com
         role:
           $ref: "#/components/schemas/UserRole"
         iat:

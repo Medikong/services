@@ -25,7 +25,7 @@ JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions
 - MVP에서는 모든 서비스가 같은 `JWT_SECRET`으로 access token을 검증한다.
 - `Authorization` 헤더는 `Bearer <accessToken>` 형식만 허용한다.
 - `role`은 `CUSTOMER`, `PROVIDER`, `ADMIN` 중 하나이다.
-- 필수 claim은 `iss`, `sub`, `email`, `role`, `iat`, `exp`, `jti`이다.
+- 필수 claim은 `iss`, `sub`, `role`, `iat`, `exp`, `jti`이다. 이메일 같은 개인정보는 access token claim에 넣지 않는다.
 - refresh token은 JWT가 아니라 opaque string이며, `auth-service`만 검증한다.
 
 ## Status Code 규칙
