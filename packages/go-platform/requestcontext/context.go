@@ -30,8 +30,8 @@ func Ensure(r *http.Request) (*http.Request, string, error) {
 			return r, "", err
 		}
 		requestID = generated
-		r.Header.Set(RequestIDHeader, requestID)
 	}
+	r.Header.Set(RequestIDHeader, requestID)
 	ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 	if clientActionID := strings.TrimSpace(r.Header.Get(ClientActionIDHeader)); clientActionID != "" {
 		ctx = context.WithValue(ctx, clientActionIDKey, clientActionID)

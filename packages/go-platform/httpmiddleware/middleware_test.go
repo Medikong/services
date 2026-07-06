@@ -1,12 +1,19 @@
 package httpmiddleware
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/metrics"
@@ -31,6 +38,97 @@ func TestStackGeneratesRequestIDAndReturnsHeader(t *testing.T) {
 	if response.Header().Get(requestcontext.RequestIDHeader) == "" {
 		t.Fatal("missing response request id")
 	}
+}
+
+func TestStackRequestIDPolicy(t *testing.T) {
+	logger.Configure(io.Discard, "test-service")
+	uuidV4 := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	tests := []struct {
+		name           string
+		headerValue    string
+		want           string
+		wantGenerated  bool
+		clientActionID string
+	}{
+		{name: "preserves external request id", headerValue: "req-duplicate-seat", want: "req-duplicate-seat"},
+		{name: "trims external request id", headerValue: "  obs-e2e-123  ", want: "obs-e2e-123", clientActionID: "checkout-click"},
+		{name: "generates uuid for blank request id", headerValue: "   ", wantGenerated: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var contextRequestID string
+			var normalizedHeader string
+			var contextClientActionID string
+			handler := Stack(Config{ServiceName: "test-service"}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				contextRequestID = requestcontext.RequestID(r.Context())
+				normalizedHeader = r.Header.Get(requestcontext.RequestIDHeader)
+				contextClientActionID = requestcontext.ClientActionID(r.Context())
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			request := httptest.NewRequest(http.MethodGet, "/v1/auth/login", nil)
+			request.Header.Set(requestcontext.RequestIDHeader, tt.headerValue)
+			if tt.clientActionID != "" {
+				request.Header.Set(requestcontext.ClientActionIDHeader, tt.clientActionID)
+			}
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			got := response.Header().Get(requestcontext.RequestIDHeader)
+			if tt.wantGenerated {
+				if !uuidV4.MatchString(got) {
+					t.Fatalf("generated request id = %q, want UUID v4", got)
+				}
+			} else if got != tt.want {
+				t.Fatalf("response request id = %q, want %q", got, tt.want)
+			}
+			if contextRequestID != got {
+				t.Fatalf("context request id = %q, want response request id %q", contextRequestID, got)
+			}
+			if normalizedHeader != got {
+				t.Fatalf("normalized request header = %q, want %q", normalizedHeader, got)
+			}
+			if contextClientActionID != tt.clientActionID {
+				t.Fatalf("context client action id = %q, want %q", contextClientActionID, tt.clientActionID)
+			}
+		})
+	}
+}
+
+func TestStackUsesRequestIDPolicyForTraceAttribute(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() {
+		_ = provider.Shutdown(context.Background())
+		otel.SetTracerProvider(trace.NewNoopTracerProvider())
+	})
+
+	logger.Configure(io.Discard, "test-service")
+	handler := Stack(Config{
+		ServiceName: "test-service",
+		RoutePattern: func(*http.Request) string {
+			return "/v1/auth/login"
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	request := httptest.NewRequest(http.MethodGet, "/v1/auth/login", nil)
+	request.Header.Set(requestcontext.RequestIDHeader, "  obs-e2e-123  ")
+
+	handler.ServeHTTP(httptest.NewRecorder(), request)
+
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("span count = %d, want 1", len(spans))
+	}
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "request_id" && attr.Value.AsString() == "obs-e2e-123" {
+			return
+		}
+	}
+	t.Fatalf("trace span does not include normalized request_id: %#v", spans[0].Attributes)
 }
 
 func TestStackPreservesRequestIDInErrorResponse(t *testing.T) {
