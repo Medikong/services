@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
+	"github.com/Medikong/services/packages/go-authz/rbac"
 )
 
 type Type string
@@ -56,8 +58,12 @@ func DecodeHeader(value string) (Principal, error) {
 }
 
 func (p Principal) HasRole(role string) bool {
+	want, canonicalWant := rbac.Canonical(role)
 	for _, candidate := range p.Roles {
 		if candidate == role {
+			return true
+		}
+		if got, ok := rbac.Canonical(candidate); ok && canonicalWant && got == want {
 			return true
 		}
 	}

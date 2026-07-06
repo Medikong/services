@@ -6,7 +6,7 @@ func TestEncodeDecodeHeaderPreservesAuthContract(t *testing.T) {
 	original := Principal{
 		Type:        TypeUser,
 		UserID:      "user-1",
-		Roles:       []string{"customer", "operator"},
+		Roles:       []string{"CUSTOMER", "ADMIN"},
 		AuthMethods: []string{"password"},
 		AuthLevel:   "normal",
 		SessionID:   "session-1",
@@ -23,7 +23,7 @@ func TestEncodeDecodeHeaderPreservesAuthContract(t *testing.T) {
 	if decoded.UserID != original.UserID || decoded.SessionID != original.SessionID || decoded.AuthLevel != original.AuthLevel || decoded.ClientType != original.ClientType {
 		t.Fatalf("decoded = %+v, want %+v", decoded, original)
 	}
-	if !decoded.HasRole("operator") || len(decoded.AuthMethods) != 1 || decoded.AuthMethods[0] != "password" {
+	if !decoded.HasRole("operator") || !decoded.HasRole("ADMIN") || len(decoded.AuthMethods) != 1 || decoded.AuthMethods[0] != "password" {
 		t.Fatalf("decoded auth fields = %+v", decoded)
 	}
 }
