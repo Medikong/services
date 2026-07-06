@@ -7,14 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Medikong/services/services/auth-service/internal/handler"
-	authservice "github.com/Medikong/services/services/auth-service/internal/service"
-	"github.com/Medikong/services/services/auth-service/internal/store/memory"
+	authhttp "github.com/Medikong/services/services/auth-service/internal/http"
 )
 
 func BenchmarkHealthzRoute(b *testing.B) {
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux, authservice.New(memory.New()))
+	authhttp.RegisterRoutes(mux, authhttp.Services{}, nil)
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 
 	b.ReportAllocs()

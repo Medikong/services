@@ -2,7 +2,7 @@ get:
   tags:
     - operational
   summary: Service readiness.
-  description: Checks whether auth-service can receive traffic.
+  description: Checks whether auth-service can receive traffic, including PostgreSQL connectivity.
   responses:
     "200":
       description: Service is ready.

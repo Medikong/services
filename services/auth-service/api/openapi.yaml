@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Auth Service API
   version: 0.1.0
-  description: Issues DropMong access tokens and normalized Principal headers for service-to-service calls.
+  description: Issues DropMong opaque access tokens and normalized Principal headers for service-to-service calls. JWT alignment remains a contract decision.
 paths:
   /auth/signup:
     post:
@@ -211,6 +211,7 @@ components:
           type: string
         accessToken:
           type: string
+          description: Current implementation returns an opaque token such as atk_*. The shared JWT contract is not implemented yet.
         refreshToken:
           type: string
         principal:
