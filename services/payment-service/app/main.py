@@ -12,6 +12,7 @@ from app.messaging import (
     PaymentEventPublisher,
     PaymentEventPublisherRef,
 )
+from app.metrics import PaymentMetrics
 from app.models import (
     ApprovePaymentRequest,
     FailPaymentRequest,
@@ -76,6 +77,7 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
+    payment_metrics = PaymentMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -92,13 +94,7 @@ def create_app(
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return (
-            "# HELP service_ready Service readiness state. Ready is 1, not ready is 0.\n"
-            "# TYPE service_ready gauge\n"
-            f'service_ready{{service_name="{SERVICE_NAME}",'
-            f'service_version="{SERVICE_VERSION}",'
-            f'service_environment="{SERVICE_ENVIRONMENT}"}} 1\n'
-        )
+        return payment_metrics.render()
 
     @app.post(
         "/payments/mock-approvals",
@@ -122,7 +118,10 @@ def create_app(
         if publishable_payment is not None:
             await resources.event_publisher.publish_payment_approved(publishable_payment)
         match result:
-            case PaymentApproved(payment=payment) | PaymentAlreadyApproved(payment=payment):
+            case PaymentApproved(payment=payment):
+                payment_metrics.record_payment_approved()
+                return PaymentResponse(data=payment)
+            case PaymentAlreadyApproved(payment=payment):
                 return PaymentResponse(data=payment)
             case PaymentOrderNotFound():
                 raise HTTPException(
@@ -165,7 +164,10 @@ def create_app(
         if publishable_payment is not None:
             await resources.event_publisher.publish_payment_failed(publishable_payment)
         match result:
-            case PaymentFailed(payment=payment) | PaymentAlreadyFailed(payment=payment):
+            case PaymentFailed(payment=payment):
+                payment_metrics.record_payment_failed()
+                return PaymentResponse(data=payment)
+            case PaymentAlreadyFailed(payment=payment):
                 return PaymentResponse(data=payment)
             case PaymentOrderNotFound():
                 raise HTTPException(

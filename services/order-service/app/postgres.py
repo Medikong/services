@@ -25,6 +25,7 @@ from app.store import (
     PaymentFailureApplied,
     PaymentFailureResult,
     PaymentIgnored,
+    ProductSoldOut,
     ProductUnavailable,
     order_matches_command,
 )
@@ -100,7 +101,7 @@ class PostgresOrderRepository:
 
             reserved_quantity = await _reserved_quantity(session, product)
             if command.quantity > product.remaining_quantity - reserved_quantity:
-                return ProductUnavailable(
+                return ProductSoldOut(
                     drop_id=command.drop_id,
                     product_id=command.product_id,
                 )

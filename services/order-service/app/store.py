@@ -48,7 +48,19 @@ class ProductUnavailable:
     product_id: ProductId
 
 
-type CreateOrderResult = OrderCreated | OrderAlreadyCreated | OrderIdempotencyConflict | ProductUnavailable
+@dataclass(frozen=True, slots=True)
+class ProductSoldOut:
+    drop_id: DropId
+    product_id: ProductId
+
+
+type CreateOrderResult = (
+    OrderCreated
+    | OrderAlreadyCreated
+    | OrderIdempotencyConflict
+    | ProductUnavailable
+    | ProductSoldOut
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,8 +131,13 @@ class OrderStore:
             return OrderAlreadyCreated(order=replayed_order)
 
         product = product_for(self._catalog, command.drop_id, command.product_id)
-        if product is None or command.quantity > self._available_quantity(product):
+        if product is None:
             return ProductUnavailable(
+                drop_id=command.drop_id,
+                product_id=command.product_id,
+            )
+        if command.quantity > self._available_quantity(product):
+            return ProductSoldOut(
                 drop_id=command.drop_id,
                 product_id=command.product_id,
             )

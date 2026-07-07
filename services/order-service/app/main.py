@@ -19,6 +19,7 @@ from app.models import (
     UserRole,
 )
 from app.db import AppResources, lifespan_for, resources_from_env
+from app.metrics import OrderMetrics
 from app.messaging import NoopOrderEventPublisher, OrderEventPublisher
 from app.repository import OrderRepository
 from app.store import (
@@ -26,6 +27,7 @@ from app.store import (
     OrderAlreadyCreated,
     OrderCreated,
     OrderIdempotencyConflict,
+    ProductSoldOut,
     ProductUnavailable,
 )
 
@@ -63,6 +65,7 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
+    order_metrics = OrderMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -83,13 +86,7 @@ def create_app(
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return (
-            "# HELP service_ready Service readiness state. Ready is 1, not ready is 0.\n"
-            "# TYPE service_ready gauge\n"
-            f'service_ready{{service_name="{SERVICE_NAME}",'
-            f'service_version="{SERVICE_VERSION}",'
-            f'service_environment="{SERVICE_ENVIRONMENT}"}} 1\n'
-        )
+        return order_metrics.render()
 
     @app.post(
         "/orders",
@@ -115,13 +112,22 @@ def create_app(
                     order,
                     idempotency_key,
                 )
+                order_metrics.record_order_created()
                 return OrderResponse(data=order)
             case OrderAlreadyCreated(order=order):
+                order_metrics.record_idempotency_replay()
                 return OrderResponse(data=order)
             case OrderIdempotencyConflict():
+                order_metrics.record_idempotency_conflict()
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="idempotency key reused with different order request",
+                )
+            case ProductSoldOut():
+                order_metrics.record_sold_out()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="product sold out",
                 )
             case ProductUnavailable():
                 raise HTTPException(
