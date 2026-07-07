@@ -137,7 +137,7 @@ Go OpenTelemetry instrumentation
 -> Tempo
 ```
 
-`/healthz`, `/readyz`는 서비스 readiness 대기용으로만 사용한다. `/healthz`, `/readyz`, `/metrics`는 Go OpenTelemetry middleware의 trace 제외 기본값이라 probe와 scrape가 Tempo trace 잡음으로 쌓이지 않는다. smoke는 세 endpoint에 고유 `X-Request-Id`를 붙여 호출한 뒤 Tempo에서 해당 trace가 없어야 한다고 확인한다. trace 생성 요청은 기본값으로 coupon-service의 `GET /internal/coupon-policies/obs-policy`를 호출한다. Grafana는 `Tempo` datasource provisioning과 수동 조회 보조 용도다. 자동 성공/실패 판정은 Grafana UI가 아니라 Tempo `/api/search`와 trace 상세 조회로 수행한다. Prometheus target/metric 확인과 Loki 로그 수집은 GitOps 관측성 stack 검증에서 별도로 다룬다.
+`/healthz`, `/readyz`는 서비스 readiness 대기용으로만 사용한다. `/healthz`, `/readyz`, `/metrics`는 Go OpenTelemetry middleware의 trace 제외 기본값이라 probe와 scrape가 Tempo trace 잡음으로 쌓이지 않는다. smoke는 세 endpoint에 고유 `X-Request-Id`를 붙여 호출한 뒤 Tempo에서 해당 trace가 없어야 한다고 확인한다. trace 생성 요청은 기본값으로 coupon-service의 `GET /v1/internal/coupon-policies/obs-policy`를 호출한다. Grafana는 `Tempo` datasource provisioning과 수동 조회 보조 용도다. 자동 성공/실패 판정은 Grafana UI가 아니라 Tempo `/api/search`와 trace 상세 조회로 수행한다. Prometheus target/metric 확인과 Loki 로그 수집은 GitOps 관측성 stack 검증에서 별도로 다룬다.
 
 ## CI
 
