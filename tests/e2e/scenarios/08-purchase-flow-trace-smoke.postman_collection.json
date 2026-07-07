@@ -1,0 +1,221 @@
+{
+  "info": {
+    "_postman_id": "078c41d9-3d16-4d52-8eb6-2d0ef6519d66",
+    "name": "08 Purchase Flow Trace Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Search catalog trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "if (traces.length === 0) {",
+              "  const retries = Number(pm.collectionVariables.get('catalogTraceRetries') || '0');",
+              "  if (retries < 15) {",
+              "    pm.collectionVariables.set('catalogTraceRetries', String(retries + 1));",
+              "    postman.setNextRequest('Search catalog trace');",
+              "    pm.test('catalog trace retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.collectionVariables.unset('catalogTraceRetries');",
+              "    pm.test('catalog trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "  }",
+              "} else {",
+              "  pm.collectionVariables.unset('catalogTraceRetries');",
+              "  pm.test('catalog trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=catalog-service request_id=e2e-happy-catalog-list&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=catalog-service request_id=e2e-happy-catalog-list"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search order trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "if (traces.length === 0) {",
+              "  const retries = Number(pm.collectionVariables.get('orderTraceRetries') || '0');",
+              "  if (retries < 15) {",
+              "    pm.collectionVariables.set('orderTraceRetries', String(retries + 1));",
+              "    postman.setNextRequest('Search order trace');",
+              "    pm.test('order trace retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.collectionVariables.unset('orderTraceRetries');",
+              "    pm.test('order trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "  }",
+              "} else {",
+              "  pm.collectionVariables.unset('orderTraceRetries');",
+              "  pm.test('order trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=order-service request_id=e2e-happy-order-create&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=order-service request_id=e2e-happy-order-create"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search payment trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "if (traces.length === 0) {",
+              "  const retries = Number(pm.collectionVariables.get('paymentTraceRetries') || '0');",
+              "  if (retries < 15) {",
+              "    pm.collectionVariables.set('paymentTraceRetries', String(retries + 1));",
+              "    postman.setNextRequest('Search payment trace');",
+              "    pm.test('payment trace retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.collectionVariables.unset('paymentTraceRetries');",
+              "    pm.test('payment trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "  }",
+              "} else {",
+              "  pm.collectionVariables.unset('paymentTraceRetries');",
+              "  pm.test('payment trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=payment-service request_id=e2e-happy-payment-approve&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=payment-service request_id=e2e-happy-payment-approve"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search notification trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "if (traces.length === 0) {",
+              "  const retries = Number(pm.collectionVariables.get('notificationTraceRetries') || '0');",
+              "  if (retries < 15) {",
+              "    pm.collectionVariables.set('notificationTraceRetries', String(retries + 1));",
+              "    postman.setNextRequest('Search notification trace');",
+              "    pm.test('notification trace retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.collectionVariables.unset('notificationTraceRetries');",
+              "    pm.test('notification trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "  }",
+              "} else {",
+              "  pm.collectionVariables.unset('notificationTraceRetries');",
+              "  pm.test('notification trace exists', function () { pm.expect(traces.length).to.be.above(0); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=notification-service request_id=e2e-happy-notification-list&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=notification-service request_id=e2e-happy-notification-list"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

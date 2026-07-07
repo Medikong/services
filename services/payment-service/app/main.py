@@ -5,6 +5,14 @@ from typing import Annotated, Final, assert_never
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from observability import (
+    RequestIdMiddleware,
+    configure_process_observability,
+    create_request_log_middleware,
+    instrument_fastapi_app,
+    observability_config_from_env,
+    request_id_middleware_options,
+)
 
 from app.db import AppResources, lifespan_for, resources_from_env
 from app.messaging import (
@@ -78,6 +86,7 @@ def create_app(
         lifespan=lifespan_for(resources),
     )
     payment_metrics = PaymentMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
+    _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -206,6 +215,14 @@ def create_app(
         return PaymentResponse(data=payment)
 
     return app
+
+
+def _configure_observability(app: FastAPI) -> None:
+    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+    configure_process_observability(config)
+    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
+    app.middleware("http")(create_request_log_middleware(config))
+    instrument_fastapi_app(app, config)
 
 
 def approve_payment_context(

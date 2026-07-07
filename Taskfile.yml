@@ -137,6 +137,13 @@ tasks:
         vars:
           E2E_REPORT_NAME: '{{default "purchase-metrics" .E2E_REPORT_NAME}}'
 
+  purchase-e2e-with-traces:
+    desc: Run happy purchase E2E and assert service traces in Tempo.
+    cmds:
+      - task: tests:purchase-e2e-with-traces
+        vars:
+          E2E_REPORT_NAME: '{{default "purchase-traces" .E2E_REPORT_NAME}}'
+
   benchmark-concert-public-api:
     cmds:
       - task: tests:benchmark-concert-public-api

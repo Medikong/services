@@ -12,7 +12,10 @@ ENV PATH="/workspace/services/notification-service/.venv/bin:${PATH}"
 COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 
 COPY packages/contracts packages/contracts
+COPY packages/errors packages/errors
 COPY packages/kafka-utils packages/kafka-utils
+COPY packages/middleware packages/middleware
+COPY packages/observability packages/observability
 COPY services/notification-service services/notification-service
 
 RUN --mount=type=cache,target=/root/.cache/uv \

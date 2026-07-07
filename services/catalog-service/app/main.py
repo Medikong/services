@@ -1,9 +1,18 @@
+import os
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Final
 
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from observability import (
+    RequestIdMiddleware,
+    configure_process_observability,
+    create_request_log_middleware,
+    instrument_fastapi_app,
+    observability_config_from_env,
+    request_id_middleware_options,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -122,6 +131,7 @@ def create_app() -> FastAPI:
         version=SERVICE_VERSION,
         default_response_class=ORJSONResponse,
     )
+    _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -166,6 +176,14 @@ def create_app() -> FastAPI:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="drop not found")
 
     return app
+
+
+def _configure_observability(app: FastAPI) -> None:
+    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+    configure_process_observability(config)
+    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
+    app.middleware("http")(create_request_log_middleware(config))
+    instrument_fastapi_app(app, config)
 
 
 def _drop_summary(drop: DropDetail) -> DropSummary:

@@ -37,6 +37,18 @@ def test_healthz_returns_notification_service_identity() -> None:
     assert response.json()["service"] == "notification-service"
 
 
+def test_healthz_echoes_request_id_header() -> None:
+    # Given
+    client = TestClient(create_app(NotificationStore()))
+
+    # When
+    response = client.get("/healthz", headers={"X-Request-Id": "notification-trace-smoke"})
+
+    # Then
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "notification-trace-smoke"
+
+
 def test_readyz_returns_ready_notification_checks() -> None:
     # Given
     client = TestClient(create_app(NotificationStore()))

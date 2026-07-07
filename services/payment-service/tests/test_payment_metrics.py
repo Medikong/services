@@ -23,6 +23,18 @@ DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
 )
 
 
+def test_healthz_echoes_request_id_header() -> None:
+    # Given
+    client = TestClient(create_app(PaymentStore()))
+
+    # When
+    response = client.get("/healthz", headers={"X-Request-Id": "payment-trace-smoke"})
+
+    # Then
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "payment-trace-smoke"
+
+
 def test_approve_mock_payment_increments_approved_metric() -> None:
     # Given
     store = PaymentStore()

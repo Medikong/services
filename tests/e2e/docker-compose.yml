@@ -1,6 +1,9 @@
 x-service-e2e-env: &service-e2e-env
   SERVICE_ENVIRONMENT: e2e
   SERVICE_VERSION: e2e
+  OTEL_TRACES_EXPORTER: "${OTEL_TRACES_EXPORTER:-none}"
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}"
+  OTEL_PYTHON_FASTAPI_EXCLUDED_URLS: "/healthz,/readyz,/metrics"
 
 services:
   redis:
@@ -63,6 +66,29 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.failed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic order.confirmed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic notification.requested --partitions 1 --replication-factor 1
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    user: "0:0"
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/tmp/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.123.0
+    command: ["--config=/etc/otel-collector.yml"]
+    volumes:
+      - ./observability/otel-collector.yml:/etc/otel-collector.yml:ro
+    depends_on:
+      tempo:
+        condition: service_started
+    ports:
+      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+      - "${OTEL_COLLECTOR_HEALTH_PORT:-13133}:13133"
 
   auth-service:
     build:
@@ -230,3 +256,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+volumes:
+  tempo-data:

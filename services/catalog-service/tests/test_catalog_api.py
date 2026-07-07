@@ -13,6 +13,15 @@ def test_healthz_returns_catalog_service_identity() -> None:
     assert response.json()["service"] == "catalog-service"
 
 
+def test_healthz_echoes_request_id_header() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/healthz", headers={"X-Request-Id": "catalog-trace-smoke"})
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "catalog-trace-smoke"
+
+
 def test_readyz_returns_ready_catalog_check() -> None:
     client = TestClient(create_app())
 

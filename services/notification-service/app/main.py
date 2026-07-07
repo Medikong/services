@@ -5,6 +5,14 @@ from typing import Annotated, Final, assert_never
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from observability import (
+    RequestIdMiddleware,
+    configure_process_observability,
+    create_request_log_middleware,
+    instrument_fastapi_app,
+    observability_config_from_env,
+    request_id_middleware_options,
+)
 
 from app.db import AppResources, lifespan_for, resources_from_env
 from app.models import (
@@ -40,6 +48,7 @@ def create_app(repository: NotificationRepository | None = None) -> FastAPI:
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
+    _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -81,6 +90,14 @@ def create_app(repository: NotificationRepository | None = None) -> FastAPI:
         )
 
     return app
+
+
+def _configure_observability(app: FastAPI) -> None:
+    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+    configure_process_observability(config)
+    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
+    app.middleware("http")(create_request_log_middleware(config))
+    instrument_fastapi_app(app, config)
 
 
 def read_notifications_context(

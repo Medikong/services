@@ -6,6 +6,18 @@ from app.models import DropId, ProductId
 from app.store import OrderStore
 
 
+def test_healthz_echoes_request_id_header() -> None:
+    # Given
+    client = TestClient(create_app(OrderStore()))
+
+    # When
+    response = client.get("/healthz", headers={"X-Request-Id": "order-trace-smoke"})
+
+    # Then
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "order-trace-smoke"
+
+
 def test_create_order_increments_orders_created_metric() -> None:
     # Given
     client = TestClient(create_app(OrderStore()))
