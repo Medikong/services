@@ -49,6 +49,18 @@ def test_get_drop_returns_selected_drop_detail() -> None:
     assert body["data"]["products"][0]["remainingQuantity"] == 42
 
 
+def test_get_drop_returns_sold_out_scenario_drop_detail() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/drops/drop-sold-out-001")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["id"] == "drop-sold-out-001"
+    assert body["data"]["products"][0]["id"] == "product-sold-out-001"
+    assert body["data"]["products"][0]["remainingQuantity"] == 42
+
+
 def test_get_drop_returns_404_when_drop_is_unknown() -> None:
     client = TestClient(create_app())
 

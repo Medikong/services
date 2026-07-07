@@ -97,6 +97,22 @@ DROP_CATALOG: Final = (
             ),
         ),
     ),
+    DropDetail(
+        id="drop-sold-out-001",
+        title="DropMong Sold Out Scenario Drop",
+        status=DropStatus.OPEN,
+        opensAt=datetime(2026, 7, 3, 10, 0, tzinfo=UTC),
+        closesAt=datetime(2026, 7, 10, 10, 0, tzinfo=UTC),
+        description="품절과 동시성 시나리오 검증을 위한 독립 드롭입니다.",
+        products=(
+            ProductSummary(
+                id="product-sold-out-001",
+                name="DropMong Concurrency Kit",
+                price=50000,
+                remainingQuantity=42,
+            ),
+        ),
+    ),
 )
 
 

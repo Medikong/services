@@ -19,6 +19,12 @@ PRODUCT_CATALOG: Final = (
         unit_price=50000,
         remaining_quantity=42,
     ),
+    ProductForSale(
+        drop_id=DropId("drop-sold-out-001"),
+        product_id=ProductId("product-sold-out-001"),
+        unit_price=50000,
+        remaining_quantity=42,
+    ),
 )
 
 

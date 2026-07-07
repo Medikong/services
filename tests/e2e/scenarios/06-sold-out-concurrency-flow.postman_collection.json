@@ -48,7 +48,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 10\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -102,7 +102,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 10\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -156,7 +156,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 10\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -210,7 +210,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 10\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -264,7 +264,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 2\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -318,7 +318,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 1\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
@@ -452,7 +452,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+          "raw": "{\n  \"dropId\": \"drop-sold-out-001\",\n  \"productId\": \"product-sold-out-001\",\n  \"quantity\": 1\n}"
         },
         "url": {
           "raw": "{{orderServiceUrl}}/orders",
