@@ -109,4 +109,3 @@ services as additional services, not by replacing one side wholesale.
 - `order-service`: `17 passed`
 - `05-payment-failure-flow`: Newman E2E passed against Docker/Postgres/Kafka
 - `06-sold-out-concurrency-flow`: Newman E2E passed against Docker/Postgres/Kafka
-
