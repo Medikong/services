@@ -1,0 +1,95 @@
+{
+  "info": {
+    "_postman_id": "9df19b20-67cf-4783-9ef5-5307e67fa3e8",
+    "name": "07 Purchase Flow Metrics",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Assert order metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function metricValue(metricName) {",
+              "  const text = pm.response.text();",
+              "  const pattern = new RegExp('^' + metricName + '(?:\\\\{[^\\\\n]*\\\\})?\\\\s+([0-9]+(?:\\\\.[0-9]+)?)$', 'm');",
+              "  const match = text.match(pattern);",
+              "  pm.expect(match, metricName + ' sample exists').to.not.equal(null);",
+              "  return Number(match[1]);",
+              "}",
+              "",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('orders_created_total is 8 after purchase scenario set', function () { pm.expect(metricValue('orders_created_total')).to.eql(8); });",
+              "pm.test('orders_sold_out_total is 1 after sold out scenario', function () { pm.expect(metricValue('orders_sold_out_total')).to.eql(1); });",
+              "pm.test('order_idempotency_replay_total stays 0', function () { pm.expect(metricValue('order_idempotency_replay_total')).to.eql(0); });",
+              "pm.test('order_idempotency_conflict_total stays 0', function () { pm.expect(metricValue('order_idempotency_conflict_total')).to.eql(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-purchase-metrics-order"
+          }
+        ],
+        "url": {
+          "raw": "{{orderServiceUrl}}/metrics",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assert payment metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function metricValue(metricName) {",
+              "  const text = pm.response.text();",
+              "  const pattern = new RegExp('^' + metricName + '(?:\\\\{[^\\\\n]*\\\\})?\\\\s+([0-9]+(?:\\\\.[0-9]+)?)$', 'm');",
+              "  const match = text.match(pattern);",
+              "  pm.expect(match, metricName + ' sample exists').to.not.equal(null);",
+              "  return Number(match[1]);",
+              "}",
+              "",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('payments_approved_total is 1 after happy path', function () { pm.expect(metricValue('payments_approved_total')).to.eql(1); });",
+              "pm.test('payments_failed_total is 2 after failure scenarios', function () { pm.expect(metricValue('payments_failed_total')).to.eql(2); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-purchase-metrics-payment"
+          }
+        ],
+        "url": {
+          "raw": "{{paymentServiceUrl}}/metrics",
+          "host": [
+            "{{paymentServiceUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -130,6 +130,13 @@ tasks:
         vars:
           SCENARIO: '{{default "" .SCENARIO}}'
 
+  purchase-e2e-with-metrics:
+    desc: Run purchase scenarios 04/05/06 and assert business metrics.
+    cmds:
+      - task: tests:purchase-e2e-with-metrics
+        vars:
+          E2E_REPORT_NAME: '{{default "purchase-metrics" .E2E_REPORT_NAME}}'
+
   benchmark-concert-public-api:
     cmds:
       - task: tests:benchmark-concert-public-api
