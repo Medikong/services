@@ -21,6 +21,12 @@ vars:
   E2E_USER_SERVICE_URL: '{{default "http://127.0.0.1:18081" .E2E_USER_SERVICE_URL}}'
   E2E_COUPON_SERVICE_URL: '{{default "http://127.0.0.1:18082" .E2E_COUPON_SERVICE_URL}}'
   E2E_BACKOFFICE_SERVICE_URL: '{{default "http://127.0.0.1:18083" .E2E_BACKOFFICE_SERVICE_URL}}'
+  PURCHASE_E2E_COMPOSE_SERVICES: '{{default "postgres kafka kafka-init catalog-service order-service payment-service notification-service" .PURCHASE_E2E_COMPOSE_SERVICES}}'
+  PURCHASE_E2E_CATALOG_SERVICE_URL: '{{default "http://catalog-service:8081" .PURCHASE_E2E_CATALOG_SERVICE_URL}}'
+  PURCHASE_E2E_ORDER_SERVICE_URL: '{{default "http://order-service:8082" .PURCHASE_E2E_ORDER_SERVICE_URL}}'
+  PURCHASE_E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8083" .PURCHASE_E2E_PAYMENT_SERVICE_URL}}'
+  PURCHASE_E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .PURCHASE_E2E_NOTIFICATION_SERVICE_URL}}'
+  PURCHASE_E2E_SCENARIOS: '{{default "01-drop-catalog-smoke 02-order-create 03-payment-approve 04-customer-drop-purchase-happy-path 05-payment-failure-flow 06-sold-out-concurrency-flow" .PURCHASE_E2E_SCENARIOS}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
   OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
@@ -524,6 +530,66 @@ tasks:
 
   e2e-down:
     desc: Stop the service E2E Docker Compose stack.
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
+
+  purchase-e2e:
+    desc: Run Python purchase-flow Newman E2E scenarios. Optionally set SCENARIO=<scenario-name>.
+    cmds:
+      - |
+        set -e
+        scenario='{{default "" .SCENARIO}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        project='{{.E2E_COMPOSE_PROJECT}}'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        compose_services='{{.PURCHASE_E2E_COMPOSE_SERVICES}}'
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}
+        task --dir "${repo_root}/tests" purchase-e2e-newman SCENARIO="${scenario}" E2E_REPORT_NAME='{{.E2E_REPORT_NAME}}'
+
+  purchase-e2e-up:
+    desc: Start the Python purchase-flow E2E Docker Compose services.
+    cmds:
+      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} {{.PURCHASE_E2E_COMPOSE_SERVICES}}'
+
+  purchase-e2e-newman:
+    desc: Run Python purchase-flow Newman collections against an already running stack.
+    cmds:
+      - |
+        set -e
+        scenario='{{default "" .SCENARIO}}'
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        mkdir -p "${repo_root}/tests/e2e/newman/reports"
+        if [ -n "${scenario}" ]; then
+          collection="${scenario#scenarios/}"
+          collection="${collection%.postman_collection.json}"
+          collections="${collection}"
+        else
+          collections='{{.PURCHASE_E2E_SCENARIOS}}'
+        fi
+        for collection in ${collections}; do
+          scenario_file="${repo_root}/tests/e2e/scenarios/${collection}.postman_collection.json"
+          if [ ! -f "${scenario_file}" ]; then
+            printf 'Unknown purchase E2E scenario: %s\n' "${collection}" >&2
+            exit 2
+          fi
+          docker run --rm --network {{.E2E_NETWORK}} \
+            -v "${repo_root}/tests/e2e":/etc/newman \
+            -w /etc/newman \
+            {{.NEWMAN_IMAGE}} run "scenarios/${collection}.postman_collection.json" \
+            -e newman/docker.postman_environment.json \
+            --env-var catalogServiceUrl="{{.PURCHASE_E2E_CATALOG_SERVICE_URL}}" \
+            --env-var orderServiceUrl="{{.PURCHASE_E2E_ORDER_SERVICE_URL}}" \
+            --env-var paymentServiceUrl="{{.PURCHASE_E2E_PAYMENT_SERVICE_URL}}" \
+            --env-var notificationServiceUrl="{{.PURCHASE_E2E_NOTIFICATION_SERVICE_URL}}" \
+            --reporters cli,junit \
+            --delay-request 1000 \
+            --reporter-junit-export "newman/reports/{{.E2E_REPORT_NAME}}-${collection}.xml"
+        done
+
+  purchase-e2e-down:
+    desc: Stop the Python purchase-flow E2E Docker Compose stack.
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
 

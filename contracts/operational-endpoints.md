@@ -1,6 +1,6 @@
 # 운영 엔드포인트 공통 규칙
 
-이 문서는 ticketing 서비스군이 공통으로 제공해야 하는 운영 엔드포인트 규칙을 정의한다.
+이 문서는 DropMong 서비스군이 공통으로 제공해야 하는 운영 엔드포인트 규칙을 정의한다.
 
 모든 서비스는 기능 API와 별개로 다음 엔드포인트를 제공한다.
 
@@ -60,10 +60,9 @@
 | Service | Required checks |
 | --- | --- |
 | `auth-service` | `database` |
-| `concert-service` | `database` |
-| `reservation-service` | `database`, `kafka` 또는 `redis` |
+| `catalog-service` | `database` |
+| `order-service` | `database`, `kafka` |
 | `payment-service` | `database`, `kafka` |
-| `ticket-service` | `database`, `kafka`, `objectStorage` |
 | `notification-service` | `database`, `kafka` |
 
 의존성이 아직 구현되지 않은 MVP 단계에서는 실제 연결이 없는 항목을 checks에 넣지 않는다. 구현된 필수 의존성만 확인한다.

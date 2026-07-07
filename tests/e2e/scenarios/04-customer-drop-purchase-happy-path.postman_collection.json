@@ -1,0 +1,321 @@
+{
+  "info": {
+    "_postman_id": "c10ec691-83fc-4d60-8f17-a4d919307104",
+    "name": "04 Customer Drop Purchase Happy Path",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List drops",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('at least one drop exists', function () { pm.expect(body.data.length).to.be.above(0); });",
+              "const drop = body.data[0];",
+              "const product = drop.products[0];",
+              "pm.environment.set('dropId', drop.id);",
+              "pm.environment.set('productId', product.id);",
+              "pm.environment.set('orderAmount', String(product.price));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-catalog-list"
+          }
+        ],
+        "url": {
+          "raw": "{{catalogServiceUrl}}/drops?limit=10",
+          "host": [
+            "{{catalogServiceUrl}}"
+          ],
+          "path": [
+            "drops"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get selected drop",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('drop id matches captured id', function () { pm.expect(body.data.id).to.eql(pm.environment.get('dropId')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-catalog-detail"
+          }
+        ],
+        "url": {
+          "raw": "{{catalogServiceUrl}}/drops/{{dropId}}",
+          "host": [
+            "{{catalogServiceUrl}}"
+          ],
+          "path": [
+            "drops",
+            "{{dropId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
+              "pm.environment.set('orderId', body.data.id);",
+              "pm.environment.set('orderAmount', String(body.data.amount));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-order-create"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-happy-order"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Approve mock payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('payment is approved', function () { pm.expect(body.data.status).to.eql('APPROVED'); });",
+              "pm.environment.set('paymentId', body.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-payment-approve"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-happy-payment"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": {{orderAmount}},\n  \"method\": \"MOCK_CARD\"\n}"
+        },
+        "url": {
+          "raw": "{{paymentServiceUrl}}/payments/mock-approvals",
+          "host": [
+            "{{paymentServiceUrl}}"
+          ],
+          "path": [
+            "payments",
+            "mock-approvals"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get confirmed order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "const status = body.data.status;",
+              "if (status !== 'CONFIRMED') {",
+              "  const retries = Number(pm.collectionVariables.get('orderStatusRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('orderStatusRetries', String(retries + 1));",
+              "    postman.setNextRequest('Get confirmed order');",
+              "    pm.test('order confirmation retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.test('order is confirmed', function () { pm.expect(status).to.eql('CONFIRMED'); });",
+              "    pm.collectionVariables.unset('orderStatusRetries');",
+              "  }",
+              "} else {",
+              "  pm.test('order is confirmed', function () { pm.expect(status).to.eql('CONFIRMED'); });",
+              "  pm.collectionVariables.unset('orderStatusRetries');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-order-confirmed"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          }
+        ],
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders/{{orderId}}",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders",
+            "{{orderId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List notifications",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "const orderId = pm.environment.get('orderId');",
+              "const matched = body.data.some(function (notification) { return notification.orderId === orderId && notification.type === 'ORDER_CONFIRMED'; });",
+              "if (!matched) {",
+              "  const retries = Number(pm.collectionVariables.get('notificationRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('notificationRetries', String(retries + 1));",
+              "    postman.setNextRequest('List notifications');",
+              "    pm.test('notification retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.test('order confirmed notification exists', function () { pm.expect(matched).to.eql(true); });",
+              "    pm.collectionVariables.unset('notificationRetries');",
+              "  }",
+              "} else {",
+              "  pm.test('order confirmed notification exists', function () { pm.expect(matched).to.eql(true); });",
+              "  pm.collectionVariables.unset('notificationRetries');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-happy-notification-list"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          }
+        ],
+        "url": {
+          "raw": "{{notificationServiceUrl}}/notifications?limit=20",
+          "host": [
+            "{{notificationServiceUrl}}"
+          ],
+          "path": [
+            "notifications"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

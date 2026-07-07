@@ -1,0 +1,110 @@
+{
+  "info": {
+    "_postman_id": "5b5145b0-d148-4fb2-9fb2-1e57d5dfd102",
+    "name": "02 Order Create",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
+              "pm.test('order belongs to current user', function () { pm.expect(body.data.userId).to.eql(pm.environment.get('userId')); });",
+              "pm.environment.set('orderId', body.data.id);",
+              "pm.environment.set('orderAmount', String(body.data.amount));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-order-create"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get created order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('order id matches captured id', function () { pm.expect(body.data.id).to.eql(pm.environment.get('orderId')); });",
+              "pm.test('order is still payable', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-order-get"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          }
+        ],
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders/{{orderId}}",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders",
+            "{{orderId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+openapi: 3.1.0
+info:
+  title: DropMong Order Service API
+  version: 0.1.0
+  description: DropMong 주문 생성과 주문 상태 조회 계약.
+servers:
+  - url: http://order-service:8082
+    description: Docker Compose service DNS
+security:
+  - BearerAuth: []
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: 주문 생성
+      parameters:
+        - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/traceparent"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Email"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
+        - $ref: "../../common/components.yaml#/components/parameters/Idempotency-Key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: 주문이 생성되고 결제 대기 상태가 되었다.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          $ref: "../../common/components.yaml#/components/responses/BadRequest"
+        "401":
+          $ref: "../../common/components.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "../../common/components.yaml#/components/responses/Forbidden"
+        "409":
+          $ref: "../../common/components.yaml#/components/responses/Conflict"
+        "422":
+          $ref: "../../common/components.yaml#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "../../common/components.yaml#/components/responses/InternalServerError"
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: 주문 상세 조회
+      parameters:
+        - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/traceparent"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
+        - $ref: "../../common/components.yaml#/components/parameters/orderId"
+      responses:
+        "200":
+          description: 주문 상세.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "401":
+          $ref: "../../common/components.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "../../common/components.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "../../common/components.yaml#/components/responses/NotFound"
+        "500":
+          $ref: "../../common/components.yaml#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: "../../common/components.yaml#/components/securitySchemes/BearerAuth"
+  schemas:
+    OrderStatus:
+      type: string
+      enum:
+        - PENDING_PAYMENT
+        - CONFIRMED
+        - PAYMENT_FAILED
+        - CANCELED
+        - EXPIRED
+    CreateOrderRequest:
+      type: object
+      required:
+        - dropId
+        - productId
+        - quantity
+      properties:
+        dropId:
+          type: string
+          examples:
+            - drop-20260703-001
+        productId:
+          type: string
+          examples:
+            - product-001
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10
+          examples:
+            - 1
+    Order:
+      type: object
+      required:
+        - id
+        - userId
+        - dropId
+        - productId
+        - quantity
+        - amount
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          examples:
+            - order-001
+        userId:
+          type: string
+          examples:
+            - user-001
+        dropId:
+          type: string
+        productId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        amount:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        paymentId:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+    OrderResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/Order"

@@ -1,0 +1,469 @@
+{
+  "info": {
+    "_postman_id": "4e7a6b0b-78e5-44a2-9a15-8d6f2c868e0c",
+    "name": "06 Sold Out Concurrency Flow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create stock reservation order 1",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
+              "pm.environment.set('releaseOrderId', body.data.id);",
+              "pm.environment.set('releaseOrderAmount', String(body.data.amount));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-reserve-1"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-reserve-1"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create stock reservation order 2",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-reserve-2"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-reserve-2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create stock reservation order 3",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-reserve-3"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-reserve-3"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create stock reservation order 4",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-reserve-4"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-reserve-4"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create stock reservation order 5",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-reserve-5"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-reserve-5"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create order while stock is exhausted",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 409', function () { pm.response.to.have.status(409); });",
+              "const body = pm.response.json();",
+              "pm.test('stock is unavailable', function () { pm.expect(body.detail).to.eql('product unavailable'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-blocked"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-002"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-blocked"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fail stock draining payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code !== 201) {",
+              "  const retries = Number(pm.collectionVariables.get('paymentFailureReadyRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('paymentFailureReadyRetries', String(retries + 1));",
+              "    postman.setNextRequest('Fail stock draining payment');",
+              "    pm.test('payment failure retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "    pm.collectionVariables.unset('paymentFailureReadyRetries');",
+              "  }",
+              "} else {",
+              "  const body = pm.response.json();",
+              "  pm.test('payment is failed', function () { pm.expect(body.data.status).to.eql('FAILED'); });",
+              "  pm.collectionVariables.unset('paymentFailureReadyRetries');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-payment-fail"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-payment-fail"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{releaseOrderId}}\",\n  \"amount\": {{releaseOrderAmount}},\n  \"method\": \"MOCK_CARD\",\n  \"reason\": \"card_declined\"\n}"
+        },
+        "url": {
+          "raw": "{{paymentServiceUrl}}/payments/mock-failures",
+          "host": [
+            "{{paymentServiceUrl}}"
+          ],
+          "path": [
+            "payments",
+            "mock-failures"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create order after payment failure releases stock",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code !== 201) {",
+              "  const retries = Number(pm.collectionVariables.get('releasedStockRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('releasedStockRetries', String(retries + 1));",
+              "    postman.setNextRequest('Create order after payment failure releases stock');",
+              "    pm.test('released stock retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "    pm.collectionVariables.unset('releasedStockRetries');",
+              "  }",
+              "} else {",
+              "  const body = pm.response.json();",
+              "  pm.test('new order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
+              "  pm.test('new order belongs to second user', function () { pm.expect(body.data.userId).to.eql('user-002'); });",
+              "  pm.collectionVariables.unset('releasedStockRetries');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-sold-out-order-after-release"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-002"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-sold-out-after-release"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    }
+  ]
+}

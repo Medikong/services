@@ -1,0 +1,227 @@
+{
+  "info": {
+    "_postman_id": "9dba9642-9668-40da-9d1e-cf4ad62e67fb",
+    "name": "05 Payment Failure Flow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create order for failed payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
+              "pm.test('order id is captured', function () { pm.expect(body.data.id).to.not.eql(''); });",
+              "pm.environment.set('orderId', body.data.id);",
+              "pm.environment.set('orderAmount', String(body.data.amount));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-payment-failure-order-create"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-payment-failure-order"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dropId\": \"{{dropId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fail mock payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('payment is failed', function () { pm.expect(body.data.status).to.eql('FAILED'); });",
+              "pm.test('payment belongs to current order', function () { pm.expect(body.data.orderId).to.eql(pm.environment.get('orderId')); });",
+              "pm.test('payment failure reason is stored', function () { pm.expect(body.data.failureReason).to.eql('card_declined'); });",
+              "pm.environment.set('paymentId', body.data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-payment-failure-fail"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}-payment-failure-payment"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": {{orderAmount}},\n  \"method\": \"MOCK_CARD\",\n  \"reason\": \"card_declined\"\n}"
+        },
+        "url": {
+          "raw": "{{paymentServiceUrl}}/payments/mock-failures",
+          "host": [
+            "{{paymentServiceUrl}}"
+          ],
+          "path": [
+            "payments",
+            "mock-failures"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get failed payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('payment id matches captured id', function () { pm.expect(body.data.id).to.eql(pm.environment.get('paymentId')); });",
+              "pm.test('payment remains failed', function () { pm.expect(body.data.status).to.eql('FAILED'); });",
+              "pm.test('payment failure reason remains stored', function () { pm.expect(body.data.failureReason).to.eql('card_declined'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-payment-failure-get-payment"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          }
+        ],
+        "url": {
+          "raw": "{{paymentServiceUrl}}/payments/{{paymentId}}",
+          "host": [
+            "{{paymentServiceUrl}}"
+          ],
+          "path": [
+            "payments",
+            "{{paymentId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get failed order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "const status = body.data.status;",
+              "if (status !== 'PAYMENT_FAILED') {",
+              "  const retries = Number(pm.collectionVariables.get('paymentFailureOrderRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('paymentFailureOrderRetries', String(retries + 1));",
+              "    postman.setNextRequest('Get failed order');",
+              "    pm.test('payment failure retry scheduled', function () { pm.expect(true).to.eql(true); });",
+              "  } else {",
+              "    pm.test('order is payment failed', function () { pm.expect(status).to.eql('PAYMENT_FAILED'); });",
+              "    pm.collectionVariables.unset('paymentFailureOrderRetries');",
+              "  }",
+              "} else {",
+              "  pm.test('order is payment failed', function () { pm.expect(status).to.eql('PAYMENT_FAILED'); });",
+              "  pm.test('order stores failed payment id', function () { pm.expect(body.data.paymentId).to.eql(pm.environment.get('paymentId')); });",
+              "  pm.collectionVariables.unset('paymentFailureOrderRetries');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-payment-failure-get-order"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "{{userRole}}"
+          }
+        ],
+        "url": {
+          "raw": "{{orderServiceUrl}}/orders/{{orderId}}",
+          "host": [
+            "{{orderServiceUrl}}"
+          ],
+          "path": [
+            "orders",
+            "{{orderId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

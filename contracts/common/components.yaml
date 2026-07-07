@@ -18,17 +18,39 @@ components:
       schema:
         type: string
       description: Request correlation id. If absent, the server may generate one.
-    X-Trace-Id:
-      name: X-Trace-Id
+    traceparent:
+      name: traceparent
       in: header
       required: false
       schema:
         type: string
-      description: Optional distributed tracing id.
+      description: W3C trace context header.
+    X-User-Id:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Authenticated user id forwarded by the trusted gateway in local E2E.
+    X-User-Email:
+      name: X-User-Email
+      in: header
+      required: false
+      schema:
+        type: string
+        format: email
+      description: Authenticated user email forwarded by the trusted gateway in local E2E.
+    X-User-Role:
+      name: X-User-Role
+      in: header
+      required: true
+      schema:
+        $ref: "#/components/schemas/UserRole"
+      description: Authenticated role forwarded by the trusted gateway in local E2E.
     Idempotency-Key:
       name: Idempotency-Key
       in: header
-      required: false
+      required: true
       schema:
         type: string
         minLength: 1
@@ -58,20 +80,20 @@ components:
       schema:
         type: string
       description: Resource id.
-    concertId:
-      name: concertId
+    dropId:
+      name: dropId
       in: path
       required: true
       schema:
         type: string
-      description: Concert id.
-    showtimeId:
-      name: showtimeId
+      description: Drop id.
+    productId:
+      name: productId
       in: path
       required: true
       schema:
         type: string
-      description: Showtime id.
+      description: Product id.
     requestId:
       name: requestId
       in: path
@@ -93,22 +115,29 @@ components:
       schema:
         type: string
       description: Payment id.
-    ticketId:
-      name: ticketId
+    orderId:
+      name: orderId
       in: path
       required: true
       schema:
         type: string
-      description: Ticket id.
+      description: Order id.
+    notificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Notification id.
 
   schemas:
     UserRole:
       type: string
       enum:
         - CUSTOMER
-        - PROVIDER
+        - OPERATOR
         - ADMIN
-      description: Authenticated ticketing role used by auth-service JWT payloads.
+      description: Authenticated DropMong role used by auth-service JWT payloads.
     JwtAccessTokenClaims:
       type: object
       required:
@@ -161,11 +190,11 @@ components:
             code:
               type: string
               examples:
-                - reservation.conflict
+                - order.sold_out
             message:
               type: string
               examples:
-                - Seat is already reserved.
+                - Drop inventory is sold out.
             details:
               type: object
               additionalProperties: true

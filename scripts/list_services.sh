@@ -155,7 +155,7 @@ normalize_service() {
 
 apply_filters() {
   services=$1
-  include=${SERVICE_INCLUDE:-${SERVICES:-}}
+  include=${SERVICE_INCLUDE:-}
   exclude=${SERVICE_EXCLUDE:-}
 
   if [ -n "${include}" ]; then

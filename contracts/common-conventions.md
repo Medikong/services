@@ -1,6 +1,6 @@
 # 공통 OpenAPI 규약
 
-이 문서는 ticketing 서비스군의 REST API 계약 초안을 작성할 때 사용하는 공통 규칙이다.
+이 문서는 DropMong 서비스군의 REST API 계약 초안을 작성할 때 사용하는 공통 규칙이다.
 
 ## 기본 규칙
 
@@ -9,7 +9,7 @@
 - 날짜와 시간은 ISO-8601 형식의 `string` + `format: date-time`을 사용한다.
 - ID는 숫자 타입 대신 `string`으로 정의한다.
 - 인증은 `Authorization: Bearer <JWT>`를 기본으로 한다.
-- 요청 추적 헤더는 `X-Request-Id`와 `X-Trace-Id`를 사용한다.
+- 요청 추적 헤더는 `X-Request-Id`와 W3C `traceparent`를 사용한다.
 - 중복 요청 방지가 필요한 생성/변경 API는 `Idempotency-Key` 헤더를 받는다.
 - 목록 조회 페이지네이션은 `limit`, `cursor` 쿼리 파라미터를 사용한다.
 - 오류 응답은 공통 `ErrorResponse` 스키마를 사용한다.
@@ -38,7 +38,7 @@ JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions
 - `401 Unauthorized`: JWT가 없거나 유효하지 않을 때 사용한다.
 - `403 Forbidden`: 인증은 됐지만 해당 리소스나 명령 권한이 없을 때 사용한다.
 - `404 Not Found`: 리소스를 찾을 수 없을 때 사용한다.
-- `409 Conflict`: 좌석 중복 선점, 이미 처리된 상태 변경처럼 현재 상태와 충돌할 때 사용한다.
+- `409 Conflict`: 품절, 중복 주문, 이미 처리된 상태 변경처럼 현재 상태와 충돌할 때 사용한다.
 - `422 Unprocessable Entity`: 형식은 맞지만 도메인 규칙상 처리할 수 없을 때 사용한다.
 - `500 Internal Server Error`: 예측하지 못한 서버 오류에 사용한다.
 
@@ -47,10 +47,10 @@ JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions
 ```json
 {
   "error": {
-    "code": "reservation.conflict",
-    "message": "Seat is already reserved.",
+    "code": "order.sold_out",
+    "message": "Drop inventory is sold out.",
     "details": {
-      "seatId": "2ec15d50-317a-5d4b-a686-a8bb790c08e0"
+      "dropId": "drop-001"
     }
   },
   "requestId": "req-01HV6W8ZK2J2J9N9S4V7T3F0CA",

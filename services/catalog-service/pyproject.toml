@@ -1,0 +1,20 @@
+[project]
+name = "catalog-service"
+version = "0.1.0"
+description = "DropMong catalog API service"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.124.0",
+    "orjson>=3.11.0,<4.0.0",
+    "uvicorn[standard]>=0.49.0,<1.0.0",
+]
+
+[dependency-groups]
+test = [
+    "httpx>=0.28.0,<1.0.0",
+    "pytest>=9.0.0,<10.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

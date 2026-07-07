@@ -3,14 +3,14 @@ set -euo pipefail
 
 # This is a focused smoke helper, not a general E2E framework entrypoint.
 # It exists to prove that a live service can handle SIGTERM, exit cleanly,
-# restart, and still pass the booking happy path.
+# restart, and still pass the normal purchase happy path.
 #
 # Known limits:
 # - The full compose service set and the Newman collection are tied to the
-#   current ticketing E2E stack shape.
+#   current DropMong E2E stack shape.
 # - Service names are intentionally allowlisted because the shutdown contract
-#   is only defined here for payment, ticket, and notification.
-# - If the E2E scenario layout, compose services, or booking happy path changes,
+#   is only defined here for order, payment, and notification.
+# - If the E2E scenario layout, compose services, or normal purchase path changes,
 #   update this script with that structure instead of assuming it will adapt.
 #
 # Possible future improvement:
@@ -22,18 +22,18 @@ repo_root="$(cd "${script_dir}/../../.." && pwd -P)"
 
 service="${SERVICE:-}"
 case "${service}" in
+  order|order-service) service="order-service" ;;
   payment|payment-service) service="payment-service" ;;
-  ticket|ticket-service) service="ticket-service" ;;
   notification|notification-service) service="notification-service" ;;
   *)
-    printf 'SERVICE must be one of: payment-service, ticket-service, notification-service.\n' >&2
+    printf 'SERVICE must be one of: order-service, payment-service, notification-service.\n' >&2
     exit 2
     ;;
 esac
 
 read -r -a compose_cmd <<< "${DOCKER_COMPOSE:-docker compose}"
 compose_file="${E2E_COMPOSE_FILE:-${repo_root}/tests/e2e/docker-compose.yml}"
-project="${E2E_COMPOSE_PROJECT:-ticketing-e2e-graceful-shutdown}"
+project="${E2E_COMPOSE_PROJECT:-dropmong-e2e-graceful-shutdown}"
 network="${E2E_NETWORK:-${project}_default}"
 newman_image="${NEWMAN_IMAGE:-postman/newman:6-alpine}"
 wait_timeout="${E2E_WAIT_TIMEOUT_SECONDS:-180}"
@@ -42,11 +42,9 @@ report_name="${E2E_REPORT_NAME:-graceful-shutdown}"
 logs_dir="${repo_root}/tests/e2e/logs"
 mkdir -p "${repo_root}/tests/e2e/newman/reports" "${logs_dir}"
 
-auth_service_url="${E2E_AUTH_SERVICE_URL:-http://auth-service:8080}"
-concert_service_url="${E2E_CONCERT_SERVICE_URL:-http://concert-service:8082}"
-reservation_service_url="${E2E_RESERVATION_SERVICE_URL:-http://reservation-service:8083}"
-payment_service_url="${E2E_PAYMENT_SERVICE_URL:-http://payment-service:8080}"
-ticket_service_url="${E2E_TICKET_SERVICE_URL:-http://ticket-service:8085}"
+catalog_service_url="${E2E_CATALOG_SERVICE_URL:-http://catalog-service:8081}"
+order_service_url="${E2E_ORDER_SERVICE_URL:-http://order-service:8082}"
+payment_service_url="${E2E_PAYMENT_SERVICE_URL:-http://payment-service:8083}"
 notification_service_url="${E2E_NOTIFICATION_SERVICE_URL:-http://notification-service:8084}"
 
 compose() {
@@ -58,13 +56,11 @@ run_happy_path() {
   docker run --rm --network "${network}" \
     -v "${repo_root}/tests/e2e":/etc/newman \
     -w /etc/newman \
-    "${newman_image}" run "scenarios/04-user-booking-happy-path.postman_collection.json" \
+    "${newman_image}" run "scenarios/04-customer-drop-purchase-happy-path.postman_collection.json" \
     -e newman/docker.postman_environment.json \
-    --env-var authServiceUrl="${auth_service_url}" \
-    --env-var concertServiceUrl="${concert_service_url}" \
-    --env-var reservationServiceUrl="${reservation_service_url}" \
+    --env-var catalogServiceUrl="${catalog_service_url}" \
+    --env-var orderServiceUrl="${order_service_url}" \
     --env-var paymentServiceUrl="${payment_service_url}" \
-    --env-var ticketServiceUrl="${ticket_service_url}" \
     --env-var notificationServiceUrl="${notification_service_url}" \
     --reporters cli,junit \
     --delay-request 1000 \
@@ -84,7 +80,7 @@ assert_shutdown_logs_are_clean() {
 trap 'compose down -v --remove-orphans' EXIT
 
 compose up -d --build --wait --wait-timeout "${wait_timeout}" \
-  postgres kafka kafka-init notification-db auth-service concert-service reservation-service payment-service ticket-service notification-service
+  postgres kafka kafka-init catalog-service order-service payment-service notification-service
 
 run_happy_path "before-restart"
 

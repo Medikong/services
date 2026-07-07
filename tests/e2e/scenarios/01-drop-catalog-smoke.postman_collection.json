@@ -1,0 +1,95 @@
+{
+  "info": {
+    "_postman_id": "1a9fdf53-0b48-4c59-9e87-0e5795a8f101",
+    "name": "01 Drop Catalog Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List drops",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('data is an array', function () { pm.expect(body.data).to.be.an('array'); });",
+              "pm.test('at least one drop exists', function () { pm.expect(body.data.length).to.be.above(0); });",
+              "const drop = body.data[0];",
+              "const product = Array.isArray(drop.products) ? drop.products[0] : null;",
+              "pm.test('drop has a product', function () { pm.expect(product).to.be.ok; });",
+              "pm.environment.set('dropId', drop.id);",
+              "pm.environment.set('productId', product.id);",
+              "pm.environment.set('orderAmount', String(product.price));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-catalog-list"
+          }
+        ],
+        "url": {
+          "raw": "{{catalogServiceUrl}}/drops?limit=10",
+          "host": [
+            "{{catalogServiceUrl}}"
+          ],
+          "path": [
+            "drops"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get selected drop",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('drop id matches captured id', function () { pm.expect(body.data.id).to.eql(pm.environment.get('dropId')); });",
+              "pm.test('selected product exists', function () {",
+              "  const productIds = body.data.products.map(function (product) { return product.id; });",
+              "  pm.expect(productIds).to.include(pm.environment.get('productId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "e2e-catalog-detail"
+          }
+        ],
+        "url": {
+          "raw": "{{catalogServiceUrl}}/drops/{{dropId}}",
+          "host": [
+            "{{catalogServiceUrl}}"
+          ],
+          "path": [
+            "drops",
+            "{{dropId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+openapi: 3.1.0
+info:
+  title: DropMong Notification Service API
+  version: 0.1.0
+  description: DropMong 사용자 알림 조회 계약.
+servers:
+  - url: http://notification-service:8084
+    description: Docker Compose service DNS
+security:
+  - BearerAuth: []
+paths:
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: 사용자 알림 목록 조회
+      parameters:
+        - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/traceparent"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
+        - $ref: "../../common/components.yaml#/components/parameters/limit"
+        - $ref: "../../common/components.yaml#/components/parameters/cursor"
+      responses:
+        "200":
+          description: 사용자 알림 목록.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+        "401":
+          $ref: "../../common/components.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "../../common/components.yaml#/components/responses/Forbidden"
+        "500":
+          $ref: "../../common/components.yaml#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: "../../common/components.yaml#/components/securitySchemes/BearerAuth"
+  schemas:
+    NotificationType:
+      type: string
+      enum:
+        - ORDER_CONFIRMED
+        - PAYMENT_FAILED
+    Notification:
+      type: object
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - message
+        - createdAt
+        - read
+      properties:
+        id:
+          type: string
+          examples:
+            - notification-001
+        userId:
+          type: string
+        orderId:
+          type:
+            - string
+            - "null"
+        type:
+          $ref: "#/components/schemas/NotificationType"
+        title:
+          type: string
+          examples:
+            - 주문이 확정되었습니다
+        message:
+          type: string
+          examples:
+            - DropMong 주문이 정상 처리되었습니다.
+        createdAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+    NotificationListResponse:
+      type: object
+      required:
+        - data
+        - pageInfo
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        pageInfo:
+          $ref: "../../common/components.yaml#/components/schemas/PageInfo"

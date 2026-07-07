@@ -12,6 +12,15 @@
 images:
   - auth-service
   - backoffice-service
+  - catalog-service
   - coupon-service
+  - notification-service
+  - order-service
+  - payment-service
   - user-service
-tests: []
+
+tests:
+  - catalog-service
+  - notification-service
+  - order-service
+  - payment-service

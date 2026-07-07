@@ -1,0 +1,28 @@
+[project]
+name = "notification-service"
+version = "0.1.0"
+description = "DropMong notification API service"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.30.0,<1.0.0",
+    "contracts",
+    "fastapi==0.124.0",
+    "kafka-utils",
+    "orjson>=3.11.0,<4.0.0",
+    "sqlalchemy[asyncio]>=2.0.41,<3.0.0",
+    "uvicorn[standard]>=0.49.0,<1.0.0",
+]
+
+[tool.uv.sources]
+contracts = { path = "../../packages/contracts", editable = true }
+kafka-utils = { path = "../../packages/kafka-utils", editable = true }
+
+[dependency-groups]
+test = [
+    "httpx>=0.28.0,<1.0.0",
+    "pytest>=9.0.0,<10.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../../packages/contracts/src"]
+testpaths = ["tests"]
