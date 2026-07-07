@@ -2,14 +2,14 @@ version: "3"
 
 vars:
   ROOT_DIR: '{{.TASKFILE_DIR}}/..'
-  TEST_RUNNER_IMAGE_PREFIX: '{{default "ticketing-test-runner" .TEST_RUNNER_IMAGE_PREFIX}}'
+  TEST_RUNNER_IMAGE_PREFIX: '{{default "dropmong-test-runner" .TEST_RUNNER_IMAGE_PREFIX}}'
   TEST_RUNNER_DOCKERFILE: '{{default "tests/docker/Dockerfile" .TEST_RUNNER_DOCKERFILE}}'
   PYTEST_ARGS: '{{default "-q -s -p no:cacheprovider" .PYTEST_ARGS}}'
-  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
+  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
   API_BENCHMARK_REPORT_ROOT: '{{default "tests/tmp/reports/api-integration" .API_BENCHMARK_REPORT_ROOT}}'
   API_BENCHMARK_DOC_DIR: '{{default "../workspace/docs/evidence/services/api-integration-test-benchmark/half-year-early-growth" .API_BENCHMARK_DOC_DIR}}'
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
-  PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
+  PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
@@ -49,7 +49,7 @@ tasks:
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         python_bin='{{.PYTHON_BIN}}'
         service_list="${repo_root}/{{.SERVICE_LIST_SCRIPT}}"
-        managed_services="$(sh "${service_list}" list --mode tests --format shell)"
+        managed_services="$("${python_bin}" "${service_list}" list --mode tests --format shell)"
         normalize_service() {
           raw="$1"
           for candidate in ${managed_services}; do
@@ -114,7 +114,7 @@ tasks:
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         python_bin='{{.PYTHON_BIN}}'
         service_list="${repo_root}/{{.SERVICE_LIST_SCRIPT}}"
-        managed_services="$(sh "${service_list}" list --mode tests --format shell)"
+        managed_services="$("${python_bin}" "${service_list}" list --mode tests --format shell)"
         if [ -z "${requested_services}" ]; then
           requested_services="${managed_services}"
         fi
@@ -258,7 +258,7 @@ tasks:
     cmds:
       - |
         set -eu
-        services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
+        services="$("{{.PYTHON_BIN}}" "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service test suites found; API benchmark smoke skipped.'
           exit 0
@@ -301,7 +301,7 @@ tasks:
     cmds:
       - |
         set -eu
-        services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
+        services="$("{{.PYTHON_BIN}}" "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service test suites found; API benchmark large skipped.'
           exit 0
@@ -328,7 +328,7 @@ tasks:
         preset='{{default "smoke" .PRESET}}'
         samples='{{default "5" .SAMPLES}}'
         warmup='{{default "1" .WARMUP}}'
-        managed_services="$(sh "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
+        managed_services="$("{{.PYTHON_BIN}}" "{{.ROOT_DIR}}/{{.SERVICE_LIST_SCRIPT}}" list --mode tests --format shell)"
         normalize_service() {
           raw="$1"
           for candidate in ${managed_services}; do

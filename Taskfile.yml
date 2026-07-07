@@ -15,7 +15,7 @@ vars:
   DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
-  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
+  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
   GO_TEST_PACKAGES: '{{default "./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/user-service/... ./services/coupon-service/... ./services/backoffice-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
@@ -61,7 +61,7 @@ tasks:
         python_bin='{{.PYTHON_BIN}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
         install_args=""
-        for project in $(find packages -mindepth 2 -maxdepth 2 -name pyproject.toml | sort) $(sh "${service_list}" list --mode pyprojects --format shell); do
+        for project in $(find packages -mindepth 2 -maxdepth 2 -name pyproject.toml | sort) $("${python_bin}" "${service_list}" list --mode pyprojects --format shell); do
           install_args="${install_args} -r ${project} --group ${project}:test"
         done
         if [ -z "${install_args}" ]; then
@@ -203,6 +203,7 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
+        python_bin='{{.PYTHON_BIN}}'
         if [ -z "${image_registry}" ]; then
           printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
@@ -242,7 +243,7 @@ tasks:
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
         }
-        services="$(sh "${service_list}" list --mode images --format shell)"
+        services="$("${python_bin}" "${service_list}" list --mode images --format shell)"
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service Docker images found; image build skipped.'
           exit 0
@@ -273,12 +274,13 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
+        python_bin='{{.PYTHON_BIN}}'
         image_prefix="${image_registry}"
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
         pids=""
-        services="$(sh "${service_list}" list --mode images --format shell)"
+        services="$("${python_bin}" "${service_list}" list --mode images --format shell)"
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service Docker images found; image push skipped.'
           exit 0
@@ -310,6 +312,7 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
+        python_bin='{{.PYTHON_BIN}}'
         if [ -z "${requested}" ]; then
           printf '%s\n' 'SERVICE is required, for example: task app-image-build SERVICE=<service-name> IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
@@ -324,7 +327,7 @@ tasks:
         fi
         normalize_service() {
           raw="$1"
-          for candidate in $(sh "${service_list}" list --mode images --format shell); do
+          for candidate in $("${python_bin}" "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
@@ -385,9 +388,10 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
+        python_bin='{{.PYTHON_BIN}}'
         normalize_service() {
           raw="$1"
-          for candidate in $(sh "${service_list}" list --mode images --format shell); do
+          for candidate in $("${python_bin}" "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
