@@ -12,10 +12,11 @@ DropMong 한정 상품 드롭 커머스의 마이크로서비스를 개발하고
 | `services/order-service/` | 주문 생성, 재고 예약, 주문 확정, 주문 이벤트 발행 |
 | `services/payment-service/` | mock 결제 승인, 결제 이벤트 발행 |
 | `services/notification-service/` | Kafka 이벤트 기반 알림 저장과 조회 |
+| `services/go-reference-service/` | Go 서버 기반 구조와 공용 패키지 조립 예제 |
 | `contracts/` | 서비스별 OpenAPI 문서와 공통 API/JWT 계약 |
 | `tests/` | 단위 테스트 러너와 테스트 보조 파일 |
 
-`auth-service`는 JWT 발급 경계로 남기되, 정상 구매 1차 구현에서는 Istio Gateway가 검증한 사용자 context가 전달된다는 전제로 시작한다.
+인증은 서비스 밖의 신뢰 경계에서 처리하고, 내부 서비스는 Gateway가 검증해 전달한 사용자 context를 사용한다.
 
 ## 서비스 흐름
 

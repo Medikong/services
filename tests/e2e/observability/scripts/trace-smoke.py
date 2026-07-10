@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+from base64 import urlsafe_b64encode
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import URLError
@@ -16,6 +17,7 @@ from uuid import uuid4
 class Settings:
     service_name: str
     service_url: str
+    admin_url: str
     trace_path: str
     tempo_url: str
     timeout_seconds: int
@@ -25,8 +27,9 @@ class Settings:
 
 def main() -> int:
     settings = Settings(
-        service_name=os.getenv("OBS_E2E_SERVICE_NAME", "coupon-service"),
-        service_url=os.getenv("OBS_E2E_SERVICE_URL", "http://coupon-service:8080").rstrip("/"),
+        service_name=os.getenv("OBS_E2E_SERVICE_NAME", "go-reference-service"),
+        service_url=os.getenv("OBS_E2E_SERVICE_URL", "http://go-reference-service:8080").rstrip("/"),
+        admin_url=os.getenv("OBS_E2E_ADMIN_URL", "http://go-reference-service:9090").rstrip("/"),
         trace_path=_trace_path(),
         tempo_url=os.getenv("OBS_E2E_TEMPO_URL", "http://tempo:3200").rstrip("/"),
         timeout_seconds=int(os.getenv("OBS_E2E_TIMEOUT_SECONDS", "90")),
@@ -36,14 +39,21 @@ def main() -> int:
     request_id = f"obs-e2e-{uuid4()}"
     print(f"observability smoke request_id={request_id} service={settings.service_name}")
 
-    wait_for_json(f"{settings.service_url}/healthz", settings, "service healthz")
-    wait_for_json(f"{settings.service_url}/readyz", settings, "service readyz")
+    wait_for_json(f"{settings.admin_url}/healthz", settings, "service healthz")
+    wait_for_json(f"{settings.admin_url}/readyz", settings, "service readyz")
     wait_for_http(f"{settings.tempo_url}/ready", settings, "tempo ready")
     wait_for_http(os.getenv("OBS_E2E_COLLECTOR_HEALTH_URL", "http://otel-collector:13133/"), settings, "collector health")
 
     excluded_request_ids = call_excluded_endpoints(settings)
-    setup_coupon_policy(settings)
-    call_json(f"{settings.service_url}{settings.trace_path}", headers={"X-Request-Id": request_id})
+    call_text(
+        f"{settings.service_url}{settings.trace_path}",
+        headers={
+            "X-Request-Id": request_id,
+            "X-Principal": principal_header(),
+            "Idempotency-Key": request_id,
+        },
+        method="POST",
+    )
     deadline = time.monotonic() + settings.timeout_seconds
     last_error = ""
     while time.monotonic() < deadline:
@@ -68,7 +78,7 @@ def main() -> int:
         "- 점검 힌트:\n"
         "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector\n"
         "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs tempo\n"
-        "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs coupon-service",
+        "  docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs go-reference-service",
         file=sys.stderr,
     )
     return 1
@@ -94,26 +104,18 @@ def wait_for_json(url: str, settings: Settings, label: str) -> dict[str, Any]:
 
 
 def _trace_path() -> str:
-    raw_path = os.getenv("OBS_E2E_TRACE_PATH", "/internal/coupon-policies/obs-policy")
+    raw_path = os.getenv("OBS_E2E_TRACE_PATH", "/v1/reference/resources/obs-resource/audit")
     if not raw_path.startswith("/"):
         raise ValueError("OBS_E2E_TRACE_PATH must start with /")
     return raw_path
 
 
-def setup_coupon_policy(settings: Settings) -> None:
-    if os.getenv("OBS_E2E_SETUP_COUPON_POLICY", "true").lower() not in {"1", "true", "yes"}:
-        return
-    call_json(
-        f"{settings.service_url}/internal/coupon-policies",
-        method="POST",
-        payload={
-            "policyId": "obs-policy",
-            "dropId": "obs-drop",
-            "name": "observability smoke",
-            "totalQuantity": 1,
-            "status": "ready",
-        },
-    )
+def principal_header() -> str:
+    payload = json.dumps(
+        {"type": "user", "userId": "observability-e2e", "roles": ["customer"]},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return urlsafe_b64encode(payload).decode("ascii").rstrip("=")
 
 
 def call_excluded_endpoints(settings: Settings) -> dict[str, str]:
@@ -123,7 +125,7 @@ def call_excluded_endpoints(settings: Settings) -> dict[str, str]:
         "/metrics": f"obs-e2e-metrics-{uuid4()}",
     }
     for path, request_id in request_ids.items():
-        url = f"{settings.service_url}{path}"
+        url = f"{settings.admin_url}{path}"
         headers = {"X-Request-Id": request_id}
         if path == "/metrics":
             call_text(url, headers=headers)

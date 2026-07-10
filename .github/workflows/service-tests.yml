@@ -13,6 +13,8 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
+      - 'go.work'
+      - 'go.work.sum'
       - '.github/workflows/service-tests.yml'
   pull_request:
     branches:
@@ -26,6 +28,8 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
+      - 'go.work'
+      - 'go.work.sum'
       - '.github/workflows/service-tests.yml'
   workflow_dispatch:
 
@@ -80,6 +84,8 @@ jobs:
               --common pyproject.toml \
               --common uv.lock \
               --common Taskfile.yml \
+              --common go.work \
+              --common go.work.sum \
               --common config/services.yml \
               --common scripts/list_services.sh \
               --common .github/workflows/service-tests.yml \
@@ -141,3 +147,42 @@ jobs:
     steps:
       - name: Report no-op
         run: echo "No managed service unit tests selected for this change."
+
+  go-reference-template:
+    name: Go reference template
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            packages/go-audit/go.sum
+            packages/go-authz/go.sum
+            packages/go-platform/go.sum
+            services/go-reference-service/go.sum
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint template OpenAPI documents
+        run: |
+          npx --yes @redocly/cli@2.38.0 lint \
+            --config services/go-reference-service/redocly.yaml \
+            services/go-reference-service/api/openapi.yaml \
+            services/go-reference-service/api/operational.openapi.yaml
+
+      - name: Test and vet Go foundation
+        run: |
+          go test -race ./packages/go-audit/... ./packages/go-authz/... ./packages/go-platform/... ./services/go-reference-service/...
+          go vet ./packages/go-audit/... ./packages/go-authz/... ./packages/go-platform/... ./services/go-reference-service/...
+          go test -tags=integration -count=1 ./services/go-reference-service/tests/integration
+
+      - name: Build template image
+        run: docker build -f services/go-reference-service/Dockerfile -t go-reference-service:ci .

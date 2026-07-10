@@ -10,14 +10,10 @@
 #   - order-service
 
 images:
-  - auth-service
-  - backoffice-service
   - catalog-service
-  - coupon-service
   - notification-service
   - order-service
   - payment-service
-  - user-service
 
 tests:
   - catalog-service

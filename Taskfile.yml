@@ -16,7 +16,7 @@ vars:
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
-  GO_TEST_PACKAGES: '{{default "./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/user-service/... ./services/coupon-service/... ./services/backoffice-service/..." .GO_TEST_PACKAGES}}'
+  GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/go-reference-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
 includes:
@@ -121,12 +121,12 @@ tasks:
     desc: Run unit tests and Docker Compose E2E tests.
     cmds:
       - task: tests:test-unit
-      - task: tests:test-e2e
+      - task: tests:purchase-e2e
 
   test-e2e:
     desc: Run Docker Compose E2E tests. Optionally set SCENARIO=<scenario-name>.
     cmds:
-      - task: tests:test-e2e
+      - task: tests:purchase-e2e
         vars:
           SCENARIO: '{{default "" .SCENARIO}}'
 
@@ -158,7 +158,7 @@ tasks:
   benchmark-api-smoke:
     desc: Run smoke API integration benchmarks for managed services.
     cmds:
-      - task: tests:benchmark-dropmong-api
+      - task: tests:benchmark-api-smoke
         vars:
           PRESET: '{{default "smoke" .PRESET}}'
           SAMPLES: '{{default "5" .SAMPLES}}'
@@ -180,7 +180,7 @@ tasks:
   benchmark-api-large:
     desc: Run large API integration benchmarks for managed services.
     cmds:
-      - task: tests:benchmark-dropmong-api
+      - task: tests:benchmark-api-large
         vars:
           PRESET: '{{default "half-year-early-growth" .PRESET}}'
           SAMPLES: '{{default "100" .SAMPLES}}'
