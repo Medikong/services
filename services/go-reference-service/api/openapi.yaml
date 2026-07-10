@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Go Reference Service
+  version: 0.1.0
+  description: 외부 연결과 런타임 정책을 검증하는 Go 서버 템플릿의 업무 API입니다.
+servers:
+  - url: http://localhost:8080
+security:
+  - TrustedPrincipal: []
+paths:
+  /v1/reference/resources/{resourceID}/audit:
+    post:
+      operationId: applyReferenceAudit
+      summary: 분산 락, fencing token, 감사 outbox 예제
+      parameters:
+        - name: resourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{1,128}$'
+        - name: X-Request-Id
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: 같은 리소스의 재시도에서 동일하게 유지하는 업무 멱등 키
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      responses:
+        '204':
+          description: 반영 완료
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestID'
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceID'
+            X-Fencing-Token:
+              schema:
+                type: integer
+                format: int64
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '423':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '405':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+        '504':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    TrustedPrincipal:
+      type: apiKey
+      in: header
+      name: X-Principal
+      description: 신뢰 경계의 게이트웨이가 검증 후 주입하는 principal 식별자
+  headers:
+    RequestID:
+      description: 요청 식별자
+      schema:
+        type: string
+    TraceID:
+      description: OpenTelemetry trace 식별자
+      schema:
+        type: string
+  schemas:
+    Error:
+      type: object
+      required: [error, requestId, occurredAt]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        requestId:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+  responses:
+    ErrorResponse:
+      description: 표준 오류 응답
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestID'
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

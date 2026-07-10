@@ -1,0 +1,18 @@
+openapi: 3.1.0
+info:
+  title: Go Reference Service Operations
+  version: 0.1.0
+  description: 내부 운영망에만 노출하는 health, readiness, metric API입니다.
+servers:
+  - url: http://localhost:9090
+    description: server admin
+  - url: http://localhost:9092
+    description: worker admin
+security: []
+paths:
+  /healthz:
+    $ref: ./operational/healthz.yaml
+  /readyz:
+    $ref: ./operational/readyz.yaml
+  /metrics:
+    $ref: ./observability/metrics.yaml

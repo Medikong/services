@@ -1,0 +1,244 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"net"
+	"net/http"
+	"time"
+
+	"github.com/grafana/pyroscope-go"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/oops"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	grpc_health "google.golang.org/grpc/health"
+	grpc_health_v1 "google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/Medikong/services/packages/go-audit"
+	"github.com/Medikong/services/packages/go-platform/httpserver"
+	"github.com/Medikong/services/packages/go-platform/operational"
+	"github.com/Medikong/services/services/go-reference-service/internal/domain/sample"
+	"github.com/Medikong/services/services/go-reference-service/internal/platform/config"
+	"github.com/Medikong/services/services/go-reference-service/internal/platform/observability"
+	referencehttp "github.com/Medikong/services/services/go-reference-service/internal/transport/http"
+)
+
+type Server struct {
+	cfg        config.ServerConfig
+	resources  Resources
+	metrics    *observability.Metrics
+	health     *operational.Handler
+	publicHTTP *http.Server
+	adminHTTP  *http.Server
+	grpc       *grpc.Server
+	grpcHealth *grpc_health.Server
+	profiler   *pyroscope.Profiler
+}
+
+func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	metrics, err := observability.NewMetrics(cfg.Service.Name)
+	if err != nil {
+		return nil, err
+	}
+	resources, err := openServerResources(ctx, cfg)
+	if err != nil {
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
+	if err := checkServerDatabase(ctx, resources.DB); err != nil {
+		_ = resources.Close()
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
+	sampleService, err := sample.New(resources.DB)
+	if err != nil {
+		_ = resources.Close()
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
+	healthState := operational.NewHandler(operational.Config{
+		Service:          cfg.Service.Name,
+		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
+		Checks: map[string]operational.Check{
+			"database": func(ctx context.Context) error {
+				return checkServerDatabase(ctx, resources.DB)
+			},
+			"redis": func(ctx context.Context) error {
+				return resources.Redis.Ping(ctx).Err()
+			},
+		},
+		Metrics:  metrics.Handler(),
+		SetReady: metrics.SetReady,
+	})
+	router, err := referencehttp.NewRouter(cfg, sampleService, resources.Redis, healthState, metrics)
+	if err != nil {
+		_ = resources.Close()
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
+	profiler, err := observability.StartProfiler(cfg.Service, cfg.Profile)
+	if err != nil {
+		_ = resources.Close()
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
+
+	adminMux := http.NewServeMux()
+	healthState.RegisterAll(adminMux, cfg.Profile.PprofEnabled)
+
+	grpcHealth := grpc_health.NewServer()
+	grpcServer := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
+	grpc_health_v1.RegisterHealthServer(grpcServer, grpcHealth)
+	grpcHealth.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+
+	adminHTTP := httpserver.New(cfg.HTTP.AdminAddr, adminMux)
+	// Profiles may legitimately run longer than the public request budget.
+	adminHTTP.WriteTimeout = 0
+	metrics.SetReady(true)
+
+	return &Server{
+		cfg:        cfg,
+		resources:  resources,
+		metrics:    metrics,
+		health:     healthState,
+		publicHTTP: httpserver.New(cfg.HTTP.PublicAddr, router),
+		adminHTTP:  adminHTTP,
+		grpc:       grpcServer,
+		grpcHealth: grpcHealth,
+		profiler:   profiler,
+	}, nil
+}
+
+func checkServerDatabase(ctx context.Context, db *pgxpool.Pool) error {
+	if err := db.Ping(ctx); err != nil {
+		return oops.In("reference_server").Code("server.database_unavailable").Wrap(err)
+	}
+	if err := audit.CheckSchema(ctx, db); err != nil {
+		return err
+	}
+	return sample.CheckSchema(ctx, db)
+}
+
+func (s *Server) Run(ctx context.Context) error {
+	publicListener, err := net.Listen("tcp", s.cfg.HTTP.PublicAddr)
+	if err != nil {
+		return s.closeWith(oops.In("reference_server").Code("server.http_listen_failed").Wrap(err))
+	}
+	adminListener, err := net.Listen("tcp", s.cfg.HTTP.AdminAddr)
+	if err != nil {
+		_ = publicListener.Close()
+		return s.closeWith(oops.In("reference_server").Code("server.admin_listen_failed").Wrap(err))
+	}
+	var grpcListener net.Listener
+	if s.cfg.HTTP.GRPCAddr != "" {
+		grpcListener, err = net.Listen("tcp", s.cfg.HTTP.GRPCAddr)
+		if err != nil {
+			_ = publicListener.Close()
+			_ = adminListener.Close()
+			return s.closeWith(oops.In("reference_server").Code("server.grpc_listen_failed").Wrap(err))
+		}
+	}
+
+	serverCount := 2
+	if grpcListener != nil {
+		serverCount++
+	}
+	results := make(chan error, serverCount)
+	go func() { results <- serveHTTP(s.publicHTTP, publicListener, "public") }()
+	go func() { results <- serveHTTP(s.adminHTTP, adminListener, "admin") }()
+	if grpcListener != nil {
+		go func() { results <- serveGRPC(s.grpc, grpcListener) }()
+	}
+
+	consumed := 0
+	var runErr error
+	select {
+	case <-ctx.Done():
+	case runErr = <-results:
+		consumed = 1
+	}
+
+	s.health.BeginDrain()
+	s.grpcHealth.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+	if ctx.Err() != nil && s.cfg.HTTP.DrainDelay > 0 {
+		timer := time.NewTimer(s.cfg.HTTP.DrainDelay)
+		<-timer.C
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
+	shutdownErr := oops.Join(
+		shutdownHTTP(shutdownCtx, s.publicHTTP, "public"),
+		shutdownHTTP(shutdownCtx, s.adminHTTP, "admin"),
+		shutdownGRPC(shutdownCtx, s.grpc),
+	)
+	cancel()
+	for consumed < serverCount {
+		if err := <-results; err != nil {
+			runErr = oops.Join(runErr, err)
+		}
+		consumed++
+	}
+	return s.closeWith(oops.Join(runErr, shutdownErr))
+}
+
+func serveHTTP(server *http.Server, listener net.Listener, name string) error {
+	err := server.Serve(listener)
+	if err == nil || errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return oops.In("reference_server").Code("server.http_serve_failed").With("server", name).Wrap(err)
+}
+
+func serveGRPC(server *grpc.Server, listener net.Listener) error {
+	err := server.Serve(listener)
+	if err == nil || errors.Is(err, grpc.ErrServerStopped) {
+		return nil
+	}
+	return oops.In("reference_server").Code("server.grpc_serve_failed").Wrap(err)
+}
+
+func shutdownHTTP(ctx context.Context, server *http.Server, name string) error {
+	if err := server.Shutdown(ctx); err != nil {
+		closeErr := server.Close()
+		if closeErr != nil {
+			closeErr = oops.In("reference_server").Code("server.http_close_failed").With("server", name).Wrap(closeErr)
+		}
+		return oops.Join(
+			oops.In("reference_server").Code("server.http_shutdown_failed").With("server", name).Wrap(err),
+			closeErr,
+		)
+	}
+	return nil
+}
+
+func shutdownGRPC(ctx context.Context, server *grpc.Server) error {
+	done := make(chan struct{})
+	go func() {
+		server.GracefulStop()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		server.Stop()
+		return oops.In("reference_server").Code("server.grpc_shutdown_timeout").Wrap(ctx.Err())
+	}
+}
+
+func (s *Server) closeWith(cause error) error {
+	var profilerErr error
+	if s.profiler != nil {
+		profilerErr = s.profiler.Stop()
+		s.profiler = nil
+	}
+	resourceErr := s.resources.Close()
+	metricCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
+	metricErr := s.metrics.Shutdown(metricCtx)
+	cancel()
+	return oops.Join(cause, profilerErr, resourceErr, metricErr)
+}
