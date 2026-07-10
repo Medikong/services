@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestNewReturnsSlogLoggerWithService(t *testing.T) {
@@ -61,6 +63,38 @@ func TestWithLevelControlsOutput(t *testing.T) {
 	event := decodeEvent(t, out.Bytes())
 	if event["level"] != "DEBUG" {
 		t.Fatalf("level = %v, want DEBUG", event["level"])
+	}
+}
+
+func TestNewAddsTraceContext(t *testing.T) {
+	var out bytes.Buffer
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()))
+	ctx, span := provider.Tracer("test").Start(context.Background(), "operation")
+	defer span.End()
+
+	New(&out, "trace-service").InfoContext(ctx, "traced")
+
+	event := decodeEvent(t, out.Bytes())
+	if event["trace_id"] != span.SpanContext().TraceID().String() {
+		t.Fatalf("trace_id = %v, want %s", event["trace_id"], span.SpanContext().TraceID())
+	}
+	if event["span_id"] != span.SpanContext().SpanID().String() {
+		t.Fatalf("span_id = %v, want %s", event["span_id"], span.SpanContext().SpanID())
+	}
+}
+
+func TestRedactKeys(t *testing.T) {
+	var out bytes.Buffer
+	log := New(&out, "redact-service", WithReplaceAttr(RedactKeys("password", "authorization")))
+
+	log.Info("request", "password", "secret", "Authorization", "Bearer token", "result", "ok")
+
+	event := decodeEvent(t, out.Bytes())
+	if event["password"] != "[REDACTED]" || event["Authorization"] != "[REDACTED]" {
+		t.Fatalf("sensitive values were not redacted: %#v", event)
+	}
+	if event["result"] != "ok" {
+		t.Fatalf("non-sensitive value = %v, want ok", event["result"])
 	}
 }
 

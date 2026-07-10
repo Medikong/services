@@ -12,7 +12,7 @@ import (
 
 func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		recorder := ensureRecorder(w)
+		recorder := newResponseRecorder(w)
 		defer func() {
 			recovered := recover()
 			if recovered == nil {
@@ -23,9 +23,9 @@ func Recovery(next http.Handler) http.Handler {
 			if recorder.WroteHeader() {
 				panic(recovered)
 			}
-			httpapi.WriteError(recorder, r, httpapi.Internal(err))
+			httpapi.WriteError(recorder.Writer(), r, httpapi.Internal(err))
 		}()
-		next.ServeHTTP(recorder, r)
+		next.ServeHTTP(recorder.Writer(), r)
 	})
 }
 

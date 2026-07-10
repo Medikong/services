@@ -88,6 +88,10 @@ func OpenPostgres(ctx context.Context, config PostgresConfig) (*pgxpool.Pool, er
 		pool.Close()
 		return nil, err
 	}
+	if err := otelpgx.RecordStats(pool); err != nil {
+		pool.Close()
+		return nil, err
+	}
 	return pool, nil
 }
 

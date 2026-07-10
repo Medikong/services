@@ -19,12 +19,12 @@ func Stack(config Config, next http.Handler) http.Handler {
 	return Chain(
 		RequestContext,
 		ResponseHeaders,
-		Metrics(config),
-		AccessLog(config),
-		Recovery,
 		func(handler http.Handler) http.Handler {
 			return telemetry.MiddlewareWithRoute(config.ServiceName, handler, config.RoutePattern)
 		},
+		Metrics(config),
+		AccessLog(config),
+		Recovery,
 	)(next)
 }
 

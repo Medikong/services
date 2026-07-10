@@ -1,6 +1,7 @@
 package httpmiddleware
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -27,14 +28,14 @@ func routeKind(route string) string {
 	return "api"
 }
 
-func requestSeverity(statusCode int, duration time.Duration) string {
+func requestSeverity(statusCode int, duration time.Duration) (string, slog.Level) {
 	if statusCode >= http.StatusInternalServerError {
-		return "ERROR"
+		return "ERROR", slog.LevelError
 	}
 	if statusCode >= http.StatusBadRequest || duration >= time.Second {
-		return "WARN"
+		return "WARN", slog.LevelWarn
 	}
-	return "INFO"
+	return "INFO", slog.LevelInfo
 }
 
 func logPolicy(routeKind string, statusCode int, duration time.Duration) string {

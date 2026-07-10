@@ -53,12 +53,24 @@ func Forbidden(code, message string) error {
 	return NewError(http.StatusForbidden, code, message, nil)
 }
 
+func NotFound(code, message string) error {
+	return NewError(http.StatusNotFound, code, message, nil)
+}
+
+func MethodNotAllowed(code, message string) error {
+	return NewError(http.StatusMethodNotAllowed, code, message, nil)
+}
+
 func Conflict(code, message string) error {
 	return NewError(http.StatusConflict, code, message, nil)
 }
 
 func Unprocessable(code, message string) error {
 	return NewError(http.StatusUnprocessableEntity, code, message, nil)
+}
+
+func GatewayTimeout(code, message string) error {
+	return NewError(http.StatusGatewayTimeout, code, message, nil)
 }
 
 func Internal(err error) error {
