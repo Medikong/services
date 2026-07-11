@@ -1,0 +1,464 @@
+openapi: 3.0.4
+info:
+  title: DropMong Context 인증 개발 API
+  version: 0.2.0
+  description: |
+    개발 및 테스트 환경에만 등록하는 `SD.A.30040`의 HTTP 계약 원장이다.
+    운영 서버와 운영 코드 생성 입력에는 이 문서를 포함하지 않는다.
+servers:
+  - url: https://api.dev.dropmong.example
+    description: 접근이 제한된 개발 및 테스트 Gateway 예시 주소
+tags:
+  - name: Development
+    description: 개발 및 테스트 환경 전용 API
+paths:
+  /api/v1/dev/auth/verification-messages/{challengeId}:
+    get:
+      tags:
+        - Development
+      summary: 가상 인증 메시지 조회
+      description: |
+        개발 및 테스트 환경에서 Virtual Verification Adapter가 전달한 인증번호를 조회한다.
+        `ready.data.code`는 공통 VerificationCode schema의 6자리 숫자 형식을 따른다.
+        운영 환경에는 이 Route를 등록하지 않는다.
+
+        `DevAccessToken`과 Challenge 소유 credential 하나를 함께 제출해야 한다. 아래 네 소유 인증
+        방식은 서로 OR 관계이고 각 방식은 DevAccessToken과 AND 관계다. 공유 개발 및 demo 환경에서는
+        Gateway의 개발 네트워크 allowlist도 통과해야 한다.
+
+        개발 접근 token이나 소유 인증 정보가 없거나 유효하지 않거나 binding이 다르면 리소스 존재
+        여부를 숨기기 위해 `404 AUTH_VIRTUAL_MESSAGE_NOT_FOUND`로 통합한다. Gateway도 같은
+        `application/problem+json` 계약을 반환한다.
+      operationId: getVirtualVerificationMessage
+      x-api-id: API.A.300-30
+      x-use-case: UC.A.300
+      x-service-design: SD.A.30040
+      x-design-doc: ../../API_A_300_30_get_virtual_verification_message.md
+      x-error-codes:
+        AUTH_VIRTUAL_MESSAGE_NOT_FOUND: 404
+        AUTH_VIRTUAL_MESSAGE_UNAVAILABLE: 410
+        AUTH_RATE_LIMITED: 429
+        AUTH_SERVICE_UNAVAILABLE: 503
+      x-environments:
+        - local
+        - test
+        - demo-restricted
+      x-virtual-projection-contract:
+        scope: dev_test_only
+        readyCodeSchema: VerificationCode
+        codeAtRest: envelope_encrypted
+        terminalTransition: atomic_destroy_and_secret_clear
+      security:
+        - DevAccessToken: []
+          WebAuthFlowCookie: []
+        - DevAccessToken: []
+          WebSessionCookie: []
+        - DevAccessToken: []
+          MobileAuthFlowToken: []
+        - DevAccessToken: []
+          MobileBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ChallengeId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/XDeviceInstallationId'
+      responses:
+        '200':
+          description: 가상 인증 메시지가 준비됐거나 Adapter 전달을 기다리고 있다. pending일 때 재조회 간격은 body의 retryAfterSeconds로만 전달하며 HTTP Retry-After는 사용하지 않는다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualVerificationMessageResponse'
+              examples:
+                ready:
+                  summary: 인증번호 조회 가능
+                  value:
+                    data:
+                      challengeId: vch_01JXYZ1234567890ABCDEFGHJK
+                      channel: email_code
+                      status: ready
+                      code: '123456'
+                      maskedDestination: b***@example.com
+                      expiresAt: '2026-07-10T08:08:00Z'
+                    meta:
+                      requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+                pending:
+                  summary: Virtual Adapter 전달 대기
+                  value:
+                    data:
+                      challengeId: vch_01JXYZ1234567890ABCDEFGHJK
+                      status: pending
+                      retryAfterSeconds: 1
+                    meta:
+                      requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+        '404':
+          $ref: '#/components/responses/VirtualMessageNotFound'
+        '410':
+          $ref: '#/components/responses/VirtualMessageUnavailable'
+        '429':
+          $ref: '#/components/responses/VirtualMessageRateLimited'
+        '503':
+          $ref: '#/components/responses/VirtualMessageServiceUnavailable'
+components:
+  securitySchemes:
+    DevAccessToken:
+      type: apiKey
+      in: header
+      name: X-Dev-Access-Token
+      description: 개발 및 테스트 Gateway가 발급·회전하며 개발 전용 API 접근을 허용하는 단기 opaque token이다. 운영 환경에는 발급자와 Route가 없다.
+      x-sensitive: true
+    WebAuthFlowCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-dm_auth
+      description: 웹의 사전 인증 컨텍스트와 Registration 소유권을 증명하는 단기 HttpOnly cookie다.
+    WebSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-dm_session
+      description: 로그인된 웹 사용자의 서버 Session을 가리키는 HttpOnly cookie다.
+    MobileAuthFlowToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Flow-Token
+      description: 모바일 사전 인증 단계에서 Registration 또는 Challenge 소유권을 증명하는 단기 opaque token이다.
+    MobileBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 로그인된 모바일 사용자의 짧은 수명 access JWT다.
+  schemas:
+    ChallengeId:
+      type: string
+      minLength: 1
+      description: 인증 Challenge의 opaque 식별자다. UUID 또는 prefix 식별자 여부는 아직 확정하지 않았다.
+      example: vch_01JXYZ1234567890ABCDEFGHJK
+    VerificationCode:
+      type: string
+      pattern: ^[0-9]{6}$
+      minLength: 6
+      maxLength: 6
+      description: MVP 이메일·SMS 소유 확인에 공통으로 사용하는 6자리 숫자 인증번호다.
+      x-sensitive: true
+      example: '123456'
+    ReadyVirtualVerificationMessage:
+      type: object
+      required:
+        - challengeId
+        - channel
+        - status
+        - code
+        - maskedDestination
+        - expiresAt
+      additionalProperties: false
+      properties:
+        challengeId:
+          $ref: '#/components/schemas/ChallengeId'
+        channel:
+          type: string
+          enum:
+            - email_code
+            - sms_code
+        status:
+          type: string
+          enum:
+            - ready
+        code:
+          $ref: '#/components/schemas/VerificationCode'
+        maskedDestination:
+          type: string
+          minLength: 1
+          description: 인증 화면에 표시할 마스킹된 이메일 주소 또는 휴대폰 번호다.
+          example: b***@example.com
+        expiresAt:
+          type: string
+          format: date-time
+          example: '2026-07-10T08:08:00Z'
+    PendingVirtualVerificationMessage:
+      type: object
+      required:
+        - challengeId
+        - status
+        - retryAfterSeconds
+      additionalProperties: false
+      properties:
+        challengeId:
+          $ref: '#/components/schemas/ChallengeId'
+        status:
+          type: string
+          enum:
+            - pending
+        retryAfterSeconds:
+          type: integer
+          minimum: 1
+          description: 다음 조회 전에 기다릴 최소 초다.
+          example: 1
+    ResponseMeta:
+      type: object
+      required:
+        - requestId
+      additionalProperties: false
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: 응답 헤더 X-Request-Id와 같은 요청 식별자다.
+          example: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    VirtualVerificationMessageResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/ReadyVirtualVerificationMessage'
+            - $ref: '#/components/schemas/PendingVirtualVerificationMessage'
+          discriminator:
+            propertyName: status
+            mapping:
+              ready: '#/components/schemas/ReadyVirtualVerificationMessage'
+              pending: '#/components/schemas/PendingVirtualVerificationMessage'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    FieldViolation:
+      type: object
+      required:
+        - field
+        - reason
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          description: 오류가 발생한 공개 요청 필드 경로다.
+          example: body
+        reason:
+          type: string
+          description: 개인정보나 입력 원문을 포함하지 않는 안정적인 검증 실패 사유다.
+          example: additional_property
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - code
+        - detail
+        - retryable
+        - requestId
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          format: uri
+          description: 안정적인 문제 유형 URI다.
+        title:
+          type: string
+          description: 개인정보나 내부 상태를 포함하지 않는 짧은 오류 제목이다.
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: ^AUTH_[A-Z0-9_]+$
+          description: 클라이언트가 분기할 수 있는 인증 도메인 오류 코드다.
+        detail:
+          type: string
+          description: 사용자에게 공개 가능한 일반화된 오류 설명이다.
+        retryable:
+          type: boolean
+          description: 같은 요청을 다시 시도할 수 있는지 나타낸다.
+        requestId:
+          type: string
+          format: uuid
+          description: 지원 및 추적에 사용하는 요청 식별자다.
+        violations:
+          type: array
+          description: 입력 검증 오류가 있을 때만 반환하는 공개 가능한 필드 오류 목록이다.
+          items:
+            $ref: '#/components/schemas/FieldViolation'
+  parameters:
+    ChallengeId:
+      name: challengeId
+      in: path
+      required: true
+      description: 인증 Challenge의 opaque 식별자다. UUID 또는 prefix 식별자 여부는 아직 확정하지 않았다.
+      schema:
+        $ref: '#/components/schemas/ChallengeId'
+      example: vch_01JXYZ1234567890ABCDEFGHJK
+    XRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: 클라이언트가 선택적으로 보내는 요청 식별자다. 비어 있거나 유효하지 않으면 Gateway가 새 UUID를 발급한다.
+      schema:
+        type: string
+      example: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C Trace Context의 traceparent 값이다.
+      schema:
+        type: string
+      example: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+    XDeviceInstallationId:
+      name: X-Device-Installation-Id
+      in: header
+      required: false
+      description: 모바일 요청에서 사용하는 앱 설치 단위의 opaque 난수 식별자다.
+      schema:
+        type: string
+      example: inst_01JXYZ1234567890ABCDEFGHJK
+  headers:
+    XRequestId:
+      description: Gateway가 확정해 응답 본문 meta.requestId와 동일하게 반환하는 요청 식별자다.
+      schema:
+        type: string
+        format: uuid
+      example: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    CacheControlNoStore:
+      description: 응답을 브라우저, CDN 또는 중간 캐시에 저장하지 못하게 한다.
+      schema:
+        type: string
+        enum:
+          - no-store
+      example: no-store
+    RetryAfter:
+      description: 클라이언트가 다음 요청을 보내기 전에 기다려야 하는 최소 초다.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+  responses:
+    VirtualMessageNotFound:
+      description: 개발 접근 token 또는 소유 인증 정보가 없거나 유효하지 않거나 현재 binding으로 조회 가능한 가상 인증 메시지를 찾을 수 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 404
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_VIRTUAL_MESSAGE_NOT_FOUND
+          example:
+            type: https://api.dropmong.example/problems/auth-virtual-message-not-found
+            title: 인증 메시지를 조회할 수 없습니다.
+            status: 404
+            code: AUTH_VIRTUAL_MESSAGE_NOT_FOUND
+            detail: 인증 요청과 현재 인증 컨텍스트를 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    VirtualMessageUnavailable:
+      description: Challenge가 종료됐거나 인증번호 원문이 폐기됐다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 410
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_VIRTUAL_MESSAGE_UNAVAILABLE
+          example:
+            type: https://api.dropmong.example/problems/auth-virtual-message-unavailable
+            title: 인증 메시지를 더 이상 조회할 수 없습니다.
+            status: 410
+            code: AUTH_VIRTUAL_MESSAGE_UNAVAILABLE
+            detail: 새 인증번호를 요청해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    VirtualMessageRateLimited:
+      description: 가상 인증 메시지 조회 제한을 초과했다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 429
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_RATE_LIMITED
+          example:
+            type: https://api.dropmong.example/problems/auth-rate-limited
+            title: 요청이 너무 많습니다.
+            status: 429
+            code: AUTH_RATE_LIMITED
+            detail: 잠시 뒤 다시 시도해주세요.
+            retryable: true
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    VirtualMessageServiceUnavailable:
+      description: 가상 인증 메시지 저장소 또는 필수 내부 의존성을 일시적으로 사용할 수 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 503
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_SERVICE_UNAVAILABLE
+          example:
+            type: https://api.dropmong.example/problems/auth-service-unavailable
+            title: 인증 서비스를 일시적으로 사용할 수 없습니다.
+            status: 503
+            code: AUTH_SERVICE_UNAVAILABLE
+            detail: 잠시 뒤 다시 시도해주세요.
+            retryable: true
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8

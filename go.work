@@ -5,5 +5,6 @@ use (
 	./packages/go-authz
 	./packages/go-contracts
 	./packages/go-platform
+	./services/auth-service
 	./services/go-reference-service
 )
