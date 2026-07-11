@@ -19,6 +19,10 @@ __pycache__/
 node_modules/
 dashboard/node_modules/
 dashboard/dist/
+**/.next/
+**/playwright-report/
+**/test-results/
+**/*.tsbuildinfo
 
 tests/e2e/newman/reports/
 tests/tmp/

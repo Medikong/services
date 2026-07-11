@@ -117,6 +117,94 @@ tasks:
     cmds:
       - go test -tags=benchmark -run '^$' -bench . -benchmem -benchtime '{{.GO_BENCH_TIME}}' {{.GO_TEST_PACKAGES}}
 
+  dropmong-web-install:
+    desc: Install the reproducible DropMong web dependencies.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm install --frozen-lockfile
+
+  dropmong-web-lint:
+    desc: Lint the DropMong buyer web application.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm lint
+
+  dropmong-web-typecheck:
+    desc: Type-check the DropMong buyer web application.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm typecheck
+
+  dropmong-web-test:
+    desc: Run DropMong web unit tests.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm test
+
+  dropmong-web-build:
+    desc: Build the DropMong buyer web application for production.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm build
+
+  dropmong-web-check:
+    desc: Run the DropMong web static verification suite.
+    deps:
+      - dropmong-web-install
+    cmds:
+      - task: dropmong-web-lint
+      - task: dropmong-web-typecheck
+      - task: dropmong-web-test
+      - task: dropmong-web-build
+
+  dropmong-web-e2e-install:
+    desc: Install the Chromium browser used by DropMong web browser tests.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm test:e2e:install
+
+  dropmong-web-e2e:
+    desc: Run mobile and desktop DropMong web purchase browser tests.
+    dir: services/dropmong-web
+    cmds:
+      - corepack pnpm test:e2e
+
+  dropmong-web-image-build:
+    desc: Build the local DropMong web Docker image without publishing it.
+    cmds:
+      - docker build -f services/dropmong-web/Dockerfile -t dropmong-web:local .
+
+  dropmong-web-docker-smoke:
+    desc: Build the local DropMong web image and verify its readiness and container health.
+    cmds:
+      - |
+        set -eu
+        image='dropmong-web:local'
+        container="dropmong-web-smoke-$$"
+        cleanup() {
+          docker rm -f "${container}" >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+        docker build -f services/dropmong-web/Dockerfile -t "${image}" .
+        docker run --detach --name "${container}" --publish 127.0.0.1::3000 \
+          --env DEV_MOCK_MODE=true \
+          --env APP_ORIGIN=http://localhost:3000 \
+          --env SESSION_COOKIE_SECRET=local-docker-session-secret-must-have-at-least-thirty-two-characters \
+          "${image}" >/dev/null
+        port="$(docker port "${container}" 3000/tcp | sed 's/.*://')"
+        for attempt in $(seq 1 35); do
+          health="$(docker inspect --format '{{"{{"}}.State.Health.Status{{"}}"}}' "${container}")"
+          if [ "${health}" = healthy ] && curl --fail --silent --show-error "http://127.0.0.1:${port}/readyz" >/dev/null; then
+            curl --fail --silent --show-error "http://127.0.0.1:${port}/healthz" | grep -q '"status":"ok"'
+            curl --fail --silent --show-error "http://127.0.0.1:${port}/metrics" | grep -q '^service_ready'
+            docker logs "${container}" | grep -q '"message":"web request completed"'
+            exit 0
+          fi
+          sleep 1
+        done
+        docker logs "${container}" >&2
+        exit 1
+
   test-all:
     desc: Run unit tests and Docker Compose E2E tests.
     cmds:

@@ -1,0 +1,618 @@
+openapi: 3.1.0
+info:
+  title: DropMong Web BFF API
+  version: 0.1.0
+  description: |
+    DropMong 구매자 웹 애플리케이션 안에서만 실행되는 동일 출처 BFF Route Handler 계약이다.
+    이 API는 별도 마이크로서비스나 도메인 원장이 아니다. 화면 DTO, 웹 세션과 CSRF,
+    내부 요청 문맥, 오류 정규화를 담당한다.
+
+    Catalog 조회는 CATALOG_INTERNAL_BASE_URL이 설정된 경우 실제 catalog-service 계약을 사용한다.
+    통합 checkout 업무 API와 실행 가능한 Auth context API가 준비되기 전까지 checkout과 인증은
+    DEV_MOCK_MODE=true에서만 명시적인 개발용 mock으로 동작한다.
+servers:
+  - url: http://dropmong-web:3000
+    description: Kubernetes service DNS
+paths:
+  /api/web/home:
+    get:
+      operationId: getBuyerHome
+      summary: 구매자 홈 화면 DTO 조회
+      responses:
+        '200':
+          description: 공개 드롭과 제한된 개인화 안내.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomePage'
+        '502':
+          $ref: '#/components/responses/DownstreamContractInvalid'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /api/web/products/{productId}:
+    get:
+      operationId: getBuyerProductDetail
+      summary: 상품 상세 화면 DTO 조회
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: dropId
+          in: query
+          required: false
+          description: Catalog에 product 단독 조회가 없으므로 상세 조회를 좁히는 드롭 식별자.
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: 상품, 드롭, 서버가 제공한 구매 가능 상태.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailPage'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '502':
+          $ref: '#/components/responses/DownstreamContractInvalid'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /api/web/auth/context:
+    get:
+      operationId: getWebAuthContext
+      summary: 웹 BFF가 인식한 최소 인증 상태 조회
+      responses:
+        '200':
+          description: 익명 또는 개발용 구매자 세션 상태. CSRF 값과 세션 원문은 반환하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebAuthContext'
+        '503':
+          description: 실행 가능한 Auth context API가 아직 연결되지 않았다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/web/checkouts/{checkoutId}:
+    get:
+      operationId: getCheckoutSnapshot
+      summary: checkout 화면 snapshot 조회
+      description: |
+        가격, 재고, 혜택은 서버가 반환한 snapshot만 표시한다. 현재는 통합 checkout 업무 API가 없으므로
+        DEV_MOCK_MODE=true인 개발 환경에서만 개발용 snapshot을 반환한다.
+      security:
+        - WebSession: []
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+      responses:
+        '200':
+          description: 권위 있는 checkout snapshot 또는 개발용 fixture.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutSnapshot'
+        '400':
+          $ref: '#/components/responses/RequestInvalid'
+        '401':
+          $ref: '#/components/responses/LoginRequired'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '503':
+          $ref: '#/components/responses/CheckoutUnavailable'
+  /api/web/checkouts/{checkoutId}/confirm:
+    post:
+      operationId: confirmCheckout
+      summary: checkout 확정 요청
+      description: |
+        Origin, session-bound CSRF, Idempotency-Key를 모두 확인한 뒤 checkout Command 하나에 전달한다.
+        현재는 DEV_MOCK_MODE=true의 개발용 fixture만 확정 결과를 반환한다. BFF는 주문·재고·결제 API를
+        직접 순차 호출하지 않는다.
+      security:
+        - WebSession: []
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - agreementConfirmed
+              additionalProperties: false
+              properties:
+                agreementConfirmed:
+                  type: boolean
+                  const: true
+      responses:
+        '200':
+          description: 확정된 주문 식별자.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutConfirmResult'
+        '400':
+          $ref: '#/components/responses/RequestInvalid'
+        '401':
+          $ref: '#/components/responses/LoginRequired'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+        '503':
+          $ref: '#/components/responses/CheckoutUnavailable'
+  /api/web/orders/{orderId}:
+    get:
+      operationId: getWebOrderResult
+      summary: 주문 완료 화면의 상태 조회
+      security:
+        - WebSession: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: 주문 소유자에게만 반환되는 주문 결과.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+        '401':
+          $ref: '#/components/responses/LoginRequired'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '503':
+          $ref: '#/components/responses/CheckoutUnavailable'
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: 프로세스 생존 상태
+      responses:
+        '200':
+          description: HTTP server가 응답 가능하다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: 로컬 초기화와 요청 수락 상태
+      responses:
+        '200':
+          description: 설정 파싱과 BFF 초기화가 완료되었다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          description: 필수 로컬 설정이 유효하지 않다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /metrics:
+    get:
+      operationId: getPrometheusMetrics
+      summary: Prometheus 형식의 최소 서비스 지표
+      responses:
+        '200':
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  securitySchemes:
+    WebSession:
+      type: apiKey
+      in: cookie
+      name: __Host-dm_session
+      description: |
+        운영 환경의 opaque Auth session cookie. DEV_MOCK_MODE=true에서는 외부 Auth가 준비될 때까지
+        BFF가 발급한 개발용 HttpOnly cookie가 같은 역할을 한다.
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    CheckoutId:
+      name: checkoutId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    RequestInvalid:
+      description: 요청 형식 또는 식별자가 유효하지 않다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    LoginRequired:
+      description: 인증된 구매자 세션이 필요하다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CsrfInvalid:
+      description: Origin 또는 session-bound CSRF 검증에 실패했다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    StateConflict:
+      description: 현재 드롭 또는 checkout 상태에서 요청을 진행할 수 없다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ResourceNotFound:
+      description: 요청한 공개 리소스 또는 주문을 찾을 수 없다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DependencyUnavailable:
+      description: 필수 downstream 조회를 완료하지 못했다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DownstreamContractInvalid:
+      description: downstream 응답이 계약과 일치하지 않는다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CheckoutUnavailable:
+      description: 통합 checkout 업무 계약이 아직 연결되지 않았다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+        - remainingQuantity
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: integer
+          minimum: 0
+        remainingQuantity:
+          type: integer
+          minimum: 0
+    Drop:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - opensAt
+        - closesAt
+        - products
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [UPCOMING, OPEN, SOLD_OUT, CLOSED]
+        opensAt:
+          type: string
+          format: date-time
+        closesAt:
+          type: [string, 'null']
+          format: date-time
+        description:
+          type: string
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+    PageMeta:
+      type: object
+      required:
+        - requestId
+        - serverNow
+        - partial
+      properties:
+        requestId:
+          type: string
+        serverNow:
+          type: string
+          format: date-time
+        partial:
+          type: boolean
+    HomePage:
+      type: object
+      required:
+        - featured
+        - upcoming
+        - ranking
+        - personalization
+        - meta
+      properties:
+        featured:
+          oneOf:
+            - $ref: '#/components/schemas/Drop'
+            - type: 'null'
+        upcoming:
+          type: array
+          items:
+            $ref: '#/components/schemas/Drop'
+        ranking:
+          type: array
+          items:
+            $ref: '#/components/schemas/Drop'
+        personalization:
+          type: object
+          required: [status, message]
+          properties:
+            status:
+              type: string
+              enum: [anonymous, unavailable]
+            message:
+              type: string
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    ProductDetailPage:
+      type: object
+      required: [product, drop, actions, personalization, meta]
+      properties:
+        product:
+          $ref: '#/components/schemas/Product'
+        drop:
+          $ref: '#/components/schemas/Drop'
+        actions:
+          type: object
+          required: [canStartCheckout, availabilityLabel]
+          properties:
+            canStartCheckout:
+              type: boolean
+            availabilityLabel:
+              type: string
+        personalization:
+          type: object
+          required: [status, message]
+          properties:
+            status:
+              type: string
+              enum: [unavailable]
+            message:
+              type: string
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    WebAuthContext:
+      type: object
+      required: [actor, developmentMocks]
+      properties:
+        actor:
+          oneOf:
+            - type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [anonymous]
+            - type: object
+              required: [kind, role]
+              properties:
+                kind:
+                  type: string
+                  enum: [development-buyer]
+                role:
+                  type: string
+                  enum: [CUSTOMER]
+        developmentMocks:
+          type: boolean
+    CheckoutSnapshot:
+      type: object
+      required: [checkoutId, source, item, delivery, paymentMethod, benefits, totals, actions, asOf]
+      properties:
+        checkoutId:
+          type: string
+        source:
+          type: string
+          enum: [development-mock]
+        item:
+          type: object
+          required: [dropId, productId, name, optionLabel, quantity, unitPrice]
+          properties:
+            dropId:
+              type: string
+            productId:
+              type: string
+            name:
+              type: string
+            optionLabel:
+              type: string
+              enum: [S, M, L, XL]
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              type: integer
+              minimum: 0
+        delivery:
+          type: object
+          required: [recipient, phone, address, shippingFee, requestedAt]
+          properties:
+            recipient:
+              type: string
+            phone:
+              type: string
+            address:
+              type: string
+            shippingFee:
+              type: integer
+              minimum: 0
+            requestedAt:
+              type: string
+        paymentMethod:
+          type: object
+          required: [id, label, description]
+          properties:
+            id:
+              type: string
+              enum: [MOCK_CARD]
+            label:
+              type: string
+            description:
+              type: string
+        benefits:
+          type: object
+          required: [coupon, point]
+          properties:
+            coupon:
+              type: string
+            point:
+              type: string
+        totals:
+          type: object
+          required: [subtotal, discount, shippingFee, total]
+          properties:
+            subtotal:
+              type: integer
+              minimum: 0
+            discount:
+              type: integer
+              minimum: 0
+            shippingFee:
+              type: integer
+              minimum: 0
+            total:
+              type: integer
+              minimum: 0
+        actions:
+          type: object
+          required: [canConfirm]
+          properties:
+            canConfirm:
+              type: boolean
+            unavailableReason:
+              type: string
+        asOf:
+          type: string
+          format: date-time
+    CheckoutConfirmResult:
+      type: object
+      required: [orderId, state]
+      properties:
+        orderId:
+          type: string
+        state:
+          type: string
+          enum: [CONFIRMED]
+    OrderResult:
+      type: object
+      required: [id, status, createdAt, confirmedAt, amount, product, deliveryExpectedAt, source]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [PENDING_PAYMENT, CONFIRMED, PAYMENT_FAILED, CANCELED, EXPIRED]
+        createdAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type: [string, 'null']
+          format: date-time
+        amount:
+          type: integer
+          minimum: 0
+        product:
+          type: object
+          required: [name, optionLabel, quantity]
+          properties:
+            name:
+              type: string
+            optionLabel:
+              type: string
+              enum: [S, M, L, XL]
+            quantity:
+              type: integer
+              minimum: 1
+        deliveryExpectedAt:
+          type: string
+        source:
+          type: string
+          enum: [development-mock]
+    HealthStatus:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          enum: [dropmong-web]
+    ReadinessStatus:
+      type: object
+      required: [status, service, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        service:
+          type: string
+          enum: [dropmong-web]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+    Problem:
+      type: object
+      required: [type, title, status, code, traceId, retryable]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          pattern: '^WEB_[A-Z0-9_]+$'
+        traceId:
+          type: string
+        retryable:
+          type: boolean

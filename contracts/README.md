@@ -1,4 +1,4 @@
-# Medikong OpenAPI Contracts
+# DropMong OpenAPI Contracts
 
 이 폴더는 DropMong 서비스군의 REST API 계약 초안을 둔다. 서비스 구현 코드는 이 계약을 기준으로 독립 구현할 수 있어야 하며, 서비스 간 강한 코드 의존을 만들지 않는다.
 
@@ -9,8 +9,9 @@
 - `payment-service`: mock 결제 생성, 결제 상태 조회, 결제 이벤트 발행
 - `notification-service`: 알림 목록 조회와 이벤트 기반 알림 저장
 - `auth-service`: 로그인과 JWT 발급. 정상 구매 1차 구현에서는 직접 구현 대상에서 제외할 수 있다.
+- `dropmong-web`: 구매자 웹과 같은 Next.js 배포 단위에서 실행하는 BFF Route Handler. 독립 마이크로서비스는 아니지만 브라우저가 호출하는 동일 출처 계약은 이 폴더에 명시한다.
 
-프론트엔드 화면은 이 repo의 OpenAPI contract 대상이 아니다.
+페이지 UI 자체는 OpenAPI contract 대상이 아니다. 다만 웹 애플리케이션이 제공하는 BFF Route Handler는 브라우저와 서버의 경계를 명확히 하기 위해 계약으로 관리한다.
 
 Kafka 이벤트 계약은 OpenAPI에 포함하지 않는다. 정상 구매 흐름의 topic과 payload 기준은 `events/dropmong-purchase-events.md`에 둔다.
 
@@ -34,6 +35,8 @@ contracts/
     payment-service/
       openapi.yaml
     notification-service/
+      openapi.yaml
+    dropmong-web/
       openapi.yaml
 ```
 

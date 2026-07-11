@@ -1,0 +1,104 @@
+name: DropMong Web
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'services/dropmong-web/**'
+      - 'contracts/services/dropmong-web/**'
+      - 'config/services.yml'
+      - 'Taskfile.yml'
+      - '.github/workflows/dropmong-web.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/dropmong-web/**'
+      - 'contracts/services/dropmong-web/**'
+      - 'config/services.yml'
+      - 'Taskfile.yml'
+      - '.github/workflows/dropmong-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dropmong-web-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: services/dropmong-web
+
+env:
+  APP_ENV: ci
+  APP_ORIGIN: http://127.0.0.1:3000
+  DEV_MOCK_MODE: 'true'
+  SESSION_COOKIE_SECRET: ci-session-secret-must-have-at-least-thirty-two-characters
+
+jobs:
+  verify:
+    name: Lint, type-check, test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+
+      - name: Enable the declared package manager
+        run: corepack enable
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Unit test
+        run: pnpm test
+
+      - name: Production build
+        run: pnpm build
+
+  browser:
+    name: Mobile and desktop purchase browser test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+
+      - name: Enable the declared package manager
+        run: corepack enable
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: pnpm test:e2e
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dropmong-web-playwright-report
+          path: services/dropmong-web/playwright-report
+          if-no-files-found: ignore
