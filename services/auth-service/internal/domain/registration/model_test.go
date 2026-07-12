@@ -35,7 +35,7 @@ func TestRegistrationVerificationLinkAndCompletion(t *testing.T) {
 		t.Fatalf("mark verification: %v", err)
 	}
 	if registration.Status != StatusAwaitingUserLink || len(registration.VerifiedMethods) != 2 {
-		t.Fatalf("registration after verification = %#v", registration)
+		t.Fatal("registration verification state does not match the contract")
 	}
 	if err := registration.MarkVerificationCompleted(completion); err != nil {
 		t.Fatalf("same verification completion must be idempotent: %v", err)
@@ -58,7 +58,7 @@ func TestRegistrationVerificationLinkAndCompletion(t *testing.T) {
 		t.Fatalf("complete registration: %v", err)
 	}
 	if registration.Status != StatusCompleted || registration.SessionID == nil || *registration.SessionID != sessionID {
-		t.Fatalf("registration after completion = %#v", registration)
+		t.Fatal("registration completion state does not match the contract")
 	}
 }
 

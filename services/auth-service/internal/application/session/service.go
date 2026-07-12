@@ -21,10 +21,11 @@ import (
 )
 
 type Config struct {
-	AccessTTL   time.Duration
-	RefreshTTL  time.Duration
-	SessionTTL  time.Duration
-	RecoveryTTL time.Duration
+	AccessTTL            time.Duration
+	RefreshTTL           time.Duration
+	SessionTTL           time.Duration
+	RememberMeSessionTTL time.Duration
+	RecoveryTTL          time.Duration
 }
 
 type Service struct {
@@ -75,9 +76,10 @@ type IssueInput struct {
 
 type Issued struct {
 	TokenSet
-	WebCookie string
-	CSRFToken string
-	ExpiresAt time.Time
+	WebCookie  string
+	CSRFToken  string
+	ExpiresAt  time.Time
+	RememberMe bool
 }
 
 // RotationInput rotates credentials for an existing Session. Rebind is used
@@ -114,7 +116,14 @@ func (s *Service) IssueTx(ctx context.Context, tx pgx.Tx, input IssueInput) (Iss
 	if sessionTTL <= 0 {
 		sessionTTL = 24 * time.Hour
 	}
-	expiresAt := time.Now().UTC().Add(sessionTTL)
+	if input.RememberMe && s.config.RememberMeSessionTTL > 0 {
+		sessionTTL = s.config.RememberMeSessionTTL
+	}
+	if channel == sessiondomain.ChannelMobile && s.config.RefreshTTL > sessionTTL {
+		sessionTTL = s.config.RefreshTTL
+	}
+	issuedAt := time.Now().UTC()
+	expiresAt := issuedAt.Add(sessionTTL)
 	sessionID := uuid.New()
 	credentialID := uuid.New()
 	issued := Issued{
@@ -122,7 +131,8 @@ func (s *Service) IssueTx(ctx context.Context, tx pgx.Tx, input IssueInput) (Iss
 			SessionID: sessionID.String(), UserID: input.UserID.String(),
 			Roles: grant.Roles, GrantVersion: grant.Version,
 		},
-		ExpiresAt: expiresAt,
+		ExpiresAt:  expiresAt,
+		RememberMe: input.RememberMe,
 	}
 	credential := sessiondomain.Credential{ID: credentialID, SessionID: sessionID, ExpiresAt: expiresAt}
 	if channel == sessiondomain.ChannelWeb {
@@ -138,7 +148,7 @@ func (s *Service) IssueTx(ctx context.Context, tx pgx.Tx, input IssueInput) (Iss
 			return Issued{}, application.Unavailable()
 		}
 		familyID := uuid.New()
-		refreshExpiresAt := time.Now().UTC().Add(s.config.RefreshTTL)
+		refreshExpiresAt := issuedAt.Add(s.config.RefreshTTL)
 		credential.Type, credential.SecretHash, credential.FamilyID, credential.ExpiresAt = "mobile_refresh_token", s.keys.Hash(raw), &familyID, refreshExpiresAt
 		token, accessExpiresAt, err := s.keys.SignAccessToken(input.UserID.String(), sessionID.String(), grant.Roles, grant.Version, s.config.AccessTTL)
 		if err != nil {
@@ -184,7 +194,7 @@ func (s *Service) RotateForDeliveryTx(ctx context.Context, tx pgx.Tx, input Rota
 	if current.Channel != sessiondomain.ChannelWeb && current.Channel != sessiondomain.ChannelMobile {
 		return Issued{}, application.Unavailable()
 	}
-	issued := Issued{TokenSet: TokenSet{SessionID: current.ID.String(), UserID: current.UserID.String(), Roles: grant.Roles, GrantVersion: grant.Version}, ExpiresAt: current.ExpiresAt}
+	issued := Issued{TokenSet: TokenSet{SessionID: current.ID.String(), UserID: current.UserID.String(), Roles: grant.Roles, GrantVersion: grant.Version}, ExpiresAt: current.ExpiresAt, RememberMe: current.RememberMe}
 	credentialType := "web_session_cookie"
 	if current.Channel == sessiondomain.ChannelMobile {
 		credentialType = "mobile_refresh_token"
@@ -495,16 +505,39 @@ func (s *Service) recoveryTTL() time.Duration {
 	return 5 * time.Minute
 }
 
-func (s *Service) Logout(ctx context.Context, principal Principal) error {
-	if !principal.Authenticated {
-		return application.Problem(401, "AUTH_SESSION_REQUIRED", "로그인 상태가 필요합니다.")
+func (s *Service) LogoutByWeb(ctx context.Context, webToken, csrfToken, idempotencyKey string) error {
+	if strings.TrimSpace(webToken) == "" || strings.TrimSpace(csrfToken) == "" {
+		return application.Problem(401, "AUTH_SESSION_REQUIRED", "유효한 인증 정보가 필요합니다.")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return application.Unavailable()
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	if err := s.sessions.Revoke(ctx, tx, principal.SessionID, "logout"); err != nil {
+	current, credential, err := s.sessions.FindByWebSecretForUpdate(ctx, tx, s.keys.Hash(webToken))
+	if errors.Is(err, sessiondomain.ErrNotFound) {
+		return application.Problem(401, "AUTH_SESSION_REQUIRED", "유효한 인증 정보가 필요합니다.")
+	}
+	if err != nil {
+		return application.Unavailable()
+	}
+	if subtle.ConstantTimeCompare([]byte(s.keys.CSRF(credential.ID, webToken)), []byte(csrfToken)) != 1 {
+		return application.Problem(403, "AUTH_CSRF_INVALID", "CSRF 검증에 실패했습니다.")
+	}
+	record, replayed, err := s.claimLogout(ctx, tx, "logout_web_session", current.ID.String(), webToken, idempotencyKey)
+	if err != nil {
+		return err
+	}
+	if replayed {
+		if err := tx.Commit(ctx); err != nil {
+			return application.Unavailable()
+		}
+		return nil
+	}
+	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
+		return application.Unavailable()
+	}
+	if err := s.idempotency.Complete(ctx, tx, record.ID, "logged_out"); err != nil {
 		return application.Unavailable()
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -515,7 +548,7 @@ func (s *Service) Logout(ctx context.Context, principal Principal) error {
 
 // LogoutByRefresh handles the mobile contract, whose current refresh token is
 // the credential that authorizes logout rather than an access JWT.
-func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken string) error {
+func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken, idempotencyKey string) error {
 	if strings.TrimSpace(refreshToken) == "" {
 		return application.Problem(401, "AUTH_SESSION_REQUIRED", "유효한 인증 정보가 필요합니다.")
 	}
@@ -524,18 +557,76 @@ func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken string) erro
 		return application.Unavailable()
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	current, _, err := s.sessions.FindByRefreshSecretForUpdate(ctx, tx, s.keys.Hash(refreshToken))
+	current, credential, err := s.sessions.FindByRefreshSecretForUpdate(ctx, tx, s.keys.Hash(refreshToken))
 	if errors.Is(err, sessiondomain.ErrNotFound) {
 		return application.Problem(401, "AUTH_SESSION_REQUIRED", "유효한 인증 정보가 필요합니다.")
 	}
 	if err != nil {
 		return application.Unavailable()
 	}
+	if credential.FamilyID == nil {
+		return application.Unavailable()
+	}
+	record, replayed, err := s.claimLogout(ctx, tx, "logout_mobile_session", credential.FamilyID.String(), refreshToken, idempotencyKey)
+	if err != nil {
+		return err
+	}
+	if replayed {
+		if err := tx.Commit(ctx); err != nil {
+			return application.Unavailable()
+		}
+		return nil
+	}
 	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
+		return application.Unavailable()
+	}
+	if err := s.idempotency.Complete(ctx, tx, record.ID, "logged_out"); err != nil {
 		return application.Unavailable()
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return application.Unavailable()
 	}
 	return nil
+}
+
+func (s *Service) claimLogout(ctx context.Context, tx pgx.Tx, operation, scope, credential, idempotencyKey string) (idempotency.Record, bool, error) {
+	parsedKey, err := uuid.Parse(strings.TrimSpace(idempotencyKey))
+	if err != nil {
+		return idempotency.Record{}, false, application.Problem(400, "AUTH_INPUT_INVALID", "멱등성 키가 필요합니다.")
+	}
+	record, claimed, err := s.idempotency.ClaimProcessing(ctx, tx, idempotency.NewRecord(
+		operation,
+		s.keys.Hash(operation, scope),
+		s.keys.Hash(parsedKey.String()),
+		s.keys.Hash(operation, credential),
+		nil,
+		nil,
+		time.Now().UTC().Add(s.logoutIdempotencyTTL()),
+	), "Session")
+	if err != nil {
+		return idempotency.Record{}, false, application.Unavailable()
+	}
+	if claimed {
+		return record, false, nil
+	}
+	if !hmac.Equal(record.RequestHash, s.keys.Hash(operation, credential)) {
+		return idempotency.Record{}, false, application.Problem(409, "AUTH_IDEMPOTENCY_CONFLICT", "같은 멱등성 키를 다른 요청에 사용할 수 없습니다.")
+	}
+	if record.Status != "completed" {
+		return idempotency.Record{}, false, application.Unavailable()
+	}
+	return record, true, nil
+}
+
+func (s *Service) logoutIdempotencyTTL() time.Duration {
+	ttl := s.config.SessionTTL
+	for _, candidate := range []time.Duration{s.config.RememberMeSessionTTL, s.config.RefreshTTL} {
+		if candidate > ttl {
+			ttl = candidate
+		}
+	}
+	if ttl <= 0 {
+		return 24 * time.Hour
+	}
+	return ttl
 }

@@ -70,7 +70,7 @@ func TestChallengeRepositoryReissueConsumeAndVirtualProjection(t *testing.T) {
 		t.Fatalf("consume mismatch: %v", err)
 	}
 	if !result.Changed || result.Failure != challenge.ConsumeFailureMismatch || consumed.Status != challenge.StatusIssued || consumed.AttemptCount != 1 {
-		t.Fatalf("mismatch result=%#v challenge=%#v", result, consumed)
+		t.Fatal("challenge mismatch result does not match the contract")
 	}
 	commitDomainTx(t, ctx, tx)
 
@@ -80,7 +80,7 @@ func TestChallengeRepositoryReissueConsumeAndVirtualProjection(t *testing.T) {
 		t.Fatalf("consume matching code: %v", err)
 	}
 	if !result.Verified || !result.Changed || consumed.Status != challenge.StatusVerified || consumed.ConsumedAt == nil {
-		t.Fatalf("matching result=%#v challenge=%#v", result, consumed)
+		t.Fatal("challenge verification result does not match the contract")
 	}
 	commitDomainTx(t, ctx, tx)
 

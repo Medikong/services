@@ -36,9 +36,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// RouterOptions contains runtime ports that must be supplied by a trusted
+// composition root. A nil ApprovalPort preserves the production-safe deny
+// default.
+type RouterOptions struct {
+	ApprovalPort appoperator.ApprovalPort
+}
+
 // NewRouter is the transport composition root. It creates application
 // services from domain repositories; controllers never receive pgx pools.
-func NewRouter(cfg config.ServerConfig, db *pgxpool.Pool, _ *operational.Handler, _ *observability.Metrics) (stdhttp.Handler, error) {
+func NewRouter(cfg config.ServerConfig, db *pgxpool.Pool, health *operational.Handler, metrics *observability.Metrics) (stdhttp.Handler, error) {
+	return NewRouterWithOptions(cfg, db, health, metrics, RouterOptions{})
+}
+
+// NewRouterWithOptions allows trusted runtime adapters to be injected without
+// weakening the default production boundary.
+func NewRouterWithOptions(cfg config.ServerConfig, db *pgxpool.Pool, _ *operational.Handler, _ *observability.Metrics, options RouterOptions) (stdhttp.Handler, error) {
 	if db == nil {
 		return nil, errors.New("auth HTTP router requires a postgres pool")
 	}
@@ -64,7 +77,8 @@ func NewRouter(cfg config.ServerConfig, db *pgxpool.Pool, _ *operational.Handler
 	outboxRepository := outbox.NewPostgresRepository(db)
 	sessionRepository := sessiondomain.NewPostgresRepository(db)
 	sessionService := appsession.NewService(db, keys, appsession.Config{
-		AccessTTL: cfg.Auth.AccessTTL, RefreshTTL: cfg.Auth.RefreshTTL, SessionTTL: cfg.Auth.SessionTTL, RecoveryTTL: cfg.Auth.RecoveryTTL,
+		AccessTTL: cfg.Auth.AccessTTL, RefreshTTL: cfg.Auth.RefreshTTL, SessionTTL: cfg.Auth.SessionTTL,
+		RememberMeSessionTTL: cfg.Auth.RememberMeSessionTTL, RecoveryTTL: cfg.Auth.RecoveryTTL,
 	}, sessionRepository, accessRepository, idempotencyRepository, outboxRepository)
 	emailSignInService := signin.NewEmailService(db, bootstrapService, identityRepository, intentRepository, sessionService)
 	phoneSignInService := signin.NewPhoneService(db, keys, bootstrapService, intentRepository, identityRepository, challengeRepository, outboxRepository, sessionService, cfg.Development.VirtualAdaptersEnabled, cfg.Auth.ChallengeTTL)
@@ -74,7 +88,11 @@ func NewRouter(cfg config.ServerConfig, db *pgxpool.Pool, _ *operational.Handler
 	}, bootstrapService, passwordResetRepository, identityRepository, challengeRepository, idempotencyRepository, sessionRepository, outboxRepository)
 	reauthService := appidentity.NewReauthService(db, keys, identityRepository, reauth.NewPostgresRepository(db), sessionRepository, idempotencyRepository, sessionService, cfg.Auth.ProofTTL, cfg.Auth.RecoveryTTL)
 	identityLinkService := appidentity.NewLinkService(db, keys, reauthService, identityRepository, challengeRepository, sessionRepository, sessionService, idempotencyRepository, outboxRepository, cfg.Development.VirtualAdaptersEnabled, cfg.Auth.ChallengeTTL, cfg.Auth.RecoveryTTL)
-	operatorService := appoperator.NewService(db, keys, operatordomain.NewPostgresRepository(db), policy.NewPostgresRepository(db), accessRepository, idempotencyRepository, outboxRepository, appoperator.Config{StrongAuthTTL: cfg.Auth.ProofTTL}, appoperator.DenyApprovalPort{})
+	approvalPort := options.ApprovalPort
+	if approvalPort == nil {
+		approvalPort = appoperator.DenyApprovalPort{}
+	}
+	operatorService := appoperator.NewService(db, keys, operatordomain.NewPostgresRepository(db), policy.NewPostgresRepository(db), accessRepository, idempotencyRepository, outboxRepository, appoperator.Config{StrongAuthTTL: cfg.Auth.ProofTTL}, approvalPort)
 	registrationService := appregistration.NewService(
 		db, keys,
 		appregistration.Config{
@@ -98,6 +116,24 @@ func NewRouter(cfg config.ServerConfig, db *pgxpool.Pool, _ *operational.Handler
 
 	router := chi.NewRouter()
 	router.Use(httpcontract.RequestIDMiddleware)
+	router.NotFound(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+		httpcontract.WriteProblem(w, r, httpcontract.NewContractError(
+			stdhttp.StatusNotFound,
+			"AUTH_ROUTE_NOT_FOUND",
+			"요청한 인증 API를 찾을 수 없습니다.",
+			"요청 경로를 확인해주세요.",
+			false,
+		))
+	})
+	router.MethodNotAllowed(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+		httpcontract.WriteProblem(w, r, httpcontract.NewContractError(
+			stdhttp.StatusMethodNotAllowed,
+			"AUTH_METHOD_NOT_ALLOWED",
+			"허용되지 않은 요청 방식입니다.",
+			"요청 방식을 확인해주세요.",
+			false,
+		))
+	})
 	router.Post("/api/v1/auth/intents", bootstrapController.CreateIntent)
 	router.Get("/api/v1/auth/methods", bootstrapController.GetMethods)
 	router.Post("/api/v1/auth/registrations", registrationController.Start)

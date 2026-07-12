@@ -51,7 +51,7 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 		t.Fatalf("reauthenticate: %v", err)
 	}
 	if result.Issued.SessionID != initial.SessionID || result.Issued.WebCookie == "" || result.Proof == "" {
-		t.Fatalf("unexpected reauth result: %#v", result)
+		t.Fatal("reauthentication result is incomplete")
 	}
 	if _, err := sessionService.Authenticate(ctx, initial.WebCookie, ""); err == nil {
 		t.Fatal("old web cookie unexpectedly authenticated outside recovery")
@@ -217,7 +217,7 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 	}
 	code := message["code"]
 	if len(code) != 6 {
-		t.Fatalf("invalid virtual code: %q", code)
+		t.Fatal("invalid virtual code length")
 	}
 	key := uuid.NewString()
 	completed, err := linkService.CompletePhoneReplacement(ctx, appidentity.CompleteLinkInput{Principal: principal, LinkID: started.LinkID, ChallengeID: issued.ChallengeID, Code: code, IdempotencyKey: key, PreviousWebCookie: reauthenticated.Issued.WebCookie})
@@ -225,7 +225,7 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 		t.Fatalf("complete replacement: %v", err)
 	}
 	if completed.Issued.SessionID != initial.SessionID || completed.Issued.WebCookie == "" {
-		t.Fatalf("unexpected replacement delivery: %#v", completed)
+		t.Fatal("replacement credential delivery is incomplete")
 	}
 	if _, err := sessionService.Authenticate(ctx, reauthenticated.Issued.WebCookie, ""); err == nil {
 		t.Fatal("pre-replacement cookie unexpectedly authenticated outside recovery")

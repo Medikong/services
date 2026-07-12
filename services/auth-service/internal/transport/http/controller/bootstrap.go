@@ -66,7 +66,7 @@ func (c *BootstrapController) GetMethods(w http.ResponseWriter, r *http.Request)
 		writeCredentialError(w, r, err)
 		return
 	}
-	intentID := strings.TrimSpace(r.URL.Query().Get("authIntentId"))
+	intentID := strings.TrimSpace(r.URL.Query().Get("intentId"))
 	channel, appErr := c.service.GetMethods(r.Context(), intentID, credential.Token)
 	if appErr != nil {
 		writeApplicationError(w, r, appErr)

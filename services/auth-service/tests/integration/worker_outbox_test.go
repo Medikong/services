@@ -74,7 +74,7 @@ func TestWorkerPublishesDomainOutboxWhenPublisherIsInjected(t *testing.T) {
 	}
 	if len(publisher.Events) != 1 || publisher.Events[0].ID != event.ID {
 		stop()
-		t.Fatalf("publisher events=%#v, want event %s", publisher.Events, event.ID)
+		t.Fatal("worker did not publish the expected event")
 	}
 	stop()
 	if err := <-result; err != nil {

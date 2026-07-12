@@ -108,7 +108,7 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replay policy update: %v", err)
 	}
-	if replayed != updated {
+	if replayed.Name != updated.Name || replayed.Version != updated.Version || replayed.Status != updated.Status || !replayed.EffectiveAt.Equal(updated.EffectiveAt) {
 		t.Fatalf("replayed policy update=%#v, want %#v", replayed, updated)
 	}
 	after, err := service.PolicyView(ctx, principal)
@@ -156,7 +156,7 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 		}
 		concurrent = append(concurrent, result.value)
 	}
-	if len(concurrent) != 2 || concurrent[0] != concurrent[1] {
+	if len(concurrent) != 2 || concurrent[0].Name != concurrent[1].Name || concurrent[0].Version != concurrent[1].Version || concurrent[0].Status != concurrent[1].Status || !concurrent[0].EffectiveAt.Equal(concurrent[1].EffectiveAt) {
 		t.Fatalf("concurrent policy results=%#v", concurrent)
 	}
 	if err := db.QueryRow(ctx, `SELECT count(*) FROM auth_policy_global_snapshots`).Scan(&count); err != nil {

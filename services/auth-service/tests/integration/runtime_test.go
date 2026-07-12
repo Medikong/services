@@ -97,6 +97,16 @@ func configureDevelopmentEnvironment(t *testing.T, databaseURL string) {
 
 func migrateSchemas(t *testing.T, ctx context.Context, postgres platformdb.PostgresConfig) *pgxpool.Pool {
 	t.Helper()
+	db := migrateProductionSchemas(t, ctx, postgres)
+	if err := auth.MigrateDevelopment(ctx, db); err != nil {
+		db.Close()
+		t.Fatalf("migrate development auth schema: %v", err)
+	}
+	return db
+}
+
+func migrateProductionSchemas(t *testing.T, ctx context.Context, postgres platformdb.PostgresConfig) *pgxpool.Pool {
+	t.Helper()
 	db, err := platformdb.OpenPostgres(ctx, postgres)
 	if err != nil {
 		t.Fatalf("open postgres: %v", err)
@@ -108,10 +118,6 @@ func migrateSchemas(t *testing.T, ctx context.Context, postgres platformdb.Postg
 	if err := auth.Migrate(ctx, db); err != nil {
 		db.Close()
 		t.Fatalf("migrate auth schema: %v", err)
-	}
-	if err := auth.MigrateDevelopment(ctx, db); err != nil {
-		db.Close()
-		t.Fatalf("migrate development auth schema: %v", err)
 	}
 	return db
 }
