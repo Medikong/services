@@ -87,6 +87,7 @@ export type SellerPageData = {
   partial: boolean;
   readOnly: boolean;
   rows: Array<Record<string, string>>;
+  sections?: Record<string, Array<Record<string, string>>>;
   stale: boolean;
   title: string;
   unavailableSections: string[];

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Problem = { title?: string; reauthentication?: { href?: string } };
+type Problem = { code?: string; detail?: string; status?: number; title?: string; reauthentication?: { href?: string } };
 
 export function SellerActionForm({
   actionPath, csrfToken, label, readOnly, strongAuthPurpose, version,
@@ -17,13 +17,14 @@ export function SellerActionForm({
 }) {
   const router = useRouter();
   const [confirmed, setConfirmed] = useState(false);
+  const [problem, setProblem] = useState<Problem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [reauthenticationHref, setReauthenticationHref] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true); setMessage(null); setReauthenticationHref(null);
+    setPending(true); setMessage(null); setProblem(null); setReauthenticationHref(null);
     try {
       const response = await fetch(`/api/web/seller/${actionPath}`, {
         method: "POST",
@@ -33,6 +34,7 @@ export function SellerActionForm({
       const body: unknown = await response.json();
       if (!response.ok) {
         const problem = isProblem(body) ? body : {};
+        setProblem(problem);
         setMessage(problem.title ?? "요청을 처리하지 못했습니다.");
         setReauthenticationHref(problem.reauthentication?.href ?? null);
         return;
@@ -51,7 +53,7 @@ export function SellerActionForm({
       ) : null}
       <button className="seller-button seller-button--primary" disabled={pending || readOnly} type="submit">{pending ? "처리 중…" : label}</button>
       {readOnly ? <p className="seller-form-message">제한 상태에서는 읽기만 할 수 있습니다.</p> : null}
-      {message ? <p aria-live="polite" className="seller-form-message">{message}</p> : null}
+      {message ? <p aria-live="polite" className={`seller-form-message seller-form-message--${problemTone(problem)}`}>{message}{problem?.status === 409 ? " 최신 값을 다시 불러온 뒤 변경 내용을 비교해 주세요." : ""}</p> : null}
       {reauthenticationHref ? <a className="seller-button seller-button--secondary" href={reauthenticationHref}>본인 확인 후 계속</a> : null}
     </form>
   );
@@ -88,4 +90,12 @@ export function SellerOnboardingForm({ csrfToken }: { csrfToken: string }) {
 
 function isProblem(value: unknown): value is Problem {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function problemTone(problem: Problem | null): "conflict" | "forbidden" | "recent-auth" | "success" | "unavailable" {
+  if (!problem) return "success";
+  if (problem.status === 409 || problem.code === "WEB_STATE_CONFLICT") return "conflict";
+  if (problem.code === "WEB_RECENT_AUTH_REQUIRED") return "recent-auth";
+  if (problem.status === 503) return "unavailable";
+  return "forbidden";
 }
