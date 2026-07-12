@@ -37,6 +37,7 @@ export default defineConfig({
     env: {
       APP_ORIGIN: baseURL,
       DEV_MOCK_MODE: "true",
+      SELLER_PORTAL_ENABLED: "true",
       SESSION_COOKIE_SECRET: "test-session-secret-must-have-at-least-thirty-two-chars",
     },
   },
