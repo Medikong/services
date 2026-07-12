@@ -12,6 +12,19 @@ export class BffError extends Error {
   }
 }
 
+export class RecentAuthRequiredError extends BffError {
+  readonly reauthenticationHref: string;
+
+  constructor(reauthenticationHref: string) {
+    super({
+      code: "WEB_RECENT_AUTH_REQUIRED",
+      message: "이 작업을 계속하려면 본인 확인이 필요합니다.",
+      status: 403,
+    });
+    this.reauthenticationHref = reauthenticationHref;
+  }
+}
+
 export function isBffError(error: unknown): error is BffError {
   return error instanceof BffError;
 }
