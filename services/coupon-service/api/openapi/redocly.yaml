@@ -1,0 +1,14 @@
+extends:
+  - recommended
+rules:
+  no-server-example.com: off
+  info-license-strict: off
+  operation-4xx-response: error
+  security-defined: error
+  no-unused-components: warn
+  operation-description: warn
+  operation-summary: error
+  operation-operationId: error
+  operation-operationId-unique: error
+  path-parameters-defined: error
+  spec-strict-refs: error
