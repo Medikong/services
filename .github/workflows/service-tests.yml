@@ -13,6 +13,8 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
+      - 'go.work'
+      - 'go.work.sum'
       - '.github/workflows/service-tests.yml'
   pull_request:
     branches:
@@ -26,6 +28,8 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Taskfile.yml'
+      - 'go.work'
+      - 'go.work.sum'
       - '.github/workflows/service-tests.yml'
   workflow_dispatch:
 
@@ -80,6 +84,8 @@ jobs:
               --common pyproject.toml \
               --common uv.lock \
               --common Taskfile.yml \
+              --common go.work \
+              --common go.work.sum \
               --common config/services.yml \
               --common scripts/list_services.sh \
               --common .github/workflows/service-tests.yml \
@@ -141,3 +147,53 @@ jobs:
     steps:
       - name: Report no-op
         run: echo "No managed service unit tests selected for this change."
+
+  go-services:
+    name: Go services and foundation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            packages/go-audit/go.sum
+            packages/go-authz/go.sum
+            packages/go-contracts/go.sum
+            packages/go-platform/go.sum
+            services/auth-service/go.sum
+            services/go-reference-service/go.sum
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint Go service OpenAPI documents
+        run: |
+          npx --yes @redocly/cli@2.38.0 lint \
+            --config services/go-reference-service/redocly.yaml \
+            services/go-reference-service/api/openapi.yaml \
+            services/go-reference-service/api/operational.openapi.yaml
+          npx --yes @redocly/cli@2.38.0 lint \
+            --config services/auth-service/api/openapi/redocly.yaml \
+            services/auth-service/api/openapi/openapi.bundle.yaml \
+            services/auth-service/api/openapi/dev.openapi.bundle.yaml
+
+      - name: Check auth OpenAPI bundle snapshot
+        run: ./services/auth-service/scripts/check-openapi.sh --snapshot-only
+
+      - name: Test and vet Go foundation
+        run: |
+          go test -race ./packages/go-audit/... ./packages/go-authz/... ./packages/go-contracts/... ./packages/go-platform/... ./services/auth-service/... ./services/go-reference-service/...
+          go vet ./packages/go-audit/... ./packages/go-authz/... ./packages/go-contracts/... ./packages/go-platform/... ./services/auth-service/... ./services/go-reference-service/...
+          go test -tags=integration -count=1 ./services/go-reference-service/tests/integration ./services/auth-service/tests/integration
+
+      - name: Build Go service images
+        run: |
+          docker build -f services/go-reference-service/Dockerfile -t go-reference-service:ci .
+          docker build -f services/auth-service/Dockerfile -t auth-service:ci .

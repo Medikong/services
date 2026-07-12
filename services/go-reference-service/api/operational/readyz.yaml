@@ -1,0 +1,8 @@
+get:
+  operationId: getReadiness
+  summary: 트래픽 수신 준비 확인
+  responses:
+    '200':
+      description: PostgreSQL과 Redis를 사용할 수 있고 drain 상태가 아님
+    '503':
+      description: 의존성 오류 또는 drain 상태

@@ -6,13 +6,11 @@ from pathlib import Path
 from typing import Any
 
 
-SERVICES = ("auth-service", "concert-service", "reservation-service", "payment-service", "ticket-service", "notification-service")
+SERVICES = ("catalog-service", "order-service", "payment-service", "notification-service")
 SERVICE_REPORTS = {
-    "auth-service": "auth-service.md",
-    "concert-service": "concert-service.md",
-    "reservation-service": "reservation-service.md",
+    "catalog-service": "catalog-service.md",
+    "order-service": "order-service.md",
     "payment-service": "payment-service.md",
-    "ticket-service": "ticket-service.md",
     "notification-service": "notification-service.md",
 }
 PRESETS = ("smoke", "half-year-early-growth")
@@ -318,14 +316,6 @@ def _fallback_query_analysis(service: str, artifact: dict[str, Any] | None) -> l
         else "100 샘플 기준으로 p95/p99와 max를 분리해 해석한다."
     )
     match service:
-        case "auth-service":
-            return [
-                _qa("login-customer", "SELECT users WHERE email", "users.email unique index lookup + password verify", "yes: ix_users_email", "email unique index 유지. 추가 인덱스보다 Argon2/password verify 비용을 분리해서 본다.", f"users={_n(tables.get('users'))}. 로그인 p50/p95는 DB보다 password hash 검증 영향이 크다. {sample_note}"),
-                _qa("signup-customer", "SELECT users WHERE email, INSERT users", "email unique index miss 후 insert", "yes: ix_users_email", "중복 이메일 방어에는 현재 unique index가 맞다.", f"신규 email은 miss path라 table 규모 영향은 작고 password hash + insert 비용이 중심이다. {sample_note}"),
-                _qa("me-customer", "SELECT users WHERE id", "primary key lookup", "yes: users_pkey", "PK 조회 유지. 감사 로그 insert가 같이 붙는다.", f"단일 사용자 조회라 users={_n(tables.get('users'))} 규모보다 JWT 검증과 audit insert 변동을 본다. {sample_note}"),
-                _qa("refresh-token", "SELECT refresh_tokens WHERE token_hash", "token_hash unique index lookup", "yes: ix_refresh_tokens_token_hash", "refresh token lookup은 unique index로 충분하다.", f"refresh_tokens={_n(tables.get('refresh_tokens'))}. token hash 계산, revoke update, token 재발급 비용을 함께 본다. {sample_note}"),
-                _qa("audit-logs-admin", "SELECT audit_logs ORDER BY id DESC LIMIT 100", "PK backward index scan 후보", "yes: audit_logs_pkey", "최근 100건 조회는 id index 역순 scan으로 유지한다.", f"audit_logs={_n(tables.get('audit_logs'))}. 응답 100건 직렬화 비용이 함께 포함된다. {sample_note}"),
-            ]
         case "concert-service":
             return [
                 _qa("recommended-concerts", "SELECT concerts ORDER BY created_at DESC, id DESC LIMIT 11", "created_at/id index scan", "yes: ix_concerts_created_at_id", "추천 first/cursor page는 (created_at, id) index 유지.", f"concerts={_n(tables.get('concerts'))}. showtimes selectinload가 붙어 목록 카드 응답 비용도 포함된다. {sample_note}"),

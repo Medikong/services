@@ -5,7 +5,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Option func(*options)
@@ -33,11 +36,11 @@ func New(out io.Writer, service string, opts ...Option) *slog.Logger {
 		opt(&config)
 	}
 
-	handler := slog.NewJSONHandler(out, &slog.HandlerOptions{
+	handler := traceHandler{Handler: slog.NewJSONHandler(out, &slog.HandlerOptions{
 		AddSource:   config.addSource,
 		Level:       config.level,
 		ReplaceAttr: config.replaceAttr,
-	})
+	})}
 	log := slog.New(handler)
 	if service != "" {
 		log = log.With(slog.String("service", service))
@@ -86,6 +89,21 @@ func WithReplaceAttr(replace func(groups []string, attr slog.Attr) slog.Attr) Op
 	}
 }
 
+func RedactKeys(keys ...string) func([]string, slog.Attr) slog.Attr {
+	redacted := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if normalized := strings.ToLower(strings.TrimSpace(key)); normalized != "" {
+			redacted[normalized] = struct{}{}
+		}
+	}
+	return func(_ []string, attr slog.Attr) slog.Attr {
+		if _, ok := redacted[strings.ToLower(attr.Key)]; ok {
+			return slog.String(attr.Key, "[REDACTED]")
+		}
+		return attr
+	}
+}
+
 func Debug(ctx context.Context, msg string, args ...any) {
 	Default().DebugContext(ctx, msg, args...)
 }
@@ -111,4 +129,27 @@ func Err(err error) slog.Attr {
 		return slog.Any("error", nil)
 	}
 	return slog.String("error", err.Error())
+}
+
+type traceHandler struct {
+	slog.Handler
+}
+
+func (h traceHandler) Handle(ctx context.Context, record slog.Record) error {
+	span := trace.SpanContextFromContext(ctx)
+	if span.IsValid() {
+		record.AddAttrs(
+			slog.String("trace_id", span.TraceID().String()),
+			slog.String("span_id", span.SpanID().String()),
+		)
+	}
+	return h.Handler.Handle(ctx, record)
+}
+
+func (h traceHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return traceHandler{Handler: h.Handler.WithAttrs(attrs)}
+}
+
+func (h traceHandler) WithGroup(name string) slog.Handler {
+	return traceHandler{Handler: h.Handler.WithGroup(name)}
 }

@@ -5,7 +5,7 @@
 ## 검증 범위
 
 ```text
-coupon-service Go OpenTelemetry instrumentation
+go-reference-service OpenTelemetry instrumentation
 -> OTLP gRPC
 -> OpenTelemetry Collector OTLP receiver
 -> Tempo
@@ -47,11 +47,11 @@ GRAFANA_PORT=13001 TEMPO_PORT=13200 task tests:test-observability-e2e
 
 ## Smoke 기준
 
-1. `coupon-service`의 `/healthz`, `/readyz`가 응답하는지 readiness 대기용으로 확인한다. 이 공용 endpoint와 `/metrics`는 trace 제외 기본값이다.
+1. `go-reference-service`의 admin 포트에서 `/healthz`, `/readyz`가 응답하는지 확인한다. 이 공용 endpoint와 `/metrics`는 trace 제외 기본값이다.
 2. Tempo와 Collector readiness endpoint가 응답하는지 확인한다.
 3. 고유 `X-Request-Id`를 붙여 `/healthz`, `/readyz`, `/metrics`를 호출하고 Tempo에 trace가 생기지 않는지 확인한다.
-4. 고유 `X-Request-Id`를 붙여 `coupon-service`의 `GET /internal/coupon-policies/{policyId}`를 호출한다.
-5. Tempo `/api/search`에서 `service.name=coupon-service request_id=<id>` 조건으로 trace를 찾는다.
+4. 고유 `X-Request-Id`, principal, idempotency key를 붙여 `go-reference-service`의 `POST /v1/reference/resources/{resourceID}/audit`를 호출한다.
+5. Tempo `/api/search`에서 `service.name=go-reference-service request_id=<id>` 조건으로 trace를 찾는다.
 6. trace 상세에서 `service.name`, `request_id`, span name, trace id가 모두 존재하는지 확인한다.
 
 ## Trace 제외 endpoint

@@ -2,13 +2,19 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: postgres
+      POSTGRES_DB: reference_service
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
-    volumes:
-      - ../postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d reference_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: valkey/valkey:8-alpine
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -52,26 +58,38 @@ services:
     ports:
       - "${GRAFANA_PORT:-3001}:3000"
 
-  coupon-service:
+  reference-migrate:
     build:
       context: ../../..
-      dockerfile: services/coupon-service/Dockerfile
+      dockerfile: services/go-reference-service/Dockerfile
+    entrypoint: ["/app/migrate"]
     environment:
-      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
+      DATABASE_URL: postgres://app:app@postgres:5432/reference_service?sslmode=disable
       SERVICE_ENVIRONMENT: observability-e2e
       SERVICE_VERSION: observability-e2e
-      OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4317
     depends_on:
       postgres:
         condition: service_healthy
+
+  go-reference-service:
+    build:
+      context: ../../..
+      dockerfile: services/go-reference-service/Dockerfile
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/reference_service?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      SERVICE_ENVIRONMENT: observability-e2e
+      SERVICE_VERSION: observability-e2e
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+      reference-migrate:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
 
 volumes:
   tempo-data:

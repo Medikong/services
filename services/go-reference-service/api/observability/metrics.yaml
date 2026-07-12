@@ -1,0 +1,10 @@
+get:
+  operationId: getMetrics
+  summary: Prometheus metric 조회
+  responses:
+    '200':
+      description: OpenTelemetry 및 애플리케이션 metric
+      content:
+        text/plain:
+          schema:
+            type: string

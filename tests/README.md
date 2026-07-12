@@ -1,6 +1,6 @@
 # 테스트 실행 가이드
 
-이 프로젝트의 테스트 진입점은 루트 `Taskfile.yml`이다. 현재 서비스 repo는 Go 기반 auth/user/coupon/backoffice 흐름과 Python 기반 catalog/order/payment/notification 구매 흐름이 함께 존재한다.
+이 프로젝트의 테스트 진입점은 루트 `Taskfile.yml`이다. Go 공용 기반 구조와 reference service, Python 기반 catalog/order/payment/notification 구매 흐름을 함께 검증한다.
 
 업무 흐름을 사람이 직접 검증하거나 장애를 주입해 확인하는 절차는 배포/인프라 repo에서 별도 문서로 관리한다.
 
@@ -8,11 +8,10 @@
 
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
-| Go 단위 테스트 | Go test | `packages/go-*`, `services/auth-service`, `services/user-service`, `services/coupon-service`, `services/backoffice-service` |
-| Go 통합 테스트 | Go test + `integration` build tag | Go 서비스와 공용 패키지의 조립 경계 |
+| Go 단위 테스트 | Go test | `packages/go-*`, `services/go-reference-service` |
+| Go 통합 테스트 | Go test + `integration` build tag | reference service와 공용 패키지의 조립 경계 |
 | Go 벤치마크 | Go test + `benchmark` build tag | Go handler, 공용 패키지, 핵심 경로 성능 |
 | Python 단위 테스트 | Docker Python pytest 러너 | `catalog-service`, `order-service`, `payment-service`, `notification-service` |
-| Go Service E2E | Docker Compose, PostgreSQL, Python 시나리오 스크립트 | auth/user/coupon/backoffice DropMong baseline 검증 |
 | Purchase E2E | Docker Compose, PostgreSQL, Kafka, Docker Newman 컨테이너 | catalog/order/payment/notification 구매, 결제 실패, 품절/동시성 검증 |
 | Observability E2E | Docker Compose, OpenTelemetry Collector, Tempo, Grafana, Python smoke 컨테이너 | Go inbound request span이 OTLP -> Collector -> Tempo 경로로 적재되는지 검증 |
 | Gateway E2E | 별도 future/Kubernetes scope | Istio Gateway/JWT/Ingress 라우팅, gateway trace boundary 검증 |
@@ -37,8 +36,6 @@ tests/
         trace-smoke.py
     postgres-init/
       01-create-databases.sql
-    scripts/
-      dropmong_scenarios.py
     scenarios/
       01-drop-catalog-smoke.postman_collection.json
       02-order-create.postman_collection.json
@@ -88,16 +85,6 @@ task test-unit
 task test-service SERVICE=order-service
 task test-service SERVICE=order
 ```
-
-## Go Service E2E
-
-`task test-e2e`는 Docker Compose로 PostgreSQL과 Go 서비스를 띄운 뒤 `tests/e2e/scripts/dropmong_scenarios.py`를 실행한다.
-
-```bash
-task test-e2e
-```
-
-이 흐름은 `auth-service`가 발급한 `X-Principal` 내부 헤더를 사용한다. Kong/Istio Gateway와 JWT 검증 자체는 기본 E2E 범위가 아니다.
 
 ## Purchase E2E
 
@@ -158,7 +145,7 @@ Go OpenTelemetry instrumentation
 -> Tempo
 ```
 
-`/healthz`, `/readyz`, `/metrics`는 trace 제외 기본값이다. smoke는 세 endpoint에 고유 `X-Request-Id`를 붙여 호출한 뒤 Tempo에서 해당 trace가 없어야 한다고 확인한다. trace 생성 요청은 기본값으로 coupon-service의 `GET /internal/coupon-policies/obs-policy`를 호출한다.
+`/healthz`, `/readyz`, `/metrics`는 trace 제외 기본값이다. smoke는 admin 포트의 세 endpoint에 고유 `X-Request-Id`를 붙여 호출한 뒤 Tempo에서 해당 trace가 없어야 한다고 확인한다. trace 생성 요청은 `go-reference-service`의 감사 예제 API를 호출한다.
 
 ## CI
 
@@ -175,7 +162,7 @@ Go OpenTelemetry instrumentation
 | pytest import 실패 | `task test-unit`로 Docker 테스트 러너를 통해 실행했는지 확인 |
 | DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
 | Kafka 이벤트 검증 실패 | Compose `kafka:29092`, topic 생성, consumer 로그 확인 |
-| Observability smoke 실패 | `docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector tempo coupon-service` 확인 |
+| Observability smoke 실패 | `docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector tempo go-reference-service` 확인 |
 | Newman 401 | Gateway E2E가 아닌지, 서비스가 요구하는 인증 헤더가 누락됐는지 확인 |
 | Newman 403 | customer/operator/admin 권한 헤더와 요청 데이터의 권한 관계 확인 |
 | Newman 404 | 서비스 URL과 API path 확인 |

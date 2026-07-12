@@ -1,11 +1,10 @@
 go 1.26
 
 use (
+	./packages/go-audit
 	./packages/go-authz
 	./packages/go-contracts
 	./packages/go-platform
 	./services/auth-service
-	./services/backoffice-service
-	./services/coupon-service
-	./services/user-service
+	./services/go-reference-service
 )

@@ -14,7 +14,7 @@ func Metrics(config Config) Middleware {
 				return
 			}
 			startedAt := time.Now()
-			recorder := ensureRecorder(w)
+			recorder := newResponseRecorder(w)
 			activeLabels := map[string]string{
 				"service_name":        config.ServiceName,
 				"http_request_method": r.Method,
@@ -35,7 +35,7 @@ func Metrics(config Config) Middleware {
 				config.Metrics.Add("http_server_request_duration_seconds", requestLabels, time.Since(startedAt).Seconds())
 				config.Metrics.Inc("http_server_requests_total", requestLabels)
 			}()
-			next.ServeHTTP(recorder, r)
+			next.ServeHTTP(recorder.Writer(), r)
 		})
 	}
 }

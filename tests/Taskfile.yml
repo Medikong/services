@@ -13,14 +13,9 @@ vars:
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
-  E2E_COMPOSE_SERVICES: '{{default "" .E2E_COMPOSE_SERVICES}}'
   E2E_NETWORK: '{{default "dropmong-e2e_default" .E2E_NETWORK}}'
   NEWMAN_IMAGE: '{{default "postman/newman:6-alpine" .NEWMAN_IMAGE}}'
   E2E_WAIT_TIMEOUT_SECONDS: '{{default "180" .E2E_WAIT_TIMEOUT_SECONDS}}'
-  E2E_AUTH_SERVICE_URL: '{{default "http://127.0.0.1:18080" .E2E_AUTH_SERVICE_URL}}'
-  E2E_USER_SERVICE_URL: '{{default "http://127.0.0.1:18081" .E2E_USER_SERVICE_URL}}'
-  E2E_COUPON_SERVICE_URL: '{{default "http://127.0.0.1:18082" .E2E_COUPON_SERVICE_URL}}'
-  E2E_BACKOFFICE_SERVICE_URL: '{{default "http://127.0.0.1:18083" .E2E_BACKOFFICE_SERVICE_URL}}'
   PURCHASE_E2E_COMPOSE_SERVICES: '{{default "postgres kafka kafka-init catalog-service order-service payment-service notification-service" .PURCHASE_E2E_COMPOSE_SERVICES}}'
   PURCHASE_E2E_CATALOG_SERVICE_URL: '{{default "http://catalog-service:8081" .PURCHASE_E2E_CATALOG_SERVICE_URL}}'
   PURCHASE_E2E_ORDER_SERVICE_URL: '{{default "http://order-service:8082" .PURCHASE_E2E_ORDER_SERVICE_URL}}'
@@ -39,9 +34,10 @@ vars:
   OBS_E2E_COMPOSE_PROJECT: '{{default "dropmong-observability-e2e" .OBS_E2E_COMPOSE_PROJECT}}'
   OBS_E2E_NETWORK: '{{default "dropmong-observability-e2e_default" .OBS_E2E_NETWORK}}'
   OBS_E2E_SMOKE_IMAGE: '{{default "python:3.12-slim" .OBS_E2E_SMOKE_IMAGE}}'
-  OBS_E2E_SERVICE_NAME: '{{default "coupon-service" .OBS_E2E_SERVICE_NAME}}'
-  OBS_E2E_SERVICE_URL: '{{default "http://coupon-service:8080" .OBS_E2E_SERVICE_URL}}'
-  OBS_E2E_TRACE_PATH: '{{default "/internal/coupon-policies/obs-policy" .OBS_E2E_TRACE_PATH}}'
+  OBS_E2E_SERVICE_NAME: '{{default "go-reference-service" .OBS_E2E_SERVICE_NAME}}'
+  OBS_E2E_SERVICE_URL: '{{default "http://go-reference-service:8080" .OBS_E2E_SERVICE_URL}}'
+  OBS_E2E_ADMIN_URL: '{{default "http://go-reference-service:9090" .OBS_E2E_ADMIN_URL}}'
+  OBS_E2E_TRACE_PATH: '{{default "/v1/reference/resources/obs-resource/audit" .OBS_E2E_TRACE_PATH}}'
   OBS_E2E_TEMPO_URL: '{{default "http://tempo:3200" .OBS_E2E_TEMPO_URL}}'
   OBS_E2E_EXCLUSION_CHECK_SECONDS: '{{default "8" .OBS_E2E_EXCLUSION_CHECK_SECONDS}}'
 
@@ -273,27 +269,6 @@ tasks:
           task --dir "{{.ROOT_DIR}}/tests" benchmark-api-smoke-service SERVICE="${service}" PRESET='{{default "smoke" .PRESET}}' SAMPLES='{{default "5" .SAMPLES}}' WARMUP='{{default "1" .WARMUP}}' API_BENCHMARK_REPORT_ROOT='{{.API_BENCHMARK_REPORT_ROOT}}' PYTEST_ARGS='{{.PYTEST_ARGS}}'
         done
 
-  benchmark-dropmong-api:
-    desc: Run DropMong API benchmark against the Docker Compose E2E stack and write Markdown report.
-    cmds:
-      - |
-        set -e
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        compose_cmd='{{.DOCKER_COMPOSE}}'
-        project='{{.E2E_COMPOSE_PROJECT}}-benchmark'
-        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
-        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres auth-service user-service coupon-service backoffice-service
-        "{{.PYTHON_BIN}}" "${repo_root}/tests/scripts/dropmong_api_benchmark.py" \
-          --preset '{{default "smoke" .PRESET}}' \
-          --samples '{{default "5" .SAMPLES}}' \
-          --warmup '{{default "1" .WARMUP}}' \
-          --reports-root '{{.API_BENCHMARK_REPORT_ROOT}}' \
-          --auth-url '{{.E2E_AUTH_SERVICE_URL}}' \
-          --user-url '{{.E2E_USER_SERVICE_URL}}' \
-          --coupon-url '{{.E2E_COUPON_SERVICE_URL}}' \
-          --backoffice-url '{{.E2E_BACKOFFICE_SERVICE_URL}}'
-
   benchmark-api-smoke-service:
     cmds:
       - task: benchmark-api-service
@@ -374,15 +349,6 @@ tasks:
           exit 3
         fi
         printf 'wrote %s/latest.json\n' "${artifact_dir}"
-
-  benchmark-api-smoke-auth:
-    cmds:
-      - task: benchmark-api-smoke-service
-        vars:
-          SERVICE: auth-service
-          PRESET: '{{default "smoke" .PRESET}}'
-          SAMPLES: '{{default "5" .SAMPLES}}'
-          WARMUP: '{{default "1" .WARMUP}}'
 
   benchmark-api-smoke-concert:
     cmds:
@@ -465,15 +431,6 @@ tasks:
           SAMPLES: '{{default "100" .SAMPLES}}'
           WARMUP: '{{default "2" .WARMUP}}'
 
-  benchmark-api-large-auth:
-    cmds:
-      - task: benchmark-api-large-service
-        vars:
-          SERVICE: auth-service
-          PRESET: '{{default "half-year-early-growth" .PRESET}}'
-          SAMPLES: '{{default "100" .SAMPLES}}'
-          WARMUP: '{{default "2" .WARMUP}}'
-
   benchmark-api-large-concert:
     cmds:
       - task: benchmark-api-large-service
@@ -493,51 +450,6 @@ tasks:
           --reports-root '{{.API_BENCHMARK_REPORT_ROOT}}' \
           --output-dir '{{.API_BENCHMARK_DOC_DIR}}' \
           --service "${service}"
-
-  test-e2e:
-    desc: Run Docker Compose service E2E tests. Optionally set SCENARIO=<scenario-name>.
-    cmds:
-      - |
-        set -e
-        compose_services='{{.E2E_COMPOSE_SERVICES}}'
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        compose_services="${compose_services:-postgres auth-service user-service coupon-service backoffice-service}"
-        compose_cmd='{{.DOCKER_COMPOSE}}'
-        project='{{.E2E_COMPOSE_PROJECT}}'
-        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
-        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}
-        E2E_AUTH_SERVICE_URL='{{.E2E_AUTH_SERVICE_URL}}' \
-        E2E_USER_SERVICE_URL='{{.E2E_USER_SERVICE_URL}}' \
-        E2E_COUPON_SERVICE_URL='{{.E2E_COUPON_SERVICE_URL}}' \
-        E2E_BACKOFFICE_SERVICE_URL='{{.E2E_BACKOFFICE_SERVICE_URL}}' \
-          "{{.PYTHON_BIN}}" "${repo_root}/tests/e2e/scripts/dropmong_scenarios.py"
-
-  e2e-up:
-    desc: Start the service E2E Docker Compose stack.
-    cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres auth-service user-service coupon-service backoffice-service'
-
-  e2e-wait:
-    desc: Wait for service E2E services to become healthy through Docker Compose.
-    cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}}'
-
-  e2e-newman:
-    desc: Run DropMong service E2E scenarios against an already running stack.
-    cmds:
-      - |
-        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
-        E2E_AUTH_SERVICE_URL='{{.E2E_AUTH_SERVICE_URL}}' \
-        E2E_USER_SERVICE_URL='{{.E2E_USER_SERVICE_URL}}' \
-        E2E_COUPON_SERVICE_URL='{{.E2E_COUPON_SERVICE_URL}}' \
-        E2E_BACKOFFICE_SERVICE_URL='{{.E2E_BACKOFFICE_SERVICE_URL}}' \
-          "{{.PYTHON_BIN}}" "${repo_root}/tests/e2e/scripts/dropmong_scenarios.py"
-
-  e2e-down:
-    desc: Stop the service E2E Docker Compose stack.
-    cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
 
   purchase-e2e:
     desc: Run Python purchase-flow Newman E2E scenarios. Optionally set SCENARIO=<scenario-name>.
@@ -820,11 +732,12 @@ tasks:
         file='{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}'
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build postgres tempo otel-collector grafana coupon-service
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --build postgres redis tempo otel-collector grafana reference-migrate go-reference-service
         docker run --rm --network {{.OBS_E2E_NETWORK}} \
           -v "${repo_root}/tests/e2e/observability/scripts":/scripts:ro \
           -e OBS_E2E_SERVICE_NAME="{{.OBS_E2E_SERVICE_NAME}}" \
           -e OBS_E2E_SERVICE_URL="{{.OBS_E2E_SERVICE_URL}}" \
+          -e OBS_E2E_ADMIN_URL="{{.OBS_E2E_ADMIN_URL}}" \
           -e OBS_E2E_TRACE_PATH="{{.OBS_E2E_TRACE_PATH}}" \
           -e OBS_E2E_TEMPO_URL="{{.OBS_E2E_TEMPO_URL}}" \
           -e OBS_E2E_EXCLUSION_CHECK_SECONDS="{{.OBS_E2E_EXCLUSION_CHECK_SECONDS}}" \
@@ -835,7 +748,7 @@ tasks:
   observability-e2e-up:
     desc: Start the observability E2E Docker Compose stack.
     cmds:
-      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" up -d --build postgres tempo otel-collector grafana coupon-service'
+      - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" up -d --build postgres redis tempo otel-collector grafana reference-migrate go-reference-service'
 
   observability-e2e-smoke:
     desc: Run observability E2E trace smoke against an already running stack.
@@ -846,6 +759,7 @@ tasks:
           -v "${repo_root}/tests/e2e/observability/scripts":/scripts:ro \
           -e OBS_E2E_SERVICE_NAME="{{.OBS_E2E_SERVICE_NAME}}" \
           -e OBS_E2E_SERVICE_URL="{{.OBS_E2E_SERVICE_URL}}" \
+          -e OBS_E2E_ADMIN_URL="{{.OBS_E2E_ADMIN_URL}}" \
           -e OBS_E2E_TRACE_PATH="{{.OBS_E2E_TRACE_PATH}}" \
           -e OBS_E2E_TEMPO_URL="{{.OBS_E2E_TEMPO_URL}}" \
           -e OBS_E2E_EXCLUSION_CHECK_SECONDS="{{.OBS_E2E_EXCLUSION_CHECK_SECONDS}}" \

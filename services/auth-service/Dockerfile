@@ -1,23 +1,25 @@
-FROM golang:1.26-alpine AS build
+FROM golang:1.26.3-bookworm AS builder
 
-WORKDIR /src
+WORKDIR /workspace
 
-COPY packages/go-platform ./packages/go-platform
+COPY packages/go-audit ./packages/go-audit
 COPY packages/go-authz ./packages/go-authz
 COPY packages/go-contracts ./packages/go-contracts
+COPY packages/go-platform ./packages/go-platform
 COPY services/auth-service ./services/auth-service
 
-WORKDIR /src/services/auth-service
-ENV GOWORK=off
-RUN go test ./...
-RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
+WORKDIR /workspace/services/auth-service
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOWORK=off CGO_ENABLED=0 go build -trimpath -o /out/server ./cmd/server && \
+    GOWORK=off CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker && \
+    GOWORK=off CGO_ENABLED=0 go build -trimpath -o /out/migrate ./cmd/migrate
 
-FROM alpine:3.22
+FROM gcr.io/distroless/static-debian12:nonroot
 
-RUN addgroup -g 65532 -S app && adduser -S -u 65532 -G app app
-USER 65532:65532
+COPY --from=builder /out/server /app/server
+COPY --from=builder /out/worker /app/worker
+COPY --from=builder /out/migrate /app/migrate
 
-COPY --from=build /out/server /server
-
-EXPOSE 8080
-ENTRYPOINT ["/server"]
+EXPOSE 8080 9090 9092
+ENTRYPOINT ["/app/server"]

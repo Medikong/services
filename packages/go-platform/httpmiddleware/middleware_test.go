@@ -1,6 +1,7 @@
 package httpmiddleware
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -13,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	"go.opentelemetry.io/otel/trace"
+	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/metrics"
@@ -102,7 +103,7 @@ func TestStackUsesRequestIDPolicyForTraceAttribute(t *testing.T) {
 	otel.SetTracerProvider(provider)
 	t.Cleanup(func() {
 		_ = provider.Shutdown(context.Background())
-		otel.SetTracerProvider(trace.NewNoopTracerProvider())
+		otel.SetTracerProvider(nooptrace.NewTracerProvider())
 	})
 
 	logger.Configure(io.Discard, "test-service")
@@ -158,7 +159,8 @@ func TestStackPreservesRequestIDInErrorResponse(t *testing.T) {
 }
 
 func TestRecoveryReraisesAfterResponseStarted(t *testing.T) {
-	logger.Configure(io.Discard, "test-service")
+	var logs bytes.Buffer
+	logger.Configure(&logs, "test-service")
 	handler := Stack(Config{ServiceName: "test-service"}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		panic("late boom")
@@ -168,6 +170,20 @@ func TestRecoveryReraisesAfterResponseStarted(t *testing.T) {
 		if recovered := recover(); recovered == nil {
 			t.Fatal("panic was not re-raised")
 		}
+		decoder := json.NewDecoder(&logs)
+		for {
+			var event map[string]any
+			if err := decoder.Decode(&event); err != nil {
+				break
+			}
+			if event["msg"] == "http.request.completed" {
+				if event["level"] != "ERROR" || event["http.handler_panicked"] != true {
+					t.Fatalf("late panic access log = %#v", event)
+				}
+				return
+			}
+		}
+		t.Fatal("late panic access log is missing")
 	}()
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/auth/login", nil))
 }
