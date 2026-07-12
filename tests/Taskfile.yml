@@ -28,6 +28,8 @@ vars:
   PURCHASE_E2E_TRACE_COLLECTION: '{{default "08-purchase-flow-trace-smoke" .PURCHASE_E2E_TRACE_COLLECTION}}'
   PURCHASE_E2E_KAFKA_TRACE_COLLECTION: '{{default "09-purchase-kafka-trace-smoke" .PURCHASE_E2E_KAFKA_TRACE_COLLECTION}}'
   PURCHASE_E2E_TEMPO_URL: '{{default "http://tempo:3200" .PURCHASE_E2E_TEMPO_URL}}'
+  PURCHASE_CONCURRENCY_COMPOSE_PROJECT: '{{default "dropmong-purchase-concurrency" .PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
+  PURCHASE_CONCURRENCY_SMOKE_IMAGE: '{{default "python:3.12-slim" .PURCHASE_CONCURRENCY_SMOKE_IMAGE}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
   OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
@@ -676,6 +678,119 @@ tasks:
           compose -p "${project}" -f "${file}" up -d --build --wait --wait-timeout "${wait_timeout_seconds}" ${compose_services}
         run_collection "${trace_scenario}"
         run_collection "${kafka_trace_collection}"
+
+  purchase-e2e-concurrency:
+    desc: Run the purchase concurrency smoke and verify active database reservations.
+    env:
+      PURCHASE_CONCURRENCY_ROOT_DIR: '{{.ROOT_DIR}}'
+      PURCHASE_CONCURRENCY_DOCKER_COMPOSE: '{{.DOCKER_COMPOSE}}'
+      PURCHASE_CONCURRENCY_PROJECT: '{{.PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
+      PURCHASE_CONCURRENCY_COMPOSE_FILE: '{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+      PURCHASE_CONCURRENCY_IMAGE: '{{.PURCHASE_CONCURRENCY_SMOKE_IMAGE}}'
+      PURCHASE_CONCURRENCY_WAIT_TIMEOUT_SECONDS: '{{.E2E_WAIT_TIMEOUT_SECONDS}}'
+    cmds:
+      - |
+        set -e
+        repo_root="$(cd "${PURCHASE_CONCURRENCY_ROOT_DIR}" && pwd -P)"
+        project="${PURCHASE_CONCURRENCY_PROJECT}"
+        file="${PURCHASE_CONCURRENCY_COMPOSE_FILE}"
+        smoke_image="${PURCHASE_CONCURRENCY_IMAGE}"
+        wait_timeout_seconds="${PURCHASE_CONCURRENCY_WAIT_TIMEOUT_SECONDS}"
+        die() {
+          printf '%s\n' "$1" >&2
+          exit 2
+        }
+        validate_name() {
+          label="$1"
+          value="$2"
+          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+            die "${label} must match [A-Za-z0-9._-]+: ${value}"
+          fi
+        }
+        validate_positive_integer() {
+          label="$1"
+          value="$2"
+          if ! printf '%s' "${value}" | grep -Eq '^[1-9][0-9]*$'; then
+            die "${label} must be a positive integer: ${value}"
+          fi
+        }
+        validate_image() {
+          value="$1"
+          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/:@-]*$'; then
+            die "PURCHASE_CONCURRENCY_SMOKE_IMAGE must be a container image reference and cannot begin with -: ${value}"
+          fi
+        }
+        compose() {
+          case "${PURCHASE_CONCURRENCY_DOCKER_COMPOSE}" in
+            "docker compose")
+              docker compose "$@"
+              ;;
+            "docker-compose")
+              docker-compose "$@"
+              ;;
+            *)
+              die "DOCKER_COMPOSE must be exactly 'docker compose' or 'docker-compose'"
+              ;;
+          esac
+        }
+        validate_name PURCHASE_CONCURRENCY_COMPOSE_PROJECT "${project}"
+        validate_positive_integer E2E_WAIT_TIMEOUT_SECONDS "${wait_timeout_seconds}"
+        validate_image "${smoke_image}"
+        run_id="purchase-concurrency-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+        validate_name PURCHASE_CONCURRENCY_RUN_ID "${run_id}"
+        cleanup() {
+          status="$?"
+          set +e
+          compose -p "${project}" -f "${file}" down -v --remove-orphans
+          cleanup_status="$?"
+          if [ "${status}" -ne 0 ]; then
+            exit "${status}"
+          fi
+          exit "${cleanup_status}"
+        }
+        trap cleanup EXIT
+        compose -p "${project}" -f "${file}" down -v --remove-orphans
+        compose -p "${project}" -f "${file}" up -d --build --wait \
+          --wait-timeout "${wait_timeout_seconds}" postgres kafka kafka-init order-service
+        set +e
+        smoke_json="$(docker run --rm --network "${project}_default" \
+          -e PURCHASE_CONCURRENCY_RUN_ID="${run_id}" \
+          -v "${repo_root}/tests/e2e/scripts:/scripts:ro" \
+          "${smoke_image}" python /scripts/purchase-concurrency-smoke.py)"
+        smoke_status="$?"
+        set -e
+        printf '%s\n' "${smoke_json}"
+        set +e
+        db_result="$(compose -p "${project}" -f "${file}" exec -T postgres \
+          psql -U app -d order_service -At -F '|' \
+          -c "SELECT COUNT(*), COALESCE(SUM(quantity), 0) FROM orders WHERE status IN ('PENDING_PAYMENT', 'CONFIRMED');")"
+        db_status="$?"
+        set -e
+        printf 'active_orders|reserved_quantity=%s\n' "${db_result}"
+        status=0
+        if [ "${smoke_status}" -ne 0 ]; then
+          status="${smoke_status}"
+        fi
+        if [ "${db_status}" -ne 0 ]; then
+          if [ "${status}" -eq 0 ]; then
+            status="${db_status}"
+          fi
+        elif ! printf '%s' "${db_result}" | grep -Eq '^[0-9]+\|[0-9]+$'; then
+          printf 'Invalid database result; expected active_orders|reserved_quantity, got: %s\n' "${db_result}" >&2
+          if [ "${status}" -eq 0 ]; then
+            status=1
+          fi
+        else
+          active_orders="${db_result%%|*}"
+          reserved_quantity="${db_result#*|}"
+          if [ "${active_orders}" -ne 4 ] || [ "${reserved_quantity}" -ne 40 ] || [ "${reserved_quantity}" -gt 42 ]; then
+            printf 'Concurrency database assertion failed: expected 4|40 with reserved_quantity <= 42, got %s\n' "${db_result}" >&2
+            if [ "${status}" -eq 0 ]; then
+              status=1
+            fi
+          fi
+        fi
+        exit "${status}"
 
   purchase-e2e-up:
     desc: Start the Python purchase-flow E2E Docker Compose services.

@@ -249,6 +249,13 @@ tasks:
         vars:
           E2E_REPORT_NAME: '{{default "purchase-kafka-traces" .E2E_REPORT_NAME}}'
 
+  purchase-e2e-concurrency:
+    desc: Run the purchase concurrency smoke and verify active database reservations.
+    cmds:
+      - task: tests:purchase-e2e-concurrency
+        vars:
+          PURCHASE_CONCURRENCY_COMPOSE_PROJECT: '{{default "dropmong-purchase-concurrency" .PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
+
   benchmark-concert-public-api:
     cmds:
       - task: tests:benchmark-concert-public-api
