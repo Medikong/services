@@ -114,6 +114,8 @@ production bundle에는 `/api/v1/dev/` route가 포함되면 안 됩니다.
 
 ## 검증과 이미지
 
+API.A.300-01~30의 실제 HTTP 범위와 기존 contract 테스트의 역할은 [`tests/integration/HTTP_E2E_MATRIX.md`](tests/integration/HTTP_E2E_MATRIX.md)에 정리합니다. production E2E는 core·audit migration만 적용하고 개발 route가 404인지 확인하며, API.A.300-30은 development migration과 모든 개발 gate를 켠 별도 server에서만 실행합니다.
+
 ```bash
 cd services/auth-service
 gofmt -w cmd internal tests

@@ -90,7 +90,7 @@ func (r *PostgresRepository) ReplacePasswordCredential(ctx context.Context, tx p
 	_, err = tx.Exec(ctx, `
 		INSERT INTO auth_password_credentials (
 			password_credential_id, identity_id, password_hash, password_status, hash_algorithm, created_at, updated_at
-		) VALUES ($2, $1, $3, 'active', 'bcrypt', now(), now())
+		) VALUES ($1, $2, $3, 'active', 'bcrypt', now(), now())
 	`, uuid.New(), identityID, hash)
 	return err
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/Medikong/services/packages/go-audit"
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/operational"
+	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
@@ -30,7 +31,19 @@ type Server struct {
 	profiler   *pyroscope.Profiler
 }
 
+// ServerOptions contains trusted runtime ports. The zero value keeps every
+// fail-closed production default.
+type ServerOptions struct {
+	ApprovalPort appoperator.ApprovalPort
+}
+
 func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
+	return NewServerWithOptions(ctx, cfg, ServerOptions{})
+}
+
+// NewServerWithOptions composes the server with explicitly supplied runtime
+// adapters. It never enables an adapter through environment configuration.
+func NewServerWithOptions(ctx context.Context, cfg config.ServerConfig, options ServerOptions) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -59,7 +72,9 @@ func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
 		Metrics:  metrics.Handler(),
 		SetReady: metrics.SetReady,
 	})
-	router, err := authhttp.NewRouter(cfg, resources.DB, healthState, metrics)
+	router, err := authhttp.NewRouterWithOptions(cfg, resources.DB, healthState, metrics, authhttp.RouterOptions{
+		ApprovalPort: options.ApprovalPort,
+	})
 	if err != nil {
 		_ = resources.Close()
 		_ = metrics.Shutdown(context.Background())

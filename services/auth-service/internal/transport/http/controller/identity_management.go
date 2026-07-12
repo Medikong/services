@@ -265,7 +265,7 @@ func (c *IdentityManagementController) CompleteReplacement(w http.ResponseWriter
 
 func (c *IdentityManagementController) writeReplacementCompletion(w http.ResponseWriter, r *http.Request, result appidentity.CompleteLinkOutput) {
 	if result.Issued.WebCookie != "" {
-		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, int(time.Until(result.Issued.ExpiresAt).Seconds()))
+		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, sessionCookieMaxAge(result.Issued.RememberMe, result.Issued.ExpiresAt))
 		httpcontract.WriteJSON(w, r, http.StatusOK, map[string]any{"replacementId": result.LinkID, "status": "active", "credentialDelivery": "web_session", "sessionId": result.Issued.SessionID, "csrfToken": result.Issued.CSRFToken})
 		return
 	}
@@ -297,7 +297,7 @@ func (c *IdentityManagementController) principal(w http.ResponseWriter, r *http.
 }
 func (c *IdentityManagementController) writeReauth(w http.ResponseWriter, r *http.Request, result appidentity.ReauthOutput) {
 	if result.Issued.WebCookie != "" {
-		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, int(time.Until(result.Issued.ExpiresAt).Seconds()))
+		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, sessionCookieMaxAge(result.Issued.RememberMe, result.Issued.ExpiresAt))
 		httpcontract.WriteJSON(w, r, http.StatusOK, map[string]any{"reauthenticationProof": result.Proof, "purpose": result.Purpose, "expiresAt": result.ExpiresAt, "credentialDelivery": "web_session", "sessionId": result.Issued.SessionID, "csrfToken": result.Issued.CSRFToken})
 		return
 	}

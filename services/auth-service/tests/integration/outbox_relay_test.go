@@ -44,7 +44,7 @@ func TestDomainOutboxRelayPublishesOnlyAfterAcknowledgement(t *testing.T) {
 		t.Fatalf("relay event: %v", err)
 	}
 	if result.Claimed != 1 || result.Published != 1 || len(publisher.Events) != 1 || publisher.Events[0].ID != event.ID {
-		t.Fatalf("unexpected relay result=%#v events=%#v", result, publisher.Events)
+		t.Fatal("outbox relay acknowledgement does not match the contract")
 	}
 	var status string
 	if err := db.QueryRow(ctx, `SELECT publish_status FROM auth_outbox_events WHERE event_id=$1`, event.ID).Scan(&status); err != nil {

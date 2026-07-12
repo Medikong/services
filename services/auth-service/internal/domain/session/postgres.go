@@ -65,6 +65,19 @@ func (r *PostgresRepository) FindByWebSecret(ctx context.Context, secretHash []b
 	`, secretHash)
 }
 
+func (r *PostgresRepository) FindByWebSecretForUpdate(ctx context.Context, tx pgx.Tx, secretHash []byte) (Session, Credential, error) {
+	return r.find(ctx, tx, `
+		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
+			s.client_channel, s.remember_me, s.roles, s.access_grant_id, s.grant_version,
+			s.last_authenticated_at, s.absolute_expires_at, s.session_status,
+			c.session_credential_id, c.session_id, c.credential_type, c.credential_status,
+			c.secret_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
+		FROM auth_session_credentials c JOIN auth_sessions s ON s.session_id = c.session_id
+		WHERE c.credential_type = 'web_session_cookie' AND c.secret_hash = $1
+		FOR UPDATE
+	`, secretHash)
+}
+
 func (r *PostgresRepository) FindByRefreshSecretForUpdate(ctx context.Context, tx pgx.Tx, secretHash []byte) (Session, Credential, error) {
 	return r.find(ctx, tx, `
 		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,

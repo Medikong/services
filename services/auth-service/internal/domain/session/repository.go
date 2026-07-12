@@ -11,6 +11,7 @@ import (
 type Repository interface {
 	Create(context.Context, pgx.Tx, CreateParams) error
 	FindByWebSecret(context.Context, []byte) (Session, Credential, error)
+	FindByWebSecretForUpdate(context.Context, pgx.Tx, []byte) (Session, Credential, error)
 	FindByRefreshSecretForUpdate(context.Context, pgx.Tx, []byte) (Session, Credential, error)
 	FindRecoveryWebSecretForUpdate(context.Context, pgx.Tx, []byte) (Session, Credential, error)
 	FindActiveForUpdate(context.Context, pgx.Tx, uuid.UUID) (Session, error)

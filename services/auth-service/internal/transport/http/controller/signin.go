@@ -62,7 +62,7 @@ func (c *SignInController) PhoneVerify(w http.ResponseWriter, r *http.Request) {
 		writeApplicationError(w, r, err)
 		return
 	}
-	c.writeIssued(w, r, issued, false)
+	c.writeIssued(w, r, issued)
 }
 
 func (c *SignInController) preAuth(w http.ResponseWriter, r *http.Request) (httpcontract.PreAuthCredential, string, bool) {
@@ -122,16 +122,12 @@ func (c *SignInController) Email(w http.ResponseWriter, r *http.Request) {
 		writeApplicationError(w, r, err)
 		return
 	}
-	c.writeIssued(w, r, issued, request.RememberMe)
+	c.writeIssued(w, r, issued)
 }
 
-func (c *SignInController) writeIssued(w http.ResponseWriter, r *http.Request, issued signin.Completed, remember bool) {
+func (c *SignInController) writeIssued(w http.ResponseWriter, r *http.Request, issued signin.Completed) {
 	if issued.WebCookie != "" {
-		maxAge := 0
-		if remember {
-			maxAge = int(time.Until(issued.ExpiresAt).Seconds())
-		}
-		c.contract.IssueSessionCookie(w, issued.WebCookie, maxAge)
+		c.contract.IssueSessionCookie(w, issued.WebCookie, sessionCookieMaxAge(issued.RememberMe, issued.ExpiresAt))
 		c.contract.ClearAuthFlowCookie(w)
 		httpcontract.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"userId":             issued.UserID,
@@ -152,4 +148,11 @@ func (c *SignInController) writeIssued(w http.ResponseWriter, r *http.Request, i
 		},
 		"next": map[string]any{"path": issued.NextPath, "intentId": issued.IntentID},
 	})
+}
+
+func sessionCookieMaxAge(rememberMe bool, expiresAt time.Time) int {
+	if !rememberMe {
+		return 0
+	}
+	return int(time.Until(expiresAt).Seconds())
 }
