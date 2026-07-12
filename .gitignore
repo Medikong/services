@@ -33,3 +33,4 @@ id_rsa*
 !services/auth-service/app/token_response.py
 *.log
 .DS_Store
+.omo
