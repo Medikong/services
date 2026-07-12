@@ -46,6 +46,7 @@ tests/
       04-customer-drop-purchase-happy-path.postman_collection.json
       05-payment-failure-flow.postman_collection.json
       06-sold-out-concurrency-flow.postman_collection.json
+      09-purchase-kafka-trace-smoke.postman_collection.json
     newman/
       docker.postman_environment.json
 ```
@@ -113,6 +114,21 @@ task tests:purchase-e2e SCENARIO=04-customer-drop-purchase-happy-path
 task tests:purchase-e2e SCENARIO=05-payment-failure-flow
 task tests:purchase-e2e SCENARIO=06-sold-out-concurrency-flow
 ```
+
+정상 구매의 Kafka producer/consumer span graph까지 확인할 때는 다음 명령을 사용한다.
+
+```bash
+task tests:purchase-e2e-with-kafka-traces
+```
+
+이 명령은 고유 request ID를 사용하는 `04-customer-drop-purchase-happy-path`와 `09-purchase-kafka-trace-smoke`를 실행한다. 최종 post-security/post-distinct 재실행의 Newman CLI 결과는 `04`가 6 requests / 12 assertions / failures 0, `09`가 5 requests / 14 assertions / failures 0이다. `09`의 bounded polling은 Tempo indexing 상태에 따라 검색 request와 그 request에서 실행되는 assertion을 반복하므로 정확한 requests/assertions 합계는 실행마다 달라질 수 있다. 통과 불변 조건은 failures 0, 서로 다른 order/payment root trace ID, 두 root에 걸친 아래 6개 필수 service/span pair다.
+
+| Trace root | 필수 service/span pair |
+| --- | --- |
+| order root | `order-service` `kafka.produce order.created`, `payment-service` `kafka.consume order.created` |
+| payment root | `payment-service` `kafka.produce payment.approved`, `order-service` `kafka.consume payment.approved`, `order-service` `kafka.produce notification.requested`, `notification-service` `kafka.consume notification.requested` |
+
+최종 재실행에서는 두 trace ID가 서로 달랐고 6개 pair가 모두 통과했다. Cleanup도 exit 0, 잔존 container 0, volume 0으로 끝났다. 전체 구매 여정은 단일 trace로 판정하지 않는다. Log correlation과 Kafka lag 검증은 향후 범위다.
 
 Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, `payment-service`, `notification-service`를 직접 호출한다. 기본 URL은 다음과 같다.
 

@@ -1,0 +1,446 @@
+{
+  "info": {
+    "_postman_id": "28a7a2c5-8cc4-48b5-a31c-09e44dbf4bc3",
+    "name": "09 Purchase Kafka Trace Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "orderCreateRequestId",
+      "value": "e2e-happy-order-create"
+    },
+    {
+      "key": "paymentApproveRequestId",
+      "value": "e2e-happy-payment-approve"
+    }
+  ],
+  "item": [
+    {
+      "name": "Reset trace check state",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.unset('orderTraceId');",
+              "pm.collectionVariables.unset('paymentTraceId');",
+              "pm.collectionVariables.unset('orderTraceSearchRetries');",
+              "pm.collectionVariables.unset('paymentTraceSearchRetries');",
+              "pm.collectionVariables.unset('orderTraceDetailRetries');",
+              "pm.collectionVariables.unset('paymentTraceDetailRetries');",
+              "pm.test('trace check state reset', function () { pm.expect(true).to.eql(true); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?limit=1",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search order root trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const maxRetries = 15;",
+              "pm.test('order trace search status is 200', function () { pm.response.to.have.status(200); });",
+              "let body = null;",
+              "let parseError = null;",
+              "try {",
+              "  body = pm.response.json();",
+              "} catch (error) {",
+              "  parseError = error;",
+              "}",
+              "pm.test('order trace search body is a JSON object', function () {",
+              "  pm.expect(parseError, parseError && parseError.message).to.eql(null);",
+              "  pm.expect(body !== null && typeof body === 'object' && !Array.isArray(body)).to.eql(true);",
+              "});",
+              "if (parseError !== null || body === null || typeof body !== 'object' || Array.isArray(body)) {",
+              "  pm.collectionVariables.unset('orderTraceId');",
+              "  postman.setNextRequest(null);",
+              "} else {",
+              "  const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "  const traceId = traces.map(function (trace) {",
+              "    if (trace === null || typeof trace !== 'object') { return ''; }",
+              "    return trace.traceID || trace.traceId || trace.trace_id || '';",
+              "  }).find(function (id) { return typeof id === 'string' && id.length > 0; });",
+              "  if (!traceId) {",
+              "    pm.collectionVariables.unset('orderTraceId');",
+              "    const retries = Number(pm.collectionVariables.get('orderTraceSearchRetries') || '0');",
+              "    if (retries < maxRetries) {",
+              "      pm.collectionVariables.set('orderTraceSearchRetries', String(retries + 1));",
+              "      postman.setNextRequest('Search order root trace');",
+              "    } else {",
+              "      pm.collectionVariables.unset('orderTraceSearchRetries');",
+              "      pm.test('order root trace exists for configured orderCreateRequestId', function () { pm.expect(traceId || '').to.not.eql(''); });",
+              "    }",
+              "  } else {",
+              "    pm.collectionVariables.set('orderTraceId', traceId);",
+              "    pm.collectionVariables.unset('orderTraceSearchRetries');",
+              "    pm.test('order root trace exists for configured orderCreateRequestId', function () { pm.expect(traceId).to.not.eql(''); });",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=order-service request_id={{orderCreateRequestId}}&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=order-service request_id={{orderCreateRequestId}}"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fetch order root trace detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const maxRetries = 15;",
+              "const requiredPairs = [",
+              "  { service: 'order-service', span: 'kafka.produce order.created' },",
+              "  { service: 'payment-service', span: 'kafka.consume order.created' }",
+              "];",
+              "function decodeAttributeValue(value) {",
+              "  if (value === null || value === undefined) { return null; }",
+              "  if (typeof value !== 'object') { return String(value); }",
+              "  const fields = ['stringValue', 'intValue', 'doubleValue', 'boolValue'];",
+              "  for (const field of fields) {",
+              "    if (value[field] !== null && value[field] !== undefined) { return String(value[field]); }",
+              "  }",
+              "  return null;",
+              "}",
+              "function attributeValue(attributes, key) {",
+              "  if (!Array.isArray(attributes)) { return null; }",
+              "  for (const attribute of attributes) {",
+              "    if (attribute === null || typeof attribute !== 'object' || attribute.key !== key) { continue; }",
+              "    return decodeAttributeValue(attribute.value);",
+              "  }",
+              "  return null;",
+              "}",
+              "function resourceSpanItems(detail) {",
+              "  const roots = [detail, detail.trace, detail.data].filter(function (item) { return item !== null && typeof item === 'object'; });",
+              "  for (const root of roots) {",
+              "    if (Array.isArray(root.resourceSpans)) { return root.resourceSpans.filter(function (item) { return item !== null && typeof item === 'object'; }); }",
+              "    if (Array.isArray(root.batches)) { return root.batches.filter(function (item) { return item !== null && typeof item === 'object'; }); }",
+              "  }",
+              "  return [];",
+              "}",
+              "function spanItems(resourceSpan) {",
+              "  const scopes = [];",
+              "  if (Array.isArray(resourceSpan.scopeSpans)) { scopes.push.apply(scopes, resourceSpan.scopeSpans); }",
+              "  if (Array.isArray(resourceSpan.instrumentationLibrarySpans)) { scopes.push.apply(scopes, resourceSpan.instrumentationLibrarySpans); }",
+              "  const spans = [];",
+              "  for (const scope of scopes) {",
+              "    if (scope !== null && typeof scope === 'object' && Array.isArray(scope.spans)) {",
+              "      spans.push.apply(spans, scope.spans.filter(function (span) { return span !== null && typeof span === 'object'; }));",
+              "    }",
+              "  }",
+              "  return spans;",
+              "}",
+              "function observedPairs(detail) {",
+              "  const observed = [];",
+              "  for (const resourceSpan of resourceSpanItems(detail)) {",
+              "    const resource = resourceSpan.resource && typeof resourceSpan.resource === 'object' ? resourceSpan.resource : {};",
+              "    const resourceService = attributeValue(resource.attributes, 'service.name');",
+              "    for (const span of spanItems(resourceSpan)) {",
+              "      const spanService = attributeValue(span.attributes, 'service.name') || resourceService;",
+              "      if (spanService && typeof span.name === 'string') { observed.push({ service: spanService, span: span.name }); }",
+              "    }",
+              "  }",
+              "  return observed;",
+              "}",
+              "pm.test('order trace detail status is 200', function () { pm.response.to.have.status(200); });",
+              "let body = null;",
+              "let parseError = null;",
+              "try {",
+              "  body = pm.response.json();",
+              "} catch (error) {",
+              "  parseError = error;",
+              "}",
+              "pm.test('order trace detail body is a JSON object', function () {",
+              "  pm.expect(parseError, parseError && parseError.message).to.eql(null);",
+              "  pm.expect(body !== null && typeof body === 'object' && !Array.isArray(body)).to.eql(true);",
+              "});",
+              "if (parseError !== null || body === null || typeof body !== 'object' || Array.isArray(body)) {",
+              "  postman.setNextRequest(null);",
+              "} else {",
+              "  const observed = observedPairs(body);",
+              "  const missing = requiredPairs.filter(function (required) {",
+              "    return !observed.some(function (actual) { return actual.service === required.service && actual.span === required.span; });",
+              "  });",
+              "  if (missing.length > 0) {",
+              "    const retries = Number(pm.collectionVariables.get('orderTraceDetailRetries') || '0');",
+              "    if (retries < maxRetries) {",
+              "      pm.collectionVariables.set('orderTraceDetailRetries', String(retries + 1));",
+              "      postman.setNextRequest('Fetch order root trace detail');",
+              "    } else {",
+              "      pm.collectionVariables.unset('orderTraceDetailRetries');",
+              "      pm.test('order root Kafka trace pairs exist', function () { pm.expect(missing, JSON.stringify(missing)).to.eql([]); });",
+              "    }",
+              "  } else {",
+              "    pm.collectionVariables.unset('orderTraceDetailRetries');",
+              "    pm.test('order root Kafka trace pairs exist', function () { pm.expect(missing).to.eql([]); });",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/traces/{{orderTraceId}}",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "traces",
+            "{{orderTraceId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search payment root trace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const maxRetries = 15;",
+              "pm.test('payment trace search status is 200', function () { pm.response.to.have.status(200); });",
+              "let body = null;",
+              "let parseError = null;",
+              "try {",
+              "  body = pm.response.json();",
+              "} catch (error) {",
+              "  parseError = error;",
+              "}",
+              "pm.test('payment trace search body is a JSON object', function () {",
+              "  pm.expect(parseError, parseError && parseError.message).to.eql(null);",
+              "  pm.expect(body !== null && typeof body === 'object' && !Array.isArray(body)).to.eql(true);",
+              "});",
+              "if (parseError !== null || body === null || typeof body !== 'object' || Array.isArray(body)) {",
+              "  pm.collectionVariables.unset('paymentTraceId');",
+              "  postman.setNextRequest(null);",
+              "} else {",
+              "  const traces = Array.isArray(body.traces) ? body.traces : [];",
+              "  const traceId = traces.map(function (trace) {",
+              "    if (trace === null || typeof trace !== 'object') { return ''; }",
+              "    return trace.traceID || trace.traceId || trace.trace_id || '';",
+              "  }).find(function (id) { return typeof id === 'string' && id.length > 0; });",
+              "  if (!traceId) {",
+              "    pm.collectionVariables.unset('paymentTraceId');",
+              "    const retries = Number(pm.collectionVariables.get('paymentTraceSearchRetries') || '0');",
+              "    if (retries < maxRetries) {",
+              "      pm.collectionVariables.set('paymentTraceSearchRetries', String(retries + 1));",
+              "      postman.setNextRequest('Search payment root trace');",
+              "    } else {",
+              "      pm.collectionVariables.unset('paymentTraceSearchRetries');",
+              "      pm.test('payment root trace exists for configured paymentApproveRequestId', function () { pm.expect(traceId || '').to.not.eql(''); });",
+              "    }",
+              "  } else {",
+              "    pm.collectionVariables.set('paymentTraceId', traceId);",
+              "    pm.collectionVariables.unset('paymentTraceSearchRetries');",
+              "    pm.test('payment root trace exists for configured paymentApproveRequestId', function () { pm.expect(traceId).to.not.eql(''); });",
+              "    const orderTraceId = pm.collectionVariables.get('orderTraceId');",
+              "    pm.test('order and payment traces are distinct', function () {",
+              "      pm.expect(orderTraceId).to.be.a('string').and.not.empty;",
+              "      pm.expect(traceId).to.not.eql(orderTraceId);",
+              "    });",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/search?tags=service.name=payment-service request_id={{paymentApproveRequestId}}&limit=20",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "service.name=payment-service request_id={{paymentApproveRequestId}}"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fetch payment root trace detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const maxRetries = 15;",
+              "const requiredPairs = [",
+              "  { service: 'payment-service', span: 'kafka.produce payment.approved' },",
+              "  { service: 'order-service', span: 'kafka.consume payment.approved' },",
+              "  { service: 'order-service', span: 'kafka.produce notification.requested' },",
+              "  { service: 'notification-service', span: 'kafka.consume notification.requested' }",
+              "];",
+              "function decodeAttributeValue(value) {",
+              "  if (value === null || value === undefined) { return null; }",
+              "  if (typeof value !== 'object') { return String(value); }",
+              "  const fields = ['stringValue', 'intValue', 'doubleValue', 'boolValue'];",
+              "  for (const field of fields) {",
+              "    if (value[field] !== null && value[field] !== undefined) { return String(value[field]); }",
+              "  }",
+              "  return null;",
+              "}",
+              "function attributeValue(attributes, key) {",
+              "  if (!Array.isArray(attributes)) { return null; }",
+              "  for (const attribute of attributes) {",
+              "    if (attribute === null || typeof attribute !== 'object' || attribute.key !== key) { continue; }",
+              "    return decodeAttributeValue(attribute.value);",
+              "  }",
+              "  return null;",
+              "}",
+              "function resourceSpanItems(detail) {",
+              "  const roots = [detail, detail.trace, detail.data].filter(function (item) { return item !== null && typeof item === 'object'; });",
+              "  for (const root of roots) {",
+              "    if (Array.isArray(root.resourceSpans)) { return root.resourceSpans.filter(function (item) { return item !== null && typeof item === 'object'; }); }",
+              "    if (Array.isArray(root.batches)) { return root.batches.filter(function (item) { return item !== null && typeof item === 'object'; }); }",
+              "  }",
+              "  return [];",
+              "}",
+              "function spanItems(resourceSpan) {",
+              "  const scopes = [];",
+              "  if (Array.isArray(resourceSpan.scopeSpans)) { scopes.push.apply(scopes, resourceSpan.scopeSpans); }",
+              "  if (Array.isArray(resourceSpan.instrumentationLibrarySpans)) { scopes.push.apply(scopes, resourceSpan.instrumentationLibrarySpans); }",
+              "  const spans = [];",
+              "  for (const scope of scopes) {",
+              "    if (scope !== null && typeof scope === 'object' && Array.isArray(scope.spans)) {",
+              "      spans.push.apply(spans, scope.spans.filter(function (span) { return span !== null && typeof span === 'object'; }));",
+              "    }",
+              "  }",
+              "  return spans;",
+              "}",
+              "function observedPairs(detail) {",
+              "  const observed = [];",
+              "  for (const resourceSpan of resourceSpanItems(detail)) {",
+              "    const resource = resourceSpan.resource && typeof resourceSpan.resource === 'object' ? resourceSpan.resource : {};",
+              "    const resourceService = attributeValue(resource.attributes, 'service.name');",
+              "    for (const span of spanItems(resourceSpan)) {",
+              "      const spanService = attributeValue(span.attributes, 'service.name') || resourceService;",
+              "      if (spanService && typeof span.name === 'string') { observed.push({ service: spanService, span: span.name }); }",
+              "    }",
+              "  }",
+              "  return observed;",
+              "}",
+              "pm.test('payment trace detail status is 200', function () { pm.response.to.have.status(200); });",
+              "let body = null;",
+              "let parseError = null;",
+              "try {",
+              "  body = pm.response.json();",
+              "} catch (error) {",
+              "  parseError = error;",
+              "}",
+              "pm.test('payment trace detail body is a JSON object', function () {",
+              "  pm.expect(parseError, parseError && parseError.message).to.eql(null);",
+              "  pm.expect(body !== null && typeof body === 'object' && !Array.isArray(body)).to.eql(true);",
+              "});",
+              "if (parseError !== null || body === null || typeof body !== 'object' || Array.isArray(body)) {",
+              "  postman.setNextRequest(null);",
+              "} else {",
+              "  const observed = observedPairs(body);",
+              "  const missing = requiredPairs.filter(function (required) {",
+              "    return !observed.some(function (actual) { return actual.service === required.service && actual.span === required.span; });",
+              "  });",
+              "  if (missing.length > 0) {",
+              "    const retries = Number(pm.collectionVariables.get('paymentTraceDetailRetries') || '0');",
+              "    if (retries < maxRetries) {",
+              "      pm.collectionVariables.set('paymentTraceDetailRetries', String(retries + 1));",
+              "      postman.setNextRequest('Fetch payment root trace detail');",
+              "    } else {",
+              "      pm.collectionVariables.unset('paymentTraceDetailRetries');",
+              "      pm.test('payment root Kafka trace pairs exist', function () { pm.expect(missing, JSON.stringify(missing)).to.eql([]); });",
+              "    }",
+              "  } else {",
+              "    pm.collectionVariables.unset('paymentTraceDetailRetries');",
+              "    pm.test('payment root Kafka trace pairs exist', function () { pm.expect(missing).to.eql([]); });",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{tempoUrl}}/api/traces/{{paymentTraceId}}",
+          "host": [
+            "{{tempoUrl}}"
+          ],
+          "path": [
+            "api",
+            "traces",
+            "{{paymentTraceId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

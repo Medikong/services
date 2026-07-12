@@ -4,6 +4,16 @@
     "name": "04 Customer Drop Purchase Happy Path",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "orderCreateRequestId",
+      "value": "e2e-happy-order-create"
+    },
+    {
+      "key": "paymentApproveRequestId",
+      "value": "e2e-happy-payment-approve"
+    }
+  ],
   "item": [
     {
       "name": "List drops",
@@ -111,7 +121,7 @@
           },
           {
             "key": "X-Request-Id",
-            "value": "e2e-happy-order-create"
+            "value": "{{orderCreateRequestId}}"
           },
           {
             "key": "X-User-Id",
@@ -166,7 +176,7 @@
           },
           {
             "key": "X-Request-Id",
-            "value": "e2e-happy-payment-approve"
+            "value": "{{paymentApproveRequestId}}"
           },
           {
             "key": "X-User-Id",

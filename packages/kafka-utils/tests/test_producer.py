@@ -146,6 +146,39 @@ def test_start_consumer_span_extracts_trace_headers(monkeypatch) -> None:
     assert started[0]["context"] == "parent-context"
 
 
+def test_start_consumer_span_without_trace_headers_starts_root_span(monkeypatch) -> None:
+    parent_is_valid: list[bool] = []
+
+    class FakeTracer:
+        def start_as_current_span(self, name: str, **kwargs: object):
+            parent_is_valid.append(
+                producer_module.trace.get_current_span(kwargs.get("context")).get_span_context().is_valid
+            )
+
+            @contextmanager
+            def span_context():
+                yield object()
+
+            return span_context()
+
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer())
+    active_span = producer_module.trace.NonRecordingSpan(
+        producer_module.trace.SpanContext(
+            trace_id=0x4F3B2C1A9D8E7F60123456789ABCDEF0,
+            span_id=0x6F1A2B3C4D5E6F70,
+            is_remote=False,
+            trace_flags=producer_module.trace.TraceFlags(1),
+        )
+    )
+    message = FakeMessage(topic="payment-approved", headers=None)
+
+    with producer_module.trace.use_span(active_span, end_on_exit=False):
+        with start_consumer_span(message):
+            pass
+
+    assert parent_is_valid == [False]
+
+
 def test_start_producer_span_uses_stored_trace_carrier_as_parent(monkeypatch) -> None:
     extracted: list[dict[str, str]] = []
     started: list[dict[str, object]] = []
@@ -349,7 +382,7 @@ class FakeTracer:
 
 
 class FakeMessage:
-    def __init__(self, *, topic: str, headers: list[tuple[str, bytes]]) -> None:
+    def __init__(self, *, topic: str, headers: list[tuple[str, bytes]] | None) -> None:
         self.topic = topic
         self.headers = headers
         self.partition = 0

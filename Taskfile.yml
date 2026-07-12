@@ -144,6 +144,13 @@ tasks:
         vars:
           E2E_REPORT_NAME: '{{default "purchase-traces" .E2E_REPORT_NAME}}'
 
+  purchase-e2e-with-kafka-traces:
+    desc: Run happy purchase E2E and assert Kafka span graph traces in Tempo.
+    cmds:
+      - task: tests:purchase-e2e-with-kafka-traces
+        vars:
+          E2E_REPORT_NAME: '{{default "purchase-kafka-traces" .E2E_REPORT_NAME}}'
+
   benchmark-concert-public-api:
     cmds:
       - task: tests:benchmark-concert-public-api

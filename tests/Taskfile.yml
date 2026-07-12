@@ -31,6 +31,7 @@ vars:
   PURCHASE_E2E_METRICS_COLLECTION: '{{default "07-purchase-flow-metrics" .PURCHASE_E2E_METRICS_COLLECTION}}'
   PURCHASE_E2E_TRACE_SCENARIO: '{{default "04-customer-drop-purchase-happy-path" .PURCHASE_E2E_TRACE_SCENARIO}}'
   PURCHASE_E2E_TRACE_COLLECTION: '{{default "08-purchase-flow-trace-smoke" .PURCHASE_E2E_TRACE_COLLECTION}}'
+  PURCHASE_E2E_KAFKA_TRACE_COLLECTION: '{{default "09-purchase-kafka-trace-smoke" .PURCHASE_E2E_KAFKA_TRACE_COLLECTION}}'
   PURCHASE_E2E_TEMPO_URL: '{{default "http://tempo:3200" .PURCHASE_E2E_TEMPO_URL}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
@@ -632,6 +633,137 @@ tasks:
           ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${compose_services}
         run_collection "${trace_scenario}"
         run_collection "${trace_collection}"
+
+  purchase-e2e-with-kafka-traces:
+    desc: Run happy purchase E2E and assert Kafka span graph traces in Tempo.
+    env:
+      PURCHASE_KAFKA_TRACES_ROOT_DIR: '{{.ROOT_DIR}}'
+      PURCHASE_KAFKA_TRACES_PYTHON_BIN: '{{.PYTHON_BIN}}'
+      PURCHASE_KAFKA_TRACES_DOCKER_COMPOSE: '{{.DOCKER_COMPOSE}}'
+      PURCHASE_KAFKA_TRACES_PROJECT: '{{.E2E_COMPOSE_PROJECT}}'
+      PURCHASE_KAFKA_TRACES_COMPOSE_FILE: '{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+      PURCHASE_KAFKA_TRACES_TRACE_SCENARIO: '{{.PURCHASE_E2E_TRACE_SCENARIO}}'
+      PURCHASE_KAFKA_TRACES_COLLECTION: '{{.PURCHASE_E2E_KAFKA_TRACE_COLLECTION}}'
+      PURCHASE_KAFKA_TRACES_NEWMAN_IMAGE: '{{.NEWMAN_IMAGE}}'
+      PURCHASE_KAFKA_TRACES_CATALOG_SERVICE_URL: '{{.PURCHASE_E2E_CATALOG_SERVICE_URL}}'
+      PURCHASE_KAFKA_TRACES_ORDER_SERVICE_URL: '{{.PURCHASE_E2E_ORDER_SERVICE_URL}}'
+      PURCHASE_KAFKA_TRACES_PAYMENT_SERVICE_URL: '{{.PURCHASE_E2E_PAYMENT_SERVICE_URL}}'
+      PURCHASE_KAFKA_TRACES_NOTIFICATION_SERVICE_URL: '{{.PURCHASE_E2E_NOTIFICATION_SERVICE_URL}}'
+      PURCHASE_KAFKA_TRACES_TEMPO_URL: '{{.PURCHASE_E2E_TEMPO_URL}}'
+      PURCHASE_KAFKA_TRACES_REPORT_NAME: '{{.E2E_REPORT_NAME}}'
+      PURCHASE_KAFKA_TRACES_WAIT_TIMEOUT_SECONDS: '{{.E2E_WAIT_TIMEOUT_SECONDS}}'
+    cmds:
+      - |
+        set -e
+        repo_root="$(cd "${PURCHASE_KAFKA_TRACES_ROOT_DIR}" && pwd -P)"
+        python_bin="${PURCHASE_KAFKA_TRACES_PYTHON_BIN}"
+        project="${PURCHASE_KAFKA_TRACES_PROJECT}"
+        file="${PURCHASE_KAFKA_TRACES_COMPOSE_FILE}"
+        compose_services="postgres kafka kafka-init tempo otel-collector catalog-service order-service payment-service notification-service"
+        trace_scenario="${PURCHASE_KAFKA_TRACES_TRACE_SCENARIO}"
+        kafka_trace_collection="${PURCHASE_KAFKA_TRACES_COLLECTION}"
+        newman_image="${PURCHASE_KAFKA_TRACES_NEWMAN_IMAGE}"
+        catalog_service_url="${PURCHASE_KAFKA_TRACES_CATALOG_SERVICE_URL}"
+        order_service_url="${PURCHASE_KAFKA_TRACES_ORDER_SERVICE_URL}"
+        payment_service_url="${PURCHASE_KAFKA_TRACES_PAYMENT_SERVICE_URL}"
+        notification_service_url="${PURCHASE_KAFKA_TRACES_NOTIFICATION_SERVICE_URL}"
+        tempo_url="${PURCHASE_KAFKA_TRACES_TEMPO_URL}"
+        report_name="${PURCHASE_KAFKA_TRACES_REPORT_NAME}"
+        wait_timeout_seconds="${PURCHASE_KAFKA_TRACES_WAIT_TIMEOUT_SECONDS}"
+        die() {
+          printf '%s\n' "$1" >&2
+          exit 2
+        }
+        validate_name() {
+          label="$1"
+          value="$2"
+          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+            die "${label} must match [A-Za-z0-9._-]+: ${value}"
+          fi
+        }
+        validate_positive_integer() {
+          label="$1"
+          value="$2"
+          if ! printf '%s' "${value}" | grep -Eq '^[1-9][0-9]*$'; then
+            die "${label} must be a positive integer: ${value}"
+          fi
+        }
+        validate_newman_image() {
+          value="$1"
+          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/:@-]*$'; then
+            die "NEWMAN_IMAGE must be a container image reference and cannot begin with -: ${value}"
+          fi
+        }
+        compose() {
+          case "${PURCHASE_KAFKA_TRACES_DOCKER_COMPOSE}" in
+            "docker compose")
+              docker compose "$@"
+              ;;
+            "docker-compose")
+              docker-compose "$@"
+              ;;
+            *)
+              die "DOCKER_COMPOSE must be exactly 'docker compose' or 'docker-compose'"
+              ;;
+          esac
+        }
+        validate_name E2E_COMPOSE_PROJECT "${project}"
+        validate_name PURCHASE_E2E_TRACE_SCENARIO "${trace_scenario}"
+        validate_name PURCHASE_E2E_KAFKA_TRACE_COLLECTION "${kafka_trace_collection}"
+        validate_name E2E_REPORT_NAME "${report_name}"
+        validate_positive_integer E2E_WAIT_TIMEOUT_SECONDS "${wait_timeout_seconds}"
+        validate_newman_image "${newman_image}"
+        run_suffix="$("${python_bin}" -c 'import time, uuid; print(time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:12])')"
+        order_create_request_id="e2e-happy-order-create-${run_suffix}"
+        payment_approve_request_id="e2e-happy-payment-approve-${run_suffix}"
+        mkdir -p "${repo_root}/tests/e2e/newman/reports"
+        cleanup() {
+          status="$?"
+          set +e
+          compose -p "${project}" -f "${file}" down -v --remove-orphans
+          cleanup_status="$?"
+          if [ "${status}" -ne 0 ]; then
+            exit "${status}"
+          fi
+          exit "${cleanup_status}"
+        }
+        trap cleanup EXIT
+        validate_collection() {
+          collection="$1"
+          scenario_file="${repo_root}/tests/e2e/scenarios/${collection}.postman_collection.json"
+          if [ ! -f "${scenario_file}" ]; then
+            printf 'Unknown purchase E2E scenario: %s\n' "${collection}" >&2
+            exit 2
+          fi
+        }
+        run_collection() {
+          collection="$1"
+          docker run --rm --network "${project}_default" \
+            -v "${repo_root}/tests/e2e":/etc/newman \
+            -w /etc/newman \
+            "${newman_image}" run "scenarios/${collection}.postman_collection.json" \
+            -e newman/docker.postman_environment.json \
+            --env-var catalogServiceUrl="${catalog_service_url}" \
+            --env-var orderServiceUrl="${order_service_url}" \
+            --env-var paymentServiceUrl="${payment_service_url}" \
+            --env-var notificationServiceUrl="${notification_service_url}" \
+            --env-var tempoUrl="${tempo_url}" \
+            --env-var orderCreateRequestId="${order_create_request_id}" \
+            --env-var paymentApproveRequestId="${payment_approve_request_id}" \
+            --reporters cli,junit \
+            --delay-request 1000 \
+            --reporter-junit-export "newman/reports/${report_name}-${collection}.xml"
+        }
+        validate_collection "${trace_scenario}"
+        validate_collection "${kafka_trace_collection}"
+        printf 'purchase kafka trace run suffix: %s\n' "${run_suffix}"
+        printf 'orderCreateRequestId=%s\n' "${order_create_request_id}"
+        printf 'paymentApproveRequestId=%s\n' "${payment_approve_request_id}"
+        compose -p "${project}" -f "${file}" down -v --remove-orphans
+        OTEL_TRACES_EXPORTER=otlp OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317 \
+          compose -p "${project}" -f "${file}" up -d --build --wait --wait-timeout "${wait_timeout_seconds}" ${compose_services}
+        run_collection "${trace_scenario}"
+        run_collection "${kafka_trace_collection}"
 
   purchase-e2e-up:
     desc: Start the Python purchase-flow E2E Docker Compose services.
