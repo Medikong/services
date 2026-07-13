@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.db import resources_from_env
 from app.main import create_app
+from app.metrics import NotificationMetrics
 from app.models import UserId
 from app.store import NotificationStore
 from contracts import NotificationRequestedEvent
@@ -76,6 +77,21 @@ def test_metrics_exposes_notification_service_readiness_metric() -> None:
     assert 'service_ready{service_name="notification-service"' in response.text
 
 
+def test_metrics_exposes_notification_business_metrics() -> None:
+    # Given
+    metrics = NotificationMetrics("notification-service", "test", "test")
+    metrics.record_created()
+    client = TestClient(create_app(NotificationStore(), metrics))
+
+    # When
+    response = client.get("/metrics")
+
+    # Then
+    assert response.status_code == 200
+    assert "notification_requested_events_consumed_total" in response.text
+    assert "notifications_created_total" in response.text
+
+
 def test_resources_from_env_defers_kafka_clients_until_lifespan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -84,7 +100,7 @@ def test_resources_from_env_defers_kafka_clients_until_lifespan(
     monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 
     # When
-    resources = resources_from_env()
+    resources = resources_from_env(NotificationMetrics("notification-service", "test", "test"))
 
     # Then
     assert isinstance(resources.repository, NotificationStore)

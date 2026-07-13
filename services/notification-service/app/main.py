@@ -15,6 +15,7 @@ from observability import (
 )
 
 from app.db import AppResources, lifespan_for, resources_from_env
+from app.metrics import NotificationMetrics
 from app.models import (
     HealthResponse,
     NotificationListResponse,
@@ -36,11 +37,19 @@ class ReadNotificationsContext:
     user_id: UserId
 
 
-def create_app(repository: NotificationRepository | None = None) -> FastAPI:
+def create_app(
+    repository: NotificationRepository | None = None,
+    notification_metrics: NotificationMetrics | None = None,
+) -> FastAPI:
+    metrics_instance = notification_metrics or NotificationMetrics(
+        SERVICE_NAME,
+        SERVICE_VERSION,
+        SERVICE_ENVIRONMENT,
+    )
     resources = (
-        AppResources(repository=repository)
+        AppResources(repository=repository, notification_metrics=metrics_instance)
         if repository is not None
-        else resources_from_env()
+        else resources_from_env(metrics_instance)
     )
     app = FastAPI(
         title="DropMong Notification Service API",
@@ -65,13 +74,7 @@ def create_app(repository: NotificationRepository | None = None) -> FastAPI:
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return (
-            "# HELP service_ready Service readiness state. Ready is 1, not ready is 0.\n"
-            "# TYPE service_ready gauge\n"
-            f'service_ready{{service_name="{SERVICE_NAME}",'
-            f'service_version="{SERVICE_VERSION}",'
-            f'service_environment="{SERVICE_ENVIRONMENT}"}} 1\n'
-        )
+        return resources.notification_metrics.render()
 
     @app.get("/notifications", response_model=NotificationListResponse)
     async def list_notifications(

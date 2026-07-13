@@ -7,6 +7,7 @@ import anyio
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
+from app.metrics import NotificationMetrics
 from app.messaging import KafkaRuntime, kafka_runtime_from_bootstrap
 from app.postgres import Base, PostgresNotificationRepository
 from app.repository import NotificationRepository
@@ -18,17 +19,19 @@ type FastAPILifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 @dataclass(slots=True)  # noqa: MUTABLE_OK
 class AppResources:
     repository: NotificationRepository
+    notification_metrics: NotificationMetrics
     engine: AsyncEngine | None = None
     kafka_bootstrap_servers: str = ""
     kafka_runtime: KafkaRuntime | None = None
 
 
-def resources_from_env() -> AppResources:
+def resources_from_env(notification_metrics: NotificationMetrics) -> AppResources:
     database_url = os.getenv("DATABASE_URL", "")
     kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
     if database_url == "":
         return AppResources(
             repository=NotificationStore(),
+            notification_metrics=notification_metrics,
             kafka_bootstrap_servers=kafka_bootstrap_servers,
         )
 
@@ -43,6 +46,7 @@ def resources_from_env() -> AppResources:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     return AppResources(
         repository=PostgresNotificationRepository(session_factory),
+        notification_metrics=notification_metrics,
         engine=engine,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
     )
@@ -59,6 +63,7 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
                 runtime = kafka_runtime_from_bootstrap(
                     resources.repository,
                     resources.kafka_bootstrap_servers,
+                    resources.notification_metrics,
                 )
                 resources.kafka_runtime = runtime
             if runtime is not None and runtime.notification_requested_consumer is not None:

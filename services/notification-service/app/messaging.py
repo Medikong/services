@@ -1,13 +1,15 @@
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, assert_never
 
 from aiokafka import AIOKafkaConsumer
 from contracts import NOTIFICATION_REQUESTED_TOPIC, NotificationRequestedEvent
 from kafka_utils import start_consumer_span
 from pydantic import ValidationError
 
+from app.metrics import NotificationMetrics
 from app.repository import NotificationRepository
+from app.store import NotificationAlreadyRecorded, NotificationRecorded
 
 
 class KafkaMessage(Protocol):
@@ -36,9 +38,11 @@ class NotificationRequestedConsumer:
         self,
         consumer: KafkaConsumerClient,
         repository: NotificationRepository,
+        metrics: NotificationMetrics,
     ) -> None:
         self._consumer = consumer
         self._repository = repository
+        self._metrics = metrics
 
     async def start(self) -> None:
         await self._consumer.start()
@@ -48,15 +52,17 @@ class NotificationRequestedConsumer:
 
     async def run(self) -> None:
         async for message in self._consumer:
-            await handle_notification_requested_message(message, self._repository)
+            await handle_notification_requested_message(message, self._repository, self._metrics)
 
 
 async def handle_notification_requested_message(
     message: KafkaMessage,
     repository: NotificationRepository,
+    metrics: NotificationMetrics,
 ) -> None:
     value = message.value
     if value is None:
+        metrics.record_invalid()
         return
     with start_consumer_span(
         message,
@@ -65,14 +71,23 @@ async def handle_notification_requested_message(
     ):
         try:
             event = NotificationRequestedEvent.model_validate_json(value)
-            await repository.record_notification_requested(event)
+            result = await repository.record_notification_requested(event)
+            match result:
+                case NotificationRecorded():
+                    metrics.record_created()
+                case NotificationAlreadyRecorded():
+                    metrics.record_replayed()
+                case unreachable:
+                    assert_never(unreachable)
         except ValidationError:
+            metrics.record_invalid()
             return
 
 
 def kafka_runtime_from_bootstrap(
     repository: NotificationRepository,
     bootstrap_servers: str,
+    metrics: NotificationMetrics,
 ) -> KafkaRuntime:
     if bootstrap_servers == "":
         return KafkaRuntime(notification_requested_consumer=None)
@@ -85,5 +100,5 @@ def kafka_runtime_from_bootstrap(
         enable_auto_commit=True,
     )
     return KafkaRuntime(
-        notification_requested_consumer=NotificationRequestedConsumer(consumer, repository),
+        notification_requested_consumer=NotificationRequestedConsumer(consumer, repository, metrics),
     )
