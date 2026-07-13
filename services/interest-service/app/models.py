@@ -56,6 +56,49 @@ class InterestListResponse(BaseModel):
     pageInfo: PageInfo
 
 
+class UpcomingRankingItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dropId: str
+    interestCount: int
+
+
+class UpcomingRankingListResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    data: tuple[UpcomingRankingItem, ...]
+    pageInfo: PageInfo
+
+
+class TrendingRankingItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dropId: str
+    rank: int
+    viewerCount: int
+
+
+class TrendingRankingListResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    data: tuple[TrendingRankingItem, ...]
+    pageInfo: PageInfo
+    bucketStart: datetime | None
+
+
+class DropInterestStats(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dropId: str
+    interestCount: int
+
+
+class DropInterestStatsResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    data: DropInterestStats
+
+
 class HealthResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
