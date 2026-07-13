@@ -635,7 +635,7 @@ tasks:
         validate_name E2E_REPORT_NAME "${report_name}"
         validate_positive_integer E2E_WAIT_TIMEOUT_SECONDS "${wait_timeout_seconds}"
         validate_newman_image "${newman_image}"
-        run_suffix="$("${python_bin}" -c 'import time, uuid; print(time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:12])')"
+        run_suffix="$("${python_bin}" -c 'import time, uuid; print(time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:12], end="")')"
         order_create_request_id="e2e-happy-order-create-${run_suffix}"
         payment_approve_request_id="e2e-happy-payment-approve-${run_suffix}"
         mkdir -p "${repo_root}/tests/e2e/newman/reports"
