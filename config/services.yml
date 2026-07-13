@@ -14,12 +14,14 @@ images:
   - catalog-service
   - coupon-service
   - dropmong-web
+  - interest-service
   - notification-service
   - order-service
   - payment-service
 
 tests:
   - catalog-service
+  - interest-service
   - notification-service
   - order-service
   - payment-service

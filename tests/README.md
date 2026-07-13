@@ -11,7 +11,7 @@
 | Go 단위 테스트 | Go test | `packages/go-*`, `services/go-reference-service` |
 | Go 통합 테스트 | Go test + `integration` build tag | reference service와 공용 패키지의 조립 경계 |
 | Go 벤치마크 | Go test + `benchmark` build tag | Go handler, 공용 패키지, 핵심 경로 성능 |
-| Python 단위 테스트 | Docker Python pytest 러너 | `catalog-service`, `order-service`, `payment-service`, `notification-service` |
+| Python 단위 테스트 | Docker Python pytest 러너 | `catalog-service`, `order-service`, `payment-service`, `notification-service`, `interest-service` |
 | Purchase E2E | Docker Compose, PostgreSQL, Kafka, Docker Newman 컨테이너 | catalog/order/payment/notification 구매, 결제 실패, 품절/동시성 검증 |
 | Observability E2E | Docker Compose, OpenTelemetry Collector, Tempo, Grafana, Python smoke 컨테이너 | Go inbound request span이 OTLP -> Collector -> Tempo 경로로 적재되는지 검증 |
 | Gateway E2E | 별도 future/Kubernetes scope | Istio Gateway/JWT/Ingress 라우팅, gateway trace boundary 검증 |
