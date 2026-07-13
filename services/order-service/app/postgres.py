@@ -34,6 +34,7 @@ RESERVED_ORDER_STATUSES: Final = (
     OrderStatus.PENDING_PAYMENT.value,
     OrderStatus.CONFIRMED.value,
 )
+PROCESSED_PAYMENT_FAILED_TYPE: Final = "PAYMENT_FAILED"
 
 
 class Base(DeclarativeBase):
@@ -65,6 +66,19 @@ class OrderRecord(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+
+class ProcessedPaymentEventRecord(Base):
+    __tablename__ = "processed_payment_events"
+
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    order_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payment_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
     )
 
 
@@ -171,11 +185,45 @@ class PostgresOrderRepository:
     ) -> PaymentFailureResult:
         order_id = OrderId(event.orderId)
         async with self._session_factory() as session:
-            record = await session.get(OrderRecord, order_id)
+            result = await session.execute(
+                select(OrderRecord)
+                .where(OrderRecord.id == order_id)
+                .with_for_update(),
+            )
+            record = result.scalar_one_or_none()
             if record is None:
                 return PaymentEventOrderMissing(order_id=order_id)
 
+            processed_event = await session.get(
+                ProcessedPaymentEventRecord,
+                event.eventId,
+            )
             status = OrderStatus(record.status)
+            if processed_event is not None:
+                match status:
+                    case OrderStatus.PAYMENT_FAILED:
+                        return PaymentFailureAlreadyApplied(
+                            order=_order_from_record(record),
+                        )
+                    case (
+                        OrderStatus.PENDING_PAYMENT
+                        | OrderStatus.CONFIRMED
+                        | OrderStatus.CANCELED
+                        | OrderStatus.EXPIRED
+                    ):
+                        return PaymentIgnored(order=_order_from_record(record))
+                    case unreachable:
+                        assert_never(unreachable)
+
+            session.add(
+                ProcessedPaymentEventRecord(
+                    event_id=event.eventId,
+                    event_type=PROCESSED_PAYMENT_FAILED_TYPE,
+                    order_id=event.orderId,
+                    payment_id=event.paymentId,
+                    processed_at=datetime.now(UTC),
+                ),
+            )
             match status:
                 case OrderStatus.PENDING_PAYMENT:
                     record.status = OrderStatus.PAYMENT_FAILED.value
@@ -183,8 +231,10 @@ class PostgresOrderRepository:
                     await session.commit()
                     return PaymentFailureApplied(order=_order_from_record(record))
                 case OrderStatus.PAYMENT_FAILED:
+                    await session.commit()
                     return PaymentFailureAlreadyApplied(order=_order_from_record(record))
                 case OrderStatus.CONFIRMED | OrderStatus.CANCELED | OrderStatus.EXPIRED:
+                    await session.commit()
                     return PaymentIgnored(order=_order_from_record(record))
                 case unreachable:
                     assert_never(unreachable)
