@@ -20,7 +20,7 @@ def test_log_correlation_image_contains_smoke_dependencies() -> None:
     assert "COPY log_assertions.py /app/log_assertions.py" in dockerfile
 
 
-def test_query_loki_deduplicates_identical_records(
+def test_query_loki_rejects_identical_records(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     log = {
@@ -46,9 +46,8 @@ def test_query_loki_deduplicates_identical_records(
     }
     monkeypatch.setattr(smoke, "request_json", lambda *_args, **_kwargs: payload)
 
-    logs, _labels = smoke.query_loki("order-service", '"correlation_id":"order-123"')
-
-    assert logs == [log]
+    with pytest.raises(AssertionError, match="duplicate Loki record"):
+        smoke.query_loki("order-service", '"correlation_id":"order-123"')
 
 
 def test_sensitive_data_check_accepts_allowlisted_kafka_metadata() -> None:

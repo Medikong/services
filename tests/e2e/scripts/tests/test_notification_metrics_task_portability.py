@@ -40,13 +40,18 @@ def test_log_and_notification_contexts_are_unique_and_cleanup_clone_failures() -
 
 
 def test_e2e_host_ports_bind_only_to_loopback() -> None:
-    compose = (SERVICE_ROOT / "tests" / "e2e" / "docker-compose.yml").read_text(
-        encoding="utf-8"
+    compose_paths = (
+        SERVICE_ROOT / "tests" / "e2e" / "docker-compose.yml",
+        SERVICE_ROOT / "tests" / "e2e" / "observability" / "docker-compose.yml",
     )
-    published_ports = [
-        line.strip().removeprefix('- "').removesuffix('"')
-        for line in compose.splitlines()
-        if line.strip().startswith('- "') and line.strip().endswith('"') and ":" in line
-    ]
-    assert published_ports
-    assert all(port.startswith("127.0.0.1:") for port in published_ports)
+    for compose_path in compose_paths:
+        compose = compose_path.read_text(encoding="utf-8")
+        published_ports = [
+            line.strip().removeprefix('- "').removesuffix('"')
+            for line in compose.splitlines()
+            if line.strip().startswith('- "')
+            and line.strip().endswith('"')
+            and ":" in line
+        ]
+        assert published_ports
+        assert all(port.startswith("127.0.0.1:") for port in published_ports)

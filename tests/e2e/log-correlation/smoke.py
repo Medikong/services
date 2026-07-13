@@ -236,8 +236,7 @@ def query_loki(
                 continue
             if isinstance(decoded, dict):
                 fingerprint = json.dumps(decoded, sort_keys=True, separators=(",", ":"))
-                if fingerprint in seen_logs:
-                    continue
+                assert fingerprint not in seen_logs, "duplicate Loki record returned"
                 seen_logs.add(fingerprint)
                 logs.append(decoded)
     return logs, label_sets
