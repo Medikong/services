@@ -49,6 +49,11 @@ json_field() {
 }
 
 repo_root="$(cd "${PAYMENT_FAILURE_IDEMPOTENCY_ROOT_DIR}" && pwd -P)"
+scripts_source="${repo_root}/tests/e2e/scripts"
+if command -v cygpath >/dev/null 2>&1; then
+  scripts_source="$(cygpath -w "${scripts_source}")"
+fi
+scripts_mount="type=bind,source=${scripts_source},target=/scripts,readonly"
 project="${PAYMENT_FAILURE_IDEMPOTENCY_PROJECT}"
 file="${PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_FILE}"
 smoke_image="${PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE:-}"
@@ -90,7 +95,7 @@ if [ -n "${smoke_image}" ]; then
     -e PAYMENT_SERVICE_URL=http://payment-service:8083 \
     -e PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID="${run_id}" \
     -e PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS="${scenario_timeout_seconds}" \
-    -v "${repo_root}/tests/e2e/scripts:/scripts:ro" \
+    --mount "${scripts_mount}" \
     -w /scripts \
     "${smoke_image}" python payment-failure-idempotency-smoke.py)"
   smoke_status="$?"
@@ -104,7 +109,7 @@ else
     -e PAYMENT_SERVICE_URL=http://payment-service:8083 \
     -e PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID="${run_id}" \
     -e PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS="${scenario_timeout_seconds}" \
-    -v "${repo_root}/tests/e2e/scripts:/scripts:ro" \
+    --mount "${scripts_mount}" \
     --workdir /scripts \
     payment-service payment-failure-idempotency-smoke.py)"
   smoke_status="$?"
