@@ -1,0 +1,43 @@
+{
+  "info": {
+    "_postman_id": "cf3a7284-8072-4fc8-84cc-44a1b456fc99",
+    "name": "10 Notification Metrics Happy",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Assert happy notification metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function metricValue(metricName) {",
+              "  const pattern = new RegExp('^' + metricName + '(?:\\\\{[^\\\\n]*\\\\})?\\\\s+([0-9]+)$', 'm');",
+              "  const match = pm.response.text().match(pattern);",
+              "  pm.expect(match, metricName + ' sample exists').to.not.equal(null);",
+              "  return Number(match[1]);",
+              "}",
+              "",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('one requested event was consumed', function () { pm.expect(metricValue('notification_requested_events_consumed_total')).to.eql(1); });",
+              "pm.test('one notification was created', function () { pm.expect(metricValue('notifications_created_total')).to.eql(1); });",
+              "pm.test('no notification event was replayed', function () { pm.expect(metricValue('notification_requested_events_replayed_total')).to.eql(0); });",
+              "pm.test('no notification event was invalid', function () { pm.expect(metricValue('notification_requested_events_invalid_total')).to.eql(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Request-Id", "value": "e2e-notification-metrics-happy" }],
+        "url": {
+          "raw": "{{notificationServiceUrl}}/metrics",
+          "host": ["{{notificationServiceUrl}}"],
+          "path": ["metrics"]
+        }
+      }
+    }
+  ]
+}

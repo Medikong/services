@@ -1,0 +1,73 @@
+{
+  "info": {
+    "_postman_id": "fb90aa15-df63-45a7-bdbc-d2f7554dc2a5",
+    "name": "11 Notification Metrics Replay",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Assert replay notification metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function metricValue(metricName) {",
+              "  const pattern = new RegExp('^' + metricName + '(?:\\\\{[^\\\\n]*\\\\})?\\\\s+([0-9]+)$', 'm');",
+              "  const match = pm.response.text().match(pattern);",
+              "  pm.expect(match, metricName + ' sample exists').to.not.equal(null);",
+              "  return Number(match[1]);",
+              "}",
+              "",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('three requested events were consumed', function () { pm.expect(metricValue('notification_requested_events_consumed_total')).to.eql(3); });",
+              "pm.test('two notifications were created', function () { pm.expect(metricValue('notifications_created_total')).to.eql(2); });",
+              "pm.test('one duplicate event was replayed', function () { pm.expect(metricValue('notification_requested_events_replayed_total')).to.eql(1); });",
+              "pm.test('no notification event was invalid', function () { pm.expect(metricValue('notification_requested_events_invalid_total')).to.eql(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Request-Id", "value": "e2e-notification-metrics-replay" }],
+        "url": {
+          "raw": "{{notificationServiceUrl}}/metrics",
+          "host": ["{{notificationServiceUrl}}"],
+          "path": ["metrics"]
+        }
+      }
+    },
+    {
+      "name": "Assert replay creates one notification",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const matches = pm.response.json().data.filter(function (notification) { return notification.id === 'notification-metric-replay-001'; });",
+              "pm.test('duplicate event creates one notification', function () { pm.expect(matches.length).to.eql(1); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Request-Id", "value": "e2e-notification-replay-list" },
+          { "key": "X-User-Id", "value": "user-metric-replay" },
+          { "key": "X-User-Role", "value": "CUSTOMER" }
+        ],
+        "url": {
+          "raw": "{{notificationServiceUrl}}/notifications?limit=20",
+          "host": ["{{notificationServiceUrl}}"],
+          "path": ["notifications"],
+          "query": [{ "key": "limit", "value": "20" }]
+        }
+      }
+    }
+  ]
+}

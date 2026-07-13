@@ -249,6 +249,11 @@ tasks:
         vars:
           E2E_REPORT_NAME: '{{default "purchase-kafka-traces" .E2E_REPORT_NAME}}'
 
+  purchase-e2e-with-notification-metrics:
+    desc: Assert notification business metrics and Kafka consumer lag recovery.
+    cmds:
+      - task: tests:purchase-e2e-with-notification-metrics
+
   purchase-e2e-concurrency:
     desc: Run the purchase concurrency smoke and verify active database reservations.
     cmds:

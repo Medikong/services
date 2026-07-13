@@ -235,6 +235,21 @@ services:
       timeout: 5s
       retries: 20
 
+  purchase-newman:
+    build:
+      context: .
+      dockerfile: newman/Dockerfile
+    profiles: ["smoke"]
+
+  notification-replay-producer:
+    image: apache/kafka:3.8.1
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        event='{"eventId":"evt-notification-metric-replay-001","eventType":"notification.requested","userId":"user-metric-replay","sourceId":"order-metric-replay-001","occurredAt":"2026-07-13T00:00:00Z","producer":"order-service","notificationId":"notification-metric-replay-001","orderId":"order-metric-replay-001","channel":"IN_APP","title":"주문이 확정되었습니다","message":"DropMong 주문이 정상 처리되었습니다."}'
+        printf '%s\n%s\n' "$${event}" "$${event}" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka:29092 --topic notification.requested
+    profiles: ["smoke"]
+
   log-correlation-smoke:
     build:
       context: ./log-correlation
