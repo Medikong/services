@@ -8,6 +8,12 @@ discovery.relabel "purchase_logs" {
 
   rule {
     action        = "keep"
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = sys.env("LOG_CORRELATION_COMPOSE_PROJECT")
+  }
+
+  rule {
+    action        = "keep"
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
     regex         = "(catalog-service|order-service|payment-service|notification-service)"
   }

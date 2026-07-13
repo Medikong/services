@@ -104,6 +104,7 @@ services:
       CONTAINERS: "1"
       EVENTS: "1"
       INFO: "1"
+      NETWORKS: "1"
       PING: "1"
       POST: "0"
       VERSION: "1"
@@ -119,6 +120,8 @@ services:
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/tmp/alloy
       - /etc/alloy/config.alloy
+    environment:
+      LOG_CORRELATION_COMPOSE_PROJECT: "${LOG_CORRELATION_COMPOSE_PROJECT:-dropmong-log-correlation}"
     volumes:
       - ./observability/alloy.alloy:/etc/alloy/config.alloy:ro
     depends_on:
