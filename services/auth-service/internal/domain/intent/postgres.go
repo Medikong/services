@@ -24,7 +24,7 @@ func (r *PostgresRepository) Create(ctx context.Context, tx pgx.Tx, params Creat
 		INSERT INTO auth_authentication_intents (
 			intent_id, client_channel, return_path, intent_type, action_context,
 			owner_proof_hash, csrf_secret_hash, csrf_key_version, action_payload_id, expires_at, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $2 = 'web' THEN 1 ELSE NULL END, $8, $9, now(), now())
+		) VALUES ($1, $2::varchar, $3, $4, $5, $6, $7, CASE WHEN $2::varchar = 'web' THEN 1 ELSE NULL END, $8, $9, now(), now())
 	`, params.ID, params.Channel, params.ReturnPath, params.Type, params.ActionContext, params.OwnerProofHash, params.CSRFHash, params.ActionPayloadID, params.ExpiresAt)
 	return err
 }

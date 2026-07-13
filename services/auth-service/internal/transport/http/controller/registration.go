@@ -3,7 +3,6 @@ package controller
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	appregistration "github.com/Medikong/services/services/auth-service/internal/application/registration"
 	httpcontract "github.com/Medikong/services/services/auth-service/internal/transport/httpcontract"
@@ -154,7 +153,7 @@ func (c *RegistrationController) Complete(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if result.Issued.WebCookie != "" {
-		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, rememberMaxAge(result.Issued.ExpiresAt))
+		c.contract.IssueSessionCookie(w, result.Issued.WebCookie, sessionCookieMaxAge(result.Issued.RememberMe, result.Issued.ExpiresAt))
 		c.contract.ClearAuthFlowCookie(w)
 		httpcontract.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"registrationId": result.RegistrationID, "status": result.Status, "credentialDelivery": "web_session",
@@ -210,5 +209,3 @@ func (c *RegistrationController) preAuth(w http.ResponseWriter, r *http.Request)
 	}
 	return credential, csrf, true
 }
-
-func rememberMaxAge(expiresAt time.Time) int { return int(time.Until(expiresAt).Seconds()) }

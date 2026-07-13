@@ -24,7 +24,7 @@ func TestSignInCompletedResponseUsesChannelSpecificOpenAPIShape(t *testing.T) {
 		issued.WebCookie = "web-cookie"
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/signins/email", nil)
-		controller.writeIssued(response, request, issued, false)
+		controller.writeIssued(response, request, issued)
 		data := responseData(t, response)
 		assertKeys(t, data, "credentialDelivery", "csrfToken", "next", "sessionId", "userId")
 		var next map[string]any
@@ -39,7 +39,7 @@ func TestSignInCompletedResponseUsesChannelSpecificOpenAPIShape(t *testing.T) {
 	t.Run("mobile", func(t *testing.T) {
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/signins/email", nil)
-		controller.writeIssued(response, request, common, false)
+		controller.writeIssued(response, request, common)
 		data := responseData(t, response)
 		assertKeys(t, data, "credentialDelivery", "next", "session", "tokens", "userId")
 		var tokens map[string]any
@@ -53,7 +53,7 @@ func TestSignInCompletedResponseUsesChannelSpecificOpenAPIShape(t *testing.T) {
 func responseData(t *testing.T, response *httptest.ResponseRecorder) map[string]json.RawMessage {
 	t.Helper()
 	if response.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		t.Fatalf("status=%d, want %d", response.Code, http.StatusOK)
 	}
 	var envelope struct {
 		Data map[string]json.RawMessage `json:"data"`

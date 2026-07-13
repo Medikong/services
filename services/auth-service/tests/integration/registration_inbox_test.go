@@ -52,9 +52,23 @@ func TestUserLinkInboxCreatesLinksExactlyOnce(t *testing.T) {
 	if err := registration.MarkMethodVerified(registrationdomain.MethodPhone); err != nil {
 		t.Fatalf("mark phone verified: %v", err)
 	}
+	completionID := uuid.New()
+	completionRecord := idempotency.NewRecord(
+		"complete_registration",
+		hash32(83),
+		hash32(84),
+		hash32(85),
+		&registrationID,
+		nil,
+		now.Add(10*time.Minute),
+	)
+	completionRecord.ID = completionID
+	if err := idempotency.NewPostgresRepository(db).CreateCompleted(ctx, tx, completionRecord, "Registration", "awaiting_user_link"); err != nil {
+		t.Fatalf("seed completion idempotency record: %v", err)
+	}
 	if err := registration.MarkVerificationCompleted(registrationdomain.VerificationCompletion{
 		EmailChallengeID: emailChallengeID, PhoneChallengeID: phoneChallengeID, EmailVerified: true, PhoneVerified: true,
-		BindingID: uuid.New(), RegistrationVersion: 1, SnapshotHash: hash32(82), VerificationCompletedEvent: uuid.New(), CompletionIdempotencyID: uuid.New(), LinkAcceptUntil: now.Add(10 * time.Minute),
+		BindingID: uuid.New(), RegistrationVersion: 1, SnapshotHash: hash32(82), VerificationCompletedEvent: uuid.New(), CompletionIdempotencyID: completionID, LinkAcceptUntil: now.Add(10 * time.Minute),
 	}); err != nil {
 		t.Fatalf("mark verification completed: %v", err)
 	}

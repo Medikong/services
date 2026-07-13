@@ -14,11 +14,11 @@ func TestChallengeConsumesOnlyOnce(t *testing.T) {
 
 	result, err := challenge.Consume(now.Add(time.Minute), true)
 	if err != nil || !result.Verified || !result.Changed || challenge.Status != StatusVerified {
-		t.Fatalf("first consume result=%#v error=%v challenge=%#v", result, err, challenge)
+		t.Fatal("first challenge consumption did not verify")
 	}
 	result, err = challenge.Consume(now.Add(2*time.Minute), false)
 	if err != nil || !result.Verified || !result.AlreadyVerified || result.Changed {
-		t.Fatalf("replayed consume result=%#v error=%v", result, err)
+		t.Fatal("verified challenge replay did not remain idempotent")
 	}
 }
 
@@ -28,11 +28,11 @@ func TestChallengeTracksAttemptsAndClosesAtLimit(t *testing.T) {
 	for attempt := 0; attempt < 2; attempt++ {
 		result, err := challenge.Consume(now.Add(time.Duration(attempt+1)*time.Minute), false)
 		if !errors.Is(err, ErrVerificationFailed) || !result.Changed {
-			t.Fatalf("attempt %d result=%#v error=%v", attempt, result, err)
+			t.Fatalf("challenge mismatch attempt %d did not match the contract", attempt)
 		}
 	}
 	if challenge.Status != StatusFailed || challenge.ClosedAt == nil || challenge.AttemptCount != 2 {
-		t.Fatalf("failed challenge=%#v", challenge)
+		t.Fatal("challenge did not enter the failed state")
 	}
 	if _, err := challenge.Consume(now.Add(3*time.Minute), true); !errors.Is(err, ErrChallengeClosed) {
 		t.Fatalf("consume closed challenge error=%v", err)
@@ -46,7 +46,7 @@ func TestChallengeExpiresAndVirtualProjectionRules(t *testing.T) {
 		t.Fatalf("expired consume error=%v", err)
 	}
 	if challenge.Status != StatusExpired || challenge.ClosedAt == nil {
-		t.Fatalf("expired challenge=%#v", challenge)
+		t.Fatal("challenge did not enter the expired state")
 	}
 
 	projection := VirtualProjection{

@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Medikong/services/services/auth-service/internal/application"
@@ -42,6 +45,10 @@ func (c *SessionController) Refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
+	if problem := decodeOptionalLogoutRequest(w, r); problem != nil {
+		httpcontract.WriteProblem(w, r, problem)
+		return
+	}
 	credential, credentialErr := c.contract.SessionCredential(r)
 	if credentialErr != nil && credentialErr.Kind == httpcontract.CredentialMissing {
 		refresh, refreshErr := httpcontract.RefreshToken(r)
@@ -49,7 +56,7 @@ func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
 			writeCredentialError(w, r, refreshErr)
 			return
 		}
-		if err := c.service.LogoutByRefresh(r.Context(), refresh); err != nil {
+		if err := c.service.LogoutByRefresh(r.Context(), refresh, r.Header.Get("Idempotency-Key")); err != nil {
 			writeApplicationError(w, r, err)
 			return
 		}
@@ -64,28 +71,47 @@ func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
 		writeCredentialError(w, r, &httpcontract.CredentialError{Kind: httpcontract.CredentialMalformed})
 		return
 	}
-	principal, err := c.service.Authenticate(r.Context(), tokenForWeb(credential), tokenForMobile(credential))
-	if err != nil {
-		writeApplicationError(w, r, err)
-		return
-	}
 	if credential.Channel == httpcontract.CredentialChannelWeb {
 		csrf, problem := c.contract.WebCSRFToken(r)
 		if problem != nil {
 			httpcontract.WriteProblem(w, r, problem)
 			return
 		}
-		if err := c.service.VerifyWebCSRF(r.Context(), credential.Token, csrf); err != nil {
+		if err := c.service.LogoutByWeb(r.Context(), credential.Token, csrf, r.Header.Get("Idempotency-Key")); err != nil {
 			writeApplicationError(w, r, err)
 			return
 		}
-	}
-	if err := c.service.Logout(r.Context(), principal); err != nil {
-		writeApplicationError(w, r, err)
+		c.contract.ClearSessionCookie(w)
+		httpcontract.WriteNoContent(w, r)
 		return
 	}
-	c.contract.ClearSessionCookie(w)
-	httpcontract.WriteNoContent(w, r)
+	writeCredentialError(w, r, &httpcontract.CredentialError{Kind: httpcontract.CredentialMalformed})
+}
+
+// logoutRequest enforces the optional OpenAPI EmptyRequest contract. A body may
+// be omitted, but a supplied JSON value must be exactly an empty object.
+type logoutRequest struct{}
+
+func (*logoutRequest) UnmarshalJSON(data []byte) error {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return err
+	}
+	if object == nil {
+		return errors.New("logout request body must be an object")
+	}
+	for field := range object {
+		return fmt.Errorf("json: unknown field %q", field)
+	}
+	return nil
+}
+
+func decodeOptionalLogoutRequest(w http.ResponseWriter, r *http.Request) *httpcontract.ContractError {
+	if r == nil || r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+		return nil
+	}
+	var request logoutRequest
+	return httpcontract.DecodeJSON(w, r, &request)
 }
 
 func (c *SessionController) Context(w http.ResponseWriter, r *http.Request) {

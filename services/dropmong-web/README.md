@@ -1,6 +1,6 @@
 # DropMong Web
 
-구매자용 반응형 Next.js 웹 애플리케이션과 애플리케이션 내부 BFF입니다. BFF는 같은 Node.js 프로세스와 Docker 이미지에서 Route Handler와 `src/server/bff/` 모듈로 실행되며, 별도 서비스나 데이터베이스를 만들지 않습니다.
+구매자·판매자용 반응형 Next.js 웹 애플리케이션과 애플리케이션 내부 BFF입니다. BFF는 같은 Node.js 프로세스와 Docker 이미지에서 Route Handler와 `src/server/bff/` 모듈로 실행되며, 별도 서비스나 데이터베이스를 만들지 않습니다.
 
 ## 첫 세로 단위
 
@@ -22,6 +22,20 @@
 | 배송·쿠폰·포인트·결제수단 | 개발 전용 표시 fixture | 해당 Query/Command 계약이 아직 없음 |
 
 `DEV_MOCK_MODE=false`에서는 준비되지 않은 checkout 계약을 성공처럼 대체하지 않고 `WEB_CHECKOUT_CONTRACT_UNAVAILABLE` 오류로 처리합니다. Catalog upstream 장애도 mock으로 바꾸지 않습니다.
+
+## 판매자 포털
+
+`SELLER_PORTAL_ENABLED=true`이면 같은 앱의 `/seller`에서 `PAGE.A.200~211` 대시보드, 드롭, 상품, 주문, 쿠폰·제휴, 분석, 정산, 스토어, 팀·권한과 운영 이슈 화면을 제공합니다. 목록 필터와 상세 패널은 URL로 복원되며 seller ID, 개인정보와 업무 본문은 URL이나 브라우저 저장소에 넣지 않습니다.
+
+개발 환경에서는 공통 `/auth/signin`에서 서명된 HttpOnly 판매자 세션과 onboarding fixture를 시작할 수 있습니다. 이 fixture는 `DEV_MOCK_MODE=true`에서만 동작합니다. 운영 또는 mock-off 환경에서 seller 기능을 켜려면 다음 서버 설정이 모두 필요하며, 누락되면 시작 단계에서 실패합니다.
+
+- `SELLER_CONTEXT_INTERNAL_BASE_URL`
+- `SELLER_MANAGEMENT_INTERNAL_BASE_URL`
+- `SELLER_SCOPE_SIGNING_KEY`
+- `SELLER_SCOPE_AUDIENCE`
+- `TRUSTED_INGRESS_SECRET`
+
+실행 중 seller downstream 장애는 seller route의 typed `503`으로 제한합니다. 현재 저장소에는 확정된 Auth seller 재인증 계약과 `SD.A.20040` API가 없으므로 운영 성공 응답을 fixture로 대체하지 않습니다.
 
 ## 실행과 검증
 

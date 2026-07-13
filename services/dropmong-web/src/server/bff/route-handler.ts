@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { toBffError } from "@/server/bff/errors";
+import { RecentAuthRequiredError, toBffError } from "@/server/bff/errors";
 import { recordRequest, traceIdFromTraceparent } from "@/server/bff/observability";
 import { createRequestContext, type RequestContext } from "@/server/bff/request-context";
 
@@ -48,6 +48,9 @@ export async function withBffResponseRoute(
         code: problem.code,
         traceId: traceIdFromTraceparent(context.traceparent),
         retryable: problem.retryable,
+        ...(problem instanceof RecentAuthRequiredError
+          ? { reauthentication: { href: problem.reauthenticationHref } }
+          : {}),
       },
       {
         status: problem.status,

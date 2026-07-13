@@ -197,10 +197,10 @@ func TestSessionCookieDeliveryAndClear(t *testing.T) {
 		t.Fatalf("cookie count = %d", len(cookies))
 	}
 	if cookies[0].Name != "__Host-dm_session" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].Path != "/" || cookies[0].SameSite != http.SameSiteLaxMode || cookies[0].MaxAge != 3600 {
-		t.Fatalf("session cookie = %#v", cookies[0])
+		t.Fatal("session cookie attributes do not match the contract")
 	}
 	if cookies[1].Name != "__Host-dm_auth" || cookies[1].MaxAge >= 0 {
-		t.Fatalf("clear auth cookie = %#v", cookies[1])
+		t.Fatal("auth-flow cookie was not cleared")
 	}
 }
 

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = "http://127.0.0.1:3000";
+const baseURL = "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -37,6 +37,7 @@ export default defineConfig({
     env: {
       APP_ORIGIN: baseURL,
       DEV_MOCK_MODE: "true",
+      SELLER_PORTAL_ENABLED: "true",
       SESSION_COOKIE_SECRET: "test-session-secret-must-have-at-least-thirty-two-chars",
     },
   },
