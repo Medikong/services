@@ -115,7 +115,15 @@ task tests:purchase-e2e-with-kafka-traces
 | order root | `order-service` `kafka.produce order.created`, `payment-service` `kafka.consume order.created` |
 | payment root | `payment-service` `kafka.produce payment.approved`, `order-service` `kafka.consume payment.approved`, `order-service` `kafka.produce notification.requested`, `notification-service` `kafka.consume notification.requested` |
 
-최종 재실행에서는 두 trace ID가 서로 달랐고 6개 pair가 모두 통과했다. Cleanup도 exit 0, 잔존 container 0, volume 0으로 끝났다. 전체 구매 여정은 단일 trace로 판정하지 않는다. Log correlation과 Kafka lag 검증은 향후 범위다.
+최종 재실행에서는 두 trace ID가 서로 달랐고 6개 pair가 모두 통과했다. Cleanup도 exit 0, 잔존 container 0, volume 0으로 끝났다. 전체 구매 여정은 단일 trace로 판정하지 않는다.
+
+정상 구매와 결제 실패의 Loki log correlation은 다음 명령으로 자동 판정한다.
+
+```bash
+task tests:purchase-e2e-with-log-correlation
+```
+
+이 gate는 HTTP와 Kafka JSON 로그의 correlation/trace 연결, bounded failure code, 민감 필드 부재, 낮은 cardinality의 Loki label을 확인하고 container, volume, network와 임시 build context를 정리한다. Kafka lag 검증은 향후 범위다.
 
 Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, `payment-service`, `notification-service`를 직접 호출한다. 기본 URL은 다음과 같다.
 
