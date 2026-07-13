@@ -681,6 +681,23 @@ tasks:
         run_collection "${trace_scenario}"
         run_collection "${kafka_trace_collection}"
 
+  purchase-e2e-with-log-correlation:
+    desc: Run normal purchase and payment failure, then assert JSON log correlation in Loki.
+    cmds:
+      - |
+        set -e
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        project='{{.E2E_COMPOSE_PROJECT}}-logs'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        services="postgres kafka kafka-init tempo otel-collector loki alloy grafana catalog-service order-service payment-service notification-service"
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        LOG_CORRELATION_COMPOSE_PROJECT="${project}" \
+        OTEL_TRACES_EXPORTER=otlp \
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317 \
+          ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${services}
+        LOG_CORRELATION_COMPOSE_PROJECT="${project}" \
+          ${compose_cmd} -p "${project}" -f "${file}" run --rm --no-deps log-correlation-smoke
+
   purchase-e2e-concurrency:
     desc: Run the purchase concurrency smoke and verify active database reservations.
     env:

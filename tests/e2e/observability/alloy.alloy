@@ -1,0 +1,43 @@
+discovery.docker "purchase_services" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "2s"
+}
+
+discovery.relabel "purchase_logs" {
+  targets = discovery.docker.purchase_services.targets
+
+  rule {
+    action        = "keep"
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(catalog-service|order-service|payment-service|notification-service)"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+loki.source.docker "purchase_logs" {
+  host             = "unix:///var/run/docker.sock"
+  targets          = discovery.relabel.purchase_logs.output
+  relabel_rules    = discovery.relabel.purchase_logs.rules
+  refresh_interval = "2s"
+  forward_to       = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

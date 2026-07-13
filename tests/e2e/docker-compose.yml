@@ -90,6 +90,50 @@ services:
       - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
       - "${OTEL_COLLECTOR_HEALTH_PORT:-13133}:13133"
 
+  loki:
+    image: grafana/loki:3.7.0
+    user: "0:0"
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./observability/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/tmp/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+
+  alloy:
+    image: grafana/alloy:v1.17.0
+    user: "0:0"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./observability/alloy.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      loki:
+        condition: service_started
+    ports:
+      - "${ALLOY_PORT:-12345}:12345"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+
   catalog-service:
     build:
       context: ../..
@@ -177,5 +221,21 @@ services:
       timeout: 5s
       retries: 20
 
+  log-correlation-smoke:
+    build:
+      context: ./log-correlation
+      dockerfile: Dockerfile
+    environment:
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+      ORDER_SERVICE_URL: http://order-service:8082
+      PAYMENT_SERVICE_URL: http://payment-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8084
+      LOKI_URL: http://loki:3100
+      LOG_CORRELATION_COMPOSE_PROJECT: "${LOG_CORRELATION_COMPOSE_PROJECT:-dropmong-log-correlation}"
+      LOG_CORRELATION_TIMEOUT_SECONDS: "${LOG_CORRELATION_TIMEOUT_SECONDS:-120}"
+    profiles: ["smoke"]
+
 volumes:
+  alloy-data:
+  loki-data:
   tempo-data:
