@@ -78,6 +78,14 @@ func validateBody(body any) *httpcontract.Error {
 		if problem := validateSnapshot("ownerSnapshot", value.OwnerSnapshot); problem != nil {
 			return problem
 		}
+		if problem := validateSnapshot("approvalPolicy", value.ApprovalPolicy); problem != nil {
+			return problem
+		}
+		if value.TemplateRef != nil {
+			if problem := validateExternalRef("templateRef", *value.TemplateRef); problem != nil {
+				return problem
+			}
+		}
 		return optionalOpaqueRef("externalBusinessRef", value.ExternalBusinessRef)
 	case *ConfigureIssuanceRequest:
 		if problem := nonNegativeVersion(value.ExpectedVersion); problem != nil {
@@ -184,7 +192,10 @@ func validateBody(body any) *httpcontract.Error {
 		if problem := validateExternalRef("sourceRef", value.SourceRef); problem != nil {
 			return problem
 		}
-		return stringRange("reasonCode", value.ReasonCode, 1, 80)
+		if problem := stringRange("reasonCode", value.ReasonCode, 1, 80); problem != nil {
+			return problem
+		}
+		return validateSnapshot("approvalPolicy", value.ApprovalPolicy)
 	default:
 		return invalid("body", "unsupported_schema")
 	}

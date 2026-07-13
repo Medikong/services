@@ -299,10 +299,30 @@ func TestCompensationMapsToOperatorGrantAndVerifiesApprovalAndCase(t *testing.T)
 		Metadata: issuanceMetadata(now, "compensation"), CampaignID: "campaign-1", UserID: "user-1",
 		SourceRef:  shared.ExternalRef{Context: "cs", Type: "compensation_task", ID: "compensation-task-1"},
 		ReasonCode: "SERVICE_RECOVERY", CaseRef: "case-1",
+		ApprovalPolicy: issuanceSnapshot(now),
 	})
 	require.NoError(t, err)
 	require.Equal(t, issuerequest.SourceOperatorGrant, issues.created.SourceType)
 	require.Equal(t, []string{CommandCreateIssueRequest}, approvals.operations)
+	require.Equal(t, []string{"case-1"}, cases.refs)
+}
+
+func TestCompensationAllowsApprovalPolicyWithoutApprovalReference(t *testing.T) {
+	now := time.Date(2026, 7, 12, 4, 0, 0, 0, time.UTC)
+	issues := &issueRepositoryFake{}
+	approvals := &approvalPortFake{}
+	cases := &casePortFake{}
+	service := newIssuanceService(t, &campaignReaderFake{campaign: activeCampaign(now)}, issues, &codeRepositoryFake{}, &userCouponRepositoryFake{}, approvals, cases)
+	metadata := issuanceMetadata(now, "compensation-without-approval")
+	metadata.ApprovalRef = ""
+
+	_, err := service.CreateCompensationIssueRequest(context.Background(), CreateCompensationIssueRequestInput{
+		Metadata: metadata, CampaignID: "campaign-1", UserID: "user-1",
+		SourceRef:  shared.ExternalRef{Context: "cs", Type: "incident", ID: "incident-1"},
+		ReasonCode: "SERVICE_RECOVERY", CaseRef: "case-1", ApprovalPolicy: issuanceSnapshot(now),
+	})
+	require.NoError(t, err)
+	require.Empty(t, approvals.operations)
 	require.Equal(t, []string{"case-1"}, cases.refs)
 }
 

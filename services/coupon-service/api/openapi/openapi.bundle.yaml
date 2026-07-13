@@ -23,7 +23,7 @@ paths:
       tags:
         - CouponWallet
       summary: 쿠폰 수령 접수
-      description: 구매자의 직접 수령 요청을 발급 요청으로 접수하고 비동기 상태 위치를 반환한다.
+      description: 구매자의 직접 수령 요청을 접수하고 발급 대기 상태와 조회 위치를 반환한다. 실제 발급 완료는 UserCoupon 생성과 수량 확정 뒤 별도 조회에서 확인한다.
       operationId: claimCoupon
       x-api-id: API.A.19-01
       x-use-case: UC.A.19-04
@@ -51,7 +51,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '202':
-          description: 발급 요청을 접수했다.
+          description: 발급 요청을 접수해 발급 대기 상태로 전환했다.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
@@ -84,7 +84,7 @@ paths:
       tags:
         - CouponWallet
       summary: 쿠폰 코드 등록
-      description: 코드 원문을 검증·예약하고 공통 발급 요청의 비동기 상태 위치를 반환한다.
+      description: 코드 원문을 검증·예약하고 발급 대기 상태와 조회 위치를 반환한다. 실제 발급 완료는 UserCoupon 생성과 수량 확정 뒤 별도 조회에서 확인한다.
       operationId: redeemCouponCode
       x-api-id: API.A.19-02
       x-use-case: UC.A.19-05
@@ -343,7 +343,7 @@ paths:
       tags:
         - CouponRedemption
       summary: 쿠폰 사용 확정
-      description: 주문·결제 결과 참조를 검증해 예약을 확정하고 비용 귀속을 기록한다.
+      description: 결제 최종 확정 사건 참조를 검증해 예약을 사용 완료로 전환하고 비용 귀속을 기록한다. 주문 생성이나 중간 결제 승인만으로는 확정하지 않는다.
       operationId: commitCouponRedemption
       x-api-id: API.A.19-07
       x-use-case: UC.A.19-24
@@ -491,7 +491,7 @@ paths:
       tags:
         - CouponCampaign
       summary: 쿠폰 캠페인 등록
-      description: 혜택·적용 정책·사용 기간·발급 및 비용 주체를 가진 캠페인을 등록한다.
+      description: 혜택·적용 정책·사용 기간·발급 및 비용 주체를 가진 캠페인을 등록한다. 위험 기반 운영 정책이 요구하는 요청에는 승인 참조가 필요하다.
       operationId: createCouponCampaign
       x-api-id: API.A.19-10
       x-use-case: UC.A.19-09
@@ -504,7 +504,7 @@ paths:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'
-        - $ref: '#/components/parameters/XApprovalRef'
+        - $ref: '#/components/parameters/XApprovalRefOptional'
       requestBody:
         required: true
         content:
@@ -792,11 +792,14 @@ paths:
       tags:
         - CouponCampaign
       summary: 쿠폰 캠페인 성과 조회
-      description: 운영·마케팅 범위에서 캠페인의 발급·사용·회수 집계를 반환한다.
+      description: 판매자·마케팅·운영 workload의 권한 범위에서 캠페인의 발급·사용·회수 집계를 반환한다. 판매자는 자신이 소유하거나 비용을 부담한 캠페인의 집계와 자기 부담 비용만 조회할 수 있다.
       operationId: getCouponCampaignPerformance
       x-api-id: API.A.19-16
-      x-use-case: UC.A.19-12
+      x-use-case:
+        - UC.A.19-08
+        - UC.A.19-12
       x-read-models:
+        - RM.A.19-03
         - RM.A.19-04
       x-service-design: SD.A.1940
       x-design-doc: ../../API_A_19_16_get_coupon_campaign_performance.md
@@ -818,6 +821,23 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: groupBy
+          in: query
+          required: false
+          description: 응답 breakdown의 집계 차원이다. 생략하면 캠페인 합계만 반환한다.
+          style: form
+          explode: false
+          schema:
+            type: array
+            uniqueItems: true
+            maxItems: 4
+            items:
+              type: string
+              enum:
+                - campaign
+                - drop
+                - product
+                - day
       responses:
         '200':
           description: 캠페인 성과 집계를 반환한다.
@@ -1155,7 +1175,7 @@ paths:
       tags:
         - CouponOperations
       summary: 보상 쿠폰 발급 요청
-      description: 승인된 CS·운영 보상 작업을 공통 CouponIssueRequest로 변환한다.
+      description: 필수 증빙과 위험 기반 승인 조건을 충족한 CS·운영 보상 작업을 공통 CouponIssueRequest로 변환한다.
       operationId: createCompensationCouponIssueRequest
       x-api-id: API.A.19-23
       x-use-case: UC.A.19-20
@@ -1168,7 +1188,7 @@ paths:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'
-        - $ref: '#/components/parameters/XApprovalRef'
+        - $ref: '#/components/parameters/XApprovalRefOptional'
         - $ref: '#/components/parameters/XCaseRef'
       requestBody:
         required: true
@@ -1178,7 +1198,7 @@ paths:
               $ref: '#/components/schemas/CreateCompensationIssueRequest'
       responses:
         '202':
-          description: 보상 발급 요청을 접수했다.
+          description: 증빙과 위험 기반 승인 조건을 확인해 보상 발급 요청을 발급 대기 상태로 접수했다.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
@@ -1352,8 +1372,9 @@ components:
           $ref: '#/components/schemas/IssueRequestId'
         status:
           type: string
+          description: 요청 접수 뒤 사용자에게 보이는 상태다. 실제 발급 완료를 뜻하지 않는다.
           enum:
-            - accepted
+            - pending
         statusPath:
           type: string
           format: uri-reference
@@ -1944,6 +1965,7 @@ components:
         - usableFrom
         - expiresAt
         - ownerSnapshot
+        - approvalPolicy
       additionalProperties: false
       properties:
         displayName:
@@ -1967,6 +1989,14 @@ components:
           format: date-time
         ownerSnapshot:
           $ref: '#/components/schemas/SnapshotRef'
+        approvalPolicy:
+          allOf:
+            - $ref: '#/components/schemas/SnapshotRef'
+          description: 승인선·금액·수량 한도를 판정하는 버전이 있는 운영 정책 스냅샷이다.
+        templateRef:
+          allOf:
+            - $ref: '#/components/schemas/ExternalRef'
+          description: 판매자 자체 요청을 허용하는 승인된 템플릿 참조다.
         externalBusinessRef:
           $ref: '#/components/schemas/OpaqueRef'
     CampaignData:
@@ -2208,21 +2238,75 @@ components:
           $ref: '#/components/schemas/BulkJobData'
         meta:
           $ref: '#/components/schemas/ResponseMeta'
+    CampaignPerformanceBreakdown:
+      type: object
+      required:
+        - dimensionType
+        - counts
+      additionalProperties: false
+      properties:
+        dimensionType:
+          type: string
+          enum:
+            - campaign
+            - drop
+            - product
+            - day
+        dimensionRef:
+          allOf:
+            - $ref: '#/components/schemas/OpaqueRef'
+          description: 캠페인·드롭·상품 차원의 opaque 참조다. 일자 차원에서는 생략한다.
+        businessDate:
+          type: string
+          format: date
+          description: 일자 차원의 기준일이다. 다른 차원에서는 생략한다.
+        counts:
+          $ref: '#/components/schemas/PerformanceCounts'
+        confirmedDiscount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: 조회 권한 범위의 확정 할인액이다.
+        reclaimedDiscount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: 조회 권한 범위의 회수 할인액이다.
     CampaignPerformanceData:
       type: object
       required:
         - campaignId
+        - scope
+        - asOf
         - counts
       additionalProperties: false
       properties:
         campaignId:
           $ref: '#/components/schemas/CampaignId'
+        scope:
+          type: string
+          description: 권한 검사 뒤 적용된 조회 범위다.
+          enum:
+            - seller
+            - marketing
+            - operations
+        asOf:
+          type: string
+          format: date-time
+          description: 집계 투영이 반영된 기준 시각이다.
         counts:
           $ref: '#/components/schemas/PerformanceCounts'
         confirmedDiscount:
-          $ref: '#/components/schemas/Money'
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: 조회 권한 범위의 확정 할인액이다. 판매자 범위에서는 판매자 부담액만 포함한다.
         reclaimedDiscount:
-          $ref: '#/components/schemas/Money'
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: 조회 권한 범위의 회수 할인액이다. 판매자 범위에서는 판매자 부담액만 포함한다.
+        breakdown:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/CampaignPerformanceBreakdown'
     CampaignPerformanceResponse:
       type: object
       required:
@@ -2582,6 +2666,7 @@ components:
         - userId
         - sourceRef
         - reasonCode
+        - approvalPolicy
       additionalProperties: false
       properties:
         campaignId:
@@ -2589,11 +2674,17 @@ components:
         userId:
           $ref: '#/components/schemas/UserId'
         sourceRef:
-          $ref: '#/components/schemas/ExternalRef'
+          allOf:
+            - $ref: '#/components/schemas/ExternalRef'
+          description: 보상 근거가 된 주문 또는 인시던트의 opaque 참조다.
         reasonCode:
           type: string
           minLength: 1
           maxLength: 80
+        approvalPolicy:
+          allOf:
+            - $ref: '#/components/schemas/SnapshotRef'
+          description: 금액·수량 한도와 운영 승인 필요 여부를 판정하는 버전이 있는 정책 스냅샷이다.
     SignalStatus:
       type: object
       required:
@@ -2780,7 +2871,7 @@ components:
       name: X-Approval-Ref
       in: header
       required: false
-      description: 운영·CS workload가 회수를 요청할 때 필요한 승인 원본의 opaque 참조다.
+      description: 위험 기반 운영 정책이 요구할 때 제공하는 승인 원본의 opaque 참조다.
       schema:
         type: string
         minLength: 1

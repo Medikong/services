@@ -67,6 +67,8 @@ type IssuerAndFunding struct {
 	FunderRef               *ExternalRef `json:"funderRef,omitempty"`
 	PlatformSharePercentage string       `json:"platformSharePercentage,omitempty"`
 	ApprovalRef             string       `json:"approvalRef,omitempty"`
+	ApprovalPolicy          *SnapshotRef `json:"approvalPolicy,omitempty"`
+	TemplateRef             *ExternalRef `json:"templateRef,omitempty"`
 }
 
 func (v IssuerAndFunding) Validate() error {
@@ -75,6 +77,16 @@ func (v IssuerAndFunding) Validate() error {
 	}
 	if v.FunderRef != nil {
 		if err := v.FunderRef.Validate(); err != nil {
+			return err
+		}
+	}
+	if v.ApprovalPolicy != nil {
+		if err := v.ApprovalPolicy.Validate(); err != nil {
+			return err
+		}
+	}
+	if v.TemplateRef != nil {
+		if err := v.TemplateRef.Validate(); err != nil {
 			return err
 		}
 	}

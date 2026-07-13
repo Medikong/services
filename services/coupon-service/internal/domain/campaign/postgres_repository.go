@@ -477,8 +477,8 @@ func loadCampaign(ctx context.Context, db queryer, campaignID string, lock bool,
 	if err := json.Unmarshal(ownerSnapshot, &c.OwnerSnapshot); err != nil {
 		return Campaign{}, oops.In("coupon_campaign_repository").Code("campaign.owner_snapshot_decode_failed").Wrap(err)
 	}
+	var funding []byte
 	if effectiveAt != nil {
-		var funding []byte
 		err := db.QueryRow(ctx, `SELECT policy_version,issuer_and_funding
 			FROM coupon_campaign_policy_versions
 			WHERE campaign_id=$1 AND effective_at<=$2
@@ -489,9 +489,14 @@ func loadCampaign(ctx context.Context, db queryer, campaignID string, lock bool,
 		if err != nil {
 			return Campaign{}, dbError("get_effective_policy_version", err)
 		}
-		if err := json.Unmarshal(funding, &c.IssuerAndFunding); err != nil {
-			return Campaign{}, oops.In("coupon_campaign_repository").Code("campaign.funding_decode_failed").Wrap(err)
+	} else {
+		err := db.QueryRow(ctx, `SELECT issuer_and_funding FROM coupon_campaign_policy_versions WHERE campaign_id=$1 AND policy_version=$2`, campaignID, c.CurrentPolicyVersion).Scan(&funding)
+		if err != nil {
+			return Campaign{}, dbError("get_current_policy_version", err)
 		}
+	}
+	if err := json.Unmarshal(funding, &c.IssuerAndFunding); err != nil {
+		return Campaign{}, oops.In("coupon_campaign_repository").Code("campaign.funding_decode_failed").Wrap(err)
 	}
 	rows, err := db.Query(ctx, `SELECT benefit_id,policy_version,benefit_type,COALESCE(amount::text,''),COALESCE(percentage::text,''),COALESCE(max_discount_amount::text,''),COALESCE(currency,'') FROM coupon_benefits WHERE campaign_id=$1 AND policy_version=$2 ORDER BY benefit_id`, campaignID, c.CurrentPolicyVersion)
 	if err != nil {

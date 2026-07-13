@@ -71,6 +71,7 @@ func TestIssuanceAggregatesPersistLedgerIdempotencyAndOutbox(t *testing.T) {
 		}},
 		IssuerAndFunding: shared.IssuerAndFunding{IssuerType: "platform", IssuerRef: shared.ExternalRef{Context: "coupon", Type: "platform", ID: "platform"}, FunderType: "platform"},
 		OwnerSnapshot:    shared.SnapshotRef{SourceRef: shared.ExternalRef{Context: "catalog", Type: "drop", ID: "drop_abcdefgh"}, SourceVersion: "1", CapturedAt: now, PayloadHash: "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+		ApprovalPolicy:   shared.SnapshotRef{SourceRef: shared.ExternalRef{Context: "operations", Type: "approval_policy", ID: "coupon-campaign-v1"}, SourceVersion: "1", CapturedAt: now, PayloadHash: "sha256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"},
 	})
 	require.NoError(t, err)
 	require.Regexp(t, `^camp_[A-Za-z0-9_-]{8,120}$`, applicationResult.CampaignID)
@@ -93,6 +94,8 @@ func TestIssuanceAggregatesPersistLedgerIdempotencyAndOutbox(t *testing.T) {
 	require.NoError(t, err)
 	changedApplicationCampaign, err := campaignRepo.Get(ctx, applicationResult.CampaignID)
 	require.NoError(t, err)
+	require.NotNil(t, changedApplicationCampaign.IssuerAndFunding.ApprovalPolicy)
+	require.Equal(t, "coupon-campaign-v1", changedApplicationCampaign.IssuerAndFunding.ApprovalPolicy.SourceRef.ID)
 	require.Equal(t, int64(2), changedApplicationCampaign.CurrentPolicyVersion)
 	require.Len(t, changedApplicationCampaign.Benefits, 1)
 	require.Len(t, changedApplicationCampaign.Applicability, 1)
