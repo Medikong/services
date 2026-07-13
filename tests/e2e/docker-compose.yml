@@ -264,5 +264,19 @@ services:
       LOG_CORRELATION_TIMEOUT_SECONDS: "${LOG_CORRELATION_TIMEOUT_SECONDS:-120}"
     profiles: ["smoke"]
 
+  payment-failure-idempotency-smoke:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/payment-failure-idempotency-smoke/Dockerfile
+      args:
+        PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: "${PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE:-python:3.12-slim}"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ORDER_SERVICE_URL: http://order-service:8082
+      PAYMENT_SERVICE_URL: http://payment-service:8083
+      PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID: "${PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID:-payment-failure-idempotency}"
+      PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS: "${PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS:-60}"
+    profiles: ["smoke"]
+
 volumes:
   tempo-data:
