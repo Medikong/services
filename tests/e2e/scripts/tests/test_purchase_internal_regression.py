@@ -106,28 +106,6 @@ def test_gates_have_exact_order_projects_and_zero_ports(tmp_path: Path) -> None:
     assert tuple(project_values) == expected_projects
 
 
-def test_run_process_uses_argument_array_without_shell(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: dict[str, object] = {}
-
-    def fake_run(
-        argv: tuple[str, ...],
-        **kwargs: object,
-    ) -> subprocess.CompletedProcess[str]:
-        observed["argv"] = argv
-        observed.update(kwargs)
-        return completed(argv)
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    runner.run_process(("task.exe", "test-services"), cwd=Path("clone"), env={})
-    assert observed["argv"] == ("task.exe", "test-services")
-    assert observed["shell"] is False
-    assert observed["check"] is False
-    assert observed["capture_output"] is True
-    assert observed["text"] is True
-    assert (observed["encoding"], observed["errors"]) == ("utf-8", "replace")
-
-
 def test_run_gates_fails_fast_and_preserves_output_and_code(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

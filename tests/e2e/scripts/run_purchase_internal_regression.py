@@ -8,6 +8,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
+from typing import TextIO
 
 from purchase_internal_regression_support import (
     PORT_VARIABLES,
@@ -60,13 +61,24 @@ def run_process(
         ) from exc
 
 
+def _emit_text(stream: TextIO, value: str) -> None:
+    try:
+        buffer = stream.buffer
+    except AttributeError:
+        encoding = getattr(stream, "encoding", None) or "utf-8"
+        safe_value = value.encode(encoding, errors="replace").decode(encoding)
+        stream.write(safe_value)
+        stream.flush()
+    else:
+        buffer.write(value.encode("utf-8"))
+        buffer.flush()
+
+
 def _emit_output(result: subprocess.CompletedProcess[str]) -> None:
     if result.stdout:
-        sys.stdout.write(result.stdout)
-        sys.stdout.flush()
+        _emit_text(sys.stdout, result.stdout)
     if result.stderr:
-        sys.stderr.write(result.stderr)
-        sys.stderr.flush()
+        _emit_text(sys.stderr, result.stderr)
 
 
 def clone_committed_head(config: RunnerConfig, clone_root: Path) -> None:
