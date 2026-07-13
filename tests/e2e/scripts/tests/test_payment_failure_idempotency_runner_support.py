@@ -17,6 +17,7 @@ from run_payment_failure_idempotency import (  # noqa: E402
     create_tracked_context,
     parse_compose_command,
     parse_smoke_json,
+    run_process,
     validate_name,
     validate_positive_integer,
     validate_smoke_image,
@@ -62,6 +63,22 @@ def test_input_parsers_reject_unsupported_compose_command_and_zero_timeout() -> 
         parse_compose_command("bash -c docker compose")
     with pytest.raises(RunnerInputError):
         validate_positive_integer("TIMEOUT", "0")
+
+
+def test_run_process_preserves_utf8_output_invalid_in_cp949() -> None:
+    output = "docker output " + chr(0x1F600)
+    script = (
+        "import sys; "
+        "output = 'docker output ' + chr(0x1F600); "
+        "sys.stdout.buffer.write(output.encode('utf-8')); "
+        "sys.stderr.buffer.write(output.encode('utf-8'))"
+    )
+
+    result = run_process((sys.executable, "-c", script))
+
+    assert result.returncode == 0
+    assert result.stdout == output
+    assert result.stderr == output
 
 
 @pytest.mark.parametrize(

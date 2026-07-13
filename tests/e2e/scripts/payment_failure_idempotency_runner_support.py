@@ -192,6 +192,8 @@ def run_process(
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
     except OSError as exc:
         raise RunnerExecutionError(
