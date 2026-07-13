@@ -793,22 +793,28 @@ tasks:
         validate_name() {
           label="$1"
           value="$2"
-          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._-]+$'; then
-            die "${label} must match [A-Za-z0-9._-]+: ${value}"
-          fi
+          case "${value}" in
+            ""|*[!A-Za-z0-9._-]*)
+              die "${label} must match [A-Za-z0-9._-]+: ${value}"
+              ;;
+          esac
         }
         validate_positive_integer() {
           label="$1"
           value="$2"
-          if ! printf '%s' "${value}" | grep -Eq '^[1-9][0-9]*$'; then
-            die "${label} must be a positive integer: ${value}"
-          fi
+          case "${value}" in
+            ""|*[!0123456789]*|0*)
+              die "${label} must be a positive integer: ${value}"
+              ;;
+          esac
         }
         validate_image() {
           value="$1"
-          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/:@-]*$'; then
-            die "PURCHASE_CONCURRENCY_SMOKE_IMAGE must be a container image reference and cannot begin with -: ${value}"
-          fi
+          case "${value}" in
+            ""|[!A-Za-z0-9]*|*[!A-Za-z0-9._/:@-]*)
+              die "PURCHASE_CONCURRENCY_SMOKE_IMAGE must be a container image reference and cannot begin with -: ${value}"
+              ;;
+          esac
         }
         compose() {
           case "${PURCHASE_CONCURRENCY_DOCKER_COMPOSE}" in
@@ -865,15 +871,33 @@ tasks:
           if [ "${status}" -eq 0 ]; then
             status="${db_status}"
           fi
-        elif ! printf '%s' "${db_result}" | grep -Eq '^[0-9]+\|[0-9]+$'; then
-          printf 'Invalid database result; expected active_orders|reserved_quantity, got: %s\n' "${db_result}" >&2
-          if [ "${status}" -eq 0 ]; then
-            status=1
-          fi
-        else
+        elif [ "${db_status}" -eq 0 ]; then
           active_orders="${db_result%%|*}"
           reserved_quantity="${db_result#*|}"
-          if [ "${active_orders}" -ne 4 ] || [ "${reserved_quantity}" -ne 40 ] || [ "${reserved_quantity}" -gt 42 ]; then
+          db_result_invalid=0
+          case "${db_result}" in
+            *'|'*)
+              ;;
+            *)
+              db_result_invalid=1
+              ;;
+          esac
+          case "${active_orders}" in
+            ""|*[!0123456789]*)
+              db_result_invalid=1
+              ;;
+          esac
+          case "${reserved_quantity}" in
+            ""|*[!0123456789]*)
+              db_result_invalid=1
+              ;;
+          esac
+          if [ "${db_result_invalid}" -ne 0 ]; then
+            printf 'Invalid database result; expected active_orders|reserved_quantity, got: %s\n' "${db_result}" >&2
+            if [ "${status}" -eq 0 ]; then
+              status=1
+            fi
+          elif [ "${active_orders}" -ne 4 ] || [ "${reserved_quantity}" -ne 40 ] || [ "${reserved_quantity}" -gt 42 ]; then
             printf 'Concurrency database assertion failed: expected 4|40 with reserved_quantity <= 42, got %s\n' "${db_result}" >&2
             if [ "${status}" -eq 0 ]; then
               status=1
