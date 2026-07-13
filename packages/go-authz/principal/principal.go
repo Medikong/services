@@ -19,6 +19,7 @@ const (
 type Principal struct {
 	Type        Type     `json:"type"`
 	UserID      string   `json:"userId,omitempty"`
+	ServiceID   string   `json:"serviceId,omitempty"`
 	Roles       []string `json:"roles,omitempty"`
 	AuthMethods []string `json:"authMethods,omitempty"`
 	AuthLevel   string   `json:"authLevel,omitempty"`

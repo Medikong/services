@@ -1,0 +1,3103 @@
+openapi: 3.0.4
+info:
+  title: Context 쿠폰 API
+  version: 0.1.0
+  description: Context 쿠폰의 공개 구매자 API와 내부 주문·운영·CS·정산 API 계약이다.
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.dropmong.example
+    description: 공개 Gateway 예시 주소
+tags:
+  - name: CouponWallet
+    description: 구매자 쿠폰 수령·코드 등록·쿠폰함 API
+  - name: CouponRedemption
+    description: 주문·결제 workload의 쿠폰 검증·예약·확정·해제·회수 API
+  - name: CouponCampaign
+    description: 캠페인 정책·승인·성과 API
+  - name: CouponOperations
+    description: 대량 발급·운영 중지·복구·CS·정산 API
+paths:
+  /api/v1/coupon-campaigns/{campaignId}/claims:
+    post:
+      tags:
+        - CouponWallet
+      summary: 쿠폰 수령 접수
+      description: 구매자의 직접 수령 요청을 발급 요청으로 접수하고 비동기 상태 위치를 반환한다.
+      operationId: claimCoupon
+      x-api-id: API.A.19-01
+      x-use-case: UC.A.19-04
+      x-command: CMD.A.19-05
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_01_claim_coupon.md
+      x-error-codes:
+        COUPON_INPUT_INVALID: 400
+        COUPON_AUTHENTICATION_REQUIRED: 401
+        COUPON_FORBIDDEN: 403
+        COUPON_IDEMPOTENCY_CONFLICT: 409
+        COUPON_OPERATION_STOPPED: 409
+        COUPON_BUSINESS_RULE_REJECTED: 422
+        COUPON_RATE_LIMITED: 429
+        COUPON_DEPENDENCY_UNAVAILABLE: 503
+      security:
+        - WebSessionCookie: []
+          WebCsrfToken: []
+          WebOrigin: []
+        - MobileBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CampaignId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: 발급 요청을 접수했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/coupon-code-redemptions:
+    post:
+      tags:
+        - CouponWallet
+      summary: 쿠폰 코드 등록
+      description: 코드 원문을 검증·예약하고 공통 발급 요청의 비동기 상태 위치를 반환한다.
+      operationId: redeemCouponCode
+      x-api-id: API.A.19-02
+      x-use-case: UC.A.19-05
+      x-command: CMD.A.19-06
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_02_redeem_coupon_code.md
+      x-sensitive-fields:
+        - code
+      x-error-codes:
+        COUPON_INPUT_INVALID: 400
+        COUPON_AUTHENTICATION_REQUIRED: 401
+        COUPON_FORBIDDEN: 403
+        COUPON_IDEMPOTENCY_CONFLICT: 409
+        COUPON_BUSINESS_RULE_REJECTED: 422
+        COUPON_RATE_LIMITED: 429
+        COUPON_DEPENDENCY_UNAVAILABLE: 503
+      security:
+        - WebSessionCookie: []
+          WebCsrfToken: []
+          WebOrigin: []
+        - MobileBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemCouponCodeRequest'
+      responses:
+        '202':
+          description: 코드 예약과 발급 요청 생성을 접수했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/users/me/coupons:
+    get:
+      tags:
+        - CouponWallet
+      summary: 내 쿠폰 목록 조회
+      description: 현재 사용자의 쿠폰함과 적용 범위에 해당하는 활성 안내를 cursor 방식으로 조회한다.
+      operationId: listMyCoupons
+      x-api-id: API.A.19-03
+      x-use-case: UC.A.19-01
+      x-read-models:
+        - RM.A.19-01
+        - RM.A.19-09
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_03_list_my_coupons.md
+      security:
+        - WebSessionCookie: []
+        - MobileBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/WalletStatus'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 현재 사용자 범위의 쿠폰 목록을 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletCouponListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/users/me/coupons/{userCouponId}:
+    get:
+      tags:
+        - CouponWallet
+      summary: 내 쿠폰 상세 조회
+      description: 현재 사용자가 소유한 쿠폰의 혜택·기간·적용 조건과 표시 상태를 반환한다.
+      operationId: getMyCoupon
+      x-api-id: API.A.19-04
+      x-use-case: UC.A.19-03
+      x-read-models:
+        - RM.A.19-02
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_04_get_my_coupon.md
+      security:
+        - WebSessionCookie: []
+        - MobileBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserCouponId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: 본인 쿠폰 상세를 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-validations:
+    post:
+      tags:
+        - CouponRedemption
+      summary: 주문 쿠폰 검증
+      description: 주문 Snapshot으로 쿠폰 하나를 평가하고 할인·비용 Snapshot과 redemption ID를 반환한다.
+      operationId: validateCoupon
+      x-api-id: API.A.19-05
+      x-use-case: UC.A.19-23
+      x-command: CMD.A.19-09
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_05_validate_coupon.md
+      x-error-codes:
+        COUPON_INPUT_INVALID: 400
+        COUPON_AUTHENTICATION_REQUIRED: 401
+        COUPON_FORBIDDEN: 403
+        COUPON_IDEMPOTENCY_CONFLICT: 409
+        COUPON_STATE_CONFLICT: 409
+        COUPON_BUSINESS_RULE_REJECTED: 422
+        COUPON_DEPENDENCY_UNAVAILABLE: 503
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateCouponRequest'
+      responses:
+        '200':
+          description: 평가 결과와 서버 계산 Snapshot을 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-redemptions/{redemptionId}/reserve:
+    post:
+      tags:
+        - CouponRedemption
+      summary: 쿠폰 사용 예약
+      description: 검증된 CouponRedemption을 같은 주문의 활성 예약으로 전이한다.
+      operationId: reserveCouponRedemption
+      x-api-id: API.A.19-06
+      x-use-case: UC.A.19-06
+      x-command: CMD.A.19-10
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_06_reserve_coupon_redemption.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RedemptionId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpectedVersionRequest'
+      responses:
+        '200':
+          description: 쿠폰 사용을 예약했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-redemptions/{redemptionId}/commit:
+    post:
+      tags:
+        - CouponRedemption
+      summary: 쿠폰 사용 확정
+      description: 주문·결제 결과 참조를 검증해 예약을 확정하고 비용 귀속을 기록한다.
+      operationId: commitCouponRedemption
+      x-api-id: API.A.19-07
+      x-use-case: UC.A.19-24
+      x-command: CMD.A.19-11
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_07_commit_coupon_redemption.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RedemptionId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedemptionTransitionRequest'
+      responses:
+        '200':
+          description: 예약된 쿠폰 사용을 확정했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-redemptions/{redemptionId}/release:
+    post:
+      tags:
+        - CouponRedemption
+      summary: 쿠폰 사용 예약 해제
+      description: 확정 전 예약을 원인 결과 참조와 함께 released 상태로 전이한다.
+      operationId: releaseCouponRedemption
+      x-api-id: API.A.19-08
+      x-use-case: UC.A.19-25
+      x-command: CMD.A.19-12
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_08_release_coupon_redemption.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RedemptionId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedemptionTransitionRequest'
+      responses:
+        '200':
+          description: 쿠폰 사용 예약을 해제했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-redemptions/{redemptionId}/revoke:
+    post:
+      tags:
+        - CouponRedemption
+      summary: 쿠폰 사용 회수
+      description: 확정된 사용을 취소·환불 결과 참조로 회수하고 비용 귀속 보정을 기록한다.
+      operationId: revokeCouponRedemption
+      x-api-id: API.A.19-09
+      x-use-case: UC.A.19-25
+      x-command: CMD.A.19-15
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_09_revoke_coupon_redemption.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RedemptionId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRefOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedemptionTransitionRequest'
+      responses:
+        '200':
+          description: 확정된 쿠폰 사용을 회수했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-campaigns:
+    post:
+      tags:
+        - CouponCampaign
+      summary: 쿠폰 캠페인 등록
+      description: 혜택·적용 정책·사용 기간·발급 및 비용 주체를 가진 캠페인을 등록한다.
+      operationId: createCouponCampaign
+      x-api-id: API.A.19-10
+      x-use-case: UC.A.19-09
+      x-command: CMD.A.19-01
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_10_create_coupon_campaign.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCouponCampaignRequest'
+      responses:
+        '201':
+          description: 캠페인 정책 version 1을 등록했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-campaigns/{campaignId}/issuance-policy:
+    put:
+      tags:
+        - CouponCampaign
+      summary: 쿠폰 발급 조건 설정
+      description: 캠페인의 총수량, 사용자별 제한과 발급 시간 구간을 설정한다.
+      operationId: configureCouponCampaignIssuance
+      x-api-id: API.A.19-11
+      x-use-case: UC.A.19-10
+      x-command: CMD.A.19-02
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_11_configure_campaign_issuance.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CampaignId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigureIssuanceRequest'
+      responses:
+        '200':
+          description: 발급 조건을 새 캠페인 version으로 저장했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-campaigns/{campaignId}/reviews:
+    post:
+      tags:
+        - CouponCampaign
+      summary: 쿠폰 캠페인 검토
+      description: 승인된 검토 작업의 승인·반려·보류 결과를 캠페인에 기록한다.
+      operationId: reviewCouponCampaign
+      x-api-id: API.A.19-12
+      x-use-case: UC.A.19-14
+      x-command: CMD.A.19-03
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_12_review_coupon_campaign.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CampaignId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCampaignRequest'
+      responses:
+        '200':
+          description: 검토 결과를 기록했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-campaigns/{campaignId}/policy-versions:
+    post:
+      tags:
+        - CouponCampaign
+      summary: 쿠폰 정책 version 등록
+      description: 미래 적용 시각을 가진 새 정책 version을 추가하고 과거 version은 보존한다.
+      operationId: createCouponCampaignPolicyVersion
+      x-api-id: API.A.19-13
+      x-use-case: UC.A.19-13
+      x-command: CMD.A.19-04
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_13_change_coupon_campaign_policy.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CampaignId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyVersionRequest'
+      responses:
+        '201':
+          description: 새 정책 version을 등록했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/bulk-coupon-issue-jobs:
+    post:
+      tags:
+        - CouponOperations
+      summary: 대량 쿠폰 발급 작업 등록
+      description: 대상 Snapshot과 기준 시각을 고정한 대량 발급 작업을 비동기로 접수한다.
+      operationId: createBulkCouponIssueJob
+      x-api-id: API.A.19-14
+      x-use-case: UC.A.19-11
+      x-command: CMD.A.19-08
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_14_create_bulk_coupon_issue_job.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBulkIssueJobRequest'
+      responses:
+        '202':
+          description: 대량 발급 작업을 등록했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkJobAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/bulk-coupon-issue-jobs/{bulkJobId}:
+    get:
+      tags:
+        - CouponOperations
+      summary: 대량 쿠폰 발급 작업 조회
+      description: 대량 작업 상태, 평가 기준 시각과 발급·실패 집계를 반환한다.
+      operationId: getBulkCouponIssueJob
+      x-api-id: API.A.19-15
+      x-use-case: UC.A.19-11
+      x-read-models:
+        - RM.A.19-04
+        - RM.A.19-05
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_15_get_bulk_coupon_issue_job.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BulkJobId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: 대량 발급 작업 상태와 집계를 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkJobResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-campaigns/{campaignId}/performance:
+    get:
+      tags:
+        - CouponCampaign
+      summary: 쿠폰 캠페인 성과 조회
+      description: 운영·마케팅 범위에서 캠페인의 발급·사용·회수 집계를 반환한다.
+      operationId: getCouponCampaignPerformance
+      x-api-id: API.A.19-16
+      x-use-case: UC.A.19-12
+      x-read-models:
+        - RM.A.19-04
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_16_get_coupon_campaign_performance.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CampaignId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 캠페인 성과 집계를 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignPerformanceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-operational-controls:
+    post:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 운영 중지 적용
+      description: 승인된 scope와 시각에 신규 발급 수량 예약과 신규 사용 예약을 중지한다.
+      operationId: applyCouponOperationalControl
+      x-api-id: API.A.19-17
+      x-use-case: UC.A.19-15
+      x-command: CMD.A.19-20
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_17_apply_coupon_operational_control.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyOperationalControlRequest'
+      responses:
+        '201':
+          description: 운영 control을 적용했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalControlResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-operational-controls/{controlId}/read-only-notice:
+    put:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 읽기 전용 안내 적용
+      description: 운영 control과 같은 scope의 안내 문구·적용 시각·활성 상태를 저장한다.
+      operationId: applyCouponReadOnlyNotice
+      x-api-id: API.A.19-18
+      x-use-case: UC.A.19-15
+      x-command: CMD.A.19-31
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_18_apply_coupon_read_only_notice.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ControlId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyReadOnlyNoticeRequest'
+      responses:
+        '200':
+          description: 읽기 전용 안내를 저장했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadOnlyNoticeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-event-recoveries:
+    get:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 이벤트 복구 목록 조회
+      description: 사용 이벤트 처리 실패와 재처리 상태를 Postgres 복구 원장에서 조회한다.
+      operationId: listCouponEventRecoveries
+      x-api-id: API.A.19-19
+      x-use-case: UC.A.19-16
+      x-read-models:
+        - RM.A.19-05
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_19_list_coupon_event_recoveries.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RecoveryStatus'
+        - name: originalOperationType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - reserve
+              - commit
+              - release
+              - revoke
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 권한 범위의 복구 항목을 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-event-recoveries/{recoveryId}/retry-attempts:
+    post:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 이벤트 복구 재시도
+      description: 승인된 복구 작업으로 새 attempt를 만들고 원본 사용 Command 재실행을 접수한다.
+      operationId: retryCouponEventRecovery
+      x-api-id: API.A.19-20
+      x-use-case: UC.A.19-17
+      x-command: CMD.A.19-21
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_20_retry_coupon_event_recovery.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RecoveryId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryRecoveryRequest'
+      responses:
+        '202':
+          description: 새 복구 attempt를 retry_pending으로 등록했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryAttemptAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-event-recoveries/{recoveryId}/finalization:
+    post:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 이벤트 복구 최종 실패
+      description: 승인된 운영 작업으로 사용 이벤트 복구를 failed_final 상태로 종료한다.
+      operationId: finalizeCouponEventRecovery
+      x-api-id: API.A.19-21
+      x-use-case: UC.A.19-17
+      x-command: CMD.A.19-25
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_21_finalize_coupon_event_recovery.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RecoveryId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeRecoveryRequest'
+      responses:
+        '200':
+          description: 복구를 최종 실패로 종료했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/users/{userId}/coupon-timeline:
+    get:
+      tags:
+        - CouponOperations
+      summary: 사용자 쿠폰 타임라인 조회
+      description: 승인된 CS 업무 범위에서 사용자의 발급·사용·회수·만료 사건을 조회한다.
+      operationId: getUserCouponTimeline
+      x-api-id: API.A.19-22
+      x-use-case: UC.A.19-18
+      x-read-models:
+        - RM.A.19-06
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_22_get_user_coupon_timeline.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/XCaseRef'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 승인된 범위의 쿠폰 타임라인을 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/compensation-coupon-issue-requests:
+    post:
+      tags:
+        - CouponOperations
+      summary: 보상 쿠폰 발급 요청
+      description: 승인된 CS·운영 보상 작업을 공통 CouponIssueRequest로 변환한다.
+      operationId: createCompensationCouponIssueRequest
+      x-api-id: API.A.19-23
+      x-use-case: UC.A.19-20
+      x-command: CMD.A.19-13
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_23_create_compensation_coupon_issue_request.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XApprovalRef'
+        - $ref: '#/components/parameters/XCaseRef'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompensationIssueRequest'
+      responses:
+        '202':
+          description: 보상 발급 요청을 접수했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessRejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-incidents/status:
+    get:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 장애 현황 조회
+      description: Postgres 업무 상태와 Redis·MQ·Worker 보조 signal의 기준 시각을 함께 반환한다.
+      operationId: getCouponIncidentStatus
+      x-api-id: API.A.19-24
+      x-use-case: UC.A.19-21
+      x-read-models:
+        - RM.A.19-07
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_24_get_coupon_incident_status.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: 쿠폰 업무·기술 signal 상태를 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentStatusResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/internal/coupon-cost-attributions:
+    get:
+      tags:
+        - CouponOperations
+      summary: 쿠폰 비용 귀속 조회
+      description: 주문·캠페인별 할인 비용 귀속과 회수 보정 항목을 cursor 방식으로 반환한다.
+      operationId: listCouponCostAttributions
+      x-api-id: API.A.19-25
+      x-use-case: UC.A.19-22
+      x-read-models:
+        - RM.A.19-08
+      x-service-design: SD.A.1940
+      x-design-doc: ../../API_A_19_25_list_coupon_cost_attributions.md
+      security:
+        - WorkloadBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: orderRef
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OpaqueRef'
+        - name: campaignId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/CampaignId'
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 비용 귀속과 보정 항목을 반환한다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostAttributionListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  securitySchemes:
+    WebSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-dm_session
+      description: Gateway가 검증하는 로그인 웹 Session cookie다.
+    WebCsrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: 현재 웹 Session과 묶인 CSRF token이다.
+    WebOrigin:
+      type: apiKey
+      in: header
+      name: Origin
+      description: Gateway가 허용 목록과 정확히 비교하는 웹 Origin이다.
+    MobileBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 로그인 사용자의 짧은 수명 모바일 access JWT다.
+    WorkloadBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 내부 Gateway·mesh가 issuer, audience, workload와 권한을 검증한 단기 workload JWT다.
+  schemas:
+    CampaignId:
+      type: string
+      pattern: ^camp_[A-Za-z0-9_-]{8,120}$
+      example: camp_01JXYZ1234567890ABCDEFGHJK
+    IssueRequestId:
+      type: string
+      pattern: ^ireq_[A-Za-z0-9_-]{8,120}$
+      example: ireq_01JXYZ1234567890ABCDEFGHJK
+    IssueAcceptedData:
+      type: object
+      required:
+        - issueRequestId
+        - status
+        - statusPath
+      additionalProperties: false
+      properties:
+        issueRequestId:
+          $ref: '#/components/schemas/IssueRequestId'
+        status:
+          type: string
+          enum:
+            - accepted
+        statusPath:
+          type: string
+          format: uri-reference
+          example: /api/v1/users/me/coupons?status=pending
+    ResponseMeta:
+      type: object
+      required:
+        - requestId
+      additionalProperties: false
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        asOf:
+          type: string
+          format: date-time
+    IssueAcceptedResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/IssueAcceptedData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ProblemViolation:
+      type: object
+      required:
+        - field
+        - reason
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          maxLength: 160
+        reason:
+          type: string
+          maxLength: 160
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - code
+        - retryable
+        - requestId
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+          maxLength: 160
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: ^COUPON_[A-Z0-9_]+$
+        detail:
+          type: string
+          maxLength: 500
+        retryable:
+          type: boolean
+        requestId:
+          type: string
+          format: uuid
+        violations:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ProblemViolation'
+    RedeemCouponCodeRequest:
+      type: object
+      required:
+        - code
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 128
+          writeOnly: true
+          description: 로그·trace·Event에 기록하지 않는 사용자 입력 코드 원문이다.
+          example: ABCD-1234-EFGH
+    WalletStatus:
+      type: string
+      enum:
+        - pending
+        - available
+        - reserved
+        - used
+        - reclaimed
+        - expired
+        - failed
+    UserCouponId:
+      type: string
+      pattern: ^ucpn_[A-Za-z0-9_-]{8,120}$
+      example: ucpn_01JXYZ1234567890ABCDEFGHJK
+    Money:
+      type: object
+      required:
+        - amount
+        - currency
+      additionalProperties: false
+      properties:
+        amount:
+          type: string
+          pattern: ^(0|[1-9][0-9]{0,17})(\.[0-9]{1,4})?$
+          example: '5000'
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+          example: KRW
+    Benefit:
+      type: object
+      required:
+        - type
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum:
+            - fixed_amount
+            - percentage
+            - shipping_fee
+        amount:
+          $ref: '#/components/schemas/Money'
+        percentage:
+          type: string
+          pattern: ^(100|[0-9]{1,2})(\.[0-9]{1,2})?$
+          example: '10'
+        maxDiscountAmount:
+          $ref: '#/components/schemas/Money'
+      description: type에 맞는 필드만 사용하며 서버가 조합 유효성을 검증한다.
+    WalletCoupon:
+      type: object
+      required:
+        - userCouponId
+        - campaignId
+        - displayName
+        - benefit
+        - status
+        - usableFrom
+        - expiresAt
+      additionalProperties: false
+      properties:
+        userCouponId:
+          $ref: '#/components/schemas/UserCouponId'
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        benefit:
+          $ref: '#/components/schemas/Benefit'
+        status:
+          $ref: '#/components/schemas/WalletStatus'
+        usableFrom:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    ControlId:
+      type: string
+      pattern: ^ctrl_[A-Za-z0-9_-]{8,120}$
+      example: ctrl_01JXYZ1234567890ABCDEFGHJK
+    ReadOnlyNotice:
+      type: object
+      required:
+        - controlId
+        - message
+        - effectiveFrom
+      additionalProperties: false
+      properties:
+        controlId:
+          $ref: '#/components/schemas/ControlId'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 500
+        effectiveFrom:
+          type: string
+          format: date-time
+    WalletCouponListData:
+      type: object
+      required:
+        - items
+        - activeNotices
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalletCoupon'
+        nextCursor:
+          type: string
+          maxLength: 512
+        activeNotices:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/ReadOnlyNotice'
+    WalletCouponListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WalletCouponListData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    OpaqueRef:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: ^[A-Za-z0-9._:/-]+$
+      example: order:order_01JXYZ1234567890ABCDEFGHJK
+    ExternalRef:
+      type: object
+      required:
+        - context
+        - type
+        - id
+      additionalProperties: false
+      properties:
+        context:
+          type: string
+          minLength: 1
+          maxLength: 64
+        type:
+          type: string
+          minLength: 1
+          maxLength: 64
+        id:
+          $ref: '#/components/schemas/OpaqueRef'
+    ApplicabilityPolicy:
+      type: object
+      required:
+        - policySchemaVersion
+        - includeTargets
+        - excludeTargets
+      additionalProperties: false
+      properties:
+        policySchemaVersion:
+          type: integer
+          enum:
+            - 1
+        includeTargets:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ExternalRef'
+        excludeTargets:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ExternalRef'
+        minimumOrderAmount:
+          $ref: '#/components/schemas/Money'
+        stackingPolicyRef:
+          $ref: '#/components/schemas/OpaqueRef'
+    IssuerAndFunding:
+      type: object
+      required:
+        - issuerType
+        - issuerRef
+        - funderType
+      additionalProperties: false
+      properties:
+        issuerType:
+          type: string
+          enum:
+            - platform
+            - seller
+            - partnership
+            - compensation
+        issuerRef:
+          $ref: '#/components/schemas/ExternalRef'
+        funderType:
+          type: string
+          enum:
+            - platform
+            - seller
+            - joint
+            - compensation
+        funderRef:
+          $ref: '#/components/schemas/ExternalRef'
+        platformSharePercentage:
+          type: string
+          pattern: ^(100|[0-9]{1,2})(\.[0-9]{1,2})?$
+    CouponDetailData:
+      type: object
+      required:
+        - userCouponId
+        - campaignId
+        - displayName
+        - benefit
+        - status
+        - usableFrom
+        - expiresAt
+        - policyVersion
+        - applicability
+        - issuerAndFunding
+      additionalProperties: false
+      properties:
+        userCouponId:
+          $ref: '#/components/schemas/UserCouponId'
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        benefit:
+          $ref: '#/components/schemas/Benefit'
+        status:
+          $ref: '#/components/schemas/WalletStatus'
+        usableFrom:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        policyVersion:
+          type: integer
+          minimum: 1
+        applicability:
+          $ref: '#/components/schemas/ApplicabilityPolicy'
+        issuerAndFunding:
+          $ref: '#/components/schemas/IssuerAndFunding'
+        activeNotice:
+          $ref: '#/components/schemas/ReadOnlyNotice'
+    CouponDetailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CouponDetailData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    SnapshotRef:
+      type: object
+      required:
+        - sourceRef
+        - sourceVersion
+        - capturedAt
+        - payloadHash
+      additionalProperties: false
+      properties:
+        sourceRef:
+          $ref: '#/components/schemas/ExternalRef'
+        sourceVersion:
+          type: string
+          minLength: 1
+          maxLength: 128
+        capturedAt:
+          type: string
+          format: date-time
+        payloadHash:
+          type: string
+          pattern: ^sha256:[A-Za-z0-9_-]{43}$
+    UserId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      example: usr_01JXYZ1234567890ABCDEFGHJK
+    OrderItemSnapshot:
+      type: object
+      required:
+        - productRef
+        - sellerRef
+        - quantity
+        - unitPrice
+      additionalProperties: false
+      properties:
+        productRef:
+          $ref: '#/components/schemas/ExternalRef'
+        dropRef:
+          $ref: '#/components/schemas/ExternalRef'
+        sellerRef:
+          $ref: '#/components/schemas/ExternalRef'
+        categoryRef:
+          $ref: '#/components/schemas/ExternalRef'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        unitPrice:
+          $ref: '#/components/schemas/Money'
+    OrderCandidateSnapshot:
+      type: object
+      required:
+        - snapshotRef
+        - orderId
+        - userId
+        - items
+        - shippingFee
+      additionalProperties: false
+      properties:
+        snapshotRef:
+          $ref: '#/components/schemas/SnapshotRef'
+        orderId:
+          $ref: '#/components/schemas/OpaqueRef'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/OrderItemSnapshot'
+        shippingFee:
+          $ref: '#/components/schemas/Money'
+    ValidateCouponRequest:
+      type: object
+      required:
+        - userCouponId
+        - orderSnapshot
+        - policyVersion
+      additionalProperties: false
+      properties:
+        userCouponId:
+          $ref: '#/components/schemas/UserCouponId'
+        orderSnapshot:
+          $ref: '#/components/schemas/OrderCandidateSnapshot'
+        policyVersion:
+          type: integer
+          minimum: 1
+        stackingPolicyRef:
+          $ref: '#/components/schemas/OpaqueRef'
+    RedemptionId:
+      type: string
+      pattern: ^redm_[A-Za-z0-9_-]{8,120}$
+      example: redm_01JXYZ1234567890ABCDEFGHJK
+    CostShare:
+      type: object
+      required:
+        - bearerType
+        - amount
+      additionalProperties: false
+      properties:
+        bearerType:
+          type: string
+          enum:
+            - platform
+            - seller
+            - joint
+            - compensation
+        bearerRef:
+          $ref: '#/components/schemas/ExternalRef'
+        amount:
+          $ref: '#/components/schemas/Money'
+    AggregateVersion:
+      type: integer
+      format: int64
+      minimum: 0
+      example: 3
+    CouponValidationData:
+      type: object
+      required:
+        - redemptionId
+        - eligible
+        - discount
+        - finalOrderAmount
+        - policyVersion
+        - orderSnapshotRef
+        - version
+      additionalProperties: false
+      properties:
+        redemptionId:
+          $ref: '#/components/schemas/RedemptionId'
+        eligible:
+          type: boolean
+        reasonCode:
+          type: string
+          maxLength: 80
+        discount:
+          $ref: '#/components/schemas/Money'
+        finalOrderAmount:
+          $ref: '#/components/schemas/Money'
+        costShares:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostShare'
+        policyVersion:
+          type: integer
+          minimum: 1
+        orderSnapshotRef:
+          $ref: '#/components/schemas/SnapshotRef'
+        version:
+          $ref: '#/components/schemas/AggregateVersion'
+    CouponValidationResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CouponValidationData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ExpectedVersionRequest:
+      type: object
+      required:
+        - expectedVersion
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+    RedemptionData:
+      type: object
+      required:
+        - redemptionId
+        - status
+        - version
+        - discount
+      additionalProperties: false
+      properties:
+        redemptionId:
+          $ref: '#/components/schemas/RedemptionId'
+        status:
+          type: string
+          enum:
+            - evaluated
+            - reserved
+            - confirmed
+            - released
+            - reclaimed
+        version:
+          $ref: '#/components/schemas/AggregateVersion'
+        discount:
+          $ref: '#/components/schemas/Money'
+        reservedUntil:
+          type: string
+          format: date-time
+        resultRef:
+          $ref: '#/components/schemas/ExternalRef'
+    RedemptionResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RedemptionData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    RedemptionTransitionRequest:
+      type: object
+      required:
+        - expectedVersion
+        - resultRef
+        - reasonCode
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+        resultRef:
+          $ref: '#/components/schemas/ExternalRef'
+        resultSnapshot:
+          $ref: '#/components/schemas/SnapshotRef'
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+    CreateCouponCampaignRequest:
+      type: object
+      required:
+        - displayName
+        - benefit
+        - applicability
+        - issuerAndFunding
+        - usableFrom
+        - expiresAt
+        - ownerSnapshot
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        benefit:
+          $ref: '#/components/schemas/Benefit'
+        applicability:
+          $ref: '#/components/schemas/ApplicabilityPolicy'
+        issuerAndFunding:
+          $ref: '#/components/schemas/IssuerAndFunding'
+        usableFrom:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        ownerSnapshot:
+          $ref: '#/components/schemas/SnapshotRef'
+        externalBusinessRef:
+          $ref: '#/components/schemas/OpaqueRef'
+    CampaignData:
+      type: object
+      required:
+        - campaignId
+        - status
+        - policyVersion
+        - version
+      additionalProperties: false
+      properties:
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        status:
+          type: string
+          enum:
+            - draft
+            - under_review
+            - approved
+            - rejected
+            - held
+            - active
+            - ended
+        policyVersion:
+          type: integer
+          minimum: 1
+        version:
+          $ref: '#/components/schemas/AggregateVersion'
+    CampaignResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CampaignData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ConfigureIssuanceRequest:
+      type: object
+      required:
+        - expectedVersion
+        - totalQuantity
+        - perUserLimit
+        - claimStartsAt
+        - claimEndsAt
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+        totalQuantity:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        perUserLimit:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        claimStartsAt:
+          type: string
+          format: date-time
+        claimEndsAt:
+          type: string
+          format: date-time
+    ReviewCampaignRequest:
+      type: object
+      required:
+        - expectedVersion
+        - decision
+        - reasonCode
+        - sellerOwnershipSnapshot
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+        decision:
+          type: string
+          enum:
+            - approved
+            - rejected
+            - held
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+        sellerOwnershipSnapshot:
+          $ref: '#/components/schemas/SnapshotRef'
+    CreatePolicyVersionRequest:
+      type: object
+      required:
+        - expectedVersion
+        - effectiveAt
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+        effectiveAt:
+          type: string
+          format: date-time
+        benefit:
+          $ref: '#/components/schemas/Benefit'
+        applicability:
+          $ref: '#/components/schemas/ApplicabilityPolicy'
+        issuerAndFunding:
+          $ref: '#/components/schemas/IssuerAndFunding'
+      minProperties: 3
+    CreateBulkIssueJobRequest:
+      type: object
+      required:
+        - campaignId
+        - audienceSnapshot
+        - evaluationAsOf
+        - operationTaskRef
+      additionalProperties: false
+      properties:
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        audienceSnapshot:
+          $ref: '#/components/schemas/SnapshotRef'
+        evaluationAsOf:
+          type: string
+          format: date-time
+        operationTaskRef:
+          $ref: '#/components/schemas/ExternalRef'
+    BulkJobId:
+      type: string
+      pattern: ^bjob_[A-Za-z0-9_-]{8,120}$
+      example: bjob_01JXYZ1234567890ABCDEFGHJK
+    BulkJobAcceptedData:
+      type: object
+      required:
+        - bulkJobId
+        - status
+        - statusPath
+      additionalProperties: false
+      properties:
+        bulkJobId:
+          $ref: '#/components/schemas/BulkJobId'
+        status:
+          type: string
+          enum:
+            - registered
+        statusPath:
+          type: string
+          format: uri-reference
+    BulkJobAcceptedResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BulkJobAcceptedData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    PerformanceCounts:
+      type: object
+      required:
+        - requested
+        - issued
+        - rejected
+        - failedFinal
+        - reserved
+        - confirmed
+        - released
+        - reclaimed
+      additionalProperties: false
+      properties:
+        requested:
+          type: integer
+          format: int64
+          minimum: 0
+        issued:
+          type: integer
+          format: int64
+          minimum: 0
+        rejected:
+          type: integer
+          format: int64
+          minimum: 0
+        failedFinal:
+          type: integer
+          format: int64
+          minimum: 0
+        reserved:
+          type: integer
+          format: int64
+          minimum: 0
+        confirmed:
+          type: integer
+          format: int64
+          minimum: 0
+        released:
+          type: integer
+          format: int64
+          minimum: 0
+        reclaimed:
+          type: integer
+          format: int64
+          minimum: 0
+    BulkJobData:
+      type: object
+      required:
+        - bulkJobId
+        - campaignId
+        - status
+        - counts
+        - evaluationAsOf
+      additionalProperties: false
+      properties:
+        bulkJobId:
+          $ref: '#/components/schemas/BulkJobId'
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        status:
+          type: string
+          enum:
+            - registered
+            - running
+            - completed
+            - failed
+        counts:
+          $ref: '#/components/schemas/PerformanceCounts'
+        evaluationAsOf:
+          type: string
+          format: date-time
+        nextCursorRef:
+          $ref: '#/components/schemas/OpaqueRef'
+    BulkJobResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BulkJobData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    CampaignPerformanceData:
+      type: object
+      required:
+        - campaignId
+        - counts
+      additionalProperties: false
+      properties:
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        counts:
+          $ref: '#/components/schemas/PerformanceCounts'
+        confirmedDiscount:
+          $ref: '#/components/schemas/Money'
+        reclaimedDiscount:
+          $ref: '#/components/schemas/Money'
+    CampaignPerformanceResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CampaignPerformanceData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    OperationalScope:
+      type: object
+      required:
+        - type
+        - ref
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum:
+            - campaign
+            - drop
+            - user_group
+        ref:
+          $ref: '#/components/schemas/ExternalRef'
+    ApplyOperationalControlRequest:
+      type: object
+      required:
+        - scope
+        - blockIssuance
+        - blockRedemption
+        - effectiveFrom
+        - active
+        - operationTaskRef
+      additionalProperties: false
+      properties:
+        scope:
+          $ref: '#/components/schemas/OperationalScope'
+        blockIssuance:
+          type: boolean
+        blockRedemption:
+          type: boolean
+        effectiveFrom:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        reasonCode:
+          type: string
+          maxLength: 80
+        operationTaskRef:
+          $ref: '#/components/schemas/ExternalRef'
+    OperationalControlData:
+      type: object
+      required:
+        - controlId
+        - scope
+        - blockIssuance
+        - blockRedemption
+        - effectiveFrom
+        - active
+        - version
+      additionalProperties: false
+      properties:
+        controlId:
+          $ref: '#/components/schemas/ControlId'
+        scope:
+          $ref: '#/components/schemas/OperationalScope'
+        blockIssuance:
+          type: boolean
+        blockRedemption:
+          type: boolean
+        effectiveFrom:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        version:
+          $ref: '#/components/schemas/AggregateVersion'
+    OperationalControlResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OperationalControlData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ApplyReadOnlyNoticeRequest:
+      type: object
+      required:
+        - expectedVersion
+        - message
+        - effectiveFrom
+        - active
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/AggregateVersion'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 500
+        effectiveFrom:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+    ReadOnlyNoticeResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required:
+            - controlId
+            - message
+            - effectiveFrom
+            - active
+            - version
+          additionalProperties: false
+          properties:
+            controlId:
+              $ref: '#/components/schemas/ControlId'
+            message:
+              type: string
+              minLength: 1
+              maxLength: 500
+            effectiveFrom:
+              type: string
+              format: date-time
+            active:
+              type: boolean
+            version:
+              $ref: '#/components/schemas/AggregateVersion'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    RecoveryStatus:
+      type: string
+      enum:
+        - recorded
+        - retry_pending
+        - retrying
+        - retry_failed
+        - completed
+        - failed_final
+    RecoveryId:
+      type: string
+      pattern: ^rcvy_[A-Za-z0-9_-]{8,120}$
+      example: rcvy_01JXYZ1234567890ABCDEFGHJK
+    AttemptId:
+      type: string
+      pattern: ^att_[A-Za-z0-9_-]{8,120}$
+      example: att_01JXYZ1234567890ABCDEFGHJK
+    RecoveryItem:
+      type: object
+      required:
+        - recoveryId
+        - status
+        - originalOperationType
+        - originalPayloadRef
+        - businessKeyRef
+        - attemptCount
+        - updatedAt
+      additionalProperties: false
+      properties:
+        recoveryId:
+          $ref: '#/components/schemas/RecoveryId'
+        status:
+          $ref: '#/components/schemas/RecoveryStatus'
+        originalOperationType:
+          type: string
+          enum:
+            - reserve
+            - commit
+            - release
+            - revoke
+        originalPayloadRef:
+          $ref: '#/components/schemas/ExternalRef'
+        businessKeyRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        attemptId:
+          $ref: '#/components/schemas/AttemptId'
+        attemptCount:
+          type: integer
+          minimum: 0
+        nextAttemptAt:
+          type: string
+          format: date-time
+        resultKind:
+          type: string
+          enum:
+            - transitioned
+            - already_applied
+            - failed
+        resultRef:
+          $ref: '#/components/schemas/ExternalRef'
+        failureCode:
+          type: string
+          maxLength: 80
+        updatedAt:
+          type: string
+          format: date-time
+    RecoveryListData:
+      type: object
+      required:
+        - items
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecoveryItem'
+        nextCursor:
+          type: string
+          maxLength: 512
+    RecoveryListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RecoveryListData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    RetryRecoveryRequest:
+      type: object
+      required:
+        - reasonCode
+        - operationTaskRef
+      additionalProperties: false
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+        operationTaskRef:
+          $ref: '#/components/schemas/ExternalRef'
+    RecoveryAttemptAcceptedData:
+      type: object
+      required:
+        - recoveryId
+        - attemptId
+        - status
+        - statusPath
+      additionalProperties: false
+      properties:
+        recoveryId:
+          $ref: '#/components/schemas/RecoveryId'
+        attemptId:
+          $ref: '#/components/schemas/AttemptId'
+        status:
+          type: string
+          enum:
+            - retry_pending
+        statusPath:
+          type: string
+          format: uri-reference
+    RecoveryAttemptAcceptedResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RecoveryAttemptAcceptedData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    FinalizeRecoveryRequest:
+      type: object
+      required:
+        - reasonCode
+        - operationTaskRef
+      additionalProperties: false
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+        operationTaskRef:
+          $ref: '#/components/schemas/ExternalRef'
+    RecoveryResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RecoveryItem'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    TimelineEvent:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - occurredAt
+        - resultRef
+      additionalProperties: false
+      properties:
+        eventId:
+          type: string
+          maxLength: 128
+        eventType:
+          type: string
+          pattern: ^EVT\.A\.19-[0-9]{2}$
+        occurredAt:
+          type: string
+          format: date-time
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        userCouponId:
+          $ref: '#/components/schemas/UserCouponId'
+        resultRef:
+          $ref: '#/components/schemas/ExternalRef'
+        publicReasonCode:
+          type: string
+          maxLength: 80
+    TimelineData:
+      type: object
+      required:
+        - items
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        nextCursor:
+          type: string
+          maxLength: 512
+    TimelineResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TimelineData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    CreateCompensationIssueRequest:
+      type: object
+      required:
+        - campaignId
+        - userId
+        - sourceRef
+        - reasonCode
+      additionalProperties: false
+      properties:
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        sourceRef:
+          $ref: '#/components/schemas/ExternalRef'
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+    SignalStatus:
+      type: object
+      required:
+        - status
+        - asOf
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - normal
+            - degraded
+            - critical
+            - unavailable
+        asOf:
+          type: string
+          format: date-time
+        lagSeconds:
+          type: integer
+          format: int64
+          minimum: 0
+    IncidentStatusData:
+      type: object
+      required:
+        - issuance
+        - redemption
+        - recovery
+        - postgres
+        - redis
+        - mq
+        - workers
+      additionalProperties: false
+      properties:
+        issuance:
+          $ref: '#/components/schemas/SignalStatus'
+        redemption:
+          $ref: '#/components/schemas/SignalStatus'
+        recovery:
+          $ref: '#/components/schemas/SignalStatus'
+        postgres:
+          $ref: '#/components/schemas/SignalStatus'
+        redis:
+          $ref: '#/components/schemas/SignalStatus'
+        mq:
+          $ref: '#/components/schemas/SignalStatus'
+        workers:
+          $ref: '#/components/schemas/SignalStatus'
+    IncidentStatusResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/IncidentStatusData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    CostAttributionItem:
+      type: object
+      required:
+        - attributionId
+        - orderRef
+        - redemptionId
+        - campaignId
+        - kind
+        - discount
+        - shares
+        - occurredAt
+      additionalProperties: false
+      properties:
+        attributionId:
+          type: string
+          maxLength: 128
+        orderRef:
+          $ref: '#/components/schemas/ExternalRef'
+        redemptionId:
+          $ref: '#/components/schemas/RedemptionId'
+        campaignId:
+          $ref: '#/components/schemas/CampaignId'
+        kind:
+          type: string
+          enum:
+            - confirmed
+            - reclaimed_adjustment
+        discount:
+          $ref: '#/components/schemas/Money'
+        shares:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CostShare'
+        occurredAt:
+          type: string
+          format: date-time
+    CostAttributionListData:
+      type: object
+      required:
+        - items
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostAttributionItem'
+        nextCursor:
+          type: string
+          maxLength: 512
+    CostAttributionListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CostAttributionListData'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+  parameters:
+    CampaignId:
+      name: campaignId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/CampaignId'
+    XRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: 클라이언트가 제안하며 Gateway가 검증·교체할 수 있는 요청 UUID다.
+      schema:
+        type: string
+        format: uuid
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C Trace Context traceparent다.
+      schema:
+        type: string
+        maxLength: 128
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: actor·workload와 업무 소유 범위에 묶는 고엔트로피 멱등 키다.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: ^[A-Za-z0-9._:-]+$
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: 서버가 발급한 불투명한 다음 페이지 cursor다.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    UserCouponId:
+      name: userCouponId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/UserCouponId'
+    RedemptionId:
+      name: redemptionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/RedemptionId'
+    XApprovalRefOptional:
+      name: X-Approval-Ref
+      in: header
+      required: false
+      description: 운영·CS workload가 회수를 요청할 때 필요한 승인 원본의 opaque 참조다.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 160
+    XApprovalRef:
+      name: X-Approval-Ref
+      in: header
+      required: true
+      description: 운영 작업 관리가 발급한 승인 원본의 opaque 참조다.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 160
+    BulkJobId:
+      name: bulkJobId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/BulkJobId'
+    ControlId:
+      name: controlId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ControlId'
+    RecoveryId:
+      name: recoveryId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/RecoveryId'
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/UserId'
+    XCaseRef:
+      name: X-Case-Ref
+      in: header
+      required: true
+      description: 승인된 CS 문의·업무의 opaque 참조다.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 160
+  headers:
+    XRequestId:
+      description: 응답 본문 meta.requestId와 같은 요청 식별자다.
+      schema:
+        type: string
+        format: uuid
+      example: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    CacheControlNoStore:
+      description: 응답을 브라우저와 중간 캐시에 저장하지 못하게 한다.
+      schema:
+        type: string
+        enum:
+          - private, no-store
+      example: private, no-store
+    Location:
+      description: 비동기 작업 또는 생성한 리소스의 상태 조회 상대 경로다.
+      schema:
+        type: string
+        format: uri-reference
+      example: /api/v1/users/me/coupons?status=pending
+    RetryAfter:
+      description: 다음 상태 조회 또는 재시도 전 기다릴 최소 초다.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+  responses:
+    BadRequest:
+      description: 요청 형식, header, cursor 또는 schema가 유효하지 않다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 400
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_INPUT_INVALID
+          example:
+            type: https://api.dropmong.example/problems/coupon-input-invalid
+            title: 요청 형식이 올바르지 않습니다.
+            status: 400
+            code: COUPON_INPUT_INVALID
+            detail: 입력값을 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    AuthenticationRequired:
+      description: 검증된 사용자 또는 workload credential이 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 401
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_AUTHENTICATION_REQUIRED
+          example:
+            type: https://api.dropmong.example/problems/coupon-authentication-required
+            title: 인증이 필요합니다.
+            status: 401
+            code: COUPON_AUTHENTICATION_REQUIRED
+            detail: 다시 로그인하거나 workload credential을 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    Forbidden:
+      description: 소유권, 역할, workload 범위 또는 승인 조건을 충족하지 않는다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 403
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_FORBIDDEN
+          example:
+            type: https://api.dropmong.example/problems/coupon-forbidden
+            title: 요청을 수행할 수 없습니다.
+            status: 403
+            code: COUPON_FORBIDDEN
+            detail: 권한과 승인 상태를 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    Conflict:
+      description: 멱등 key, version, 현재 상태 또는 운영 중지와 충돌한다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 409
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_IDEMPOTENCY_CONFLICT
+                      - COUPON_VERSION_CONFLICT
+                      - COUPON_STATE_CONFLICT
+                      - COUPON_OPERATION_STOPPED
+          example:
+            type: https://api.dropmong.example/problems/coupon-state-conflict
+            title: 현재 상태에서 요청을 수행할 수 없습니다.
+            status: 409
+            code: COUPON_STATE_CONFLICT
+            detail: 최신 상태와 최초 Idempotency-Key를 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    BusinessRejected:
+      description: 자격, 기간, 적용 대상, 할인, 수량 또는 정책 업무 규칙을 충족하지 않는다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 422
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_BUSINESS_RULE_REJECTED
+          example:
+            type: https://api.dropmong.example/problems/coupon-business-rule-rejected
+            title: 쿠폰을 적용할 수 없습니다.
+            status: 422
+            code: COUPON_BUSINESS_RULE_REJECTED
+            detail: 쿠폰 조건과 현재 주문을 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    RateLimited:
+      description: 공개 수령·코드 등록 또는 운영 보호 한도를 초과했다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 429
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_RATE_LIMITED
+          example:
+            type: https://api.dropmong.example/problems/coupon-rate-limited
+            title: 요청이 너무 많습니다.
+            status: 429
+            code: COUPON_RATE_LIMITED
+            detail: 잠시 뒤 다시 시도해주세요.
+            retryable: true
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    Unavailable:
+      description: 필수 Snapshot 원천, 승인 원천, 저장소 또는 Read Model을 사용할 수 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 503
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_DEPENDENCY_UNAVAILABLE
+          example:
+            type: https://api.dropmong.example/problems/coupon-dependency-unavailable
+            title: 쿠폰 서비스를 일시적으로 사용할 수 없습니다.
+            status: 503
+            code: COUPON_DEPENDENCY_UNAVAILABLE
+            detail: 잠시 뒤 다시 시도해주세요.
+            retryable: true
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    NotFound:
+      description: 현재 Principal·workload에 공개 가능한 대상을 찾을 수 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetails'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 404
+                  code:
+                    type: string
+                    enum:
+                      - COUPON_NOT_FOUND
+          example:
+            type: https://api.dropmong.example/problems/coupon-not-found
+            title: 쿠폰 정보를 찾을 수 없습니다.
+            status: 404
+            code: COUPON_NOT_FOUND
+            detail: 식별자와 접근 범위를 확인해주세요.
+            retryable: false
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8

@@ -12,6 +12,7 @@
 images:
   - auth-service
   - catalog-service
+  - coupon-service
   - dropmong-web
   - notification-service
   - order-service

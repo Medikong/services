@@ -35,3 +35,18 @@ func TestDecodeHeaderRejectsInvalidValues(t *testing.T) {
 		}
 	}
 }
+
+func TestEncodeDecodeHeaderPreservesServiceIdentity(t *testing.T) {
+	original := Principal{Type: TypeService, ServiceID: "checkout-service", Roles: []string{"coupon-redemption"}}
+	header, err := EncodeHeader(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeHeader(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Type != TypeService || decoded.ServiceID != original.ServiceID {
+		t.Fatalf("decoded = %+v", decoded)
+	}
+}
