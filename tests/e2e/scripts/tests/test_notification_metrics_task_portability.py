@@ -33,7 +33,7 @@ def test_log_and_notification_contexts_are_unique_and_cleanup_clone_failures() -
     )
     for task_name, next_task_name in task_pairs:
         task = task_body(task_name, next_task_name)
-        assert "uuid.uuid4().hex" in task
+        assert "print(uuid.uuid4().hex, end=\"\")" in task
         assert "context-${run_token}" in task
         assert task.index("trap '") < task.index("git clone --no-hardlinks")
         assert 'rm -rf "${context}"\n        git clone' not in task

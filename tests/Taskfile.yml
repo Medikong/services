@@ -696,7 +696,7 @@ tasks:
         python_bin='{{.PYTHON_BIN}}'
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-logs'
-        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex)')"
+        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex, end="")')"
         context="${repo_root}/tests/tmp/log-correlation-context-${run_token}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
@@ -719,7 +719,7 @@ tasks:
         python_bin='{{.PYTHON_BIN}}'
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-notification-metrics'
-        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex)')"
+        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex, end="")')"
         context="${repo_root}/tests/tmp/notification-metrics-context-${run_token}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
