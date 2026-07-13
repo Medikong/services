@@ -714,12 +714,15 @@ tasks:
         project='{{.E2E_COMPOSE_PROJECT}}-notification-metrics'
         context="${repo_root}/tests/tmp/notification-metrics-context"
         rm -rf "${context}"
-        mkdir -p "${context}"
-        git -C "${repo_root}" archive HEAD | tar -xf - -C "${context}"
+        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
         services="postgres kafka kafka-init catalog-service order-service payment-service notification-service"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
-        ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${services}
+        CATALOG_SERVICE_PORT=0 \
+        ORDER_SERVICE_PORT=0 \
+        PAYMENT_SERVICE_PORT=0 \
+        NOTIFICATION_SERVICE_PORT=0 \
+          ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${services}
         ${compose_cmd} -p "${project}" -f "${file}" build purchase-newman
         run_collection() {
           ${compose_cmd} -p "${project}" -f "${file}" run --rm --no-deps purchase-newman run "scenarios/$1.postman_collection.json" \
@@ -735,7 +738,14 @@ tasks:
           while [ "${attempts}" -lt 30 ]; do
             output="$(${compose_cmd} -p "${project}" -f "${file}" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh \
               --bootstrap-server kafka:29092 --group notification-service-notification-requested --describe 2>&1)"
-            lag="$(printf '%s\n' "${output}" | awk '$1 == "notification-service-notification-requested" && $2 == "notification.requested" { found=1; total += $6 } END { if (found) print total }')"
+            lag=""
+            while read -r group topic partition current_offset log_end_offset current_lag rest; do
+              if [ "${group}" = "notification-service-notification-requested" ] && [ "${topic}" = "notification.requested" ]; then
+                lag="${current_lag}"
+              fi
+            done <<EOF
+        ${output}
+        EOF
             if [ "${lag}" = "0" ]; then
               printf '%s\n' "${output}"
               return 0
