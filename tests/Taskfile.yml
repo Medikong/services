@@ -693,14 +693,15 @@ tasks:
       - |
         set -e
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        python_bin='{{.PYTHON_BIN}}'
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-logs'
-        context="${repo_root}/tests/tmp/log-correlation-context"
-        rm -rf "${context}"
-        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
+        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex)')"
+        context="${repo_root}/tests/tmp/log-correlation-context-${run_token}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
-        services="postgres kafka kafka-init tempo otel-collector loki alloy grafana catalog-service order-service payment-service notification-service"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
+        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
+        services="postgres kafka kafka-init tempo otel-collector loki alloy grafana catalog-service order-service payment-service notification-service"
         LOG_CORRELATION_COMPOSE_PROJECT="${project}" \
         OTEL_TRACES_EXPORTER=otlp \
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317 \
@@ -718,12 +719,12 @@ tasks:
         python_bin='{{.PYTHON_BIN}}'
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-notification-metrics'
-        context="${repo_root}/tests/tmp/notification-metrics-context"
-        rm -rf "${context}"
-        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
+        run_token="$("${python_bin}" -c 'import uuid; print(uuid.uuid4().hex)')"
+        context="${repo_root}/tests/tmp/notification-metrics-context-${run_token}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
-        services="postgres kafka kafka-init catalog-service order-service payment-service notification-service"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
+        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
+        services="postgres kafka kafka-init catalog-service order-service payment-service notification-service"
         CATALOG_SERVICE_PORT=0 \
         ORDER_SERVICE_PORT=0 \
         PAYMENT_SERVICE_PORT=0 \

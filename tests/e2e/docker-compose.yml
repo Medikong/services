@@ -75,7 +75,7 @@ services:
       - ./observability/tempo.yml:/etc/tempo.yml:ro
       - tempo-data:/tmp/tempo
     ports:
-      - "${TEMPO_PORT:-3200}:3200"
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
 
   otel-collector:
     image: otel/opentelemetry-collector:0.123.0
@@ -86,9 +86,9 @@ services:
       tempo:
         condition: service_started
     ports:
-      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
-      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
-      - "${OTEL_COLLECTOR_HEALTH_PORT:-13133}:13133"
+      - "127.0.0.1:${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+      - "127.0.0.1:${OTEL_COLLECTOR_HEALTH_PORT:-13133}:13133"
 
   loki:
     image: grafana/loki:3.7.0
@@ -159,7 +159,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${CATALOG_SERVICE_PORT:-18084}:8081"
+      - "127.0.0.1:${CATALOG_SERVICE_PORT:-18084}:8081"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz').read()"]
       interval: 5s
@@ -182,7 +182,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     ports:
-      - "${ORDER_SERVICE_PORT:-18085}:8082"
+      - "127.0.0.1:${ORDER_SERVICE_PORT:-18085}:8082"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/readyz').read()"]
       interval: 5s
@@ -205,7 +205,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     ports:
-      - "${PAYMENT_SERVICE_PORT:-18086}:8083"
+      - "127.0.0.1:${PAYMENT_SERVICE_PORT:-18086}:8083"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/readyz').read()"]
       interval: 5s
@@ -228,7 +228,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     ports:
-      - "${NOTIFICATION_SERVICE_PORT:-18087}:8084"
+      - "127.0.0.1:${NOTIFICATION_SERVICE_PORT:-18087}:8084"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/readyz').read()"]
       interval: 5s

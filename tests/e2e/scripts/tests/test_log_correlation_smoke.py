@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -10,6 +11,95 @@ SMOKE_DIR = Path(__file__).resolve().parents[2] / "log-correlation"
 sys.path.insert(0, str(SMOKE_DIR))
 
 import smoke  # noqa: E402
+
+
+def test_log_correlation_image_contains_smoke_dependencies() -> None:
+    dockerfile = (SMOKE_DIR / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY smoke.py /app/smoke.py" in dockerfile
+    assert "COPY http_client.py /app/http_client.py" in dockerfile
+    assert "COPY log_assertions.py /app/log_assertions.py" in dockerfile
+
+
+def test_query_loki_deduplicates_identical_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log = {
+        "event": "kafka.message.publish",
+        "service.name": "order-service",
+        "messaging.system": "kafka",
+        "messaging.operation": "publish",
+        "messaging.destination.name": "order.created",
+        "correlation_id": "order-123",
+        "trace_id": "a" * 32,
+        "span_id": "b" * 16,
+        "outcome": "success",
+    }
+    payload = {
+        "data": {
+            "result": [
+                {
+                    "stream": {"service": "order-service"},
+                    "values": [["1", json.dumps(log)], ["2", json.dumps(log)]],
+                }
+            ]
+        }
+    }
+    monkeypatch.setattr(smoke, "request_json", lambda *_args, **_kwargs: payload)
+
+    logs, _labels = smoke.query_loki("order-service", '"correlation_id":"order-123"')
+
+    assert logs == [log]
+
+
+def test_sensitive_data_check_accepts_allowlisted_kafka_metadata() -> None:
+    smoke.assert_sensitive_data_absent(
+        [
+            {
+                "event": "kafka.message.process",
+                "service.name": "notification-service",
+                "messaging.system": "kafka",
+                "messaging.operation": "process",
+                "messaging.destination.name": "notification.requested",
+                "messaging.kafka.partition": 0,
+                "messaging.kafka.message.offset": 42,
+                "correlation_id": "order-123",
+                "trace_id": "a" * 32,
+                "span_id": "b" * 16,
+                "outcome": "success",
+            }
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("headers", {"authorization": "Bearer secret"}),
+        ("kafka_key", "customer@example.com"),
+        ("correlation_id", "Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature"),
+        ("correlation_id", "customer@example.com"),
+        ("correlation_id", "4111111111111111"),
+    ],
+)
+def test_sensitive_data_check_rejects_unapproved_fields_and_values(
+    field: str,
+    value: str | dict[str, str],
+) -> None:
+    log = {
+        "event": "kafka.message.publish",
+        "service.name": "payment-service",
+        "messaging.system": "kafka",
+        "messaging.operation": "publish",
+        "messaging.destination.name": "payment.approved",
+        "correlation_id": "order-123",
+        "trace_id": "a" * 32,
+        "span_id": "b" * 16,
+        "outcome": "success",
+        field: value,
+    }
+
+    with pytest.raises(AssertionError):
+        smoke.assert_sensitive_data_absent([log])
 
 
 @pytest.mark.parametrize(

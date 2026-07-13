@@ -4,17 +4,25 @@ import json
 import os
 import time
 from typing import Any
-from urllib.error import HTTPError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 from uuid import uuid4
+
+from http_client import TIMEOUT_SECONDS, request_json, wait_ready
+from log_assertions import (
+    assert_log_graph,
+    assert_low_cardinality_labels,
+    assert_nonempty_ids,
+    assert_sensitive_data_absent,
+    assert_trace_link,
+    safe_log_fields,
+    unique_label_sets,
+)
 
 
 CATALOG_URL = os.environ.get("CATALOG_SERVICE_URL", "http://catalog-service:8081")
 ORDER_URL = os.environ.get("ORDER_SERVICE_URL", "http://order-service:8082")
 PAYMENT_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://payment-service:8083")
 LOKI_URL = os.environ.get("LOKI_URL", "http://loki:3100")
-TIMEOUT_SECONDS = int(os.environ.get("LOG_CORRELATION_TIMEOUT_SECONDS", "120"))
 COMPOSE_PROJECT = os.environ.get("LOG_CORRELATION_COMPOSE_PROJECT", "dropmong-log-correlation")
 USER_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
 
@@ -177,36 +185,6 @@ def assert_http_log(service: str, request_id: str) -> dict[str, Any]:
     }
 
 
-def safe_log_fields(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    fields = (
-        "service.name",
-        "messaging.operation",
-        "messaging.destination.name",
-        "messaging.kafka.partition",
-        "messaging.kafka.message.offset",
-        "correlation_id",
-        "trace_id",
-        "span_id",
-        "outcome",
-        "failure.code",
-    )
-    return [{field: log[field] for field in fields if field in log} for log in logs]
-
-
-def assert_trace_link(
-    http_log: dict[str, Any],
-    kafka_logs: list[dict[str, Any]],
-    topics: set[str],
-) -> None:
-    linked = [
-        log
-        for log in kafka_logs
-        if log.get("messaging.destination.name") in topics
-    ]
-    assert linked, f"no Kafka logs found for topics {sorted(topics)}"
-    assert {log.get("trace_id") for log in linked} == {http_log["trace_id"]}
-
-
 def wait_for_kafka_logs(correlation_id: str, *, expected: int) -> list[dict[str, Any]]:
     return wait_for_logs(
         "order-service|payment-service|notification-service",
@@ -245,6 +223,7 @@ def query_loki(
     )
     payload = request_json("GET", f"{LOKI_URL}/loki/api/v1/query_range?{params}")
     logs: list[dict[str, Any]] = []
+    seen_logs: set[str] = set()
     label_sets: list[dict[str, str]] = []
     for stream in payload.get("data", {}).get("result", []):
         labels = stream.get("stream", {})
@@ -256,97 +235,12 @@ def query_loki(
             except json.JSONDecodeError:
                 continue
             if isinstance(decoded, dict):
+                fingerprint = json.dumps(decoded, sort_keys=True, separators=(",", ":"))
+                if fingerprint in seen_logs:
+                    continue
+                seen_logs.add(fingerprint)
                 logs.append(decoded)
     return logs, label_sets
-
-
-def unique_label_sets(label_sets: list[dict[str, str]]) -> list[dict[str, str]]:
-    unique = {tuple(sorted(labels.items())) for labels in label_sets}
-    return [dict(items) for items in sorted(unique)]
-
-
-def assert_low_cardinality_labels(label_sets: list[dict[str, str]]) -> None:
-    assert label_sets, "Loki query returned no stream labels"
-    forbidden = {"request_id", "correlation_id", "trace_id", "span_id"}
-    for labels in label_sets:
-        assert forbidden.isdisjoint(labels), f"high-cardinality Loki labels: {sorted(forbidden & labels.keys())}"
-
-
-def assert_log_graph(
-    logs: list[dict[str, Any]],
-    expected: set[tuple[str, str, str]],
-    correlation_id: str,
-) -> None:
-    actual = {
-        (
-            str(log.get("service.name")),
-            str(log.get("messaging.operation")),
-            str(log.get("messaging.destination.name")),
-        )
-        for log in logs
-    }
-    missing = expected - actual
-    assert not missing, f"missing Kafka log pairs: {sorted(missing)}"
-    for log in logs:
-        assert log.get("correlation_id") == correlation_id
-        assert_nonempty_ids(log)
-        assert log.get("outcome") == "success"
-
-
-def assert_nonempty_ids(log: dict[str, Any]) -> None:
-    assert isinstance(log.get("trace_id"), str) and log["trace_id"]
-    assert isinstance(log.get("span_id"), str) and log["span_id"]
-
-
-def assert_sensitive_data_absent(logs: list[dict[str, Any]]) -> None:
-    forbidden_fields = {"authorization", "token", "card", "payload", "value", "kafka_value"}
-    serialized = json.dumps(logs).lower()
-    assert "4111111111111111" not in serialized
-    for log in logs:
-        for key in log:
-            normalized = key.lower().replace(".", "_").split("_")
-            assert forbidden_fields.isdisjoint(normalized), f"sensitive log field: {key}"
-
-
-def wait_ready(url: str) -> None:
-    deadline = time.monotonic() + TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        try:
-            with urlopen(url, timeout=5) as response:
-                if response.status == 200:
-                    return
-        except OSError:
-            pass
-        time.sleep(2)
-    raise AssertionError(f"endpoint did not become ready: {url}")
-
-
-def request_json(
-    method: str,
-    url: str,
-    *,
-    body: dict[str, Any] | None = None,
-    request_id: str | None = None,
-    headers: dict[str, str] | None = None,
-    expected_status: int = 200,
-) -> dict[str, Any]:
-    request_headers = dict(headers or {})
-    if request_id is not None:
-        request_headers["X-Request-Id"] = request_id
-    data = None
-    if body is not None:
-        request_headers["Content-Type"] = "application/json"
-        data = json.dumps(body).encode("utf-8")
-    request = Request(url, data=data, headers=request_headers, method=method)
-    try:
-        with urlopen(request, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-            if response.status != expected_status:
-                raise AssertionError(f"{method} {url}: expected {expected_status}, got {response.status}")
-            return payload
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")
-        raise AssertionError(f"{method} {url}: HTTP {error.code}: {detail}") from error
 
 
 if __name__ == "__main__":
