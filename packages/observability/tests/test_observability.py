@@ -795,6 +795,7 @@ def test_request_observability_emits_single_line_json_log(caplog, monkeypatch) -
     assert log["severity"] == "INFO"
     assert log["severity_text"] == "INFO"
     assert log["request_id"] == "11111111-1111-4111-8111-111111111111"
+    assert log["correlation_id"] == "11111111-1111-4111-8111-111111111111"
     assert log["client_action_id"] == "22222222-2222-4222-8222-222222222222"
     assert log["trace_id"]
     assert log["span_id"]

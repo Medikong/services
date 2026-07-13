@@ -24,6 +24,7 @@ def order_created_event(
         quantity=order.quantity,
         amount=order.amount,
         idempotencyKey=idempotency_key,
+        correlationId=order.id,
     )
 
 
@@ -38,4 +39,5 @@ def notification_requested_event(order: Order) -> NotificationRequestedEvent:
         orderId=order.id,
         title="주문이 확정되었습니다",
         message="DropMong 주문이 정상 처리되었습니다.",
+        correlationId=order.id,
     )

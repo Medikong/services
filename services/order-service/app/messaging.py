@@ -160,7 +160,11 @@ async def handle_payment_approved_message(
     value = message.value
     if value is None:
         return
-    with start_consumer_span(message, name="kafka.consume payment.approved"):
+    with start_consumer_span(
+        message,
+        service_name="order-service",
+        name="kafka.consume payment.approved",
+    ):
         try:
             event = PaymentApprovedEvent.model_validate_json(value)
         except ValidationError:
@@ -183,7 +187,12 @@ async def handle_payment_failed_message(
     value = message.value
     if value is None:
         return
-    with start_consumer_span(message, name="kafka.consume payment.failed"):
+    with start_consumer_span(
+        message,
+        service_name="order-service",
+        name="kafka.consume payment.failed",
+        failure_code="payment_failed_event",
+    ):
         try:
             event = PaymentFailedEvent.model_validate_json(value)
         except ValidationError:

@@ -10,11 +10,14 @@ from aiokafka import AIOKafkaProducer
 from opentelemetry import propagate, trace
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode
 
+from kafka_utils.logging import KafkaLogContext, log_kafka_operation
+from kafka_utils.propagation import (
+    CORRELATION_ID_HEADER,
+    KafkaHeaders,
+    build_producer_headers,
+    string_carrier,
+)
 
-TRACEPARENT_HEADER = "traceparent"
-TRACESTATE_HEADER = "tracestate"
-CORRELATION_ID_HEADER = "correlation_id"
-KafkaHeaders = list[tuple[str, bytes]]
 SpanAttributeValue = str | bool | int | float
 KafkaProducerOption: TypeAlias = Callable[["_KafkaProducerSendConfig"], None]
 
@@ -29,8 +32,9 @@ class _KafkaProducerSendConfig:
 
 
 class TraceAwareKafkaProducer:
-    def __init__(self, raw_producer: AIOKafkaProducer) -> None:
+    def __init__(self, raw_producer: AIOKafkaProducer, *, service_name: str) -> None:
         self._producer = raw_producer
+        self._service_name = service_name
 
     @property
     def raw_producer(self) -> AIOKafkaProducer:
@@ -56,12 +60,20 @@ class TraceAwareKafkaProducer:
             name=send_options.span_name,
             attributes=_span_attributes_for_options(send_options),
         ) as span:
+            log_context = KafkaLogContext(
+                service_name=self._service_name,
+                operation="publish",
+                topic=topic,
+                partition=partition,
+                correlation_id=_string_value(send_options.correlation_id) or "",
+                span=span,
+            )
             resolved_headers = _merge_headers(
                 headers,
                 build_producer_headers(correlation_id=send_options.correlation_id),
             )
             try:
-                return await self._producer.send(
+                result = await self._producer.send(
                     topic,
                     value=value,
                     key=key,
@@ -71,7 +83,10 @@ class TraceAwareKafkaProducer:
                 )
             except Exception as exc:
                 _record_producer_exception(span, exc)
+                log_kafka_operation(log_context, "failure", type(exc).__name__)
                 raise
+            log_kafka_operation(log_context, "success")
+            return result
 
     async def send_and_wait(
         self,
@@ -90,12 +105,20 @@ class TraceAwareKafkaProducer:
             name=send_options.span_name,
             attributes=_span_attributes_for_options(send_options),
         ) as span:
+            log_context = KafkaLogContext(
+                service_name=self._service_name,
+                operation="publish",
+                topic=topic,
+                partition=partition,
+                correlation_id=_string_value(send_options.correlation_id) or "",
+                span=span,
+            )
             resolved_headers = _merge_headers(
                 headers,
                 build_producer_headers(correlation_id=send_options.correlation_id),
             )
             try:
-                return await self._producer.send_and_wait(
+                result = await self._producer.send_and_wait(
                     topic,
                     value=value,
                     key=key,
@@ -105,7 +128,23 @@ class TraceAwareKafkaProducer:
                 )
             except Exception as exc:
                 _record_producer_exception(span, exc)
+                log_kafka_operation(log_context, "failure", type(exc).__name__)
                 raise
+            result_partition = getattr(result, "partition", None)
+            result_offset = getattr(result, "offset", None)
+            log_kafka_operation(
+                KafkaLogContext(
+                    service_name=log_context.service_name,
+                    operation=log_context.operation,
+                    topic=log_context.topic,
+                    partition=result_partition if isinstance(result_partition, int) else partition,
+                    offset=result_offset if isinstance(result_offset, int) else None,
+                    correlation_id=log_context.correlation_id,
+                    span=log_context.span,
+                ),
+                "success",
+            )
+            return result
 
 
 def create_kafka_producer(
@@ -123,7 +162,10 @@ def create_kafka_producer(
     }
     if client_id is not None:
         producer_kwargs["client_id"] = client_id
-    return TraceAwareKafkaProducer(producer_factory(**producer_kwargs))
+    return TraceAwareKafkaProducer(
+        producer_factory(**producer_kwargs),
+        service_name=client_id or "unknown-service",
+    )
 
 
 def with_trace_context(trace_context: Mapping[str, object] | None) -> KafkaProducerOption:
@@ -162,24 +204,6 @@ def with_span_attributes(span_attributes: Mapping[str, SpanAttributeValue] | Non
     return apply
 
 
-def build_producer_headers(
-    *,
-    correlation_id: str | None = None,
-    carrier: Mapping[str, str] | None = None,
-) -> KafkaHeaders:
-    resolved_carrier: dict[str, str] = {}
-    if carrier is None:
-        propagate.inject(resolved_carrier)
-    else:
-        resolved_carrier.update(_string_carrier(carrier))
-
-    resolved_correlation_id = _string_value(correlation_id)
-    if resolved_correlation_id:
-        resolved_carrier[CORRELATION_ID_HEADER] = resolved_correlation_id
-
-    return [(key, value.encode("utf-8")) for key, value in resolved_carrier.items() if key in _ALLOWED_HEADERS]
-
-
 @contextmanager
 def start_producer_span(
     topic: str,
@@ -188,7 +212,7 @@ def start_producer_span(
     name: str | None = None,
     attributes: Mapping[str, SpanAttributeValue] | None = None,
 ) -> Iterator[Span]:
-    resolved_carrier = _string_carrier(carrier or {})
+    resolved_carrier = string_carrier(carrier or {})
     parent_context = propagate.extract(resolved_carrier) if resolved_carrier else None
     tracer = trace.get_tracer("kafka_utils.producer")
     span_attributes = kafka_producer_attributes(topic, carrier=resolved_carrier)
@@ -204,54 +228,6 @@ def start_producer_span(
 
     with tracer.start_as_current_span(name or f"kafka.produce {topic}", **span_kwargs) as span:
         yield span
-
-
-def headers_to_carrier(headers: Sequence[tuple[str | bytes, bytes]] | None) -> dict[str, str]:
-    carrier: dict[str, str] = {}
-    for key, value in headers or ():
-        decoded_key = key.decode("utf-8") if isinstance(key, bytes) else key
-        if decoded_key not in _ALLOWED_HEADERS:
-            continue
-        carrier[decoded_key] = value.decode("utf-8")
-    return carrier
-
-
-@contextmanager
-def start_consumer_span(message: Any, *, name: str | None = None) -> Iterator[Span]:
-    topic = str(getattr(message, "topic", "unknown"))
-    carrier = headers_to_carrier(getattr(message, "headers", None))
-    parent_context = propagate.extract(carrier)
-    tracer = trace.get_tracer("kafka_utils.consumer")
-    span_name = name or f"kafka.consume {topic}"
-
-    with tracer.start_as_current_span(
-        span_name,
-        context=parent_context,
-        kind=SpanKind.CONSUMER,
-        attributes=kafka_message_attributes(message, carrier=carrier),
-    ) as span:
-        yield span
-
-
-def kafka_message_attributes(message: Any, *, carrier: Mapping[str, str] | None = None) -> dict[str, str | int]:
-    topic = str(getattr(message, "topic", "unknown"))
-    attributes: dict[str, str | int] = {
-        "messaging.system": "kafka",
-        "messaging.destination.name": topic,
-        "messaging.operation": "process",
-    }
-    partition = getattr(message, "partition", None)
-    offset = getattr(message, "offset", None)
-    if isinstance(partition, int):
-        attributes["messaging.kafka.partition"] = partition
-    if isinstance(offset, int):
-        attributes["messaging.kafka.message.offset"] = offset
-
-    correlation_id = (carrier or headers_to_carrier(getattr(message, "headers", None))).get(CORRELATION_ID_HEADER)
-    if correlation_id:
-        attributes[CORRELATION_ID_HEADER] = correlation_id
-    return attributes
-
 
 def kafka_producer_attributes(topic: str, *, carrier: Mapping[str, str] | None = None) -> dict[str, str]:
     attributes = {
@@ -276,17 +252,6 @@ def _string_value(value: object) -> str | None:
     return text or None
 
 
-def _string_carrier(carrier: Mapping[str, str]) -> dict[str, str]:
-    resolved: dict[str, str] = {}
-    for key, value in carrier.items():
-        resolved_key = _string_value(key)
-        resolved_value = _string_value(value)
-        if resolved_key is None or resolved_value is None:
-            continue
-        resolved[resolved_key] = resolved_value
-    return resolved
-
-
 def _build_send_config(producer_options: Sequence[KafkaProducerOption]) -> _KafkaProducerSendConfig:
     config = _KafkaProducerSendConfig()
     for option in producer_options:
@@ -296,7 +261,7 @@ def _build_send_config(producer_options: Sequence[KafkaProducerOption]) -> _Kafk
 
 def _trace_carrier_for_options(options: _KafkaProducerSendConfig) -> dict[str, str] | None:
     if options.trace_carrier is not None:
-        return _string_carrier(options.trace_carrier)
+        return string_carrier(options.trace_carrier)
 
     trace_context = options.trace_context
     if not isinstance(trace_context, Mapping):
@@ -341,6 +306,3 @@ def _merge_headers(
 def _record_producer_exception(span: Span, exc: Exception) -> None:
     span.record_exception(exc)
     span.set_status(Status(StatusCode.ERROR, str(exc)))
-
-
-_ALLOWED_HEADERS = {TRACEPARENT_HEADER, TRACESTATE_HEADER, CORRELATION_ID_HEADER}

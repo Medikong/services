@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
+import json
+import logging
+import re
 from typing import Any
 
 import pytest
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanContext, SpanKind, TraceFlags
 
 from kafka_utils import (
     TraceAwareKafkaProducer,
@@ -21,6 +25,8 @@ from kafka_utils import producer as producer_module
 
 
 EVENT_ID = "6c98a5ce-8913-5597-9ad7-c617f71f0be3"
+TRACE_ID = "4f3b2c1a9d8e7f60123456789abcdef0"
+SPAN_ID = "6f1a2b3c4d5e6f70"
 
 
 def test_create_kafka_producer_returns_none_without_kafka_config() -> None:
@@ -133,7 +139,7 @@ def test_start_consumer_span_extracts_trace_headers(monkeypatch) -> None:
         ],
     )
 
-    with start_consumer_span(message):
+    with start_consumer_span(message, service_name="order-service"):
         pass
 
     assert extracted == [
@@ -173,7 +179,7 @@ def test_start_consumer_span_without_trace_headers_starts_root_span(monkeypatch)
     message = FakeMessage(topic="payment-approved", headers=None)
 
     with producer_module.trace.use_span(active_span, end_on_exit=False):
-        with start_consumer_span(message):
+        with start_consumer_span(message, service_name="order-service"):
             pass
 
     assert parent_is_valid == [False]
@@ -250,7 +256,7 @@ def test_trace_aware_producer_send_and_wait_extracts_stored_parent_and_injects_p
     monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
 
     result = run_async(
-        TraceAwareKafkaProducer(raw_producer).send_and_wait(
+        TraceAwareKafkaProducer(raw_producer, service_name="payment-service").send_and_wait(
             "payment-approved",
             {"eventId": EVENT_ID},
             with_trace_context(
@@ -303,7 +309,7 @@ def test_trace_aware_producer_merges_headers_with_wrapper_trace_priority(monkeyp
     monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer([]))
 
     run_async(
-        TraceAwareKafkaProducer(raw_producer).send_and_wait(
+        TraceAwareKafkaProducer(raw_producer, service_name="payment-service").send_and_wait(
             "payment-approved",
             {"eventId": EVENT_ID},
             with_correlation_id("wrapper-correlation"),
@@ -322,17 +328,121 @@ def test_trace_aware_producer_merges_headers_with_wrapper_trace_priority(monkeyp
     ]
 
 
-def test_trace_aware_producer_send_and_wait_failure_is_not_swallowed(monkeypatch) -> None:
+def test_trace_aware_producer_send_and_wait_failure_is_not_swallowed(monkeypatch, caplog) -> None:
     raw_producer = FailingProducer({})
     started: list[dict[str, object]] = []
     monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
+    caplog.set_level(logging.INFO)
 
     with pytest.raises(RuntimeError, match="kafka publish failed"):
-        run_async(TraceAwareKafkaProducer(raw_producer).send_and_wait("payment-approved", {"eventId": EVENT_ID}))
+        run_async(
+            TraceAwareKafkaProducer(raw_producer, service_name="payment-service").send_and_wait(
+                "payment-approved",
+                {"token": "producer-secret", "card_number": "4111111111111111"},
+                with_correlation_id("order-001"),
+            )
+        )
 
     span = started[0]["span"]
     assert span.recorded_exceptions == ["kafka publish failed"]
     assert span.status.description == "kafka publish failed"
+    log = kafka_log(caplog.records, "kafka.message.publish")
+    assert log["service.name"] == "payment-service"
+    assert log["messaging.operation"] == "publish"
+    assert log["messaging.destination.name"] == "payment-approved"
+    assert log["correlation_id"] == "order-001"
+    assert log["trace_id"] == TRACE_ID
+    assert log["span_id"] == SPAN_ID
+    assert log["outcome"] == "failure"
+    assert log["failure.code"] == "RuntimeError"
+    assert_safe_log(log, forbidden_values=("producer-secret", "4111111111111111"))
+
+
+def test_trace_aware_producer_logs_correlated_publish_metadata(monkeypatch, caplog) -> None:
+    raw_producer = MetadataProducer({})
+    started: list[dict[str, object]] = []
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
+    caplog.set_level(logging.INFO)
+
+    result = run_async(
+        TraceAwareKafkaProducer(raw_producer, service_name="payment-service").send_and_wait(
+            "payment.approved",
+            {"value": "payload-secret", "card_token": "card-secret"},
+            with_correlation_id("order-001"),
+        )
+    )
+
+    assert result == FakeRecordMetadata(partition=2, offset=41)
+    log = kafka_log(caplog.records, "kafka.message.publish")
+    assert log == {
+        "event": "kafka.message.publish",
+        "service.name": "payment-service",
+        "messaging.system": "kafka",
+        "messaging.operation": "publish",
+        "messaging.destination.name": "payment.approved",
+        "messaging.kafka.partition": 2,
+        "messaging.kafka.message.offset": 41,
+        "correlation_id": "order-001",
+        "trace_id": TRACE_ID,
+        "span_id": SPAN_ID,
+        "outcome": "success",
+    }
+    assert_safe_log(log, forbidden_values=("payload-secret", "card-secret"))
+
+
+def test_consumer_span_logs_safe_correlated_processing_metadata(monkeypatch, caplog) -> None:
+    started: list[dict[str, object]] = []
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
+    caplog.set_level(logging.INFO)
+    message = FakeMessage(
+        topic="payment.approved",
+        partition=3,
+        offset=42,
+        headers=[("correlation_id", b"order-001")],
+        value=b'{"token":"consumer-secret","card":"4111111111111111"}',
+    )
+
+    with start_consumer_span(message, service_name="order-service"):
+        pass
+
+    log = kafka_log(caplog.records, "kafka.message.process")
+    assert log == {
+        "event": "kafka.message.process",
+        "service.name": "order-service",
+        "messaging.system": "kafka",
+        "messaging.operation": "process",
+        "messaging.destination.name": "payment.approved",
+        "messaging.kafka.partition": 3,
+        "messaging.kafka.message.offset": 42,
+        "correlation_id": "order-001",
+        "trace_id": TRACE_ID,
+        "span_id": SPAN_ID,
+        "outcome": "success",
+    }
+    assert_safe_log(log, forbidden_values=("consumer-secret", "4111111111111111"))
+
+
+def test_consumer_span_bounds_failure_code_and_omits_exception_message(monkeypatch, caplog) -> None:
+    started: list[dict[str, object]] = []
+    monkeypatch.setattr(producer_module.trace, "get_tracer", lambda name: FakeTracer(started))
+    caplog.set_level(logging.INFO)
+    message = FakeMessage(
+        topic="order.created",
+        partition=0,
+        offset=7,
+        headers=[("correlation_id", b"order-002")],
+    )
+
+    with pytest.raises(VeryLongKafkaFailureCodeThatMustBeBoundedBeforeItReachesStructuredLogs):
+        with start_consumer_span(message, service_name="payment-service"):
+            raise VeryLongKafkaFailureCodeThatMustBeBoundedBeforeItReachesStructuredLogs(
+                "token=consumer-secret card=4111111111111111"
+            )
+
+    log = kafka_log(caplog.records, "kafka.message.process")
+    assert log["outcome"] == "failure"
+    assert re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", log["failure.code"])
+    assert_safe_log(log, forbidden_values=("consumer-secret", "4111111111111111"))
 
 
 class FakeProducer:
@@ -354,10 +464,31 @@ class FailingProducer(FakeProducer):
         raise RuntimeError("kafka publish failed")
 
 
+@dataclass(frozen=True, slots=True)
+class FakeRecordMetadata:
+    partition: int
+    offset: int
+
+
+class MetadataProducer(FakeProducer):
+    async def send_and_wait(self, topic: str, **kwargs: object) -> FakeRecordMetadata:
+        self.sent.append({"topic": topic, **kwargs})
+        return FakeRecordMetadata(partition=2, offset=41)
+
+
 class FakeSpan:
     def __init__(self) -> None:
         self.recorded_exceptions: list[str] = []
         self.status: object | None = None
+        self._context = SpanContext(
+            trace_id=int(TRACE_ID, 16),
+            span_id=int(SPAN_ID, 16),
+            is_remote=False,
+            trace_flags=TraceFlags(1),
+        )
+
+    def get_span_context(self) -> SpanContext:
+        return self._context
 
     def record_exception(self, exc: Exception) -> None:
         self.recorded_exceptions.append(str(exc))
@@ -376,17 +507,47 @@ class FakeTracer:
 
         @contextmanager
         def span_context():
-            yield span
+            with producer_module.trace.use_span(span, end_on_exit=False):
+                yield span
 
         return span_context()
 
 
 class FakeMessage:
-    def __init__(self, *, topic: str, headers: list[tuple[str, bytes]] | None) -> None:
+    def __init__(
+        self,
+        *,
+        topic: str,
+        headers: list[tuple[str, bytes]] | None,
+        partition: int = 0,
+        offset: int = 0,
+        value: bytes | None = None,
+    ) -> None:
         self.topic = topic
         self.headers = headers
-        self.partition = 0
-        self.offset = 0
+        self.partition = partition
+        self.offset = offset
+        self.value = value
+
+
+class VeryLongKafkaFailureCodeThatMustBeBoundedBeforeItReachesStructuredLogs(RuntimeError):
+    pass
+
+
+def kafka_log(records: list[logging.LogRecord], event: str) -> dict[str, Any]:
+    for record in reversed(records):
+        payload = json.loads(record.getMessage())
+        if payload.get("event") == event:
+            return payload
+    raise AssertionError(f"missing {event} log")
+
+
+def assert_safe_log(log: dict[str, Any], *, forbidden_values: tuple[str, ...]) -> None:
+    serialized = json.dumps(log)
+    for field in log:
+        assert not {"payload", "value", "token", "card"}.intersection(field.lower().replace(".", "_").split("_"))
+    for forbidden_value in forbidden_values:
+        assert forbidden_value not in serialized
 
 
 def run_async(awaitable):

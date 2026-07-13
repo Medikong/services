@@ -128,7 +128,11 @@ async def handle_order_created_message(
     value = message.value
     if value is None:
         return
-    with start_consumer_span(message, name="kafka.consume order.created"):
+    with start_consumer_span(
+        message,
+        service_name="payment-service",
+        name="kafka.consume order.created",
+    ):
         try:
             event = OrderCreatedEvent.model_validate_json(value)
         except ValidationError:

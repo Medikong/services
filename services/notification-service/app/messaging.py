@@ -58,7 +58,11 @@ async def handle_notification_requested_message(
     value = message.value
     if value is None:
         return
-    with start_consumer_span(message, name="kafka.consume notification.requested"):
+    with start_consumer_span(
+        message,
+        service_name="notification-service",
+        name="kafka.consume notification.requested",
+    ):
         try:
             event = NotificationRequestedEvent.model_validate_json(value)
             await repository.record_notification_requested(event)

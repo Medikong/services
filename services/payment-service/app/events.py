@@ -18,6 +18,7 @@ def payment_approved_event(payment: Payment) -> PaymentApprovedEvent:
         orderId=payment.orderId,
         paymentId=payment.id,
         amount=payment.amount,
+        correlationId=payment.orderId,
     )
 
 
@@ -32,4 +33,5 @@ def payment_failed_event(payment: Payment) -> PaymentFailedEvent:
         paymentId=payment.id,
         amount=payment.amount,
         reason=payment.failureReason,
+        correlationId=payment.orderId,
     )
