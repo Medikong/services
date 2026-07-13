@@ -121,6 +121,7 @@ def run_purchase(drop_id: str, product_id: str, amount: int, *, fail: bool) -> d
         expected_status=201,
     )
     order_id = str(order_payload["data"]["id"])
+    wait_order_status(order_id, "READY_FOR_PAYMENT")
     payment_request_id = str(uuid4())
     path = "mock-failures" if fail else "mock-approvals"
     payment_body: dict[str, Any] = {
@@ -138,8 +139,7 @@ def run_purchase(drop_id: str, product_id: str, amount: int, *, fail: bool) -> d
         headers={**USER_HEADERS, "Idempotency-Key": f"log-payment-{suffix}"},
         expected_status=201,
     )
-    expected_order_status = "PAYMENT_FAILED" if fail else "CONFIRMED"
-    wait_order_status(order_id, expected_order_status)
+    wait_order_status(order_id, "PAYMENT_FAILED" if fail else "CONFIRMED")
     return {
         "order_id": order_id,
         "order_request_id": order_request_id,
