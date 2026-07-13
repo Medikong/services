@@ -249,6 +249,13 @@ tasks:
         vars:
           E2E_REPORT_NAME: '{{default "purchase-kafka-traces" .E2E_REPORT_NAME}}'
 
+  purchase-e2e-with-log-correlation:
+    desc: Run purchase log-correlation assertions in Loki.
+    cmds:
+      - task: tests:purchase-e2e-with-log-correlation
+        vars:
+          E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
+
   purchase-e2e-with-notification-metrics:
     desc: Assert notification business metrics and Kafka consumer lag recovery.
     cmds:
@@ -268,6 +275,15 @@ tasks:
         vars:
           PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
           PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
+
+  purchase-internal-regression:
+    desc: Run the Gateway-excluded, internal-only purchase regression from committed HEAD.
+    env:
+      INTERNAL_REGRESSION_SOURCE_ROOT: '{{.TASKFILE_DIR}}'
+      INTERNAL_REGRESSION_PROJECT_PREFIX: '{{default "dropmong-g009-internal-regression" .INTERNAL_REGRESSION_PROJECT_PREFIX}}'
+      INTERNAL_REGRESSION_TASK_BIN: '{{default "" .INTERNAL_REGRESSION_TASK_BIN}}'
+    cmds:
+      - '"{{.PYTHON_BIN}}" "{{.TASKFILE_DIR}}/tests/e2e/scripts/run_purchase_internal_regression.py"'
 
   benchmark-concert-public-api:
     cmds:
