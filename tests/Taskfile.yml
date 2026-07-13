@@ -593,22 +593,28 @@ tasks:
         validate_name() {
           label="$1"
           value="$2"
-          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9._-]+$'; then
-            die "${label} must match [A-Za-z0-9._-]+: ${value}"
-          fi
+          case "${value}" in
+            ""|*[!A-Za-z0-9._-]*)
+              die "${label} must match [A-Za-z0-9._-]+: ${value}"
+              ;;
+          esac
         }
         validate_positive_integer() {
           label="$1"
           value="$2"
-          if ! printf '%s' "${value}" | grep -Eq '^[1-9][0-9]*$'; then
-            die "${label} must be a positive integer: ${value}"
-          fi
+          case "${value}" in
+            ""|*[!0123456789]*|0*)
+              die "${label} must be a positive integer: ${value}"
+              ;;
+          esac
         }
         validate_newman_image() {
           value="$1"
-          if ! printf '%s' "${value}" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/:@-]*$'; then
-            die "NEWMAN_IMAGE must be a container image reference and cannot begin with -: ${value}"
-          fi
+          case "${value}" in
+            ""|[!A-Za-z0-9]*|*[!A-Za-z0-9._/:@-]*)
+              die "NEWMAN_IMAGE must be a container image reference and cannot begin with -: ${value}"
+              ;;
+          esac
         }
         compose() {
           case "${PURCHASE_KAFKA_TRACES_DOCKER_COMPOSE}" in
