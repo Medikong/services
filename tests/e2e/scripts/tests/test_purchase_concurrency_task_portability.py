@@ -14,6 +14,10 @@ def test_purchase_concurrency_task_uses_portable_shell_validation() -> None:
     )[0]
 
     assert "grep" not in task
+    assert "$(date " not in task
+    assert "date -u" not in task
+    assert "PURCHASE_CONCURRENCY_PYTHON_BIN: '{{.PYTHON_BIN}}'" in task
+    assert 'python_bin="${PURCHASE_CONCURRENCY_PYTHON_BIN}"' in task
     assert '""|*[!A-Za-z0-9._-]*)' in task
     assert '""|*[!0123456789]*|0*)' in task
     assert '""|[!A-Za-z0-9]*|*[!A-Za-z0-9._/:@-]*)' in task
@@ -36,6 +40,9 @@ def test_purchase_concurrency_task_uses_portable_shell_validation() -> None:
     assert task.count('active_orders="${db_result%%|*}"') == 1
     assert task.count('reserved_quantity="${db_result#*|}"') == 1
     assert task.count('""|*[!0123456789]*)') >= 2
+    assert 'time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())' in task
+    assert 'uuid.uuid4().hex[:12], end="")' in task
+    assert 'run_id="purchase-concurrency-${run_suffix}"' in task
     assert (
         'if [ "${active_orders}" -ne 4 ] || '
         '[ "${reserved_quantity}" -ne 40 ] || '

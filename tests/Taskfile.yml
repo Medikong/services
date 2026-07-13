@@ -773,6 +773,7 @@ tasks:
     desc: Run the purchase concurrency smoke and verify active database reservations.
     env:
       PURCHASE_CONCURRENCY_ROOT_DIR: '{{.ROOT_DIR}}'
+      PURCHASE_CONCURRENCY_PYTHON_BIN: '{{.PYTHON_BIN}}'
       PURCHASE_CONCURRENCY_DOCKER_COMPOSE: '{{.DOCKER_COMPOSE}}'
       PURCHASE_CONCURRENCY_PROJECT: '{{.PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
       PURCHASE_CONCURRENCY_COMPOSE_FILE: '{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
@@ -782,6 +783,7 @@ tasks:
       - |
         set -e
         repo_root="$(cd "${PURCHASE_CONCURRENCY_ROOT_DIR}" && pwd -P)"
+        python_bin="${PURCHASE_CONCURRENCY_PYTHON_BIN}"
         project="${PURCHASE_CONCURRENCY_PROJECT}"
         file="${PURCHASE_CONCURRENCY_COMPOSE_FILE}"
         smoke_image="${PURCHASE_CONCURRENCY_IMAGE}"
@@ -832,7 +834,8 @@ tasks:
         validate_name PURCHASE_CONCURRENCY_COMPOSE_PROJECT "${project}"
         validate_positive_integer E2E_WAIT_TIMEOUT_SECONDS "${wait_timeout_seconds}"
         validate_image "${smoke_image}"
-        run_id="purchase-concurrency-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+        run_suffix="$("${python_bin}" -c 'import time, uuid; print(time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:12], end="")')"
+        run_id="purchase-concurrency-${run_suffix}"
         validate_name PURCHASE_CONCURRENCY_RUN_ID "${run_id}"
         cleanup() {
           status="$?"
