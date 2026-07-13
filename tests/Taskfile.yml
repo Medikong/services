@@ -695,6 +695,7 @@ tasks:
         OTEL_TRACES_EXPORTER=otlp \
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317 \
           ${compose_cmd} -p "${project}" -f "${file}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} ${services}
+        ${compose_cmd} -p "${project}" -f "${file}" build log-correlation-smoke
         LOG_CORRELATION_COMPOSE_PROJECT="${project}" \
           ${compose_cmd} -p "${project}" -f "${file}" run --rm --no-deps log-correlation-smoke
 
