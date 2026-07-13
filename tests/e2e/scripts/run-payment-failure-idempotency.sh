@@ -80,8 +80,6 @@ compose -p "${project}" -f "${file}" down -v --remove-orphans
 compose -p "${project}" -f "${file}" up -d --build --wait \
   --wait-timeout "${wait_timeout_seconds}" postgres kafka kafka-init order-service payment-service
 
-export MSYS2_ARG_CONV_EXCL="/scripts"
-
 if [ -n "${smoke_image}" ]; then
   set +e
   smoke_json="$(docker run --rm --network "${project}_default" \
@@ -91,8 +89,7 @@ if [ -n "${smoke_image}" ]; then
     -e PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID="${run_id}" \
     -e PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS="${scenario_timeout_seconds}" \
     -v "${repo_root}/tests/e2e/scripts:/scripts:ro" \
-    -w /scripts \
-    "${smoke_image}" python payment-failure-idempotency-smoke.py)"
+    "${smoke_image}" python /scripts/payment-failure-idempotency-smoke.py)"
   smoke_status="$?"
   set -e
 else
@@ -105,8 +102,7 @@ else
     -e PAYMENT_FAILURE_IDEMPOTENCY_RUN_ID="${run_id}" \
     -e PAYMENT_FAILURE_IDEMPOTENCY_TIMEOUT_SECONDS="${scenario_timeout_seconds}" \
     -v "${repo_root}/tests/e2e/scripts:/scripts:ro" \
-    --workdir /scripts \
-    payment-service payment-failure-idempotency-smoke.py)"
+    payment-service /scripts/payment-failure-idempotency-smoke.py)"
   smoke_status="$?"
   set -e
 fi
