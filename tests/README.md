@@ -157,7 +157,32 @@ docker compose -p dropmong-e2e-notification-metrics -f tests/e2e/docker-compose.
 
 gate 종료 시 `docker compose ... down -v --remove-orphans` cleanup으로 container, volume, network가 각각 0개이고 임시 context가 남지 않아야 한다(`temp context=false`).
 
-C003 전체 회귀 확인에서는 notification unit 18개, `04/05/06/07`, `04/08`이 통과했다. `09` runner는 Go Task shell에 `grep`이 없어 시작 전에 실패했으므로, 전체 `04-09` 회귀가 모두 재통과했다고 판정하지 않는다. 이 제한을 해소하기 전까지 `09`는 알려진 runner 제한으로 기록한다.
+### 최종 내부 구매 회귀
+
+루트의 다음 명령 하나로 Gateway를 제외한 내부 구매 회귀를 실행한다.
+
+```bash
+task purchase-internal-regression
+```
+
+이 명령은 커밋된 HEAD를 추적 파일만 포함하는 깨끗한 복제 context로 옮기고, 서로 다른 UUID를 사용하는 임시 Compose project에서 다음 8개 gate를 순서대로 실행한다.
+
+1. `test-services`: catalog, order, payment, notification 단위 회귀
+2. `purchase-e2e-with-metrics`: 정상 구매와 비즈니스 지표
+3. `purchase-e2e-concurrency`: 실제 PostgreSQL을 사용한 품절 동시성 및 초과 판매 방지
+4. `payment-failure-idempotency`: 중복 HTTP 요청과 Kafka 재전달의 결제 실패 멱등성
+5. `purchase-e2e-with-traces`: HTTP 추적
+6. `purchase-e2e-with-kafka-traces`: Kafka producer/consumer 추적 그래프
+7. `purchase-e2e-with-log-correlation`: 정상 구매와 결제 실패의 Loki 상관관계
+8. `purchase-e2e-with-notification-metrics`: notification 지표, 재처리 분류, Kafka consumer 지연 회복
+
+`ea9710d`에서 실행한 전체 묶음은 522.6초 동안 8개 gate를 모두 통과하고 종료 코드 0으로 끝났다. 이전의 Go Task shell `grep` 실행 제한은 해결되었으며, 최종 내부 묶음이 통과한 상태다. 보안 후속 변경 `34f909b`에서는 영향받은 실제 Loki gate를 다시 실행했고 99.9초, 종료 코드 0으로 통과했다.
+
+모든 E2E 공개 port는 `127.0.0.1`에만 바인딩한다. 각 gate는 고유한 임시 Compose project와 network를 사용하며, observability build context도 CRLF가 섞이지 않은 UUID로 이름을 정한 깨끗한 추적 파일 복제본을 사용한다. 종료 후 확인 결과 container, network, volume, test image, 임시 observability context, `purchase-internal-regression-*` 복제본은 모두 0개였다.
+
+이 회귀에서 Gateway JWT는 명시적으로 제외한다. `X-User-Id`, `X-User-Email`, `X-User-Role`은 내부 테스트 context에서만 신뢰하는 header다. Istio JWT 검증, 외부 요청의 header 위조 차단, auth-service 연동은 후속 Gateway E2E 범위이며, 이 회귀 결과로 운영 또는 외부 준비 상태를 주장하지 않는다.
+
+결제 실패의 현재 수용 상태는 `PAYMENT_FAILED`이며 재고 해제는 활성 예약 집계에서 제외되는 방식으로 검증한다. `CANCELLED`, `EXPIRED`, 지연 승인, 실패 알림, `outbox`는 후속 범위다.
 
 Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, `payment-service`, `notification-service`를 직접 호출한다. 기본 URL은 다음과 같다.
 
@@ -168,7 +193,7 @@ Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, 
 | `payment-service` | `http://payment-service:8083` |
 | `notification-service` | `http://notification-service:8084` |
 
-Python 구매 서비스는 현재 Gateway가 검증한 JWT claim에서 만들어진 `X-User-Id`, `X-User-Email`, `X-User-Role` 컨텍스트 헤더를 신뢰하는 구조로 테스트한다. 외부 클라이언트가 이 헤더를 직접 보내는 상황은 별도 Gateway E2E에서 차단 여부를 확인한다.
+Python 구매 서비스는 내부 테스트 context에서 `X-User-Id`, `X-User-Email`, `X-User-Role` header를 신뢰하는 구조로 테스트한다. 외부 클라이언트가 이 header를 직접 보내는 상황은 후속 Gateway E2E에서 차단 여부를 확인한다.
 
 ## 로컬 Observability E2E
 
