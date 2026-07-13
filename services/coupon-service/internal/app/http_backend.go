@@ -70,6 +70,15 @@ func (b *httpBackend) Campaign(ctx context.Context, call couponhttp.Call) (coupo
 			return couponhttp.Result{}, transportError(err)
 		}
 		businessKey := commandBusinessKey(call, request.ExternalBusinessRef)
+		approvalPolicy, err := domainSnapshot(request.ApprovalPolicy)
+		if err != nil {
+			return couponhttp.Result{}, transportError(err)
+		}
+		var templateRef *shared.ExternalRef
+		if request.TemplateRef != nil {
+			value := domainExternal(*request.TemplateRef)
+			templateRef = &value
+		}
 		result, err := b.components.campaigns.RegisterPolicy(ctx, campaignapp.RegisterPolicyInput{
 			Metadata:            b.campaignMetadata(call, campaignapp.CommandRegisterPolicy, businessKey),
 			DisplayName:         request.DisplayName,
@@ -80,6 +89,8 @@ func (b *httpBackend) Campaign(ctx context.Context, call couponhttp.Call) (coupo
 			Applicability:       applicability,
 			IssuerAndFunding:    campaignFunding(request.IssuerAndFunding),
 			OwnerSnapshot:       owner,
+			ApprovalPolicy:      approvalPolicy,
+			TemplateRef:         templateRef,
 			ExternalBusinessRef: request.ExternalBusinessRef,
 		})
 		if err != nil {
@@ -244,14 +255,19 @@ func (b *httpBackend) Issuance(ctx context.Context, call couponhttp.Call) (coupo
 		if !ok {
 			return backendInvariant()
 		}
+		approvalPolicy, err := domainSnapshot(request.ApprovalPolicy)
+		if err != nil {
+			return couponhttp.Result{}, transportError(err)
+		}
 		result, err := b.components.issuance.CreateCompensationIssueRequest(ctx, issuanceapp.CreateCompensationIssueRequestInput{
 			Metadata: b.issuanceMetadata(call, issuanceapp.CommandCreateIssueRequest,
 				commandBusinessKey(call, request.CampaignID, request.UserID, request.SourceRef.ID, call.Headers.CaseRef)),
-			CampaignID: request.CampaignID,
-			UserID:     request.UserID,
-			SourceRef:  domainExternal(request.SourceRef),
-			ReasonCode: request.ReasonCode,
-			CaseRef:    call.Headers.CaseRef,
+			CampaignID:     request.CampaignID,
+			UserID:         request.UserID,
+			SourceRef:      domainExternal(request.SourceRef),
+			ReasonCode:     request.ReasonCode,
+			CaseRef:        call.Headers.CaseRef,
+			ApprovalPolicy: approvalPolicy,
 		})
 		if err != nil {
 			return couponhttp.Result{}, transportError(err)
@@ -851,7 +867,7 @@ func (b *httpBackend) currentTime() time.Time {
 func issueAcceptedResult(issueRequestID string) couponhttp.Result {
 	return couponhttp.Result{
 		Data: couponhttp.IssueAcceptedData{
-			IssueRequestID: issueRequestID, Status: "accepted", StatusPath: issueStatusPath,
+			IssueRequestID: issueRequestID, Status: "pending", StatusPath: issueStatusPath,
 		},
 		Location: issueStatusPath, RetryAfterSeconds: asyncRetrySeconds,
 	}
@@ -949,7 +965,7 @@ func bulkJobData(job bulk.Job) couponhttp.BulkJobData {
 
 func campaignPerformanceData(value readmodel.CampaignPerformance) couponhttp.CampaignPerformanceData {
 	result := couponhttp.CampaignPerformanceData{
-		CampaignID: value.CampaignID,
+		CampaignID: value.CampaignID, Scope: "operations", AsOf: formatTime(value.AsOf),
 		Counts: couponhttp.PerformanceCounts{
 			Requested: value.Counts.Requested, Issued: value.Counts.Issued,
 			Rejected: value.Counts.Rejected, FailedFinal: value.Counts.FailedFinal,

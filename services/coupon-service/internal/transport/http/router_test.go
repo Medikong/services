@@ -238,17 +238,6 @@ func TestRouterRejectsInvalidHeadersPathQueryAndJSON(t *testing.T) {
 		headers map[string]string
 	}{
 		{
-			name:   "approval required",
-			method: http.MethodPost,
-			path:   "/api/v1/internal/coupon-campaigns",
-			body:   bodyForSchema("CreateCouponCampaignRequest"),
-			headers: map[string]string{
-				contractheaders.Principal:      servicePrincipal,
-				contractheaders.IdempotencyKey: "operation-key-1234",
-				"Content-Type":                 "application/json",
-			},
-		},
-		{
 			name:   "case required",
 			method: http.MethodGet,
 			path:   "/api/v1/internal/users/user-1/coupon-timeline",
@@ -347,7 +336,7 @@ func responseData(operationID string) any {
 	issuer := IssuerAndFunding{IssuerType: "platform", IssuerRef: ext, FunderType: "platform"}
 	switch operationID {
 	case "API.A.19-01", "API.A.19-02", "API.A.19-23":
-		return IssueAcceptedData{IssueRequestID: "ireq_12345678", Status: "accepted", StatusPath: "/api/v1/users/me/coupons?status=pending"}
+		return IssueAcceptedData{IssueRequestID: "ireq_12345678", Status: "pending", StatusPath: "/api/v1/users/me/coupons?status=pending"}
 	case "API.A.19-03":
 		return WalletCouponListData{Items: []WalletCoupon{}, ActiveNotices: []ReadOnlyNotice{}}
 	case "API.A.19-04":
@@ -363,7 +352,7 @@ func responseData(operationID string) any {
 	case "API.A.19-15":
 		return BulkJobData{BulkJobID: "bjob_12345678", CampaignID: "camp_12345678", Status: "registered", Counts: PerformanceCounts{}, EvaluationAsOf: "2026-07-11T00:00:00Z"}
 	case "API.A.19-16":
-		return CampaignPerformanceData{CampaignID: "camp_12345678", Counts: PerformanceCounts{}}
+		return CampaignPerformanceData{CampaignID: "camp_12345678", Scope: "operations", AsOf: "2026-07-11T00:00:00Z", Counts: PerformanceCounts{}}
 	case "API.A.19-17":
 		return OperationalControlData{ControlID: "ctrl_12345678", Scope: OperationalScope{Type: "campaign", Ref: ext}, BlockIssuance: true, EffectiveFrom: "2026-07-11T00:00:00Z", Active: true, Version: 1}
 	case "API.A.19-18":
@@ -442,7 +431,7 @@ func bodyForSchema(schema string) string {
 	case "RedemptionTransitionRequest":
 		return fmt.Sprintf(`{"expectedVersion":0,"resultRef":%s,"reasonCode":"completed"}`, ext)
 	case "CreateCouponCampaignRequest":
-		return fmt.Sprintf(`{"displayName":"Campaign","benefit":%s,"applicability":%s,"issuerAndFunding":%s,"usableFrom":"2026-07-11T00:00:00Z","expiresAt":"2026-07-12T00:00:00Z","ownerSnapshot":%s}`, benefit, applicability, issuer, snapshot)
+		return fmt.Sprintf(`{"displayName":"Campaign","benefit":%s,"applicability":%s,"issuerAndFunding":%s,"usableFrom":"2026-07-11T00:00:00Z","expiresAt":"2026-07-12T00:00:00Z","ownerSnapshot":%s,"approvalPolicy":%s}`, benefit, applicability, issuer, snapshot, snapshot)
 	case "ConfigureIssuanceRequest":
 		return `{"expectedVersion":0,"totalQuantity":100,"perUserLimit":1,"claimStartsAt":"2026-07-11T00:00:00Z","claimEndsAt":"2026-07-12T00:00:00Z"}`
 	case "ReviewCampaignRequest":
@@ -458,7 +447,7 @@ func bodyForSchema(schema string) string {
 	case "RetryRecoveryRequest", "FinalizeRecoveryRequest":
 		return fmt.Sprintf(`{"reasonCode":"retry","operationTaskRef":%s}`, ext)
 	case "CreateCompensationIssueRequest":
-		return fmt.Sprintf(`{"campaignId":"camp_12345678","userId":"user-1","sourceRef":%s,"reasonCode":"compensation"}`, ext)
+		return fmt.Sprintf(`{"campaignId":"camp_12345678","userId":"user-1","sourceRef":%s,"reasonCode":"compensation","approvalPolicy":%s}`, ext, snapshot)
 	default:
 		return `{}`
 	}

@@ -75,7 +75,7 @@ func TestHTTPBackendReadsRM04CampaignPerformance(t *testing.T) {
 	if !ok {
 		t.Fatalf("Campaign() data = %T, want CampaignPerformanceData", result.Data)
 	}
-	if data.CampaignID != "camp_12345678" || data.Counts.Issued != 8 || data.Counts.Reclaimed != 2 ||
+	if data.CampaignID != "camp_12345678" || data.Scope != "operations" || data.AsOf != asOf.Format(time.RFC3339Nano) || data.Counts.Issued != 8 || data.Counts.Reclaimed != 2 ||
 		data.ConfirmedDiscount == nil || data.ConfirmedDiscount.Amount != "12000.0000" ||
 		data.ReclaimedDiscount == nil || data.ReclaimedDiscount.Amount != "3000.0000" {
 		t.Fatalf("Campaign() data = %#v", data)

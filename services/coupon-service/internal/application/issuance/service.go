@@ -121,12 +121,13 @@ type CreateIssueRequestInput struct {
 }
 
 type CreateCompensationIssueRequestInput struct {
-	Metadata   CommandMetadata
-	CampaignID string
-	UserID     string
-	SourceRef  shared.ExternalRef
-	ReasonCode string
-	CaseRef    string
+	Metadata       CommandMetadata
+	CampaignID     string
+	UserID         string
+	SourceRef      shared.ExternalRef
+	ReasonCode     string
+	CaseRef        string
+	ApprovalPolicy shared.SnapshotRef
 }
 
 type IssueUserCouponInput struct {
@@ -359,7 +360,7 @@ func (s *Service) codeRejectionReason(ctx context.Context, campaignID, userID st
 }
 
 func (s *Service) CreateIssueRequest(ctx context.Context, input CreateIssueRequestInput) (IssueRequestResult, error) {
-	if err := input.Metadata.validate(input.SourceType == issuerequest.SourceOperatorGrant); err != nil {
+	if err := input.Metadata.validate(false); err != nil {
 		return IssueRequestResult{}, err
 	}
 	if strings.TrimSpace(input.CampaignID) == "" || strings.TrimSpace(input.UserID) == "" || strings.TrimSpace(input.SourceRef) == "" {
@@ -374,8 +375,10 @@ func (s *Service) CreateIssueRequest(ctx context.Context, input CreateIssueReque
 		if strings.TrimSpace(input.CaseRef) == "" || strings.TrimSpace(input.ReasonCode) == "" {
 			return IssueRequestResult{}, invalidInput(CommandCreateIssueRequest, "case reference and reason are required for operator grants")
 		}
-		if err := s.approvals.VerifyApproval(ctx, input.Metadata.ApprovalRef, CommandCreateIssueRequest); err != nil {
-			return IssueRequestResult{}, verificationError(CommandCreateIssueRequest, err)
+		if strings.TrimSpace(input.Metadata.ApprovalRef) != "" {
+			if err := s.approvals.VerifyApproval(ctx, input.Metadata.ApprovalRef, CommandCreateIssueRequest); err != nil {
+				return IssueRequestResult{}, verificationError(CommandCreateIssueRequest, err)
+			}
 		}
 		if err := s.cases.VerifyCase(ctx, input.CaseRef, ports.CSCaseBinding{UserID: input.UserID, OperationTaskRef: input.SourceRef}); err != nil {
 			return IssueRequestResult{}, verificationError(CommandCreateIssueRequest, err)
@@ -404,7 +407,7 @@ func (s *Service) CreateIssueRequest(ctx context.Context, input CreateIssueReque
 		return IssueRequestResult{}, err
 	}
 	hashInput := input
-	hashInput.Metadata = input.Metadata.canonical(input.SourceType == issuerequest.SourceOperatorGrant)
+	hashInput.Metadata = input.Metadata.canonical(strings.TrimSpace(input.Metadata.ApprovalRef) != "")
 	hashInput.IssueRequestID = issueRequestID
 	command, err := issueCommand(CommandCreateIssueRequest, input.Metadata, hashInput)
 	if err != nil {
@@ -423,6 +426,9 @@ func (s *Service) CreateCompensationIssueRequest(ctx context.Context, input Crea
 	}
 	if strings.TrimSpace(input.ReasonCode) == "" {
 		return IssueRequestResult{}, invalidInput(CommandCreateIssueRequest, "compensation reason is required")
+	}
+	if err := input.ApprovalPolicy.Validate(); err != nil {
+		return IssueRequestResult{}, err
 	}
 	return s.CreateIssueRequest(ctx, CreateIssueRequestInput{
 		Metadata: input.Metadata, CampaignID: input.CampaignID, UserID: input.UserID,

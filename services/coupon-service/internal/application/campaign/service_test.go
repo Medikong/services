@@ -169,6 +169,37 @@ func TestRegisterAndReviewVerifyExternalEvidenceBeforeMutation(t *testing.T) {
 	require.Equal(t, 2, seller.calls)
 }
 
+func TestSellerTemplateRegistrationDoesNotRequireApprovalReference(t *testing.T) {
+	now := time.Date(2026, 7, 12, 3, 0, 0, 0, time.UTC)
+	repository := &campaignRepositoryFake{current: validCampaign(now)}
+	approval := &approvalFake{}
+	service, err := New(Dependencies{Repository: repository, SellerSnapshots: &sellerSnapshotFake{}, Approvals: approval})
+	require.NoError(t, err)
+	input := validRegisterInput(now)
+	input.Metadata.ApprovalRef = ""
+	input.TemplateRef = &shared.ExternalRef{Context: "operations", Type: "coupon_template", ID: "seller-standard-v1"}
+
+	_, err = service.RegisterPolicy(context.Background(), input)
+	require.NoError(t, err)
+	require.Empty(t, approval.operations)
+}
+
+func TestPlatformRegistrationRequiresApprovalReference(t *testing.T) {
+	now := time.Date(2026, 7, 12, 3, 0, 0, 0, time.UTC)
+	repository := &campaignRepositoryFake{current: validCampaign(now)}
+	service, err := New(Dependencies{Repository: repository, SellerSnapshots: &sellerSnapshotFake{}, Approvals: &approvalFake{}})
+	require.NoError(t, err)
+	input := validRegisterInput(now)
+	input.Metadata.ApprovalRef = ""
+	input.IssuerAndFunding = shared.IssuerAndFunding{
+		IssuerType: "platform", IssuerRef: shared.ExternalRef{Context: "operations", Type: "workload", ID: "marketing"}, FunderType: "platform",
+	}
+
+	_, err = service.RegisterPolicy(context.Background(), input)
+	require.Error(t, err)
+	require.Empty(t, repository.calls)
+}
+
 func TestChangePolicyCarriesOwnerSnapshotAndReversionsApplicability(t *testing.T) {
 	now := time.Date(2026, 7, 12, 3, 0, 0, 0, time.UTC)
 	tests := []struct {
@@ -303,6 +334,7 @@ func validRegisterInput(now time.Time) RegisterPolicyInput {
 			FunderType: "seller", FunderRef: &shared.ExternalRef{Context: "seller", Type: "seller", ID: "seller-1"},
 		},
 		OwnerSnapshot: validSnapshot(now), ExternalBusinessRef: "operation-1",
+		ApprovalPolicy: validSnapshot(now),
 	}
 }
 

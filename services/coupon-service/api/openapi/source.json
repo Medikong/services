@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "generator": "@redocly/cli@2.38.0",
   "sourceOrigin": "../archive/blueprint/50-service-design/A_19_coupon/A_19_40-api/openapi",
-  "sourceCommit": "73b1e9400fd43d3604ab13fbf8a146cdfa17edc3",
-  "sourceTreeSha256": "701592ececa79d5d0a5c6031da5c49f0693ca1d85c23983ddbf22b8e0dbd18be",
+  "sourceCommit": "8b3258fde053045e7f69f9897e7f3eb9c7eef9ca",
+  "sourceTreeSha256": "9a12ff8b945ab7d7ac766699682586c6381b32fe846375a0e9b11f3623b4f23a",
   "production": {
     "entry": "openapi.yaml",
     "sourceSha256": "32ef55822ae90dfb4dfa9b4183deace42ae186ff2f26a960926c1b90dad3bbe8",
     "bundle": "openapi.bundle.yaml",
-    "bundleSha256": "592624b2299bfcf123b187730538f8698669b55f521b0f9c0bbfb47409901fcc"
+    "bundleSha256": "dfd791b6b9460273f0b1bf43d55972195dda15a4bfa7854f7e707f078faf1fd9"
   }
 }

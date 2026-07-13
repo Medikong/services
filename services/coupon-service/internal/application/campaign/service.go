@@ -68,6 +68,8 @@ type RegisterPolicyInput struct {
 	Applicability       []campaign.ApplicabilityPolicy
 	IssuerAndFunding    shared.IssuerAndFunding
 	OwnerSnapshot       shared.SnapshotRef
+	ApprovalPolicy      shared.SnapshotRef
+	TemplateRef         *shared.ExternalRef
 	ExternalBusinessRef string
 }
 
@@ -131,7 +133,7 @@ type QuantityResult struct {
 }
 
 func (s *Service) RegisterPolicy(ctx context.Context, input RegisterPolicyInput) (Result, error) {
-	if err := input.Metadata.validate(true); err != nil {
+	if err := input.Metadata.validate(false); err != nil {
 		return Result{}, err
 	}
 	if strings.TrimSpace(input.DisplayName) == "" || input.StartsAt.IsZero() || !input.StartsAt.Before(input.EndsAt) {
@@ -140,11 +142,25 @@ func (s *Service) RegisterPolicy(ctx context.Context, input RegisterPolicyInput)
 	if err := input.OwnerSnapshot.Validate(); err != nil {
 		return Result{}, err
 	}
+	if err := input.ApprovalPolicy.Validate(); err != nil {
+		return Result{}, err
+	}
+	if input.TemplateRef != nil {
+		if err := input.TemplateRef.Validate(); err != nil {
+			return Result{}, err
+		}
+	}
 	if err := input.IssuerAndFunding.Validate(); err != nil {
 		return Result{}, err
 	}
-	if err := s.approvals.VerifyApproval(ctx, input.Metadata.ApprovalRef, CommandRegisterPolicy); err != nil {
-		return Result{}, verificationError(CommandRegisterPolicy, err)
+	sellerTemplateRequest := input.IssuerAndFunding.IssuerType == "seller" && input.IssuerAndFunding.FunderType == "seller" && input.TemplateRef != nil
+	if !sellerTemplateRequest && strings.TrimSpace(input.Metadata.ApprovalRef) == "" {
+		return Result{}, invalidInput(CommandRegisterPolicy, "approval reference is required by the campaign approval policy")
+	}
+	if strings.TrimSpace(input.Metadata.ApprovalRef) != "" {
+		if err := s.approvals.VerifyApproval(ctx, input.Metadata.ApprovalRef, CommandRegisterPolicy); err != nil {
+			return Result{}, verificationError(CommandRegisterPolicy, err)
+		}
 	}
 	if input.IssuerAndFunding.IssuerType == "seller" || input.IssuerAndFunding.IssuerType == "partnership" || input.IssuerAndFunding.FunderType == "seller" {
 		if err := s.sellerSnapshots.VerifySellerOwnership(ctx, input.OwnerSnapshot); err != nil {
@@ -175,6 +191,8 @@ func (s *Service) RegisterPolicy(ctx context.Context, input RegisterPolicyInput)
 	}
 	funding := input.IssuerAndFunding
 	funding.ApprovalRef = input.Metadata.ApprovalRef
+	funding.ApprovalPolicy = &input.ApprovalPolicy
+	funding.TemplateRef = input.TemplateRef
 	registered := campaign.Campaign{
 		ID: campaignID, DisplayName: input.DisplayName, Description: input.Description,
 		Status: campaign.StatusUnderReview, StartsAt: input.StartsAt, EndsAt: input.EndsAt,
@@ -187,7 +205,7 @@ func (s *Service) RegisterPolicy(ctx context.Context, input RegisterPolicyInput)
 		return Result{}, err
 	}
 	hashInput := input
-	hashInput.Metadata = input.Metadata.canonical(true)
+	hashInput.Metadata = input.Metadata.canonical(strings.TrimSpace(input.Metadata.ApprovalRef) != "")
 	command, err := campaignCommand(CommandRegisterPolicy, input.Metadata, hashInput)
 	if err != nil {
 		return Result{}, err

@@ -89,6 +89,8 @@ type CreateCouponCampaignRequest struct {
 	UsableFrom          string              `json:"usableFrom"`
 	ExpiresAt           string              `json:"expiresAt"`
 	OwnerSnapshot       SnapshotRef         `json:"ownerSnapshot"`
+	ApprovalPolicy      SnapshotRef         `json:"approvalPolicy"`
+	TemplateRef         *ExternalRef        `json:"templateRef,omitempty"`
 	ExternalBusinessRef string              `json:"externalBusinessRef,omitempty"`
 }
 
@@ -155,10 +157,11 @@ type FinalizeRecoveryRequest struct {
 }
 
 type CreateCompensationIssueRequest struct {
-	CampaignID string      `json:"campaignId"`
-	UserID     string      `json:"userId"`
-	SourceRef  ExternalRef `json:"sourceRef"`
-	ReasonCode string      `json:"reasonCode"`
+	CampaignID     string      `json:"campaignId"`
+	UserID         string      `json:"userId"`
+	SourceRef      ExternalRef `json:"sourceRef"`
+	ReasonCode     string      `json:"reasonCode"`
+	ApprovalPolicy SnapshotRef `json:"approvalPolicy"`
 }
 
 type IssueAcceptedData struct {
@@ -264,7 +267,19 @@ type BulkJobData struct {
 }
 
 type CampaignPerformanceData struct {
-	CampaignID        string            `json:"campaignId"`
+	CampaignID        string                         `json:"campaignId"`
+	Scope             string                         `json:"scope"`
+	AsOf              string                         `json:"asOf"`
+	Counts            PerformanceCounts              `json:"counts"`
+	ConfirmedDiscount *Money                         `json:"confirmedDiscount,omitempty"`
+	ReclaimedDiscount *Money                         `json:"reclaimedDiscount,omitempty"`
+	Breakdown         []CampaignPerformanceBreakdown `json:"breakdown,omitempty"`
+}
+
+type CampaignPerformanceBreakdown struct {
+	DimensionType     string            `json:"dimensionType"`
+	DimensionRef      string            `json:"dimensionRef,omitempty"`
+	BusinessDate      string            `json:"businessDate,omitempty"`
 	Counts            PerformanceCounts `json:"counts"`
 	ConfirmedDiscount *Money            `json:"confirmedDiscount,omitempty"`
 	ReclaimedDiscount *Money            `json:"reclaimedDiscount,omitempty"`
