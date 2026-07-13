@@ -15,6 +15,7 @@ ORDER_URL = os.environ.get("ORDER_SERVICE_URL", "http://order-service:8082")
 PAYMENT_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://payment-service:8083")
 LOKI_URL = os.environ.get("LOKI_URL", "http://loki:3100")
 TIMEOUT_SECONDS = int(os.environ.get("LOG_CORRELATION_TIMEOUT_SECONDS", "120"))
+COMPOSE_PROJECT = os.environ.get("LOG_CORRELATION_COMPOSE_PROJECT", "dropmong-log-correlation")
 USER_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
 
 
@@ -43,6 +44,12 @@ def main() -> None:
         assert_http_log("order-service", failed["order_request_id"]),
         assert_http_log("payment-service", failed["payment_request_id"]),
     ]
+    assert_trace_link(http_logs[0], happy_logs, {"order.created"})
+    assert_trace_link(
+        http_logs[1],
+        happy_logs,
+        {"payment.approved", "notification.requested"},
+    )
 
     failure_logs = wait_for_kafka_logs(failed["order_id"], expected=2)
     assert_log_graph(
@@ -60,6 +67,8 @@ def main() -> None:
         and log.get("messaging.destination.name") == "payment.failed"
     )
     assert failure_process.get("failure.code") == "payment_failed_event"
+    assert_trace_link(http_logs[2], failure_logs, {"order.created"})
+    assert_trace_link(http_logs[3], failure_logs, {"payment.failed"})
     assert_sensitive_data_absent(happy_logs + failure_logs)
     _, happy_labels = query_loki(
         "order-service|payment-service|notification-service",
@@ -184,6 +193,20 @@ def safe_log_fields(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{field: log[field] for field in fields if field in log} for log in logs]
 
 
+def assert_trace_link(
+    http_log: dict[str, Any],
+    kafka_logs: list[dict[str, Any]],
+    topics: set[str],
+) -> None:
+    linked = [
+        log
+        for log in kafka_logs
+        if log.get("messaging.destination.name") in topics
+    ]
+    assert linked, f"no Kafka logs found for topics {sorted(topics)}"
+    assert {log.get("trace_id") for log in linked} == {http_log["trace_id"]}
+
+
 def wait_for_kafka_logs(correlation_id: str, *, expected: int) -> list[dict[str, Any]]:
     return wait_for_logs(
         "order-service|payment-service|notification-service",
@@ -207,7 +230,10 @@ def query_loki(
     text: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     now = time.time_ns()
-    query = f'{{service=~"{service_pattern}"}} |= {json.dumps(text)}'
+    query = (
+        f'{{compose_project="{COMPOSE_PROJECT}",service=~"{service_pattern}"}} '
+        f'|= {json.dumps(text)}'
+    )
     params = urlencode(
         {
             "query": query,

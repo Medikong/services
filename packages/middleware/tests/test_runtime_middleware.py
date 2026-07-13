@@ -48,6 +48,25 @@ def test_request_context_generates_request_id_when_header_is_missing() -> None:
     assert response.body["clientActionId"] is None
 
 
+@pytest.mark.parametrize(
+    "unsafe_request_id",
+    (
+        "4111111111111111",
+        "Bearer.secret.value",
+        "eyJhbGciOiJIUzI1NiJ9.payload.signature",
+        "token-super-secret",
+        "x" * 8192,
+    ),
+)
+def test_request_context_replaces_sensitive_request_id(unsafe_request_id: str) -> None:
+    messages = _call(_runtime_stack(_context_echo_app), headers={"X-Request-Id": unsafe_request_id})
+
+    response = _response(messages)
+
+    assert response.body["requestId"] != unsafe_request_id
+    assert response.body["requestId"] == response.headers["x-request-id"]
+
+
 def test_runtime_recovery_returns_500_for_unhandled_exception() -> None:
     async def failing_app(scope: Scope, receive: Receive, send: Send) -> None:
         raise RuntimeError("boom")

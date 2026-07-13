@@ -92,31 +92,42 @@ services:
 
   loki:
     image: grafana/loki:3.7.0
-    user: "0:0"
     command: ["-config.file=/etc/loki/loki.yml"]
     volumes:
       - ./observability/loki.yml:/etc/loki/loki.yml:ro
-      - loki-data:/tmp/loki
     ports:
-      - "${LOKI_PORT:-3100}:3100"
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      PING: "1"
+      POST: "0"
+      VERSION: "1"
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   alloy:
     image: grafana/alloy:v1.17.0
-    user: "0:0"
+    user: "65532:65532"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
-      - --storage.path=/var/lib/alloy/data
+      - --storage.path=/tmp/alloy
       - /etc/alloy/config.alloy
     volumes:
       - ./observability/alloy.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - alloy-data:/var/lib/alloy/data
     depends_on:
+      docker-socket-proxy:
+        condition: service_started
       loki:
         condition: service_started
     ports:
-      - "${ALLOY_PORT:-12345}:12345"
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
 
   grafana:
     image: grafana/grafana:11.6.0
@@ -132,7 +143,7 @@ services:
       tempo:
         condition: service_started
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
 
   catalog-service:
     build:
@@ -236,6 +247,4 @@ services:
     profiles: ["smoke"]
 
 volumes:
-  alloy-data:
-  loki-data:
   tempo-data:

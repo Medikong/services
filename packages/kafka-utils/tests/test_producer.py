@@ -15,6 +15,7 @@ from kafka_utils import (
     TraceAwareKafkaProducer,
     build_producer_headers,
     create_kafka_producer,
+    headers_to_carrier,
     start_consumer_span,
     start_producer_span,
     with_correlation_id,
@@ -107,6 +108,12 @@ def test_build_producer_headers_uses_stored_trace_carrier(monkeypatch) -> None:
         "tracestate": b"vendor=value",
         "correlation_id": b"req-1",
     }
+
+
+def test_headers_to_carrier_ignores_malformed_utf8() -> None:
+    assert headers_to_carrier(
+        [("traceparent", b"\xff"), (b"\xff", b"value")]
+    ) == {}
 
 
 def test_start_consumer_span_extracts_trace_headers(monkeypatch) -> None:

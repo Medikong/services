@@ -8,7 +8,7 @@ from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI, Request
 from starlette.responses import Response
 
-from middleware import get_current_client_action_id
+from middleware import get_current_client_action_id, is_safe_request_id
 from middleware import get_current_request_id as get_runtime_request_id
 from observability.config import ObservabilityConfig
 from observability.tracing import current_trace_context, set_current_span_attributes, trace_recorder
@@ -96,11 +96,11 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
                     "service.environment": config.service_environment,
                     "severity": severity_text,
                     "severity_text": severity_text,
-                "trace_id": trace_id,
-                "span_id": span_id,
-                "request_id": request_id,
-                "correlation_id": request_id,
-                "client_action_id": client_action_id,
+                    "trace_id": trace_id,
+                    "span_id": span_id,
+                    "request_id": request_id,
+                    "correlation_id": request_id,
+                    "client_action_id": client_action_id,
                     "http.method": request.method,
                     "http.route": route,
                     "http.route.kind": route_kind,
@@ -117,17 +117,19 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
 
 
 def _request_id(request: Request) -> str:
-    return (
+    candidate = (
         get_runtime_request_id()
         or correlation_id.get()
         or request.headers.get(REQUEST_ID_HEADER)
         or request.headers.get("x-request-id")
-        or str(uuid4())
     )
+    if candidate is not None and _valid_request_id(candidate):
+        return candidate.strip()
+    return str(uuid4())
 
 
 def _valid_request_id(request_id: str) -> bool:
-    return bool(request_id.strip())
+    return is_safe_request_id(request_id)
 
 
 def _route_template(request: Request) -> str:

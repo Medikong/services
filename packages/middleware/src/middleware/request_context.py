@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 from dataclasses import dataclass
+import re
 from uuid import uuid4
 
 from middleware.types import ASGIApp, Receive, Scope, Send
@@ -9,6 +10,7 @@ from middleware.types import ASGIApp, Receive, Scope, Send
 
 REQUEST_ID_HEADER = "X-Request-Id"
 CLIENT_ACTION_ID_HEADER = "X-Client-Action-Id"
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
 
 @dataclass(frozen=True)
@@ -89,7 +91,19 @@ def request_context_middleware_options() -> dict[str, str]:
 
 def _header_or_generated(scope: Scope, header_name: str) -> str:
     value = _optional_header(scope, header_name)
-    return value or str(uuid4())
+    return value if value is not None and is_safe_request_id(value) else str(uuid4())
+
+
+def is_safe_request_id(value: str) -> bool:
+    normalized = value.strip()
+    if REQUEST_ID_PATTERN.fullmatch(normalized) is None:
+        return False
+    lowered = normalized.lower()
+    if lowered.startswith(("bearer", "card", "eyj", "token")):
+        return False
+    if normalized.isdigit() and 12 <= len(normalized) <= 19:
+        return False
+    return normalized.count(".") != 2
 
 
 def _optional_header(scope: Scope, header_name: str) -> str | None:

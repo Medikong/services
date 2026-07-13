@@ -686,11 +686,16 @@ tasks:
     cmds:
       - |
         set -e
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-logs'
-        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        context="${repo_root}/tests/tmp/log-correlation-context"
+        rm -rf "${context}"
+        mkdir -p "${context}"
+        git -C "${repo_root}" archive HEAD | tar -xf - -C "${context}"
+        file="${context}/{{.E2E_COMPOSE_FILE}}"
         services="postgres kafka kafka-init tempo otel-collector loki alloy grafana catalog-service order-service payment-service notification-service"
-        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans' EXIT
+        trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT
         LOG_CORRELATION_COMPOSE_PROJECT="${project}" \
         OTEL_TRACES_EXPORTER=otlp \
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317 \

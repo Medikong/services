@@ -811,6 +811,35 @@ def test_request_observability_emits_single_line_json_log(caplog, monkeypatch) -
     assert span_attributes["http.route"] == "/items/{item_id}"
 
 
+@pytest.mark.parametrize(
+    "unsafe_request_id",
+    (
+        "4111111111111111",
+        "Bearer.secret.value",
+        "eyJhbGciOiJIUzI1NiJ9.payload.signature",
+        "token-super-secret",
+        "x" * 8192,
+    ),
+)
+def test_request_observability_replaces_sensitive_request_ids(caplog, unsafe_request_id) -> None:
+    app = _observed_app(ObservabilityConfig(service_name="test-service"))
+
+    @app.get("/items")
+    def get_items() -> dict[str, list[str]]:
+        return {"items": []}
+
+    caplog.set_level(logging.INFO)
+    response = TestClient(app).get("/items", headers={"X-Request-Id": unsafe_request_id})
+
+    generated_id = response.headers["X-Request-Id"]
+    assert generated_id != unsafe_request_id
+    assert UUID(generated_id)
+    log = _request_log(caplog.records)
+    assert log["request_id"] == generated_id
+    assert log["correlation_id"] == generated_id
+    assert unsafe_request_id not in json.dumps(log)
+
+
 def test_request_observability_records_call_next_boundary_events(caplog, monkeypatch) -> None:
     recorder = RecordingTraceRecorder()
     monkeypatch.setattr(fastapi_module, "trace_recorder", lambda: recorder)

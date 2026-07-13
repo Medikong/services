@@ -44,10 +44,14 @@ def headers_to_carrier(
     """Decode only propagation headers from a Kafka message."""
     carrier: dict[str, str] = {}
     for key, value in headers or ():
-        decoded_key = key.decode("utf-8") if isinstance(key, bytes) else key
+        try:
+            decoded_key = key.decode("utf-8") if isinstance(key, bytes) else key
+            decoded_value = value.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
         if decoded_key not in _ALLOWED_HEADERS:
             continue
-        carrier[decoded_key] = value.decode("utf-8")
+        carrier[decoded_key] = decoded_value
     return carrier
 
 
