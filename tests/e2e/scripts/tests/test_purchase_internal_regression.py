@@ -71,6 +71,7 @@ def test_gates_have_exact_order_projects_and_zero_ports(tmp_path: Path) -> None:
         "catalog-service order-service payment-service notification-service"
     )
     project_values: list[str] = []
+    network_values: list[str] = []
     project_keys = (
         None,
         "E2E_COMPOSE_PROJECT",
@@ -87,8 +88,16 @@ def test_gates_have_exact_order_projects_and_zero_ports(tmp_path: Path) -> None:
         argv = runner.gate_argv(config.task_bin, gate)
         assert argv[:2] == (str(config.task_bin), gate.task_name)
         if project_key is not None:
-            project_values.append(variables[project_key])
+            project = variables[project_key]
+            project_values.append(project)
+            if project_key == "E2E_COMPOSE_PROJECT":
+                network = variables["E2E_NETWORK"]
+                assert network == f"{project}_default"
+                network_values.append(network)
+            else:
+                assert "E2E_NETWORK" not in variables
     assert len(project_values) == len(set(project_values)) == 7
+    assert len(network_values) == len(set(network_values)) == 5
     suffixes = (
         "metrics", "concurrency", "payment-failure", "traces", "kafka-traces",
         "log-correlation", "notification-metrics",

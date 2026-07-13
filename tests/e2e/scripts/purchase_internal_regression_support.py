@@ -106,11 +106,14 @@ def _gate(
     project: tuple[str, str] | None = None,
     variables: tuple[tuple[str, str], ...] = (),
 ) -> Gate:
-    project_variable = ()
+    project_variables = ()
     if project is not None:
-        project_variable = ((project[0], f"{run_prefix}-{project[1]}"),)
+        project_name = f"{run_prefix}-{project[1]}"
+        project_variables = ((project[0], project_name),)
+        if project[0] == "E2E_COMPOSE_PROJECT":
+            project_variables += (("E2E_NETWORK", f"{project_name}_default"),)
     ports = tuple((name, "0") for name in PORT_VARIABLES)
-    return Gate(label, task_name, (*variables, *project_variable, *ports))
+    return Gate(label, task_name, (*variables, *project_variables, *ports))
 
 
 def build_gates(run_prefix: str) -> tuple[Gate, ...]:
