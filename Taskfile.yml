@@ -256,6 +256,14 @@ tasks:
         vars:
           PURCHASE_CONCURRENCY_COMPOSE_PROJECT: '{{default "dropmong-purchase-concurrency" .PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
 
+  payment-failure-idempotency:
+    desc: Run duplicate payment-failure HTTP and Kafka redelivery Docker E2E gate.
+    cmds:
+      - task: tests:payment-failure-idempotency
+        vars:
+          PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
+          PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
+
   benchmark-concert-public-api:
     cmds:
       - task: tests:benchmark-concert-public-api

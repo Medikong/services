@@ -30,6 +30,8 @@ vars:
   PURCHASE_E2E_TEMPO_URL: '{{default "http://tempo:3200" .PURCHASE_E2E_TEMPO_URL}}'
   PURCHASE_CONCURRENCY_COMPOSE_PROJECT: '{{default "dropmong-purchase-concurrency" .PURCHASE_CONCURRENCY_COMPOSE_PROJECT}}'
   PURCHASE_CONCURRENCY_SMOKE_IMAGE: '{{default "python:3.12-slim" .PURCHASE_CONCURRENCY_SMOKE_IMAGE}}'
+  PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
+  PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
   OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
@@ -791,6 +793,20 @@ tasks:
           fi
         fi
         exit "${status}"
+
+  payment-failure-idempotency:
+    desc: Run duplicate payment-failure HTTP and Kafka redelivery Docker E2E gate.
+    env:
+      PAYMENT_FAILURE_IDEMPOTENCY_ROOT_DIR: '{{.ROOT_DIR}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_DOCKER_COMPOSE: '{{.DOCKER_COMPOSE}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_PROJECT: '{{.PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_FILE: '{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{.PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_PYTHON_BIN: '{{.PYTHON_BIN}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_WAIT_TIMEOUT_SECONDS: '{{.E2E_WAIT_TIMEOUT_SECONDS}}'
+      PAYMENT_FAILURE_IDEMPOTENCY_SCENARIO_TIMEOUT_SECONDS: '{{default "60" .PAYMENT_FAILURE_IDEMPOTENCY_SCENARIO_TIMEOUT_SECONDS}}'
+    cmds:
+      - bash "{{.ROOT_DIR}}/tests/e2e/scripts/run-payment-failure-idempotency.sh"
 
   purchase-e2e-up:
     desc: Start the Python purchase-flow E2E Docker Compose services.
