@@ -123,7 +123,41 @@ task tests:purchase-e2e-with-kafka-traces
 task tests:purchase-e2e-with-log-correlation
 ```
 
-이 gate는 HTTP와 Kafka JSON 로그의 correlation/trace 연결, bounded failure code, 민감 필드 부재, 낮은 cardinality의 Loki label을 확인하고 container, volume, network와 임시 build context를 정리한다. Kafka lag 검증은 향후 범위다.
+이 gate는 HTTP와 Kafka JSON 로그의 correlation/trace 연결, bounded failure code, 민감 필드 부재, 낮은 cardinality의 Loki label을 확인하고 container, volume, network와 임시 build context를 정리한다.
+
+정상 구매 후 notification business metric과 Kafka consumer lag까지 확인할 때는 다음 G005 gate를 사용한다.
+
+```bash
+task tests:purchase-e2e-with-notification-metrics
+task purchase-e2e-with-notification-metrics
+```
+
+루트 wrapper는 위 `tests:` task를 호출한다. gate는 깨끗한 임시 context를 만들고 host port를 모두 ephemeral port(`CATALOG_SERVICE_PORT=0`, `ORDER_SERVICE_PORT=0`, `PAYMENT_SERVICE_PORT=0`, `NOTIFICATION_SERVICE_PORT=0`)로 지정한 뒤, `04-customer-drop-purchase-happy-path`, `10-notification-metrics-happy`, `11-notification-metrics-replay` 순서로 실행한다. Newman 결과는 `10`이 1 request / 5 assertions / 0 failures, `11`이 2 requests / 7 assertions / 0 failures다.
+
+`notification-service`의 outcome metric은 `service_name`, `service_version`, `service_environment` 같은 저카디널리티 라벨을 사용하는 business counter다. 정상 구매 뒤 `10`에서 기대하는 값은 다음과 같다.
+
+| Metric | 값 |
+| --- | ---: |
+| `notification_requested_events_consumed_total` | 1 |
+| `notifications_created_total` | 1 |
+| `notification_requested_events_replayed_total` | 0 |
+| `notification_requested_events_invalid_total` | 0 |
+
+consumer lag는 notification 애플리케이션의 local gauge로 판정하지 않는다. Kafka 안에서 다음 consumer group과 topic을 `kafka-consumer-groups.sh --describe`로 조회한다.
+
+```bash
+docker compose -p dropmong-e2e-notification-metrics -f tests/e2e/docker-compose.yml exec -T kafka \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka:29092 \
+  --group notification-service-notification-requested \
+  --describe
+```
+
+`notification-service-notification-requested` group의 `notification.requested` topic은 정상 구매 뒤 committed offset / log-end offset / lag가 `1 / 1 / 0`이어야 한다. 이후 같은 유효 이벤트를 두 번 추가 발행하고 `11`을 실행하면 metric은 `3 / 2 / 1 / 0`(`consumed / created / replayed / invalid`)이어야 하며, duplicate event 하나당 notification은 정확히 1개만 남아야 한다. 같은 Kafka 조회 결과도 `3 / 3 / 0`이어야 한다.
+
+gate 종료 시 `docker compose ... down -v --remove-orphans` cleanup으로 container, volume, network가 각각 0개이고 임시 context가 남지 않아야 한다(`temp context=false`).
+
+C003 전체 회귀 확인에서는 notification unit 18개, `04/05/06/07`, `04/08`이 통과했다. `09` runner는 Go Task shell에 `grep`이 없어 시작 전에 실패했으므로, 전체 `04-09` 회귀가 모두 재통과했다고 판정하지 않는다. 이 제한을 해소하기 전까지 `09`는 알려진 runner 제한으로 기록한다.
 
 Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, `payment-service`, `notification-service`를 직접 호출한다. 기본 URL은 다음과 같다.
 
