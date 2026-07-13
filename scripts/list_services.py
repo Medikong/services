@@ -39,7 +39,13 @@ def main() -> int:
             exclude=os.getenv("SERVICE_EXCLUDE") or "",
         )
         selected = _select_services(args, services)
-        sys.stdout.write(_format_services(selected, args.mode, args.output_format))
+        output = _format_services(selected, args.mode, args.output_format)
+        try:
+            stdout_buffer = sys.stdout.buffer
+        except AttributeError:
+            sys.stdout.write(output)
+        else:
+            stdout_buffer.write(output.encode("utf-8"))
     except CliError as exc:
         sys.stderr.write(f"{exc}\n")
         return 2
