@@ -697,8 +697,7 @@ tasks:
         project='{{.E2E_COMPOSE_PROJECT}}-logs'
         context="${repo_root}/tests/tmp/log-correlation-context"
         rm -rf "${context}"
-        mkdir -p "${context}"
-        git -C "${repo_root}" archive HEAD | tar -xf - -C "${context}"
+        git clone --no-hardlinks --quiet "${repo_root}" "${context}"
         file="${context}/{{.E2E_COMPOSE_FILE}}"
         services="postgres kafka kafka-init tempo otel-collector loki alloy grafana catalog-service order-service payment-service notification-service"
         trap '${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans; rm -rf "${context}"' EXIT

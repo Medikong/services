@@ -18,3 +18,15 @@ def test_purchase_kafka_trace_task_uses_posix_case_validation() -> None:
     assert '""|*[!0123456789]*|0*)' in task
     assert '""|[!A-Za-z0-9]*|*[!A-Za-z0-9._/:@-]*)' in task
     assert 'uuid.uuid4().hex[:12], end="")' in task
+
+
+def test_log_correlation_uses_no_hardlinks_clone_without_tar() -> None:
+    taskfile = (SERVICE_ROOT / "tests" / "Taskfile.yml").read_text(encoding="utf-8")
+    task = taskfile.split("  purchase-e2e-with-log-correlation:", 1)[1].split(
+        "\n  purchase-e2e-with-notification-metrics:",
+        1,
+    )[0]
+
+    assert 'git clone --no-hardlinks --quiet "${repo_root}" "${context}"' in task
+    assert 'mkdir -p "${context}"' not in task
+    assert "tar " not in task
