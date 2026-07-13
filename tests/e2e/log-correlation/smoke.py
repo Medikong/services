@@ -37,8 +37,12 @@ def main() -> None:
         },
         happy["order_id"],
     )
-    assert_http_log("order-service", happy["order_request_id"])
-    assert_http_log("payment-service", happy["payment_request_id"])
+    http_logs = [
+        assert_http_log("order-service", happy["order_request_id"]),
+        assert_http_log("payment-service", happy["payment_request_id"]),
+        assert_http_log("order-service", failed["order_request_id"]),
+        assert_http_log("payment-service", failed["payment_request_id"]),
+    ]
 
     failure_logs = wait_for_kafka_logs(failed["order_id"], expected=2)
     assert_log_graph(
@@ -57,6 +61,16 @@ def main() -> None:
     )
     assert failure_process.get("failure.code") == "payment_failed_event"
     assert_sensitive_data_absent(happy_logs + failure_logs)
+    _, happy_labels = query_loki(
+        "order-service|payment-service|notification-service",
+        f'"correlation_id":"{happy["order_id"]}"',
+    )
+    _, failure_labels = query_loki(
+        "order-service|payment-service|notification-service",
+        f'"correlation_id":"{failed["order_id"]}"',
+    )
+    label_sets = unique_label_sets(happy_labels + failure_labels)
+    assert_low_cardinality_labels(label_sets)
 
     print(
         json.dumps(
@@ -66,8 +80,13 @@ def main() -> None:
                 "failed_order_id": failed["order_id"],
                 "happy_kafka_records": len(happy_logs),
                 "failure_kafka_records": len(failure_logs),
-                "http_records": 4,
+                "http_records": http_logs,
+                "happy_kafka_logs": safe_log_fields(happy_logs),
+                "failure_kafka_logs": safe_log_fields(failure_logs),
+                "failure_code": failure_process["failure.code"],
                 "sensitive_fields": "absent",
+                "runner": "compose-service-no-host-bind-mount",
+                "loki_stream_labels": label_sets,
             },
             separators=(",", ":"),
         )
@@ -134,12 +153,35 @@ def wait_order_status(order_id: str, expected: str) -> None:
     raise AssertionError(f"order {order_id} did not reach {expected}")
 
 
-def assert_http_log(service: str, request_id: str) -> None:
+def assert_http_log(service: str, request_id: str) -> dict[str, Any]:
     logs = wait_for_logs(service, f'"request_id":"{request_id}"', expected=1)
     log = logs[-1]
     assert log.get("request_id") == request_id
     assert log.get("correlation_id") == request_id
     assert_nonempty_ids(log)
+    return {
+        "service.name": service,
+        "request_id": log["request_id"],
+        "correlation_id": log["correlation_id"],
+        "trace_id": log["trace_id"],
+        "span_id": log["span_id"],
+    }
+
+
+def safe_log_fields(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fields = (
+        "service.name",
+        "messaging.operation",
+        "messaging.destination.name",
+        "messaging.kafka.partition",
+        "messaging.kafka.message.offset",
+        "correlation_id",
+        "trace_id",
+        "span_id",
+        "outcome",
+        "failure.code",
+    )
+    return [{field: log[field] for field in fields if field in log} for log in logs]
 
 
 def wait_for_kafka_logs(correlation_id: str, *, expected: int) -> list[dict[str, Any]]:
@@ -153,14 +195,17 @@ def wait_for_kafka_logs(correlation_id: str, *, expected: int) -> list[dict[str,
 def wait_for_logs(service_pattern: str, text: str, *, expected: int) -> list[dict[str, Any]]:
     deadline = time.monotonic() + TIMEOUT_SECONDS
     while time.monotonic() < deadline:
-        logs = query_loki(service_pattern, text)
+        logs, _ = query_loki(service_pattern, text)
         if len(logs) >= expected:
             return logs
         time.sleep(2)
     raise AssertionError(f"Loki returned fewer than {expected} records for {text}")
 
 
-def query_loki(service_pattern: str, text: str) -> list[dict[str, Any]]:
+def query_loki(
+    service_pattern: str,
+    text: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     now = time.time_ns()
     query = f'{{service=~"{service_pattern}"}} |= {json.dumps(text)}'
     params = urlencode(
@@ -174,7 +219,11 @@ def query_loki(service_pattern: str, text: str) -> list[dict[str, Any]]:
     )
     payload = request_json("GET", f"{LOKI_URL}/loki/api/v1/query_range?{params}")
     logs: list[dict[str, Any]] = []
+    label_sets: list[dict[str, str]] = []
     for stream in payload.get("data", {}).get("result", []):
+        labels = stream.get("stream", {})
+        if isinstance(labels, dict):
+            label_sets.append({str(key): str(value) for key, value in labels.items()})
         for _, line in stream.get("values", []):
             try:
                 decoded = json.loads(line)
@@ -182,7 +231,19 @@ def query_loki(service_pattern: str, text: str) -> list[dict[str, Any]]:
                 continue
             if isinstance(decoded, dict):
                 logs.append(decoded)
-    return logs
+    return logs, label_sets
+
+
+def unique_label_sets(label_sets: list[dict[str, str]]) -> list[dict[str, str]]:
+    unique = {tuple(sorted(labels.items())) for labels in label_sets}
+    return [dict(items) for items in sorted(unique)]
+
+
+def assert_low_cardinality_labels(label_sets: list[dict[str, str]]) -> None:
+    assert label_sets, "Loki query returned no stream labels"
+    forbidden = {"request_id", "correlation_id", "trace_id", "span_id"}
+    for labels in label_sets:
+        assert forbidden.isdisjoint(labels), f"high-cardinality Loki labels: {sorted(forbidden & labels.keys())}"
 
 
 def assert_log_graph(
