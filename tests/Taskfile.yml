@@ -715,6 +715,7 @@ tasks:
       - |
         set -e
         repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        python_bin='{{.PYTHON_BIN}}'
         compose_cmd='{{.DOCKER_COMPOSE}}'
         project='{{.E2E_COMPOSE_PROJECT}}-notification-metrics'
         context="${repo_root}/tests/tmp/notification-metrics-context"
@@ -756,7 +757,7 @@ tasks:
               return 0
             fi
             attempts=$((attempts + 1))
-            sleep 2
+            "${python_bin}" -c 'import time; time.sleep(2)'
           done
           printf '%s\n' "${output}" >&2
           return 1
