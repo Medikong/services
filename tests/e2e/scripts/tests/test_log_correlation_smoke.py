@@ -19,7 +19,7 @@ import smoke  # noqa: E402
         (True, "mock-failures", "PAYMENT_FAILED"),
     ],
 )
-def test_run_purchase_waits_until_ready_before_payment(
+def test_run_purchase_waits_for_payment_consumer_before_payment(
     monkeypatch: pytest.MonkeyPatch,
     *,
     fail: bool,
@@ -46,16 +46,25 @@ def test_run_purchase_waits_until_ready_before_payment(
 
     def fake_wait_order_status(order_id: str, expected: str) -> None:
         assert order_id == "order-123"
-        events.append(f"wait:{expected}")
+        events.append(f"wait-order:{expected}")
+
+    def fake_wait_for_kafka_logs(
+        order_id: str,
+        *,
+        expected: int,
+    ) -> list[dict[str, str]]:
+        events.append(f"wait-kafka:{order_id}:{expected}")
+        return []
 
     monkeypatch.setattr(smoke, "request_json", fake_request_json)
     monkeypatch.setattr(smoke, "wait_order_status", fake_wait_order_status)
+    monkeypatch.setattr(smoke, "wait_for_kafka_logs", fake_wait_for_kafka_logs)
 
     smoke.run_purchase("drop-1", "product-1", 1000, fail=fail)
 
     assert events == [
         "order-created",
-        "wait:READY_FOR_PAYMENT",
+        "wait-kafka:order-123:2",
         f"payment-posted:{payment_path}",
-        f"wait:{terminal_status}",
+        f"wait-order:{terminal_status}",
     ]

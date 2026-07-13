@@ -121,7 +121,7 @@ def run_purchase(drop_id: str, product_id: str, amount: int, *, fail: bool) -> d
         expected_status=201,
     )
     order_id = str(order_payload["data"]["id"])
-    wait_order_status(order_id, "READY_FOR_PAYMENT")
+    wait_for_kafka_logs(order_id, expected=2)
     payment_request_id = str(uuid4())
     path = "mock-failures" if fail else "mock-approvals"
     payment_body: dict[str, Any] = {
