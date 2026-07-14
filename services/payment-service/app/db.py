@@ -6,14 +6,16 @@ from dataclasses import dataclass
 import anyio
 from fastapi import FastAPI
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
-
-from app.messaging import (
-    KafkaRuntime,
-    NoopPaymentEventPublisher,
-    PaymentEventPublisherRef,
-    kafka_runtime_from_bootstrap,
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
+
+from app.messaging import KafkaRuntimeConfig, kafka_runtime_from_config
+from app.kafka_workers import run_order_created_consumer_worker, run_outbox_worker
+from app.metrics import PaymentMetrics
 from app.postgres import PostgresPaymentRepository
 from app.repository import PaymentRepository
 from app.store import PaymentStore
@@ -21,22 +23,25 @@ from app.store import PaymentStore
 type FastAPILifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)  # noqa: MUTABLE_OK
 class AppResources:
+    """Resources assembled before lifespan starts async Kafka workers."""
+
     repository: PaymentRepository
-    event_publisher: PaymentEventPublisherRef
     engine: AsyncEngine | None = None
+    session_factory: async_sessionmaker[AsyncSession] | None = None
     kafka_bootstrap_servers: str = ""
+    metrics: PaymentMetrics | None = None
 
 
-def resources_from_env() -> AppResources:
+def resources_from_env(metrics: PaymentMetrics | None = None) -> AppResources:
     database_url = os.getenv("DATABASE_URL", "")
     kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
     if database_url == "":
         return AppResources(
             repository=PaymentStore(),
-            event_publisher=PaymentEventPublisherRef(NoopPaymentEventPublisher()),
             kafka_bootstrap_servers=kafka_bootstrap_servers,
+            metrics=metrics,
         )
 
     engine = create_async_engine(
@@ -51,38 +56,40 @@ def resources_from_env() -> AppResources:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     return AppResources(
         repository=PostgresPaymentRepository(session_factory),
-        event_publisher=PaymentEventPublisherRef(NoopPaymentEventPublisher()),
         engine=engine,
+        session_factory=session_factory,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
+        metrics=metrics,
     )
 
 
 def lifespan_for(resources: AppResources) -> FastAPILifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        runtime: KafkaRuntime | None = None
+        runtime = kafka_runtime_from_config(
+            KafkaRuntimeConfig(
+                bootstrap_servers=resources.kafka_bootstrap_servers,
+                repository=resources.repository,
+                session_factory=resources.session_factory,
+                metrics=resources.metrics
+                or PaymentMetrics("payment-service", "unknown", "unknown"),
+            ),
+        )
         try:
-            if resources.kafka_bootstrap_servers != "":
-                runtime = kafka_runtime_from_bootstrap(
-                    resources.repository,
-                    resources.kafka_bootstrap_servers,
-                )
-                if runtime.publisher is not None:
-                    resources.event_publisher.replace(runtime.publisher)
-            if runtime is not None and runtime.publisher is not None:
-                await runtime.publisher.start()
-            if runtime is not None and runtime.order_created_consumer is not None:
-                await runtime.order_created_consumer.start()
             async with anyio.create_task_group() as task_group:
-                if runtime is not None and runtime.order_created_consumer is not None:
-                    task_group.start_soon(runtime.order_created_consumer.run)
+                if runtime.order_created_consumer_factory is not None:
+                    task_group.start_soon(
+                        run_order_created_consumer_worker,
+                        runtime.order_created_consumer_factory,
+                    )
+                if runtime.outbox_worker_factory is not None:
+                    task_group.start_soon(
+                        run_outbox_worker,
+                        runtime.outbox_worker_factory,
+                    )
                 yield
                 task_group.cancel_scope.cancel()
         finally:
-            if runtime is not None and runtime.order_created_consumer is not None:
-                await runtime.order_created_consumer.stop()
-            if runtime is not None and runtime.publisher is not None:
-                await runtime.publisher.stop()
             if resources.engine is not None:
                 await resources.engine.dispose()
 
@@ -99,7 +106,7 @@ async def database_schema_is_current(engine: AsyncEngine) -> bool:
         version = (
             await connection.execute(text("SELECT version_num FROM alembic_version"))
         ).scalar_one_or_none()
-    return version == "20260714_01"
+    return version == "20260714_02"
 
 
 def _async_database_url(database_url: str) -> str:

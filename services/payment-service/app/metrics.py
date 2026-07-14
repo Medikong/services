@@ -1,3 +1,13 @@
+from enum import StrEnum, unique
+
+
+@unique
+class OutboxRelayOutcome(StrEnum):
+    PUBLISHED = "published"
+    RETRY = "retry"
+    DEAD_LETTERED = "dead_lettered"
+
+
 class PaymentMetrics:
     def __init__(
         self,
@@ -12,12 +22,16 @@ class PaymentMetrics:
         )
         self._payments_approved_total = 0
         self._payments_failed_total = 0
+        self._outbox_relay_totals = {outcome: 0 for outcome in OutboxRelayOutcome}
 
     def record_payment_approved(self) -> None:
         self._payments_approved_total += 1
 
     def record_payment_failed(self) -> None:
         self._payments_failed_total += 1
+
+    def record_outbox_relay(self, outcome: OutboxRelayOutcome) -> None:
+        self._outbox_relay_totals[outcome] += 1
 
     def render(self) -> str:
         return "".join(
@@ -39,7 +53,22 @@ class PaymentMetrics:
                     self._payments_approved_total,
                 ),
                 _metric_header("payments_failed_total", "Payments failed.", "counter"),
-                _metric_sample("payments_failed_total", self._labels, self._payments_failed_total),
+                _metric_sample(
+                    "payments_failed_total", self._labels, self._payments_failed_total
+                ),
+                _metric_header(
+                    "payment_outbox_relay_total",
+                    "Payment outbox relay outcomes.",
+                    "counter",
+                ),
+                *(
+                    _metric_sample(
+                        "payment_outbox_relay_total",
+                        f'{self._labels},outcome="{outcome.value}"',
+                        count,
+                    )
+                    for outcome, count in self._outbox_relay_totals.items()
+                ),
             ],
         )
 

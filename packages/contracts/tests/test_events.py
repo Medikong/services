@@ -233,3 +233,24 @@ def test_order_outbox_event_ids_match_database_boundary(
 
     assert error.value.errors()[0]["loc"] == ("orderId",)
     assert error.value.errors()[0]["type"] == "string_too_long"
+
+
+def test_order_created_order_id_matches_payment_storage_limit() -> None:
+    payload = {
+        "eventId": EVENT_ID,
+        "eventType": "order.created",
+        "userId": "1",
+        "sourceId": SOURCE_ID,
+        "occurredAt": "2026-05-13T10:00:00Z",
+        "producer": "contract-test",
+        "dropId": DROP_ID,
+        "productId": PRODUCT_ID,
+        "quantity": 1,
+        "amount": 50000,
+    }
+
+    event = OrderCreatedEvent.model_validate(payload | {"orderId": "o" * 64})
+
+    assert len(event.orderId) == 64
+    with pytest.raises(ValidationError):
+        _ = OrderCreatedEvent.model_validate(payload | {"orderId": "o" * 65})

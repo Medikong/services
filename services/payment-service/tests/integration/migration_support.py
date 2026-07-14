@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.postgres import Base
+from app.records import Base, KnownOrderRecord, PaymentRecord
 
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,7 +59,13 @@ async def isolated_database(prefix: str) -> AsyncIterator[TestDatabase]:
 async def create_legacy_schema(database_url: str) -> AsyncEngine:
     engine = create_async_engine(database_url)
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+        await connection.run_sync(
+            Base.metadata.create_all,
+            tables=[
+                Base.metadata.tables[KnownOrderRecord.__tablename__],
+                Base.metadata.tables[PaymentRecord.__tablename__],
+            ],
+        )
         await connection.execute(
             text(
                 "ALTER TABLE payments "

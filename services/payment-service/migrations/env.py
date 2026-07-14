@@ -8,8 +8,8 @@ from alembic import context
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.ledger import OutboxEventRecord, ProcessedEventRecord, RefundRecord
-from app.postgres import Base
+from app.ledger import RefundRecord
+from app.records import Base, OutboxEventRecord, ProcessedEventRecord
 
 config = context.config
 if config.config_file_name is not None:

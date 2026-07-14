@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
@@ -9,9 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.db import resources_from_env
 from app.main import create_app
-from app.messaging import NoopPaymentEventPublisher, handle_order_created_message
-from app.models import Payment, PaymentId
-from app.store import KnownOrder, PaymentStore
+from app.store import PaymentStore
 from contracts import OrderCreatedEvent
 
 DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
@@ -27,27 +23,6 @@ DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
     amount=50000,
     idempotencyKey="order-create-default",
 )
-
-
-class RecordingPaymentEventPublisher:
-    def __init__(self) -> None:
-        self.published_payments: list[Payment] = []
-        self.published_failed_payments: list[Payment] = []
-
-    async def publish_payment_approved(self, payment: Payment) -> None:
-        self.published_payments.append(payment)
-
-    async def publish_payment_failed(self, payment: Payment) -> None:
-        self.published_failed_payments.append(payment)
-
-
-@dataclass(frozen=True, slots=True)
-class FakeKafkaMessage:
-    topic: str
-    partition: int
-    offset: int
-    headers: Sequence[tuple[str | bytes, bytes]] | None
-    value: bytes | None
 
 
 def record_known_order(
@@ -110,16 +85,14 @@ def test_resources_from_env_defers_kafka_clients_until_lifespan(
 
     # Then
     assert isinstance(resources.repository, PaymentStore)
-    assert isinstance(resources.event_publisher.current, NoopPaymentEventPublisher)
     assert resources.kafka_bootstrap_servers == "kafka:9092"
 
 
-def test_approve_mock_payment_returns_approved_payment_and_publishes_event() -> None:
+def test_approve_mock_payment_returns_approved_payment() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -140,17 +113,13 @@ def test_approve_mock_payment_returns_approved_payment_and_publishes_event() -> 
     assert body["data"]["amount"] == 50000
     assert body["data"]["method"] == "MOCK_CARD"
     assert body["data"]["status"] == "APPROVED"
-    assert publisher.published_payments == [
-        Payment.model_validate(body["data"]),
-    ]
 
 
 def test_approve_mock_payment_reuses_payment_when_idempotency_key_repeats() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
     headers = {
         "X-User-Id": "user-001",
         "X-User-Role": "CUSTOMER",
@@ -159,22 +128,24 @@ def test_approve_mock_payment_reuses_payment_when_idempotency_key_repeats() -> N
     payload = {"orderId": "order-001", "amount": 50000, "method": "MOCK_CARD"}
 
     # When
-    first_response = client.post("/payments/mock-approvals", headers=headers, json=payload)
-    second_response = client.post("/payments/mock-approvals", headers=headers, json=payload)
+    first_response = client.post(
+        "/payments/mock-approvals", headers=headers, json=payload
+    )
+    second_response = client.post(
+        "/payments/mock-approvals", headers=headers, json=payload
+    )
 
     # Then
     assert first_response.status_code == 201
     assert second_response.status_code == 201
     assert first_response.json()["data"]["id"] == second_response.json()["data"]["id"]
-    assert len(publisher.published_payments) == 1
 
 
-def test_fail_mock_payment_returns_failed_payment_and_publishes_event() -> None:
+def test_fail_mock_payment_returns_failed_payment() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -198,18 +169,13 @@ def test_fail_mock_payment_returns_failed_payment_and_publishes_event() -> None:
     assert body["data"]["approvedAt"] is None
     assert body["data"]["failedAt"] is not None
     assert body["data"]["failureReason"] == "card_declined"
-    assert publisher.published_failed_payments == [
-        Payment.model_validate(body["data"]),
-    ]
-    assert publisher.published_payments == []
 
 
 def test_fail_mock_payment_reuses_payment_when_idempotency_key_repeats() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
     headers = {
         "X-User-Id": "user-001",
         "X-User-Role": "CUSTOMER",
@@ -223,14 +189,48 @@ def test_fail_mock_payment_reuses_payment_when_idempotency_key_repeats() -> None
     }
 
     # When
-    first_response = client.post("/payments/mock-failures", headers=headers, json=payload)
-    second_response = client.post("/payments/mock-failures", headers=headers, json=payload)
+    first_response = client.post(
+        "/payments/mock-failures", headers=headers, json=payload
+    )
+    second_response = client.post(
+        "/payments/mock-failures", headers=headers, json=payload
+    )
 
     # Then
     assert first_response.status_code == 201
     assert second_response.status_code == 201
     assert first_response.json()["data"]["id"] == second_response.json()["data"]["id"]
-    assert len(publisher.published_failed_payments) == 1
+
+
+def test_fail_mock_payment_returns_conflict_when_order_is_already_approved() -> None:
+    # Given
+    store = PaymentStore()
+    record_known_order(store)
+    client = TestClient(create_app(store))
+    approval_response = client.post(
+        "/payments/mock-approvals",
+        headers={
+            "X-User-Id": "user-001",
+            "X-User-Role": "CUSTOMER",
+            "Idempotency-Key": "payment-terminal-approval-001",
+        },
+        json={"orderId": "order-001", "amount": 50000},
+    )
+    assert approval_response.status_code == 201
+
+    # When
+    failure_response = client.post(
+        "/payments/mock-failures",
+        headers={
+            "X-User-Id": "user-001",
+            "X-User-Role": "CUSTOMER",
+            "Idempotency-Key": "payment-terminal-failure-001",
+        },
+        json={"orderId": "order-001", "amount": 50000},
+    )
+
+    # Then
+    assert failure_response.status_code == 409
 
 
 def test_get_payment_returns_approved_payment_for_owner_customer() -> None:
@@ -304,35 +304,3 @@ def test_approve_mock_payment_returns_403_when_owner_role_requests_approval() ->
 
     # Then
     assert response.status_code == 403
-
-
-def test_order_created_kafka_message_records_known_order_when_payload_is_valid() -> None:
-    # Given
-    store = PaymentStore()
-    event = OrderCreatedEvent(
-        eventId="evt-order-created-001",
-        userId="user-001",
-        sourceId="order-001",
-        occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
-        producer="order-service",
-        orderId="order-001",
-        dropId="drop-001",
-        productId="product-001",
-        quantity=1,
-        amount=50000,
-        idempotencyKey="order-create-001",
-    )
-    message = FakeKafkaMessage(
-        topic="order.created",
-        partition=0,
-        offset=1,
-        headers=None,
-        value=event.model_dump_json().encode("utf-8"),
-    )
-
-    # When
-    anyio.run(handle_order_created_message, message, store)
-
-    # Then
-    known_order = anyio.run(store.get_known_order, "order-001")
-    assert known_order == KnownOrder(order_id="order-001", user_id="user-001", amount=50000)

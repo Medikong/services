@@ -5,7 +5,6 @@ import anyio
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.models import Payment
 from app.store import PaymentStore
 from contracts import OrderCreatedEvent
 
@@ -24,26 +23,14 @@ DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
 )
 
 
-class RecordingPaymentEventPublisher:
-    def __init__(self) -> None:
-        self.published_payments: list[Payment] = []
-        self.published_failed_payments: list[Payment] = []
-
-    async def publish_payment_approved(self, payment: Payment) -> None:
-        self.published_payments.append(payment)
-
-    async def publish_payment_failed(self, payment: Payment) -> None:
-        self.published_failed_payments.append(payment)
-
-
 def record_known_order(store: PaymentStore) -> None:
     anyio.run(store.record_order_created, DEFAULT_ORDER_CREATED)
 
 
 def test_approve_mock_payment_returns_409_when_order_is_unknown() -> None:
     # Given
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(PaymentStore(), publisher))
+    store = PaymentStore()
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -59,13 +46,13 @@ def test_approve_mock_payment_returns_409_when_order_is_unknown() -> None:
     # Then
     assert response.status_code == 409
     assert response.json()["detail"] == "order is not ready for payment"
-    assert publisher.published_payments == []
+    assert store._payments == {}
 
 
 def test_fail_mock_payment_returns_409_when_order_is_unknown() -> None:
     # Given
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(PaymentStore(), publisher))
+    store = PaymentStore()
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -86,15 +73,14 @@ def test_fail_mock_payment_returns_409_when_order_is_unknown() -> None:
     # Then
     assert response.status_code == 409
     assert response.json()["detail"] == "order is not ready for payment"
-    assert publisher.published_failed_payments == []
+    assert store._payments == {}
 
 
 def test_approve_mock_payment_returns_409_when_amount_mismatches_order() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -110,15 +96,14 @@ def test_approve_mock_payment_returns_409_when_amount_mismatches_order() -> None
     # Then
     assert response.status_code == 409
     assert response.json()["detail"] == "payment request does not match order"
-    assert publisher.published_payments == []
+    assert store._payments == {}
 
 
 def test_fail_mock_payment_returns_409_when_amount_mismatches_order() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
@@ -139,15 +124,14 @@ def test_fail_mock_payment_returns_409_when_amount_mismatches_order() -> None:
     # Then
     assert response.status_code == 409
     assert response.json()["detail"] == "payment request does not match order"
-    assert publisher.published_failed_payments == []
+    assert store._payments == {}
 
 
 def test_approve_mock_payment_returns_409_when_idempotency_payload_changes() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
     headers = {
         "X-User-Id": "user-001",
         "X-User-Role": "CUSTOMER",
@@ -169,16 +153,18 @@ def test_approve_mock_payment_returns_409_when_idempotency_payload_changes() -> 
     # Then
     assert first_response.status_code == 201
     assert second_response.status_code == 409
-    assert second_response.json()["detail"] == "idempotency key reused with different payment request"
-    assert len(publisher.published_payments) == 1
+    assert (
+        second_response.json()["detail"]
+        == "idempotency key reused with different payment request"
+    )
+    assert len(store._payments) == 1
 
 
 def test_fail_mock_payment_returns_409_when_idempotency_payload_changes() -> None:
     # Given
     store = PaymentStore()
     record_known_order(store)
-    publisher = RecordingPaymentEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
     headers = {
         "X-User-Id": "user-001",
         "X-User-Role": "CUSTOMER",
@@ -210,8 +196,11 @@ def test_fail_mock_payment_returns_409_when_idempotency_payload_changes() -> Non
     # Then
     assert first_response.status_code == 201
     assert second_response.status_code == 409
-    assert second_response.json()["detail"] == "idempotency key reused with different payment request"
-    assert len(publisher.published_failed_payments) == 1
+    assert (
+        second_response.json()["detail"]
+        == "idempotency key reused with different payment request"
+    )
+    assert len(store._payments) == 1
 
 
 def test_approve_mock_payment_returns_422_when_order_id_is_empty() -> None:

@@ -20,6 +20,30 @@ def test_payment_failed_event_uses_order_id_as_purchase_correlation() -> None:
     assert event.correlationId == payment.orderId
 
 
+def test_payment_approved_event_is_fixed_for_the_terminal_payment() -> None:
+    # Given
+    payment = approved_payment()
+
+    # When
+    first_event = payment_approved_event(payment)
+    replayed_event = payment_approved_event(payment)
+
+    # Then
+    assert replayed_event == first_event
+
+
+def test_payment_failed_event_is_fixed_for_the_terminal_payment() -> None:
+    # Given
+    payment = failed_payment()
+
+    # When
+    first_event = payment_failed_event(payment)
+    replayed_event = payment_failed_event(payment)
+
+    # Then
+    assert replayed_event == first_event
+
+
 def approved_payment() -> Payment:
     occurred_at = datetime(2026, 7, 13, tzinfo=UTC)
     return Payment(

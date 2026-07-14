@@ -12,7 +12,7 @@ from tests.integration.migration_support import (
     run_migration,
 )
 
-MIGRATION_HEAD = "20260714_01"
+MIGRATION_HEAD = "20260714_02"
 
 
 @pytest.mark.anyio
@@ -225,7 +225,7 @@ async def test_downgrade_is_explicitly_unsupported() -> None:
         assert upgrade.returncode == 0, upgrade.stderr
 
         # When
-        downgrade = await run_migration(database.url, "downgrade", "base")
+        downgrade = await run_migration(database.url, "downgrade", "-1")
 
         # Then
         assert downgrade.returncode != 0

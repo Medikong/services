@@ -5,21 +5,17 @@ from typing import Annotated, Final, assert_never
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from middleware import is_safe_request_id
 from observability import (
+    REQUEST_ID_HEADER,
     RequestIdMiddleware,
     configure_process_observability,
     create_request_log_middleware,
     instrument_fastapi_app,
     observability_config_from_env,
-    request_id_middleware_options,
 )
 
 from app.db import AppResources, lifespan_for, resources_from_env
-from app.messaging import (
-    NoopPaymentEventPublisher,
-    PaymentEventPublisher,
-    PaymentEventPublisherRef,
-)
 from app.metrics import PaymentMetrics
 from app.models import (
     ApprovePaymentRequest,
@@ -45,8 +41,7 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
-    approval_should_publish,
-    failure_should_publish,
+    PaymentTerminalConflict,
 )
 
 SERVICE_NAME: Final = "payment-service"
@@ -67,17 +62,15 @@ class ReadPaymentContext:
 
 def create_app(
     repository: PaymentRepository | None = None,
-    event_publisher: PaymentEventPublisher | None = None,
 ) -> FastAPI:
+    payment_metrics = PaymentMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
     resources = (
         AppResources(
             repository=repository,
-            event_publisher=PaymentEventPublisherRef(
-                event_publisher or NoopPaymentEventPublisher(),
-            ),
+            metrics=payment_metrics,
         )
         if repository is not None
-        else resources_from_env()
+        else resources_from_env(payment_metrics)
     )
     app = FastAPI(
         title="DropMong Payment Service API",
@@ -85,7 +78,6 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
-    payment_metrics = PaymentMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
     _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
@@ -118,9 +110,6 @@ def create_app(
                 idempotency_key=context.idempotency_key,
             ),
         )
-        publishable_payment = approval_should_publish(result)
-        if publishable_payment is not None:
-            await resources.event_publisher.publish_payment_approved(publishable_payment)
         match result:
             case PaymentApproved(payment=payment):
                 payment_metrics.record_payment_approved()
@@ -141,6 +130,11 @@ def create_app(
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="idempotency key reused with different payment request",
+                )
+            case PaymentTerminalConflict():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="order already has a terminal payment",
                 )
             case unreachable:
                 assert_never(unreachable)
@@ -164,9 +158,6 @@ def create_app(
                 reason=payload.reason,
             ),
         )
-        publishable_payment = failure_should_publish(result)
-        if publishable_payment is not None:
-            await resources.event_publisher.publish_payment_failed(publishable_payment)
         match result:
             case PaymentFailed(payment=payment):
                 payment_metrics.record_payment_failed()
@@ -187,6 +178,11 @@ def create_app(
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="idempotency key reused with different payment request",
+                )
+            case PaymentTerminalConflict():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="order already has a terminal payment",
                 )
             case unreachable:
                 assert_never(unreachable)
@@ -215,7 +211,12 @@ def create_app(
 def _configure_observability(app: FastAPI) -> None:
     config = observability_config_from_env(SERVICE_NAME, env=os.environ)
     configure_process_observability(config)
-    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
+    app.add_middleware(
+        RequestIdMiddleware,
+        header_name=REQUEST_ID_HEADER,
+        update_request_header=True,
+        validator=is_safe_request_id,
+    )
     app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
 

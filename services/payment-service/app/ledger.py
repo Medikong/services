@@ -5,16 +5,14 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.postgres import Base
+from app.records import Base
 
 
 class RefundRecord(Base):
@@ -59,50 +57,6 @@ class RefundRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-
-class ProcessedEventRecord(Base):
-    __tablename__: Final = "processed_events"
-
-    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    event_type: Mapped[str] = mapped_column(String(128))
-    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
-class OutboxEventRecord(Base):
-    __tablename__: Final = "outbox_events"
-    __table_args__: tuple[CheckConstraint | Index, ...] = (
-        CheckConstraint("attempts >= 0", name="ck_outbox_events_attempts_nonnegative"),
-        Index(
-            "ix_outbox_events_pending",
-            "published_at",
-            "dead_lettered_at",
-            "next_attempt_at",
-        ),
-    )
-
-    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    event_type: Mapped[str] = mapped_column(String(128))
-    aggregate_type: Mapped[str] = mapped_column(String(64))
-    aggregate_id: Mapped[str] = mapped_column(String(64))
-    topic: Mapped[str] = mapped_column(String(128))
-    message_key: Mapped[str] = mapped_column(String(128))
-    payload: Mapped[dict[str, str | int | bool | None]] = mapped_column(JSONB)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    next_attempt_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-    dead_lettered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

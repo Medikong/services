@@ -54,4 +54,4 @@
 - `notification.requested`는 기본 `IN_APP` 채널을 사용하고 `notificationType`을 생략한 기존 payload는 `ORDER_CONFIRMED`로 해석한다.
 - `notificationType`은 `ORDER_CONFIRMED`, `PAYMENT_FAILED`, `ORDER_EXPIRED`, `ORDER_CANCELED`, `PAYMENT_REFUNDED`, `REFUND_FAILED` 중 하나다.
 - 모든 모델은 알 수 없는 필드를 거부하며, 기존 이벤트 payload에 `schemaVersion`이나 `notificationType`을 새 필수 필드로 요구하지 않는다.
-- order-service와 payment-service의 DB commit과 Kafka publish 사이에는 아직 transactional outbox가 없다. 주문 생성 뒤 `order.created`, 결제 승인 뒤 `payment.approved`, 결제 실패 뒤 `payment.failed`, 주문 확정 뒤 `notification.requested` 발행 구간을 모두 원자화해야 한다.
+- order-service와 payment-service는 DB commit과 Kafka publish 사이를 transactional outbox로 연결하며, relay가 성공적으로 ack된 이벤트만 발행 완료로 기록한다.

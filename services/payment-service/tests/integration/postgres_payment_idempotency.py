@@ -25,6 +25,7 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
+    PaymentTerminalConflict,
 )
 from contracts import OrderCreatedEvent
 
@@ -76,11 +77,14 @@ async def test_fail_mock_payment_replays_one_failure_when_two_sessions_race() ->
         # Then
         failed_payment, replayed_payment = _one_failed_and_one_replayed(results)
         assert failed_payment.id == replayed_payment.id
-        assert await _matching_payment_count(
-            session_factory=session_factory,
-            payment=failed_payment,
-            command=command,
-        ) == 1
+        assert (
+            await _matching_payment_count(
+                session_factory=session_factory,
+                payment=failed_payment,
+                command=command,
+            )
+            == 1
+        )
 
 
 @asynccontextmanager
@@ -161,6 +165,7 @@ def _one_failed_and_one_replayed(
                 PaymentOrderNotFound()
                 | PaymentOrderMismatch()
                 | PaymentIdempotencyConflict()
+                | PaymentTerminalConflict()
             ):
                 pytest.fail(f"unexpected payment result: {type(result).__name__}")
             case unreachable:

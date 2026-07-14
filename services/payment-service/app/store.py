@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import assert_never
-
 from contracts import OrderCreatedEvent
 
 from app.models import (
@@ -69,12 +67,18 @@ class PaymentIdempotencyConflict:
     payment: Payment
 
 
+@dataclass(frozen=True, slots=True)
+class PaymentTerminalConflict:
+    payment: Payment
+
+
 type ApprovePaymentResult = (
     PaymentApproved
     | PaymentAlreadyApproved
     | PaymentOrderNotFound
     | PaymentOrderMismatch
     | PaymentIdempotencyConflict
+    | PaymentTerminalConflict
 )
 
 
@@ -84,6 +88,7 @@ type FailPaymentResult = (
     | PaymentOrderNotFound
     | PaymentOrderMismatch
     | PaymentIdempotencyConflict
+    | PaymentTerminalConflict
 )
 
 
@@ -98,15 +103,25 @@ class PaymentStore:
     def __init__(self) -> None:
         self._payments: dict[PaymentId, Payment] = {}
         self._idempotency_index: dict[tuple[UserId, IdempotencyKey], PaymentId] = {}
+        self._order_index: dict[OrderId, PaymentId] = {}
         self._known_orders: dict[OrderId, KnownOrder] = {}
+        self._processed_event_ids: set[str] = set()
         self._next_payment_number = 1
 
-    async def approve_mock_payment(self, command: ApprovePaymentCommand) -> ApprovePaymentResult:
-        replayed_payment = self._replayed_payment(command.user_id, command.idempotency_key)
+    async def approve_mock_payment(
+        self, command: ApprovePaymentCommand
+    ) -> ApprovePaymentResult:
+        replayed_payment = self._replayed_payment(
+            command.user_id, command.idempotency_key
+        )
         if replayed_payment is not None:
             if not payment_matches_command(replayed_payment, command):
                 return PaymentIdempotencyConflict(payment=replayed_payment)
             return PaymentAlreadyApproved(payment=replayed_payment)
+
+        terminal_payment = self._terminal_payment(command.order_id)
+        if terminal_payment is not None:
+            return PaymentTerminalConflict(payment=terminal_payment)
 
         known_order = self._known_orders.get(command.order_id)
         if known_order is None:
@@ -128,14 +143,21 @@ class PaymentStore:
         )
         self._payments[payment_id] = payment
         self._idempotency_index[(command.user_id, command.idempotency_key)] = payment_id
+        self._order_index[command.order_id] = payment_id
         return PaymentApproved(payment=payment)
 
     async def fail_mock_payment(self, command: FailPaymentCommand) -> FailPaymentResult:
-        replayed_payment = self._replayed_payment(command.user_id, command.idempotency_key)
+        replayed_payment = self._replayed_payment(
+            command.user_id, command.idempotency_key
+        )
         if replayed_payment is not None:
             if not failed_payment_matches_command(replayed_payment, command):
                 return PaymentIdempotencyConflict(payment=replayed_payment)
             return PaymentAlreadyFailed(payment=replayed_payment)
+
+        terminal_payment = self._terminal_payment(command.order_id)
+        if terminal_payment is not None:
+            return PaymentTerminalConflict(payment=terminal_payment)
 
         known_order = self._known_orders.get(command.order_id)
         if known_order is None:
@@ -158,6 +180,7 @@ class PaymentStore:
         )
         self._payments[payment_id] = payment
         self._idempotency_index[(command.user_id, command.idempotency_key)] = payment_id
+        self._order_index[command.order_id] = payment_id
         return PaymentFailed(payment=payment)
 
     async def get_payment(self, payment_id: PaymentId) -> Payment | None:
@@ -165,13 +188,17 @@ class PaymentStore:
 
     async def record_order_created(self, event: OrderCreatedEvent) -> KnownOrder:
         order_id = OrderId(event.orderId)
-        known_order = KnownOrder(
+        persisted_order = self._known_orders.get(order_id)
+        incoming_order = KnownOrder(
             order_id=OrderId(event.orderId),
             user_id=UserId(event.userId),
             amount=event.amount,
         )
-        self._known_orders[order_id] = known_order
-        return known_order
+        if event.eventId in self._processed_event_ids:
+            return persisted_order or incoming_order
+        persisted_order = self._known_orders.setdefault(order_id, incoming_order)
+        self._processed_event_ids.add(event.eventId)
+        return persisted_order
 
     async def get_known_order(self, order_id: str) -> KnownOrder | None:
         return self._known_orders.get(OrderId(order_id))
@@ -191,29 +218,11 @@ class PaymentStore:
         self._next_payment_number += 1
         return payment_id
 
-
-def approval_should_publish(result: ApprovePaymentResult) -> Payment | None:
-    match result:
-        case PaymentApproved(payment=payment):
-            return payment
-        case PaymentAlreadyApproved():
+    def _terminal_payment(self, order_id: OrderId) -> Payment | None:
+        payment_id = self._order_index.get(order_id)
+        if payment_id is None:
             return None
-        case PaymentOrderNotFound() | PaymentOrderMismatch() | PaymentIdempotencyConflict():
-            return None
-        case unreachable:
-            assert_never(unreachable)
-
-
-def failure_should_publish(result: FailPaymentResult) -> Payment | None:
-    match result:
-        case PaymentFailed(payment=payment):
-            return payment
-        case PaymentAlreadyFailed():
-            return None
-        case PaymentOrderNotFound() | PaymentOrderMismatch() | PaymentIdempotencyConflict():
-            return None
-        case unreachable:
-            assert_never(unreachable)
+        return self._payments[payment_id]
 
 
 def payment_matches_command(payment: Payment, command: ApprovePaymentCommand) -> bool:
@@ -226,7 +235,9 @@ def payment_matches_command(payment: Payment, command: ApprovePaymentCommand) ->
     )
 
 
-def failed_payment_matches_command(payment: Payment, command: FailPaymentCommand) -> bool:
+def failed_payment_matches_command(
+    payment: Payment, command: FailPaymentCommand
+) -> bool:
     return (
         payment.status == PaymentStatus.FAILED
         and payment.orderId == command.order_id
@@ -242,6 +253,5 @@ def known_order_matches_command(
     command: ApprovePaymentCommand | FailPaymentCommand,
 ) -> bool:
     return (
-        known_order.user_id == command.user_id
-        and known_order.amount == command.amount
+        known_order.user_id == command.user_id and known_order.amount == command.amount
     )

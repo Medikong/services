@@ -1,6 +1,3 @@
-from datetime import UTC, datetime
-from uuid import uuid4
-
 from contracts import PaymentApprovedEvent, PaymentFailedEvent
 
 from app.models import Payment
@@ -10,10 +7,10 @@ PRODUCER_NAME = "payment-service"
 
 def payment_approved_event(payment: Payment) -> PaymentApprovedEvent:
     return PaymentApprovedEvent(
-        eventId=f"evt-{uuid4().hex}",
+        eventId=f"evt-payment-approved-{payment.id}",
         userId=payment.userId,
         sourceId=payment.id,
-        occurredAt=datetime.now(UTC),
+        occurredAt=payment.approvedAt or payment.createdAt,
         producer=PRODUCER_NAME,
         orderId=payment.orderId,
         paymentId=payment.id,
@@ -24,10 +21,10 @@ def payment_approved_event(payment: Payment) -> PaymentApprovedEvent:
 
 def payment_failed_event(payment: Payment) -> PaymentFailedEvent:
     return PaymentFailedEvent(
-        eventId=f"evt-{uuid4().hex}",
+        eventId=f"evt-payment-failed-{payment.id}",
         userId=payment.userId,
         sourceId=payment.id,
-        occurredAt=payment.failedAt or datetime.now(UTC),
+        occurredAt=payment.failedAt or payment.createdAt,
         producer=PRODUCER_NAME,
         orderId=payment.orderId,
         paymentId=payment.id,
