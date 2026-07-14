@@ -7,7 +7,6 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/Medikong/services/packages/go-platform/httpapi"
-	"github.com/Medikong/services/packages/go-platform/logger"
 )
 
 func Recovery(next http.Handler) http.Handler {
@@ -19,11 +18,11 @@ func Recovery(next http.Handler) http.Handler {
 				return
 			}
 			err := recoveredError(recovered)
-			logger.Error(r.Context(), "http.request.panic", logger.Err(err))
 			if recorder.WroteHeader() {
+				httpapi.ReportError(r.Context(), err, http.StatusInternalServerError, "common.internal")
 				panic(recovered)
 			}
-			httpapi.WriteError(recorder.Writer(), r, httpapi.Internal(err))
+			httpapi.WriteError(recorder.Writer(), r, err)
 		}()
 		next.ServeHTTP(recorder.Writer(), r)
 	})

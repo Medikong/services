@@ -11,7 +11,7 @@ func RequestContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		request, _, err := requestcontext.Ensure(r)
 		if err != nil {
-			httpapi.WriteError(w, r, httpapi.Internal(err))
+			httpapi.WriteError(w, r, err)
 			return
 		}
 		next.ServeHTTP(w, request)

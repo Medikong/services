@@ -171,19 +171,29 @@ func TestRecoveryReraisesAfterResponseStarted(t *testing.T) {
 			t.Fatal("panic was not re-raised")
 		}
 		decoder := json.NewDecoder(&logs)
+		errorLogs := 0
+		accessLogs := 0
 		for {
 			var event map[string]any
 			if err := decoder.Decode(&event); err != nil {
 				break
 			}
+			if event["msg"] == "http.request.failed" {
+				errorLogs++
+				if event["level"] != "ERROR" {
+					t.Fatalf("late panic error log = %#v", event)
+				}
+			}
 			if event["msg"] == "http.request.completed" {
+				accessLogs++
 				if event["level"] != "ERROR" || event["http.handler_panicked"] != true {
 					t.Fatalf("late panic access log = %#v", event)
 				}
-				return
 			}
 		}
-		t.Fatal("late panic access log is missing")
+		if errorLogs != 1 || accessLogs != 1 {
+			t.Fatalf("late panic logs = error:%d access:%d; logs=%s", errorLogs, accessLogs, logs.String())
+		}
 	}()
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/auth/login", nil))
 }

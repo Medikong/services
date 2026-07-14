@@ -53,10 +53,14 @@ func NewRouter(
 	router.Use(platformmiddleware.Timeout(cfg.HTTP.RequestTimeout))
 	router.Use(healthState.RejectWhileDraining)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		httpapi.WriteError(w, r, httpapi.NotFound("common.not_found", "요청한 API를 찾을 수 없습니다."))
+		httpapi.WriteError(w, r, httpapi.NotFound("common.not_found").
+			Public("요청한 API를 찾을 수 없습니다.").
+			New("API route not found"))
 	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		httpapi.WriteError(w, r, httpapi.MethodNotAllowed("common.method_not_allowed", "허용되지 않은 HTTP 메서드입니다."))
+		httpapi.WriteError(w, r, httpapi.MethodNotAllowed("common.method_not_allowed").
+			Public("허용되지 않은 HTTP 메서드입니다.").
+			New("HTTP method not allowed"))
 	})
 
 	handler := Handler{service: service, metrics: metrics}
@@ -88,21 +92,19 @@ func (h Handler) Apply(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, sample.ErrStaleFence):
 			h.metrics.RecordOperation("stale_fence")
-			httpapi.WriteError(w, r, httpapi.Conflict(
-				"reference.stale_fence",
-				"더 최신 요청이 이미 반영되었습니다.",
-			))
+			httpapi.WriteError(w, r, httpapi.Conflict("reference.stale_fence").
+				Public("더 최신 요청이 이미 반영되었습니다.").
+				New("stale fencing token"))
 			return
 		case errors.Is(err, sample.ErrDuplicateOperation):
 			h.metrics.RecordOperation("duplicate")
-			httpapi.WriteError(w, r, httpapi.Conflict(
-				"reference.duplicate_operation",
-				"같은 요청이 이미 처리되었습니다.",
-			))
+			httpapi.WriteError(w, r, httpapi.Conflict("reference.duplicate_operation").
+				Public("같은 요청이 이미 처리되었습니다.").
+				New("duplicate operation"))
 			return
 		}
 		h.metrics.RecordOperation("error")
-		httpapi.WriteError(w, r, httpapi.Internal(err))
+		httpapi.WriteError(w, r, err)
 		return
 	}
 	h.metrics.RecordOperation("success")
@@ -121,10 +123,9 @@ func RoutePattern(r *http.Request) string {
 func lockKey(r *http.Request) (platformmiddleware.RedisLockKey, error) {
 	resourceID := chi.URLParam(r, "resourceID")
 	if !resourceIDPattern.MatchString(resourceID) {
-		return platformmiddleware.RedisLockKey{}, httpapi.BadRequest(
-			"reference.invalid_resource_id",
-			"resourceID 형식이 올바르지 않습니다.",
-		)
+		return platformmiddleware.RedisLockKey{}, httpapi.BadRequest("reference.invalid_resource_id").
+			Public("resourceID 형식이 올바르지 않습니다.").
+			New("resourceID is invalid")
 	}
 	// Both keys share a Redis Cluster hash tag.
 	return platformmiddleware.RedisLockKey{

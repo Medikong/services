@@ -46,10 +46,10 @@ func RedisLock(config RedisLockConfig) (Middleware, error) {
 			key.Fence = strings.TrimSpace(key.Fence)
 			if key.Lock == "" || key.Fence == "" {
 				config.record("key_error")
-				httpapi.WriteError(w, r, httpapi.Internal(oops.
+				httpapi.WriteError(w, r, oops.
 					In("redis_lock").
 					Code("redis_lock.invalid_key").
-					New("lock and fence keys are required")))
+					New("lock and fence keys are required"))
 				return
 			}
 
@@ -61,20 +61,17 @@ func RedisLock(config RedisLockConfig) (Middleware, error) {
 			if err != nil {
 				if errors.Is(err, redislock.ErrNotObtained) || errors.Is(err, context.DeadlineExceeded) {
 					config.record("busy")
-					httpapi.WriteError(w, r, httpapi.NewError(
-						http.StatusLocked,
-						"common.resource_locked",
-						"같은 리소스의 요청이 처리 중입니다.",
-						nil,
-					))
+					httpapi.WriteError(w, r, httpapi.Error(http.StatusLocked, "common.resource_locked").
+						Public("같은 리소스의 요청이 처리 중입니다.").
+						New("resource is locked"))
 					return
 				}
 				config.record("acquire_error")
-				httpapi.WriteError(w, r, httpapi.Internal(oops.
+				httpapi.WriteError(w, r, oops.
 					In("redis_lock").
 					Code("redis_lock.acquire_failed").
 					With("lock_key", key.Lock).
-					Wrap(err)))
+					Wrap(err))
 				return
 			}
 
@@ -82,11 +79,11 @@ func RedisLock(config RedisLockConfig) (Middleware, error) {
 			if err != nil {
 				config.record("fence_error")
 				release(config, lock, key.Lock)
-				httpapi.WriteError(w, r, httpapi.Internal(oops.
+				httpapi.WriteError(w, r, oops.
 					In("redis_lock").
 					Code("redis_lock.fence_failed").
 					With("fence_key", key.Fence).
-					Wrap(err)))
+					Wrap(err))
 				return
 			}
 

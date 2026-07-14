@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  title: DropMong User Development API
+  version: 1.0.0
+  description: local/development/dev/test에서 명시적으로 활성화한 경우에만 등록되는 proof fixture API입니다.
+paths:
+  /internal/dev/proofs/registration:
+    post:
+      operationId: issueDevelopmentRegistrationProof
+      parameters:
+        - $ref: '#/components/parameters/DevelopmentToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [registrationId]
+              properties:
+                registrationId:
+                  type: string
+      responses:
+        '200':
+          description: 개발 전용 가입 proof
+  /internal/dev/proofs/media:
+    post:
+      operationId: issueDevelopmentMediaProof
+      parameters:
+        - $ref: '#/components/parameters/DevelopmentToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [userId, mediaAssetId]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                mediaAssetId:
+                  type: string
+      responses:
+        '200':
+          description: 개발 전용 Media proof
+components:
+  parameters:
+    DevelopmentToken:
+      name: X-Development-Token
+      in: header
+      required: true
+      schema:
+        type: string

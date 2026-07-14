@@ -100,12 +100,9 @@ func (h *Handler) RejectWhileDraining(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h.Draining() {
 			w.Header().Set("Retry-After", "1")
-			httpapi.WriteError(w, r, httpapi.NewError(
-				http.StatusServiceUnavailable,
-				"common.draining",
-				"서비스가 종료 준비 중입니다.",
-				nil,
-			))
+			httpapi.WriteError(w, r, httpapi.Error(http.StatusServiceUnavailable, "common.draining").
+				Public("서비스가 종료 준비 중입니다.").
+				New("service is draining"))
 			return
 		}
 		next.ServeHTTP(w, r)
