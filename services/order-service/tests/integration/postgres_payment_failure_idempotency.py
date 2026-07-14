@@ -21,12 +21,16 @@ from app.models import DropId, IdempotencyKey, OrderId, OrderStatus, ProductId, 
 from app.postgres import Base, PostgresOrderRepository
 from app.store import (
     CreateOrderCommand,
+    OrderAlreadyCreated,
     OrderCreated,
+    OrderIdempotencyConflict,
     PaymentFailureAlreadyApplied,
     PaymentFailureApplied,
     PaymentFailureResult,
     PaymentIgnored,
     PaymentEventOrderMissing,
+    ProductSoldOut,
+    ProductUnavailable,
 )
 
 ORDER_TEST_DATABASE_URL: Final = "ORDER_TEST_DATABASE_URL"
@@ -42,7 +46,6 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
         drop_id=DropId("drop-payment-failure-idempotency"),
         product_id=ProductId("product-payment-failure-idempotency"),
         unit_price=50000,
-        remaining_quantity=2,
     )
     command = CreateOrderCommand(
         user_id=UserId("user-payment-failure-idempotency"),
@@ -55,6 +58,7 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
     async with _postgres_schema(database_url, schema_name) as engine:
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
         await _create_schema_tables(engine)
+        await _seed_inventory(session_factory, product)
         order_id = await _create_pending_order(session_factory, product, command)
         event = PaymentFailedEvent(
             eventId="evt-payment-failed-duplicate",
@@ -141,8 +145,28 @@ async def _create_pending_order(
     match result:
         case OrderCreated(order=order):
             return OrderId(order.id)
+        case (
+            OrderAlreadyCreated()
+            | OrderIdempotencyConflict()
+            | ProductUnavailable()
+            | ProductSoldOut()
+        ):
+            pytest.fail(f"unexpected order result: {type(result).__name__}")
         case unreachable:
             assert_never(unreachable)
+
+
+async def _seed_inventory(
+    session_factory: async_sessionmaker[AsyncSession],
+    product: ProductForSale,
+) -> None:
+    async with session_factory.begin() as session:
+        await session.execute(
+            text(
+                "INSERT INTO inventory_items VALUES (:drop_id, :product_id, 2, 0, 0, 0)"
+            ),
+            {"drop_id": product.drop_id, "product_id": product.product_id},
+        )
 
 
 async def _fail_concurrently(

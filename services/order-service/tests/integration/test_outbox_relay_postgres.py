@@ -8,7 +8,12 @@ from uuid import uuid4
 import anyio
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.metrics import OrderMetrics
 from app.outbox import OutboxMessage, OutboxRelay
@@ -63,6 +68,7 @@ async def test_pending_event_survives_broker_failure_and_restart() -> None:
         repository = PostgresOrderRepository(session_factory)
         created = await repository.create_order(_create_command("broker-restart"))
         assert isinstance(created, OrderCreated)
+        await _retain_created_event(session_factory)
         failed_at = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
         metrics = _metrics()
         failed_relay = OutboxRelay(session_factory, FailingPublisher(), metrics)
@@ -93,6 +99,7 @@ async def test_competing_relays_do_not_claim_the_same_row() -> None:
         repository = PostgresOrderRepository(session_factory)
         created = await repository.create_order(_create_command("relay-competition"))
         assert isinstance(created, OrderCreated)
+        await _retain_created_event(session_factory)
         entered = anyio.Event()
         release = anyio.Event()
         second_done = anyio.Event()
@@ -132,6 +139,7 @@ async def test_tenth_failure_dead_letters_with_bounded_error_and_metric() -> Non
         repository = PostgresOrderRepository(session_factory)
         created = await repository.create_order(_create_command("dead-letter"))
         assert isinstance(created, OrderCreated)
+        await _retain_created_event(session_factory)
         metrics = _metrics()
         relay = OutboxRelay(session_factory, FailingPublisher(), metrics)
         started_at = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
@@ -163,6 +171,7 @@ async def test_crash_after_send_retries_the_same_event_id() -> None:
         repository = PostgresOrderRepository(session_factory)
         created = await repository.create_order(_create_command("send-crash"))
         assert isinstance(created, OrderCreated)
+        await _retain_created_event(session_factory)
         crashing_publisher = CrashAfterSendPublisher()
         relay = OutboxRelay(session_factory, crashing_publisher, _metrics())
 
@@ -197,6 +206,12 @@ async def _postgres_schema(database_url: str) -> AsyncIterator[AsyncEngine]:
             await connection.execute(text(f"CREATE SCHEMA {schema_name}"))
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
+            await connection.execute(
+                text(
+                    "INSERT INTO inventory_items VALUES "
+                    "('drop-001', 'product-001', 42, 0, 0, 0)"
+                )
+            )
         yield engine
     finally:
         await engine.dispose()
@@ -207,7 +222,7 @@ async def _postgres_schema(database_url: str) -> AsyncIterator[AsyncEngine]:
         await admin_engine.dispose()
 
 
-async def _outbox_state(session_factory: async_sessionmaker):
+async def _outbox_state(session_factory: async_sessionmaker[AsyncSession]):
     async with session_factory() as session:
         result = await session.execute(
             text(
@@ -216,6 +231,15 @@ async def _outbox_state(session_factory: async_sessionmaker):
             ),
         )
         return result.one()
+
+
+async def _retain_created_event(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory.begin() as session:
+        await session.execute(
+            text("DELETE FROM outbox_events WHERE event_type = 'inventory.changed'")
+        )
 
 
 def _metrics() -> OrderMetrics:

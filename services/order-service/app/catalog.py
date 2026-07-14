@@ -9,21 +9,18 @@ class ProductForSale:
     drop_id: DropId
     product_id: ProductId
     unit_price: int
-    remaining_quantity: int
 
 
-PRODUCT_CATALOG: Final = (
+PRODUCTS_FOR_SALE: Final = (
     ProductForSale(
         drop_id=DropId("drop-001"),
         product_id=ProductId("product-001"),
         unit_price=50000,
-        remaining_quantity=42,
     ),
     ProductForSale(
         drop_id=DropId("drop-sold-out-001"),
         product_id=ProductId("product-sold-out-001"),
         unit_price=50000,
-        remaining_quantity=42,
     ),
 )
 

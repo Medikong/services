@@ -1,11 +1,16 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Final, Protocol
+from typing import Final, Protocol, assert_never
 
 import anyio
 from aiokafka.errors import KafkaError
-from contracts import NotificationRequestedEvent, OrderCreatedEvent
+from contracts import (
+    InventoryChangedEvent,
+    NotificationRequestedEvent,
+    OrderCreatedEvent,
+    OrderExpiredEvent,
+)
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -90,17 +95,37 @@ def retry_delay(attempt: int) -> timedelta:
 
 def add_outbox_event(
     session: AsyncSession,
-    event: OrderCreatedEvent | NotificationRequestedEvent,
+    event: (
+        OrderCreatedEvent
+        | NotificationRequestedEvent
+        | InventoryChangedEvent
+        | OrderExpiredEvent
+    ),
 ) -> None:
     """Stage a domain event in the caller's database transaction."""
+    match event:
+        case InventoryChangedEvent(dropId=drop_id, productId=product_id):
+            aggregate_type = "inventory"
+            aggregate_id = f"{drop_id}:{product_id}"
+        case OrderCreatedEvent(orderId=order_id):
+            aggregate_type = "order"
+            aggregate_id = order_id
+        case NotificationRequestedEvent(orderId=order_id):
+            aggregate_type = "order"
+            aggregate_id = order_id
+        case OrderExpiredEvent(orderId=order_id):
+            aggregate_type = "order"
+            aggregate_id = order_id
+        case unreachable:
+            assert_never(unreachable)
     session.add(
         OutboxEventRecord(
             event_id=event.eventId,
             event_type=event.eventType,
-            aggregate_type="order",
-            aggregate_id=event.orderId,
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
             topic=event.eventType,
-            message_key=event.orderId,
+            message_key=aggregate_id,
             payload=event.model_dump(mode="json"),
             occurred_at=event.occurredAt,
             attempts=0,

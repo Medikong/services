@@ -5,7 +5,7 @@ from app.catalog import ProductForSale
 from app.db import resources_from_env
 from app.main import create_app
 from app.models import DropId, ProductId
-from app.store import OrderStore
+from app.store import InventorySeed, OrderStore
 
 
 def test_healthz_returns_order_service_identity() -> None:
@@ -194,10 +194,12 @@ def test_create_order_returns_409_when_reserved_stock_is_sold_out() -> None:
             drop_id=DropId("drop-limited"),
             product_id=ProductId("product-limited"),
             unit_price=50000,
-            remaining_quantity=1,
         ),
     )
-    client = TestClient(create_app(OrderStore(catalog)))
+    inventory = (
+        InventorySeed(DropId("drop-limited"), ProductId("product-limited"), 1),
+    )
+    client = TestClient(create_app(OrderStore(catalog, inventory)))
 
     # When
     first_response = client.post(

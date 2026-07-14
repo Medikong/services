@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.catalog import ProductForSale
 from app.main import create_app
 from app.models import DropId, ProductId
-from app.store import OrderStore
+from app.store import InventorySeed, OrderStore
 
 
 def test_healthz_echoes_request_id_header() -> None:
@@ -50,10 +50,16 @@ def test_create_order_increments_sold_out_metric_when_stock_is_exhausted() -> No
             drop_id=DropId("drop-limited-metric"),
             product_id=ProductId("product-limited-metric"),
             unit_price=50000,
-            remaining_quantity=1,
         ),
     )
-    client = TestClient(create_app(OrderStore(catalog)))
+    inventory = (
+        InventorySeed(
+            DropId("drop-limited-metric"),
+            ProductId("product-limited-metric"),
+            1,
+        ),
+    )
+    client = TestClient(create_app(OrderStore(catalog, inventory)))
 
     # When
     first_response = client.post(

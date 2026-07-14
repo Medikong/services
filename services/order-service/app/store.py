@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import assert_never
 
 from contracts import PaymentApprovedEvent, PaymentFailedEvent
 
-from app.catalog import PRODUCT_CATALOG, ProductForSale, product_for
+from app.catalog import PRODUCTS_FOR_SALE, ProductForSale, product_for
 from app.models import (
     DropId,
     IdempotencyKey,
@@ -15,110 +14,65 @@ from app.models import (
     ProductId,
     UserId,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class CreateOrderCommand:
-    user_id: UserId
-    drop_id: DropId
-    product_id: ProductId
-    quantity: int
-    idempotency_key: IdempotencyKey
-
-
-@dataclass(frozen=True, slots=True)
-class OrderCreated:
-    order: Order
-    idempotency_key: IdempotencyKey
-
-
-@dataclass(frozen=True, slots=True)
-class OrderAlreadyCreated:
-    order: Order
-
-
-@dataclass(frozen=True, slots=True)
-class OrderIdempotencyConflict:
-    order: Order
-
-
-@dataclass(frozen=True, slots=True)
-class ProductUnavailable:
-    drop_id: DropId
-    product_id: ProductId
-
-
-@dataclass(frozen=True, slots=True)
-class ProductSoldOut:
-    drop_id: DropId
-    product_id: ProductId
-
-
-type CreateOrderResult = (
-    OrderCreated
-    | OrderAlreadyCreated
-    | OrderIdempotencyConflict
-    | ProductUnavailable
-    | ProductSoldOut
+from app.store_contracts import (
+    DEFAULT_IN_MEMORY_INVENTORY,
+    CreateOrderCommand,
+    CreateOrderResult,
+    IdempotencyEntry,
+    InventorySeed,
+    OrderAlreadyCreated,
+    OrderCreated,
+    OrderIdempotencyConflict,
+    OrderRequestFingerprint,
+    PaymentAlreadyApplied,
+    PaymentApplied,
+    PaymentApprovalResult,
+    PaymentEventOrderMissing,
+    PaymentFailureAlreadyApplied,
+    PaymentFailureApplied,
+    PaymentFailureResult,
+    PaymentIgnored,
+    ProductSoldOut,
+    ProductUnavailable,
 )
 
-
-@dataclass(frozen=True, slots=True)
-class OrderRequestFingerprint:
-    drop_id: DropId
-    product_id: ProductId
-    quantity: int
-
-
-@dataclass(frozen=True, slots=True)
-class IdempotencyEntry:
-    order_id: OrderId
-    fingerprint: OrderRequestFingerprint
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentApplied:
-    order: Order
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentAlreadyApplied:
-    order: Order
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentEventOrderMissing:
-    order_id: OrderId
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentIgnored:
-    order: Order
-
-
-type PaymentApprovalResult = PaymentApplied | PaymentAlreadyApplied | PaymentEventOrderMissing | PaymentIgnored
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentFailureApplied:
-    order: Order
-
-
-@dataclass(frozen=True, slots=True)
-class PaymentFailureAlreadyApplied:
-    order: Order
-
-
-type PaymentFailureResult = (
-    PaymentFailureApplied | PaymentFailureAlreadyApplied | PaymentEventOrderMissing | PaymentIgnored
+__all__ = (
+    "CreateOrderCommand",
+    "CreateOrderResult",
+    "InventorySeed",
+    "OrderAlreadyCreated",
+    "OrderCreated",
+    "OrderIdempotencyConflict",
+    "OrderStore",
+    "PaymentAlreadyApplied",
+    "PaymentApplied",
+    "PaymentApprovalResult",
+    "PaymentEventOrderMissing",
+    "PaymentFailureAlreadyApplied",
+    "PaymentFailureApplied",
+    "PaymentFailureResult",
+    "PaymentIgnored",
+    "ProductSoldOut",
+    "ProductUnavailable",
+    "order_matches_command",
+    "order_request_fingerprint",
 )
 
 
 class OrderStore:
-    def __init__(self, catalog: tuple[ProductForSale, ...] = PRODUCT_CATALOG) -> None:
+    def __init__(
+        self,
+        catalog: tuple[ProductForSale, ...] = PRODUCTS_FOR_SALE,
+        inventory: tuple[InventorySeed, ...] = DEFAULT_IN_MEMORY_INVENTORY,
+    ) -> None:
         self._catalog = catalog
+        self._total_quantities = {
+            (item.drop_id, item.product_id): item.total_quantity for item in inventory
+        }
         self._orders: dict[OrderId, Order] = {}
-        self._idempotency_index: dict[tuple[UserId, IdempotencyKey], IdempotencyEntry] = {}
+        self._idempotency_index: dict[
+            tuple[UserId, IdempotencyKey], IdempotencyEntry
+        ] = {}
         self._reserved_quantities: dict[tuple[DropId, ProductId], int] = {}
         self._next_order_number = 1
 
@@ -157,9 +111,11 @@ class OrderStore:
         self._reserved_quantities[(command.drop_id, command.product_id)] = (
             self._reserved_quantity(product) + command.quantity
         )
-        self._idempotency_index[(command.user_id, command.idempotency_key)] = IdempotencyEntry(
-            order_id=order_id,
-            fingerprint=fingerprint,
+        self._idempotency_index[(command.user_id, command.idempotency_key)] = (
+            IdempotencyEntry(
+                order_id=order_id,
+                fingerprint=fingerprint,
+            )
         )
         return OrderCreated(order=order, idempotency_key=command.idempotency_key)
 
@@ -188,7 +144,12 @@ class OrderStore:
                 return PaymentApplied(order=confirmed_order)
             case OrderStatus.CONFIRMED:
                 return PaymentAlreadyApplied(order=order)
-            case OrderStatus.PAYMENT_FAILED | OrderStatus.CANCELED | OrderStatus.EXPIRED:
+            case (
+                OrderStatus.PAYMENT_FAILED
+                | OrderStatus.CANCEL_PENDING
+                | OrderStatus.CANCELED
+                | OrderStatus.EXPIRED
+            ):
                 return PaymentIgnored(order=order)
             case unreachable:
                 assert_never(unreachable)
@@ -215,7 +176,12 @@ class OrderStore:
                 return PaymentFailureApplied(order=failed_order)
             case OrderStatus.PAYMENT_FAILED:
                 return PaymentFailureAlreadyApplied(order=order)
-            case OrderStatus.CONFIRMED | OrderStatus.CANCELED | OrderStatus.EXPIRED:
+            case (
+                OrderStatus.CONFIRMED
+                | OrderStatus.CANCEL_PENDING
+                | OrderStatus.CANCELED
+                | OrderStatus.EXPIRED
+            ):
                 return PaymentIgnored(order=order)
             case unreachable:
                 assert_never(unreachable)
@@ -236,7 +202,10 @@ class OrderStore:
         return order_id
 
     def _available_quantity(self, product: ProductForSale) -> int:
-        return product.remaining_quantity - self._reserved_quantity(product)
+        total_quantity = self._total_quantities.get(
+            (product.drop_id, product.product_id), 0
+        )
+        return total_quantity - self._reserved_quantity(product)
 
     def _reserved_quantity(self, product: ProductForSale) -> int:
         return self._reserved_quantities.get((product.drop_id, product.product_id), 0)

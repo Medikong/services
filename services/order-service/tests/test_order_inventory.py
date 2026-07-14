@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.catalog import ProductForSale
 from app.main import create_app
 from app.models import DropId, OrderId, ProductId
-from app.store import OrderStore, PaymentFailureApplied
+from app.store import InventorySeed, OrderStore, PaymentFailureApplied
 from contracts import PaymentFailedEvent
 
 
@@ -17,10 +17,12 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
             drop_id=DropId("drop-limited"),
             product_id=ProductId("product-limited"),
             unit_price=50000,
-            remaining_quantity=1,
         ),
     )
-    store = OrderStore(catalog)
+    inventory = (
+        InventorySeed(DropId("drop-limited"), ProductId("product-limited"), 1),
+    )
+    store = OrderStore(catalog, inventory)
     client = TestClient(create_app(store))
     first_response = client.post(
         "/orders",
@@ -60,6 +62,8 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
     assert first_response.status_code == 201
     assert isinstance(failure_result, PaymentFailureApplied)
     assert second_response.status_code == 201
-    second_order = anyio.run(store.get_order, OrderId(second_response.json()["data"]["id"]))
+    second_order = anyio.run(
+        store.get_order, OrderId(second_response.json()["data"]["id"])
+    )
     assert second_order is not None
     assert second_order.userId == "user-002"

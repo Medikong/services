@@ -1,21 +1,23 @@
 from datetime import UTC, datetime
-from hashlib import blake2b
-from typing import Final
 from uuid import uuid4
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent
-from sqlalchemy import func, select
+from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.catalog import PRODUCT_CATALOG, ProductForSale, product_for
-from app.events import order_created_event
+from app.catalog import PRODUCTS_FOR_SALE, ProductForSale, product_for
+from app.events import inventory_changed_event, order_created_event
 from app.models import Order, OrderId, OrderStatus
 from app.outbox import add_outbox_event
 from app.postgres_mapping import order_from_record
 from app.postgres_payments import apply_payment_approved, apply_payment_failed
+from app.postgres_inventory import (
+    apply_refund_completed,
+    expire_pending_order,
+)
 from app.records import Base as Base
-from app.records import OrderRecord
+from app.records import InventoryItemRecord, OrderRecord
 from app.store import (
     CreateOrderCommand,
     CreateOrderResult,
@@ -29,17 +31,12 @@ from app.store import (
     order_matches_command,
 )
 
-RESERVED_ORDER_STATUSES: Final = (
-    OrderStatus.PENDING_PAYMENT.value,
-    OrderStatus.CONFIRMED.value,
-)
-
 
 class PostgresOrderRepository:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
-        catalog: tuple[ProductForSale, ...] = PRODUCT_CATALOG,
+        catalog: tuple[ProductForSale, ...] = PRODUCTS_FOR_SALE,
     ) -> None:
         self._session_factory = session_factory
         self._catalog = catalog
@@ -59,20 +56,30 @@ class PostgresOrderRepository:
                     product_id=command.product_id,
                 )
 
-            await _lock_product_inventory(session, product)
+            inventory = await _locked_inventory(session, product)
+            if inventory is None:
+                return ProductUnavailable(
+                    drop_id=command.drop_id,
+                    product_id=command.product_id,
+                )
             replayed_order = await self._replayed_order(session, command)
             if replayed_order is not None:
                 if not order_matches_command(replayed_order, command):
                     return OrderIdempotencyConflict(order=replayed_order)
                 return OrderAlreadyCreated(order=replayed_order)
 
-            reserved_quantity = await _reserved_quantity(session, product)
-            if command.quantity > product.remaining_quantity - reserved_quantity:
+            available_quantity = (
+                inventory.total_quantity
+                - inventory.reserved_quantity
+                - inventory.sold_quantity
+            )
+            if command.quantity > available_quantity:
                 return ProductSoldOut(
                     drop_id=command.drop_id,
                     product_id=command.product_id,
                 )
 
+            created_at = datetime.now(UTC)
             record = OrderRecord(
                 id=_new_order_id(),
                 user_id=command.user_id,
@@ -82,12 +89,24 @@ class PostgresOrderRepository:
                 amount=product.unit_price * command.quantity,
                 status=OrderStatus.PENDING_PAYMENT.value,
                 idempotency_key=command.idempotency_key,
-                created_at=datetime.now(UTC),
+                created_at=created_at,
             )
+            inventory.reserved_quantity += command.quantity
+            inventory.version += 1
             session.add(record)
             add_outbox_event(
                 session,
                 order_created_event(order_from_record(record), command.idempotency_key),
+            )
+            add_outbox_event(
+                session,
+                inventory_changed_event(
+                    inventory,
+                    cause_id=f"reserve:{record.id}",
+                    occurred_at=created_at,
+                    user_id=record.user_id,
+                    order_id=record.id,
+                ),
             )
             try:
                 await session.commit()
@@ -123,6 +142,16 @@ class PostgresOrderRepository:
     ) -> PaymentFailureResult:
         return await apply_payment_failed(self._session_factory, event)
 
+    async def expire_pending_order(
+        self,
+        order_id: OrderId,
+        occurred_at: datetime,
+    ) -> bool:
+        return await expire_pending_order(self._session_factory, order_id, occurred_at)
+
+    async def apply_refund_completed(self, event: RefundCompletedEvent) -> bool:
+        return await apply_refund_completed(self._session_factory, event)
+
     async def _replayed_order(
         self,
         session: AsyncSession,
@@ -140,33 +169,19 @@ class PostgresOrderRepository:
         return order_from_record(record)
 
 
-async def _lock_product_inventory(
+async def _locked_inventory(
     session: AsyncSession,
     product: ProductForSale,
-) -> None:
-    await session.execute(
-        select(func.pg_advisory_xact_lock(_inventory_lock_key(product))),
-    )
-
-
-async def _reserved_quantity(
-    session: AsyncSession,
-    product: ProductForSale,
-) -> int:
+) -> InventoryItemRecord | None:
     result = await session.execute(
-        select(func.coalesce(func.sum(OrderRecord.quantity), 0)).where(
-            OrderRecord.drop_id == product.drop_id,
-            OrderRecord.product_id == product.product_id,
-            OrderRecord.status.in_(RESERVED_ORDER_STATUSES),
-        ),
+        select(InventoryItemRecord)
+        .where(
+            InventoryItemRecord.drop_id == product.drop_id,
+            InventoryItemRecord.product_id == product.product_id,
+        )
+        .with_for_update(),
     )
-    return int(result.scalar_one())
-
-
-def _inventory_lock_key(product: ProductForSale) -> int:
-    lock_source = f"{product.drop_id}\0{product.product_id}".encode("utf-8")
-    digest = blake2b(lock_source, digest_size=8).digest()
-    return int.from_bytes(digest, byteorder="big", signed=True)
+    return result.scalar_one_or_none()
 
 
 def _new_order_id() -> OrderId:

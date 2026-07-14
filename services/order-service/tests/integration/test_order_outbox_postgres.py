@@ -172,6 +172,12 @@ async def _postgres_schema(database_url: str) -> AsyncIterator[AsyncEngine]:
             await connection.execute(text(f"CREATE SCHEMA {schema_name}"))
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
+            await connection.execute(
+                text(
+                    "INSERT INTO inventory_items VALUES "
+                    "('drop-001', 'product-001', 42, 0, 0, 0)"
+                )
+            )
         yield engine
     finally:
         await engine.dispose()
