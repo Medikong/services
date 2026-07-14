@@ -35,6 +35,9 @@ async def _reset_database() -> None:
     engine = create_async_engine(DATABASE_URL)
     async with engine.begin() as connection:
         await connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        await connection.execute(
+            text("DROP TABLE IF EXISTS inventory_projections"),
+        )
         await connection.execute(text("DROP TABLE IF EXISTS processed_events"))
         await connection.execute(text("DROP TABLE IF EXISTS products"))
         await connection.execute(text("DROP TABLE IF EXISTS drops"))
@@ -117,12 +120,16 @@ async def test_repeat_upgrade_is_noop_and_does_not_reseed_cleared_projection() -
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "UPDATE products SET remaining_quantity = 3, inventory_version = 9 "
-                "WHERE id = 'product-001'"
+                "UPDATE inventory_projections "
+                "SET remaining_quantity = 3, inventory_version = 9 "
+                "WHERE product_id = 'product-001'"
             )
         )
         await connection.execute(
-            text("DELETE FROM products WHERE id = 'product-sold-out-001'")
+            text(
+                "DELETE FROM inventory_projections "
+                "WHERE product_id = 'product-sold-out-001'"
+            )
         )
 
     await _upgrade()
@@ -131,8 +138,8 @@ async def test_repeat_upgrade_is_noop_and_does_not_reseed_cleared_projection() -
         projections = (
             await connection.execute(
                 text(
-                    "SELECT id, remaining_quantity, inventory_version "
-                    "FROM products ORDER BY id"
+                    "SELECT product_id, remaining_quantity, inventory_version "
+                    "FROM inventory_projections ORDER BY product_id"
                 )
             )
         ).all()
@@ -144,10 +151,12 @@ async def test_repeat_upgrade_is_noop_and_does_not_reseed_cleared_projection() -
     "statement",
     [
         text(
-            "UPDATE products SET remaining_quantity = -1 WHERE id = 'product-001'",
+            "UPDATE inventory_projections SET remaining_quantity = -1 "
+            "WHERE product_id = 'product-001'",
         ),
         text(
-            "UPDATE products SET inventory_version = -1 WHERE id = 'product-001'",
+            "UPDATE inventory_projections SET inventory_version = -1 "
+            "WHERE product_id = 'product-001'",
         ),
     ],
 )

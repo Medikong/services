@@ -1,8 +1,6 @@
 """Catalog FastAPI composition root."""
 
 import os
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Final
 
@@ -19,7 +17,8 @@ from observability import (
 )
 
 from app.catalog import CatalogReadiness, DropDetail
-from app.db import Database, create_database
+from app.db import Database, create_database, lifespan_for
+from app.messaging import inventory_consumer_factory
 from app.postgres import PostgresCatalogRepository
 from app.repository import CatalogRepository
 from app.schemas import (
@@ -45,18 +44,20 @@ def create_app(repository: CatalogRepository | None = None) -> FastAPI:
         database = create_database()
         repository = PostgresCatalogRepository(database.sessions)
     store = CatalogStore(repository)
-
-    @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        yield
-        if database is not None:
-            await database.engine.dispose()
+    consumer_factory = (
+        inventory_consumer_factory(
+            PostgresCatalogRepository(database.sessions),
+            os.getenv("KAFKA_BOOTSTRAP_SERVERS", ""),
+        )
+        if database is not None
+        else None
+    )
 
     app = FastAPI(
         title="DropMong Catalog Service API",
         version=SERVICE_VERSION,
         default_response_class=ORJSONResponse,
-        lifespan=lifespan,
+        lifespan=lifespan_for(database, consumer_factory),
     )
     _configure_observability(app)
 
@@ -123,7 +124,7 @@ def _readiness_response(
     readiness: CatalogReadiness,
     response: Response,
 ) -> ReadinessResponse:
-    match readiness:
+    match readiness:  # noqa: MATCH_OK
         case CatalogReadiness.READY:
             response.status_code = status.HTTP_200_OK
             readiness_status = "ready"

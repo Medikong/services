@@ -6,7 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic==1.18.5",
     "asyncpg>=0.30.0,<1.0.0",
+    "contracts",
     "fastapi==0.124.0",
+    "kafka-utils",
     "middleware",
     "observability",
     "orjson>=3.11.0,<4.0.0",
@@ -22,7 +24,7 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = [".", "../../packages/errors/src", "../../packages/middleware/src", "../../packages/observability/src"]
+pythonpath = [".", "../../packages/contracts/src", "../../packages/errors/src", "../../packages/kafka-utils/src", "../../packages/middleware/src", "../../packages/observability/src"]
 testpaths = ["tests"]
 markers = ["postgres: requires TEST_DATABASE_URL and a disposable PostgreSQL database"]
 
@@ -57,13 +59,12 @@ docstring-code-format = true
 
 [tool.basedpyright]
 typeCheckingMode = "all"
+stubPath = "typings"
 pythonVersion = "3.12"
 pythonPlatform = "All"
 include = ["app"]
 exclude = ["**/__pycache__", "**/.venv"]
-extraPaths = ["../../packages/observability/src", "../../packages/middleware/src"]
-venvPath = "."
-venv = ".venv"
+extraPaths = ["../../packages/contracts/src", "../../packages/kafka-utils/src", "../../packages/observability/src", "../../packages/middleware/src"]
 reportUnnecessaryTypeIgnoreComment = "error"
 reportUnusedVariable = "error"
 reportMissingParameterType = "error"
@@ -71,6 +72,8 @@ reportMissingTypeStubs = "none"
 reportUnusedFunction = "none"
 
 [tool.uv.sources]
+contracts = { path = "../../packages/contracts", editable = true }
 errors = { path = "../../packages/errors", editable = true }
+kafka-utils = { path = "../../packages/kafka-utils", editable = true }
 middleware = { path = "../../packages/middleware", editable = true }
 observability = { path = "../../packages/observability", editable = true }

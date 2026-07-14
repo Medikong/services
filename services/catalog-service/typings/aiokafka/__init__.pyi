@@ -1,0 +1,19 @@
+from collections.abc import AsyncIterator
+from typing import Self
+
+from aiokafka.structs import ConsumerRecord
+
+class AIOKafkaConsumer(AsyncIterator[ConsumerRecord[bytes, bytes]]):
+    def __init__(
+        self,
+        *topics: str,
+        bootstrap_servers: str,
+        group_id: str,
+        auto_offset_reset: str,
+        enable_auto_commit: bool,
+    ) -> None: ...
+    async def start(self) -> None: ...
+    async def stop(self) -> None: ...
+    async def commit(self) -> None: ...
+    def __aiter__(self) -> Self: ...
+    async def __anext__(self) -> ConsumerRecord[bytes, bytes]: ...

@@ -169,7 +169,7 @@ class InventoryChangedEvent(BusinessEvent):
     reservedQuantity: int = Field(ge=0)
     soldQuantity: int = Field(ge=0)
     remainingQuantity: int = Field(ge=0)
-    inventoryVersion: int = Field(ge=1)
+    inventoryVersion: int = Field(ge=0)
 
 
 class RefundRequestedEvent(BusinessEvent):

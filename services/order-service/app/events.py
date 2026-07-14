@@ -80,6 +80,34 @@ def inventory_changed_event(
     )
 
 
+def inventory_snapshot_event(
+    inventory: InventoryItemRecord,
+    event_id: str,
+    occurred_at: datetime,
+) -> InventoryChangedEvent:
+    """Build a fresh snapshot event without changing authoritative inventory."""
+    aggregate_id = f"{inventory.drop_id}:{inventory.product_id}"
+    return InventoryChangedEvent(
+        eventId=event_id,
+        userId="system",
+        sourceId=aggregate_id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        dropId=inventory.drop_id,
+        productId=inventory.product_id,
+        totalQuantity=inventory.total_quantity,
+        reservedQuantity=inventory.reserved_quantity,
+        soldQuantity=inventory.sold_quantity,
+        remainingQuantity=(
+            inventory.total_quantity
+            - inventory.reserved_quantity
+            - inventory.sold_quantity
+        ),
+        inventoryVersion=inventory.version,
+        correlationId=event_id,
+    )
+
+
 def order_expired_event(order: Order, occurred_at: datetime) -> OrderExpiredEvent:
     return OrderExpiredEvent(
         eventId=f"evt-order-expired-{order.id}",

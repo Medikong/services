@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Final, final
 
 import anyio
+from contracts import InventoryChangedEvent
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     select,
     table,
 )
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import (
@@ -30,7 +32,7 @@ from sqlalchemy.orm import (
 
 from app.catalog import CatalogReadiness, DropDetail, DropStatus, Product
 
-MIGRATION_HEAD: Final = "0001_catalog_projection"
+MIGRATION_HEAD: Final = "0002_inventory_projection"
 READINESS_TIMEOUT_SECONDS: Final = 1.0
 
 
@@ -59,19 +61,11 @@ class DropRow(Base):
 
 @final
 class ProductRow(Base):
-    """Persisted product metadata and order-owned inventory projection."""
+    """Persisted Catalog-owned product metadata."""
 
     __tablename__ = "products"
     __table_args__: tuple[CheckConstraint, ...] = (
         CheckConstraint("price >= 0", name="ck_products_price_nonnegative"),
-        CheckConstraint(
-            "remaining_quantity >= 0",
-            name="ck_products_remaining_quantity_nonnegative",
-        ),
-        CheckConstraint(
-            "inventory_version >= 0",
-            name="ck_products_inventory_version_nonnegative",
-        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -81,9 +75,41 @@ class ProductRow(Base):
     )
     name: Mapped[str] = mapped_column(String(255))
     price: Mapped[int] = mapped_column(Integer)
+    drop: Mapped[DropRow] = relationship(back_populates="products")
+    inventory: Mapped["InventoryProjectionRow | None"] = relationship(
+        back_populates="product",
+        lazy="joined",
+        uselist=False,
+    )
+
+
+@final
+class InventoryProjectionRow(Base):
+    """Order-owned inventory values projected into Catalog storage."""
+
+    __tablename__ = "inventory_projections"
+    __table_args__: tuple[CheckConstraint, ...] = (
+        CheckConstraint(
+            "remaining_quantity >= 0",
+            name="ck_inventory_projections_remaining_nonnegative",
+        ),
+        CheckConstraint(
+            "inventory_version >= 0",
+            name="ck_inventory_projections_version_nonnegative",
+        ),
+    )
+
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    drop_id: Mapped[str] = mapped_column(
+        ForeignKey("drops.id", ondelete="CASCADE"),
+        index=True,
+    )
     remaining_quantity: Mapped[int] = mapped_column(Integer)
     inventory_version: Mapped[int] = mapped_column(BigInteger)
-    drop: Mapped[DropRow] = relationship(back_populates="products")
+    product: Mapped[ProductRow] = relationship(back_populates="inventory")
 
 
 @final
@@ -128,6 +154,47 @@ class PostgresCatalogRepository:
             )
             return None if row is None else _to_drop(row)
 
+    async def apply_inventory_changed(self, event: InventoryChangedEvent) -> None:
+        """Record and conditionally apply one absolute inventory projection."""
+        async with self._sessions.begin() as session:
+            processed = await session.get(ProcessedEventRow, event.eventId)
+            if processed is not None:
+                return
+            session.add(
+                ProcessedEventRow(
+                    event_id=event.eventId,
+                    event_type=event.eventType,
+                ),
+            )
+            product_exists = await session.scalar(
+                select(ProductRow.id).where(
+                    ProductRow.id == event.productId,
+                    ProductRow.drop_id == event.dropId,
+                ),
+            )
+            if product_exists is None:
+                return
+            statement = insert(InventoryProjectionRow).values(
+                product_id=event.productId,
+                drop_id=event.dropId,
+                remaining_quantity=event.remainingQuantity,
+                inventory_version=event.inventoryVersion,
+            )
+            _ = await session.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[InventoryProjectionRow.product_id],
+                    set_={
+                        "drop_id": statement.excluded.drop_id,
+                        "remaining_quantity": statement.excluded.remaining_quantity,
+                        "inventory_version": statement.excluded.inventory_version,
+                    },
+                    where=(
+                        statement.excluded.inventory_version
+                        > InventoryProjectionRow.inventory_version
+                    ),
+                ),
+            )
+
     async def readiness(self) -> CatalogReadiness:
         """Return bounded database and migration readiness."""
         try:
@@ -154,21 +221,34 @@ class PostgresCatalogRepository:
 
 
 def _to_drop(row: DropRow) -> DropDetail:
+    products = tuple(
+        Product(
+            id=product.id,
+            name=product.name,
+            price=product.price,
+            remaining_quantity=(
+                product.inventory.remaining_quantity
+                if product.inventory is not None
+                else 0
+            ),
+            inventory_version=(
+                product.inventory.inventory_version
+                if product.inventory is not None
+                else 0
+            ),
+        )
+        for product in row.products
+    )
     return DropDetail(
         id=row.id,
         title=row.title,
-        status=DropStatus(row.status),
+        status=(
+            DropStatus.SOLD_OUT
+            if products and all(product.remaining_quantity == 0 for product in products)
+            else DropStatus(row.status)
+        ),
         opens_at=row.opens_at,
         closes_at=row.closes_at,
         description=row.description,
-        products=tuple(
-            Product(
-                id=product.id,
-                name=product.name,
-                price=product.price,
-                remaining_quantity=product.remaining_quantity,
-                inventory_version=product.inventory_version,
-            )
-            for product in row.products
-        ),
+        products=products,
     )

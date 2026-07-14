@@ -167,8 +167,13 @@ services:
     environment:
       <<: *service-e2e-env
       DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/catalog_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       catalog-migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      kafka-init:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:${CATALOG_SERVICE_PORT:-18084}:8081"
