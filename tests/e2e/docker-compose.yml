@@ -202,6 +202,19 @@ services:
       timeout: 5s
       retries: 20
 
+  payment-migrate:
+    build:
+      context: ../..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      <<: *service-e2e-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   payment-service:
     build:
       context: ../..
@@ -211,8 +224,8 @@ services:
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
-      postgres:
-        condition: service_healthy
+      payment-migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
       kafka-init:

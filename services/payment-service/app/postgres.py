@@ -2,7 +2,16 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from contracts import OrderCreatedEvent
-from sqlalchemy import DateTime, Index, Integer, String, UniqueConstraint, select
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    select,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -34,11 +43,28 @@ class Base(DeclarativeBase):
 class PaymentRecord(Base):
     __tablename__ = "payments"
     __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_payments_amount_nonnegative"),
+        CheckConstraint("method = 'MOCK_CARD'", name="ck_payments_method"),
+        CheckConstraint(
+            "status IN ('APPROVED', 'FAILED')",
+            name="ck_payments_status",
+        ),
+        CheckConstraint(
+            "(status = 'APPROVED' AND approved_at IS NOT NULL AND failed_at IS NULL) "
+            "OR (status = 'FAILED' AND approved_at IS NULL AND failed_at IS NOT NULL)",
+            name="ck_payments_terminal_timestamps",
+        ),
+        ForeignKeyConstraint(
+            ["order_id"],
+            ["known_orders.order_id"],
+            name="fk_payments_order_id",
+        ),
         UniqueConstraint(
             "user_id",
             "idempotency_key",
             name="uq_payments_user_idempotency_key",
         ),
+        UniqueConstraint("order_id", name="uq_payments_order_id"),
         Index("ix_payments_order_id", "order_id"),
     )
 
@@ -57,6 +83,9 @@ class PaymentRecord(Base):
 
 class KnownOrderRecord(Base):
     __tablename__ = "known_orders"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_known_orders_amount_nonnegative"),
+    )
 
     order_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), nullable=False)

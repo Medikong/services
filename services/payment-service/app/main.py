@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from observability import (
     RequestIdMiddleware,
@@ -34,6 +34,7 @@ from app.models import (
     UserRole,
 )
 from app.repository import PaymentRepository
+from app.readiness import payment_readiness
 from app.store import (
     ApprovePaymentCommand,
     FailPaymentCommand,
@@ -44,7 +45,6 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
-    PaymentStore,
     approval_should_publish,
     failure_should_publish,
 )
@@ -93,13 +93,8 @@ def create_app(
         return HealthResponse(status="ok", service=SERVICE_NAME, timestamp=_utc_now())
 
     @app.get("/readyz", response_model=ReadinessResponse)
-    def readyz() -> ReadinessResponse:
-        return ReadinessResponse(
-            status="ready",
-            service=SERVICE_NAME,
-            checks={"payments": "ok", "order_created_handler": "ok"},
-            timestamp=_utc_now(),
-        )
+    async def readyz(response: Response) -> ReadinessResponse:
+        return await payment_readiness(resources, response, SERVICE_NAME)
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:

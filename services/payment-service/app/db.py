@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import anyio
 from fastapi import FastAPI
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from app.messaging import (
@@ -13,7 +14,7 @@ from app.messaging import (
     PaymentEventPublisherRef,
     kafka_runtime_from_bootstrap,
 )
-from app.postgres import Base, PostgresPaymentRepository
+from app.postgres import PostgresPaymentRepository
 from app.repository import PaymentRepository
 from app.store import PaymentStore
 
@@ -45,6 +46,7 @@ def resources_from_env() -> AppResources:
         max_overflow=0,
         pool_timeout=5.0,
         pool_recycle=1800,
+        connect_args={"timeout": 3.0},
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     return AppResources(
@@ -60,8 +62,6 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         runtime: KafkaRuntime | None = None
         try:
-            if resources.engine is not None:
-                await create_schema(resources.engine)
             if resources.kafka_bootstrap_servers != "":
                 runtime = kafka_runtime_from_bootstrap(
                     resources.repository,
@@ -89,9 +89,17 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
     return lifespan
 
 
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+async def database_schema_is_current(engine: AsyncEngine) -> bool:
+    async with engine.connect() as connection:
+        version_table = (
+            await connection.execute(text("SELECT to_regclass('alembic_version')"))
+        ).scalar_one()
+        if version_table is None:
+            return False
+        version = (
+            await connection.execute(text("SELECT version_num FROM alembic_version"))
+        ).scalar_one_or_none()
+    return version == "20260714_01"
 
 
 def _async_database_url(database_url: str) -> str:
