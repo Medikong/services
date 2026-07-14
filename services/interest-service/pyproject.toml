@@ -1,0 +1,35 @@
+[project]
+name = "interest-service"
+version = "0.1.0"
+description = "DropMong interest (wishlist) API service"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.30.0,<1.0.0",
+    "fastapi==0.124.0",
+    "observability",
+    "orjson>=3.11.0,<4.0.0",
+    "sqlalchemy[asyncio]>=2.0.41,<3.0.0",
+    "uvicorn[standard]>=0.49.0,<1.0.0",
+]
+
+[tool.uv.sources]
+errors = { path = "../../packages/errors", editable = true }
+kafka-utils = { path = "../../packages/kafka-utils", editable = true }
+middleware = { path = "../../packages/middleware", editable = true }
+observability = { path = "../../packages/observability", editable = true }
+
+[dependency-groups]
+test = [
+    "httpx>=0.28.0,<1.0.0",
+    "pytest>=9.0.0,<10.0.0",
+]
+# kafka-utils(→ aiokafka)는 기본 의존성이 아니라 별도 그룹이다. 이 서비스는 KAFKA_BOOTSTRAP_SERVERS가
+# 없으면 NoopInterestEventPublisher만 쓰므로, 로컬 개발/테스트에 aiokafka 빌드가 필요 없게 하기 위함이다
+# (2026-07-14: kafka-utils를 기본 의존성에 넣었다가 aiokafka C 확장 빌드가 로컬 환경에서 막혀 되돌림).
+kafka = [
+    "kafka-utils",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../../packages/errors/src", "../../packages/middleware/src", "../../packages/observability/src"]
+testpaths = ["tests"]

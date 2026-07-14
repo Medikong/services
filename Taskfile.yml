@@ -16,7 +16,7 @@ vars:
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
-  GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/go-reference-service/..." .GO_TEST_PACKAGES}}'
+  GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
 includes:
@@ -214,6 +214,16 @@ tasks:
     desc: Verify that the auth OpenAPI bundle snapshot matches the sibling archive checkout.
     cmds:
       - ./services/auth-service/scripts/check-openapi.sh
+
+  coupon-openapi-sync:
+    desc: Bundle the coupon OpenAPI source of truth from the sibling archive checkout.
+    cmds:
+      - ./services/coupon-service/scripts/sync-openapi.sh
+
+  coupon-openapi-check:
+    desc: Verify that the coupon OpenAPI bundle snapshot matches the sibling archive checkout.
+    cmds:
+      - ./services/coupon-service/scripts/check-openapi.sh
 
   test-all:
     desc: Run unit tests and Docker Compose E2E tests.

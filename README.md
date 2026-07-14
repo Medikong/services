@@ -13,6 +13,7 @@ DropMong 한정 상품 드롭 커머스의 마이크로서비스를 개발하고
 | `services/payment-service/` | mock 결제 승인, 결제 이벤트 발행 |
 | `services/notification-service/` | Kafka 이벤트 기반 알림 저장과 조회 |
 | `services/go-reference-service/` | Go 서버 기반 구조와 공용 패키지 조립 예제 |
+| `services/coupon-service/` | Context 쿠폰 캠페인·발급·사용·운영·복구 서비스 |
 | `contracts/` | 서비스별 OpenAPI 문서와 공통 API/JWT 계약 |
 | `tests/` | 단위 테스트 러너와 테스트 보조 파일 |
 
