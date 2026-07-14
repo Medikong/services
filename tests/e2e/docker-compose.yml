@@ -250,6 +250,17 @@ services:
       timeout: 5s
       retries: 20
 
+  notification-migrate:
+    build:
+      context: ../..
+      dockerfile: services/notification-service/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/notification_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   notification-service:
     build:
       context: ../..
@@ -261,6 +272,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      notification-migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
       kafka-init:

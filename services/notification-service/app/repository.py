@@ -1,12 +1,13 @@
 from typing import Protocol
 
-from contracts import NotificationRequestedEvent
-
 from app.models import NotificationId, UserId
 from app.store import NotificationPage, RecordNotificationResult
+from contracts import NotificationRequestedEvent
 
 
 class NotificationRepository(Protocol):
+    async def is_ready(self) -> bool: ...
+
     async def record_notification_requested(
         self,
         event: NotificationRequestedEvent,

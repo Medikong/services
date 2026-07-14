@@ -1,12 +1,24 @@
 from datetime import datetime
+from typing import Final
 
-from contracts import NotificationRequestedEvent
-from sqlalchemy import Boolean, DateTime, Index, String, UniqueConstraint, and_, or_, select
-from sqlalchemy.exc import IntegrityError
+import anyio
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Index,
+    String,
+    UniqueConstraint,
+    and_,
+    or_,
+    select,
+    text,
+)
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from app.models import Notification, NotificationId, NotificationType, UserId
+from app.models import Notification, NotificationId, UserId
 from app.store import (
     NotificationAlreadyRecorded,
     NotificationPage,
@@ -15,6 +27,9 @@ from app.store import (
     notification_from_requested_event,
     page_from_notifications,
 )
+from contracts import NotificationRequestedEvent, NotificationType
+
+READINESS_TIMEOUT_SECONDS: Final = 2.0
 
 
 class Base(DeclarativeBase):
@@ -26,22 +41,55 @@ class NotificationRecord(Base):
     __table_args__ = (
         UniqueConstraint("event_id", name="uq_notifications_event_id"),
         Index("ix_notifications_user_created", "user_id", "created_at"),
+        CheckConstraint(
+            "type IN ('ORDER_CONFIRMED', 'PAYMENT_FAILED', 'ORDER_EXPIRED', "
+            "'ORDER_CANCELED', 'PAYMENT_REFUNDED', 'REFUND_FAILED')",
+            name="ck_notifications_type",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     event_id: Mapped[str] = mapped_column(String(128), nullable=False)
     user_id: Mapped[str] = mapped_column(String(64), nullable=False)
     order_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=NotificationType.ORDER_CONFIRMED.value,
+    )
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     message: Mapped[str] = mapped_column(String(500), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     read: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class ProcessedEventRecord(Base):
+    __tablename__ = "processed_events"
+
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class PostgresNotificationRepository:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
+
+    async def is_ready(self) -> bool:
+        try:
+            with anyio.fail_after(READINESS_TIMEOUT_SECONDS):
+                async with self._session_factory() as session:
+                    result = await session.execute(
+                        text("SELECT version_num FROM alembic_version")
+                    )
+                    version = result.scalar_one_or_none()
+        except (ConnectionRefusedError, SQLAlchemyError, TimeoutError):
+            return False
+        return str(version) == "0001_notification_storage"
 
     async def record_notification_requested(
         self,
@@ -64,7 +112,13 @@ class PostgresNotificationRepository:
                 created_at=notification.createdAt,
                 read=notification.read,
             )
+            processed_event = ProcessedEventRecord(
+                event_id=event.eventId,
+                event_type=event.eventType,
+                processed_at=event.occurredAt,
+            )
             session.add(record)
+            session.add(processed_event)
             try:
                 await session.commit()
             except IntegrityError:
@@ -108,7 +162,9 @@ class PostgresNotificationRepository:
                 )
                 .limit(limit + 1),
             )
-            notifications = tuple(_notification_from_record(record) for record in result.scalars().all())
+            notifications = tuple(
+                _notification_from_record(record) for record in result.scalars().all()
+            )
             return page_from_notifications(notifications, limit)
 
     async def _notification_by_event_id(

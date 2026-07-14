@@ -7,9 +7,9 @@ import anyio
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
-from app.metrics import NotificationMetrics
 from app.messaging import KafkaRuntime, kafka_runtime_from_bootstrap
-from app.postgres import Base, PostgresNotificationRepository
+from app.metrics import NotificationMetrics
+from app.postgres import PostgresNotificationRepository
 from app.repository import NotificationRepository
 from app.store import NotificationStore
 
@@ -57,8 +57,6 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         runtime = resources.kafka_runtime
         try:
-            if resources.engine is not None:
-                await create_schema(resources.engine)
             if runtime is None and resources.kafka_bootstrap_servers != "":
                 runtime = kafka_runtime_from_bootstrap(
                     resources.repository,
@@ -66,25 +64,29 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
                     resources.notification_metrics,
                 )
                 resources.kafka_runtime = runtime
-            if runtime is not None and runtime.notification_requested_consumer is not None:
+            if (
+                runtime is not None
+                and runtime.notification_requested_consumer is not None
+            ):
                 await runtime.notification_requested_consumer.start()
             async with anyio.create_task_group() as task_group:
-                if runtime is not None and runtime.notification_requested_consumer is not None:
+                if (
+                    runtime is not None
+                    and runtime.notification_requested_consumer is not None
+                ):
                     task_group.start_soon(runtime.notification_requested_consumer.run)
                 yield
                 task_group.cancel_scope.cancel()
         finally:
-            if runtime is not None and runtime.notification_requested_consumer is not None:
+            if (
+                runtime is not None
+                and runtime.notification_requested_consumer is not None
+            ):
                 await runtime.notification_requested_consumer.stop()
             if resources.engine is not None:
                 await resources.engine.dispose()
 
     return lifespan
-
-
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
 
 
 def _async_database_url(database_url: str) -> str:

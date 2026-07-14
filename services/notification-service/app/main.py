@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from observability import (
     RequestIdMiddleware,
@@ -18,14 +18,13 @@ from app.db import AppResources, lifespan_for, resources_from_env
 from app.metrics import NotificationMetrics
 from app.models import (
     HealthResponse,
-    NotificationListResponse,
     NotificationId,
+    NotificationListResponse,
     ReadinessResponse,
     UserId,
     UserRole,
 )
 from app.repository import NotificationRepository
-from app.store import NotificationStore
 
 SERVICE_NAME: Final = "notification-service"
 SERVICE_VERSION: Final = os.getenv("SERVICE_VERSION", "0.1.0")
@@ -64,11 +63,17 @@ def create_app(
         return HealthResponse(status="ok", service=SERVICE_NAME, timestamp=_utc_now())
 
     @app.get("/readyz", response_model=ReadinessResponse)
-    def readyz() -> ReadinessResponse:
+    async def readyz(response: Response) -> ReadinessResponse:
+        repository_ready = await resources.repository.is_ready()
+        if not repository_ready:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return ReadinessResponse(
-            status="ready",
+            status="ready" if repository_ready else "not_ready",
             service=SERVICE_NAME,
-            checks={"notifications": "ok", "notification_requested_handler": "ok"},
+            checks={
+                "notifications": "ok" if repository_ready else "migration_required",
+                "notification_requested_handler": "ok",
+            },
             timestamp=_utc_now(),
         )
 
@@ -78,7 +83,9 @@ def create_app(
 
     @app.get("/notifications", response_model=NotificationListResponse)
     async def list_notifications(
-        context: Annotated[ReadNotificationsContext, Depends(read_notifications_context)],
+        context: Annotated[
+            ReadNotificationsContext, Depends(read_notifications_context)
+        ],
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
         cursor: Annotated[str | None, Query(max_length=128)] = None,
     ) -> NotificationListResponse:

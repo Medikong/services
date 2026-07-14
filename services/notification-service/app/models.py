@@ -4,15 +4,11 @@ from typing import NewType
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from contracts import NotificationType
+
 NotificationId = NewType("NotificationId", str)
 OrderId = NewType("OrderId", str)
 UserId = NewType("UserId", str)
-
-
-@unique
-class NotificationType(StrEnum):
-    ORDER_CONFIRMED = "ORDER_CONFIRMED"
-    PAYMENT_FAILED = "PAYMENT_FAILED"
 
 
 @unique

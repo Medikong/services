@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from typing import assert_never
 
+from app.models import Notification, NotificationId, OrderId, PageInfo, UserId
 from contracts import NotificationRequestedEvent
-
-from app.models import Notification, NotificationId, NotificationType, OrderId, PageInfo, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,13 +29,18 @@ class NotificationStore:
         self._notifications: dict[NotificationId, Notification] = {}
         self._event_index: dict[str, NotificationId] = {}
 
+    async def is_ready(self) -> bool:
+        return True
+
     async def record_notification_requested(
         self,
         event: NotificationRequestedEvent,
     ) -> RecordNotificationResult:
         existing_id = self._event_index.get(event.eventId)
         if existing_id is not None:
-            return NotificationAlreadyRecorded(notification=self._notifications[existing_id])
+            return NotificationAlreadyRecorded(
+                notification=self._notifications[existing_id]
+            )
 
         notification = notification_from_requested_event(event)
         notification_id = NotificationId(notification.id)
@@ -66,12 +70,14 @@ class NotificationStore:
         return page_from_notifications(selected, limit)
 
 
-def notification_from_requested_event(event: NotificationRequestedEvent) -> Notification:
+def notification_from_requested_event(
+    event: NotificationRequestedEvent,
+) -> Notification:
     return Notification(
         id=NotificationId(event.notificationId),
         userId=UserId(event.userId),
         orderId=OrderId(event.orderId),
-        type=NotificationType.ORDER_CONFIRMED,
+        type=event.notificationType,
         title=event.title,
         message=event.message,
         createdAt=event.occurredAt,

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from time import monotonic
 from typing import Final
 
 import anyio
@@ -43,7 +44,9 @@ def test_healthz_echoes_request_id_header() -> None:
     client = TestClient(create_app(NotificationStore()))
 
     # When
-    response = client.get("/healthz", headers={"X-Request-Id": "notification-trace-smoke"})
+    response = client.get(
+        "/healthz", headers={"X-Request-Id": "notification-trace-smoke"}
+    )
 
     # Then
     assert response.status_code == 200
@@ -63,6 +66,29 @@ def test_readyz_returns_ready_notification_checks() -> None:
         "notifications": "ok",
         "notification_requested_handler": "ok",
     }
+
+
+def test_readyz_returns_bounded_503_when_postgres_is_unreachable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@127.0.0.1:59999/notification_db",
+    )
+    monkeypatch.delenv("KAFKA_BOOTSTRAP_SERVERS", raising=False)
+
+    # When
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        started_at = monotonic()
+        response = client.get("/readyz")
+        elapsed_seconds = monotonic() - started_at
+
+    # Then
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+    assert response.json()["checks"]["notifications"] == "migration_required"
+    assert elapsed_seconds < 3.0
 
 
 def test_metrics_exposes_notification_service_readiness_metric() -> None:
@@ -100,7 +126,9 @@ def test_resources_from_env_defers_kafka_clients_until_lifespan(
     monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 
     # When
-    resources = resources_from_env(NotificationMetrics("notification-service", "test", "test"))
+    resources = resources_from_env(
+        NotificationMetrics("notification-service", "test", "test")
+    )
 
     # Then
     assert isinstance(resources.repository, NotificationStore)
