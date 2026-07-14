@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	apperrors "github.com/Medikong/services/packages/go-platform/errors"
 	"github.com/Medikong/services/packages/go-platform/requestcontext"
 	"github.com/samber/oops"
 )
@@ -21,6 +20,17 @@ const (
 	internalErrorCode    = "common.internal"
 	internalErrorMessage = "요청 처리 중 오류가 발생했습니다."
 )
+
+type ErrorResponse struct {
+	Error      ErrorBody `json:"error"`
+	RequestID  string    `json:"requestId"`
+	OccurredAt time.Time `json:"occurredAt"`
+}
+
+type ErrorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
 
 func Error(statusCode int, code string) oops.OopsErrorBuilder {
 	return oops.Code(code).With(OopsHTTPStatusCodeKey, statusCode)
@@ -112,8 +122,8 @@ func writeErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, 
 	if requestID == "" {
 		requestID = r.Header.Get(requestcontext.RequestIDHeader)
 	}
-	WriteJSON(w, statusCode, apperrors.ErrorResponse{
-		Error: apperrors.ErrorBody{
+	WriteJSON(w, statusCode, ErrorResponse{
+		Error: ErrorBody{
 			Code:    code,
 			Message: message,
 		},

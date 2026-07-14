@@ -8,7 +8,6 @@ import (
 
 	"github.com/samber/oops"
 
-	apperrors "github.com/Medikong/services/packages/go-platform/errors"
 	"github.com/Medikong/services/packages/go-platform/httpapi"
 )
 
@@ -44,7 +43,7 @@ func TestUserErrorsCarryHTTPContract(t *testing.T) {
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
-			var body apperrors.ErrorResponse
+			var body httpapi.ErrorResponse
 			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 				t.Fatalf("json decode: %v", err)
 			}
