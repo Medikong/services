@@ -43,6 +43,10 @@ components:
       enum:
         - ORDER_CONFIRMED
         - PAYMENT_FAILED
+        - ORDER_EXPIRED
+        - ORDER_CANCELED
+        - PAYMENT_REFUNDED
+        - REFUND_FAILED
     Notification:
       type: object
       required:

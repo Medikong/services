@@ -79,6 +79,13 @@ components:
       enum:
         - APPROVED
         - FAILED
+    RefundStatus:
+      type: string
+      enum:
+        - REQUESTED
+        - PROCESSING
+        - COMPLETED
+        - FAILED
     ApproveMockPaymentRequest:
       type: object
       required:
@@ -147,3 +154,59 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/Payment"
+    Refund:
+      type: object
+      required:
+        - id
+        - orderId
+        - paymentId
+        - userId
+        - amount
+        - status
+        - reason
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        paymentId:
+          type: string
+        userId:
+          type: string
+        amount:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/RefundStatus"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        attempts:
+          type: integer
+          minimum: 0
+          default: 0
+        lastError:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+    RefundResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/Refund"

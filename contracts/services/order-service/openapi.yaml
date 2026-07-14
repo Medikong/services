@@ -70,6 +70,66 @@ paths:
           $ref: "../../common/components.yaml#/components/responses/NotFound"
         "500":
           $ref: "../../common/components.yaml#/components/responses/InternalServerError"
+  /orders/{order_id}/cancellations:
+    post:
+      operationId: cancelOrder
+      summary: 배송 전 주문 취소 및 전액 환불 요청
+      description: >-
+        CONFIRMED 주문의 배송이 시작되기 전에 취소를 접수한다. 같은
+        Idempotency-Key와 같은 reason의 재실행은 최초 접수 결과를 그대로 반환한다.
+      parameters:
+        - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/traceparent"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - CUSTOMER
+        - $ref: "../../common/components.yaml#/components/parameters/Idempotency-Key"
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelOrderRequest"
+      responses:
+        "202":
+          description: >-
+            취소와 전액 환불이 접수되었다. 멱등 재실행은 같은 취소 접수 결과를
+            반환한다.
+          x-idempotent-replay: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationResponse"
+        "401":
+          $ref: "../../common/components.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "../../common/components.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "../../common/components.yaml#/components/responses/NotFound"
+        "409":
+          description: >-
+            주문 상태가 CONFIRMED가 아니거나 fulfillmentStatus가 SHIPPED이면
+            취소할 수 없다. 같은 Idempotency-Key에 다른 reason도 충돌이다.
+          content:
+            application/json:
+              schema:
+                $ref: "../../common/components.yaml#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "../../common/components.yaml#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "../../common/components.yaml#/components/responses/InternalServerError"
 components:
   securitySchemes:
     BearerAuth:
@@ -81,8 +141,31 @@ components:
         - PENDING_PAYMENT
         - CONFIRMED
         - PAYMENT_FAILED
+        - CANCEL_PENDING
         - CANCELED
         - EXPIRED
+      x-allowed-transitions:
+        PENDING_PAYMENT:
+          - CONFIRMED
+          - PAYMENT_FAILED
+          - EXPIRED
+        CONFIRMED:
+          - CANCEL_PENDING
+        CANCEL_PENDING:
+          - CANCELED
+    FulfillmentStatus:
+      type: string
+      enum:
+        - NOT_STARTED
+        - PREPARING
+        - SHIPPED
+    RefundStatus:
+      type: string
+      enum:
+        - REQUESTED
+        - PROCESSING
+        - COMPLETED
+        - FAILED
     CreateOrderRequest:
       type: object
       required:
@@ -136,6 +219,8 @@ components:
           minimum: 0
         status:
           $ref: "#/components/schemas/OrderStatus"
+        fulfillmentStatus:
+          $ref: "#/components/schemas/FulfillmentStatus"
         paymentId:
           type:
             - string
@@ -148,6 +233,53 @@ components:
             - string
             - "null"
           format: date-time
+    CancelOrderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    Cancellation:
+      type: object
+      required:
+        - id
+        - orderId
+        - reason
+        - orderStatus
+        - refundStatus
+        - createdAt
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        refundStatus:
+          $ref: "#/components/schemas/RefundStatus"
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+    CancellationResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/Cancellation"
     OrderResponse:
       type: object
       required:
