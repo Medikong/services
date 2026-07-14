@@ -13,7 +13,7 @@ from app.messaging import (
     OrderEventPublisher,
     kafka_runtime_from_bootstrap,
 )
-from app.postgres import Base, PostgresOrderRepository
+from app.postgres import PostgresOrderRepository
 from app.repository import OrderRepository
 from app.store import OrderStore
 
@@ -65,8 +65,6 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         runtime = resources.kafka_runtime
         try:
-            if resources.engine is not None:
-                await create_schema(resources.engine)
             if runtime is None and resources.kafka_bootstrap_servers != "":
                 runtime = kafka_runtime_from_bootstrap(
                     resources.repository,
@@ -95,12 +93,9 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
     return lifespan
 
 
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-
-
 def _async_database_url(database_url: str) -> str:
     if database_url.startswith("postgresql+psycopg://"):
         return database_url.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return database_url

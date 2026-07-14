@@ -166,6 +166,19 @@ services:
       timeout: 5s
       retries: 20
 
+  order-migrate:
+    build:
+      context: ../..
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      <<: *service-e2e-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/order_service
+    command: ["python", "-m", "app.migrate", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   order-service:
     build:
       context: ../..
@@ -175,8 +188,8 @@ services:
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/order_service
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
-      postgres:
-        condition: service_healthy
+      order-migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
       kafka-init:

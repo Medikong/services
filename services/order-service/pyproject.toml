@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "DropMong order API service"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic==1.18.5",
     "asyncpg>=0.30.0,<1.0.0",
     "contracts",
     "fastapi==0.124.0",

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from observability import (
     RequestIdMiddleware,
@@ -30,6 +30,7 @@ from app.db import AppResources, lifespan_for, resources_from_env
 from app.metrics import OrderMetrics
 from app.messaging import NoopOrderEventPublisher, OrderEventPublisher
 from app.repository import OrderRepository
+from app.schema import database_migration_is_current
 from app.store import (
     CreateOrderCommand,
     OrderAlreadyCreated,
@@ -81,14 +82,32 @@ def create_app(
         return HealthResponse(status="ok", service=SERVICE_NAME, timestamp=_utc_now())
 
     @app.get("/readyz", response_model=ReadinessResponse)
-    def readyz() -> ReadinessResponse:
+    async def readyz(response: Response) -> ReadinessResponse:
+        migration_is_current = (
+            resources.engine is None
+            or await database_migration_is_current(
+                resources.engine,
+            )
+        )
+        if not migration_is_current:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return ReadinessResponse(
-            status="ready",
+            status="ready" if migration_is_current else "not_ready",
             service=SERVICE_NAME,
             checks={
                 "orders": "ok",
                 "payment_approved_handler": "ok",
                 "payment_failed_handler": "ok",
+                **(
+                    {"database_migration": "ok"}
+                    if resources.engine is not None and migration_is_current
+                    else {}
+                ),
+                **(
+                    {"database_migration": "failed"}
+                    if resources.engine is not None and not migration_is_current
+                    else {}
+                ),
             },
             timestamp=_utc_now(),
         )
