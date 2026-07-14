@@ -1,16 +1,16 @@
-# DropMong 정상 구매 이벤트 계약
+# DropMong 구매 이벤트 계약
 
-이 문서는 정상 구매 시나리오에서 서비스 사이에 오가는 Kafka topic과 payload 기준을 고정한다.
+이 문서는 정상 구매, 결제 실패, 품절/동시성 시나리오에서 서비스 사이에 오가는 Kafka topic과 payload 기준을 고정한다.
 
 ## Topic
 
 | topic | producer | consumer | 용도 |
 | --- | --- | --- | --- |
-| `order.created` | `order-service` | 관측/분석 후보 | 주문 생성 사실 기록 |
+| `order.created` | `order-service` | `payment-service` | 결제 대상 주문을 payment-service의 `known_orders`에 등록 |
 | `payment.approved` | `payment-service` | `order-service` | 결제 승인 후 주문 확정 |
-| `payment.failed` | `payment-service` | `order-service`, `notification-service` | 결제 실패 처리 |
-| `order.confirmed` | `order-service` | 관측/분석 후보 | 주문 확정 사실 기록 |
-| `notification.requested` | `order-service` | `notification-service` | 주문 확정 알림 생성 |
+| `payment.failed` | `payment-service` | `order-service` | 결제 실패 반영과 예약 수량 해제 |
+| `order.confirmed` | 미구현 | 미구현 | 후속 분석·확장용 예약 계약 |
+| `notification.requested` | `order-service` | `notification-service` | 현재는 주문 확정 알림 생성 |
 
 ## 공통 필드
 
@@ -34,9 +34,12 @@
 | `order.confirmed` | `orderId`, `paymentId`, `dropId`, `productId`, `quantity`, `amount` |
 | `notification.requested` | `notificationId`, `orderId`, `channel`, `title`, `message` |
 
-## 처리 규칙
+## 현재 처리 규칙
 
-- consumer는 `eventId` 기준으로 중복 처리를 막는다.
-- 결제 승인 이벤트가 먼저 도착해도 `orderId`로 주문을 찾을 수 없으면 재처리 가능한 실패로 둔다.
+- `payment-service`는 `order.created`를 소비해 `orderId` 기준으로 결제 대상 주문을 저장한다.
+- `order-service`는 `payment.failed`의 `eventId`를 `processed_payment_events`에 기록해 중복 상태 전이를 막는다.
+- `notification-service`는 `notification.requested`의 `eventId`에 unique constraint를 적용해 중복 알림 생성을 막는다.
+- 결제 이벤트의 `orderId`에 해당하는 주문이 없으면 현재 consumer는 상태를 변경하지 않고 종료한다. 자동 retry와 DLQ는 아직 없다.
 - `notification.requested`는 기본 `IN_APP` 채널만 1차 구현 범위로 둔다.
-- DLQ, retry backoff, schema registry는 구현 이후 성능/운영 Task에서 별도 확장한다.
+- 결제 실패 알림, `order.confirmed` 발행, DLQ, retry backoff, schema registry는 후속 범위다.
+- order-service와 payment-service의 DB commit과 Kafka publish 사이에는 아직 transactional outbox가 없다. 주문 생성 뒤 `order.created`, 결제 승인 뒤 `payment.approved`, 결제 실패 뒤 `payment.failed`, 주문 확정 뒤 `notification.requested` 발행 구간을 모두 원자화해야 한다.

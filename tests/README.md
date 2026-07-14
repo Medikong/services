@@ -180,9 +180,9 @@ task purchase-internal-regression
 
 모든 E2E 공개 port는 `127.0.0.1`에만 바인딩한다. 각 gate는 고유한 임시 Compose project와 network를 사용하며, observability build context도 CRLF가 섞이지 않은 UUID로 이름을 정한 깨끗한 추적 파일 복제본을 사용한다. 종료 후 확인 결과 container, network, volume, test image, 임시 observability context, `purchase-internal-regression-*` 복제본은 모두 0개였다.
 
-이 회귀에서 Gateway JWT는 명시적으로 제외한다. `X-User-Id`, `X-User-Email`, `X-User-Role`은 내부 테스트 context에서만 신뢰하는 header다. Istio JWT 검증, 외부 요청의 header 위조 차단, auth-service 연동은 후속 Gateway E2E 범위이며, 이 회귀 결과로 운영 또는 외부 준비 상태를 주장하지 않는다.
+이 회귀에서 Gateway JWT는 명시적으로 제외한다. 현재 구매 서비스가 소비하는 `X-User-Id`, `X-User-Role`은 내부 테스트 context에서만 신뢰하는 header다. Istio JWT 검증, 외부 요청의 header 위조 차단, auth-service 연동은 후속 Gateway E2E 범위이며, 이 회귀 결과로 운영 또는 외부 준비 상태를 주장하지 않는다.
 
-결제 실패의 현재 수용 상태는 `PAYMENT_FAILED`이며 재고 해제는 활성 예약 집계에서 제외되는 방식으로 검증한다. `CANCELLED`, `EXPIRED`, 지연 승인, 실패 알림, `outbox`는 후속 범위다.
+결제 실패의 현재 수용 상태는 `PAYMENT_FAILED`이며 재고 해제는 활성 예약 집계에서 제외되는 방식으로 검증한다. 취소 상태의 기계 계약은 코드, OpenAPI, 설계 문서 모두 `CANCELED`로 통일했다. `EXPIRED`, 지연 승인, 실패 알림, 모든 구매 event producer의 `outbox`는 후속 범위다.
 
 Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, `payment-service`, `notification-service`를 직접 호출한다. 기본 URL은 다음과 같다.
 
@@ -193,7 +193,7 @@ Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, 
 | `payment-service` | `http://payment-service:8083` |
 | `notification-service` | `http://notification-service:8084` |
 
-Python 구매 서비스는 내부 테스트 context에서 `X-User-Id`, `X-User-Email`, `X-User-Role` header를 신뢰하는 구조로 테스트한다. 외부 클라이언트가 이 header를 직접 보내는 상황은 후속 Gateway E2E에서 차단 여부를 확인한다.
+Python 구매 서비스는 내부 테스트 context에서 `X-User-Id`, `X-User-Role` header를 신뢰하는 구조로 테스트한다. 기존 JWT convention과 order OpenAPI의 선택적 `X-User-Email`은 현재 구매 서비스가 소비하지 않는다. 역할값도 JWT/OpenAPI의 `OPERATOR`와 구매 런타임의 `OWNER`가 다르므로 auth-service owner와 계약을 확정해야 한다. 외부 클라이언트가 이 header를 직접 보내는 상황은 후속 Gateway E2E에서 차단 여부를 확인한다.
 
 ## 로컬 Observability E2E
 
