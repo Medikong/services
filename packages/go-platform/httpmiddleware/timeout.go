@@ -17,10 +17,9 @@ func Timeout(timeout time.Duration) Middleware {
 				timedOut := ctx.Err() == context.DeadlineExceeded
 				cancel()
 				if timedOut && !recorder.WroteHeader() {
-					httpapi.WriteError(recorder.Writer(), r.WithContext(ctx), httpapi.GatewayTimeout(
-						"common.timeout",
-						"요청 처리 시간이 초과되었습니다.",
-					))
+					httpapi.WriteError(recorder.Writer(), r.WithContext(ctx), httpapi.GatewayTimeout("common.timeout").
+						Public("요청 처리 시간이 초과되었습니다.").
+						New("request timed out"))
 				}
 			}()
 			next.ServeHTTP(recorder.Writer(), r.WithContext(ctx))

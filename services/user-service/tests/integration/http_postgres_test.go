@@ -29,7 +29,6 @@ import (
 	"github.com/Medikong/services/packages/go-contracts/headers"
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	"github.com/Medikong/services/services/user-service/internal/application"
 	"github.com/Medikong/services/services/user-service/internal/domain/user"
 	"github.com/Medikong/services/services/user-service/internal/platform/observability"
 	"github.com/Medikong/services/services/user-service/internal/security"
@@ -320,11 +319,11 @@ func newTestRuntime(t *testing.T, ctx context.Context) *testRuntime {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := user.NewStore(db)
+	repository, err := user.NewUserRepository(db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := application.NewService(store, sealer, authVerifier, mediaVerifier, userSigner, application.Config{
+	service, err := user.NewUserService(repository, sealer, authVerifier, mediaVerifier, userSigner, user.UserServiceConfig{
 		RequiredAgreements: map[string]string{"TERMS_OF_SERVICE": "2026-07-01"},
 		IdempotencyTTL:     24 * time.Hour, ProofTTL: 5 * time.Minute,
 	})
@@ -345,10 +344,15 @@ func newTestRuntime(t *testing.T, ctx context.Context) *testRuntime {
 			return user.CheckSchema(ctx, db)
 		}}, Metrics: metrics.Handler(), SetReady: metrics.SetReady,
 	})
+	userHandler, err := user.NewUserHandler(service, metrics, user.UserHandlerConfig{
+		AllowedOrigins: map[string]struct{}{"http://client.test": {}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	router, err := userhttp.NewRouter(userhttp.RouterConfig{
 		ServiceName: "user-service-integration", RequestTimeout: 5 * time.Second,
-		AllowedOrigins: map[string]struct{}{"http://client.test": {}},
-	}, service, health, metrics)
+	}, userHandler, nil, health)
 	if err != nil {
 		t.Fatal(err)
 	}

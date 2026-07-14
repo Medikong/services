@@ -11,9 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
 
+	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	"github.com/Medikong/services/services/user-service/internal/application"
+	"github.com/Medikong/services/services/user-service/internal/development"
 	"github.com/Medikong/services/services/user-service/internal/domain/user"
 	"github.com/Medikong/services/services/user-service/internal/platform/config"
 	"github.com/Medikong/services/services/user-service/internal/platform/observability"
@@ -23,7 +24,7 @@ import (
 
 type Server struct {
 	cfg        config.ServerConfig
-	resources  Resources
+	db         *pgxpool.Pool
 	metrics    *observability.Metrics
 	health     *operational.Handler
 	publicHTTP *http.Server
@@ -39,84 +40,82 @@ func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	resources, err := openServerResources(ctx, cfg)
+	db, err := platformdb.OpenPostgres(ctx, cfg.Postgres)
 	if err != nil {
 		_ = metrics.Shutdown(context.Background())
-		return nil, err
+		return nil, oops.In("user_server").Code("database.open_failed").Wrap(err)
 	}
-	if err := checkServerDatabase(ctx, resources.DB); err != nil {
-		_ = resources.Close()
+	cleanup := func() {
+		db.Close()
 		_ = metrics.Shutdown(context.Background())
+	}
+	if err := checkServerDatabase(ctx, db); err != nil {
+		cleanup()
 		return nil, err
 	}
-	store, err := user.NewStore(resources.DB)
+	repository, err := user.NewUserRepository(db)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	sealer, err := security.NewSealer(cfg.Proof.PrivateNameEncryptionKey, nil)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	authVerifier, err := security.NewVerifier("auth-service", cfg.Proof.AuthProofKeyID, cfg.Proof.AuthProofPublicKey, cfg.Proof.ClockSkew, nil)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	mediaVerifier, err := security.NewVerifier("media-service", cfg.Proof.MediaProofKeyID, cfg.Proof.MediaProofPublicKey, cfg.Proof.ClockSkew, nil)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	userSigner, err := security.NewSigner("user-service", cfg.Proof.UserSigningKeyID, cfg.Proof.UserSigningPrivateKey, nil)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
-	service, err := application.NewService(store, sealer, authVerifier, mediaVerifier, userSigner, application.Config{
+	service, err := user.NewUserService(repository, sealer, authVerifier, mediaVerifier, userSigner, user.UserServiceConfig{
 		RequiredAgreements: cfg.RequiredAgreements,
 		IdempotencyTTL:     cfg.IdempotencyTTL,
 		ProofTTL:           cfg.Proof.ProofTTL,
 	})
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	health := operational.NewHandler(operational.Config{
 		Service:          cfg.Service.Name,
 		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
 		Checks: map[string]operational.Check{
-			"database": func(ctx context.Context) error { return checkServerDatabase(ctx, resources.DB) },
+			"database": func(ctx context.Context) error { return checkServerDatabase(ctx, db) },
 		},
 		Metrics:  metrics.Handler(),
 		SetReady: metrics.SetReady,
 	})
-	development, err := developmentProofConfig(cfg)
+	userHandler, err := user.NewUserHandler(service, metrics, user.UserHandlerConfig{AllowedOrigins: cfg.HTTP.AllowedOrigins})
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
+		return nil, err
+	}
+	proofHandler, err := newDevelopmentProofHandler(cfg, metrics)
+	if err != nil {
+		cleanup()
 		return nil, err
 	}
 	router, err := userhttp.NewRouter(userhttp.RouterConfig{
 		ServiceName: cfg.Service.Name, RequestTimeout: cfg.HTTP.RequestTimeout,
-		AllowedOrigins: cfg.HTTP.AllowedOrigins, Development: development,
-	}, service, health, metrics)
+	}, userHandler, proofHandler, health)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	profiler, err := observability.StartProfiler(cfg.Service, cfg.Profile)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	adminMux := http.NewServeMux()
@@ -125,28 +124,29 @@ func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
 	adminHTTP.WriteTimeout = 0
 	metrics.SetReady(true)
 	return &Server{
-		cfg: cfg, resources: resources, metrics: metrics, health: health,
+		cfg: cfg, db: db, metrics: metrics, health: health,
 		publicHTTP: httpserver.New(cfg.HTTP.PublicAddr, router), adminHTTP: adminHTTP, profiler: profiler,
 	}, nil
 }
 
-func developmentProofConfig(cfg config.ServerConfig) (userhttp.DevelopmentProofConfig, error) {
-	result := userhttp.DevelopmentProofConfig{Enabled: cfg.Development.Enabled}
+func newDevelopmentProofHandler(cfg config.ServerConfig, metrics *observability.Metrics) (*development.ProofHandler, error) {
 	if !cfg.Development.Enabled {
-		return result, nil
+		return nil, nil
 	}
 	authSigner, err := security.NewSigner("auth-service", cfg.Proof.AuthProofKeyID, cfg.Development.AuthSigningPrivateKey, nil)
 	if err != nil {
-		return userhttp.DevelopmentProofConfig{}, err
+		return nil, err
 	}
 	mediaSigner, err := security.NewSigner("media-service", cfg.Proof.MediaProofKeyID, cfg.Development.MediaSigningPrivateKey, nil)
 	if err != nil {
-		return userhttp.DevelopmentProofConfig{}, err
+		return nil, err
 	}
-	return userhttp.DevelopmentProofConfig{
-		Enabled: true, AccessToken: cfg.Development.AccessToken,
-		AuthSigner: authSigner, MediaSigner: mediaSigner, ProofTTL: cfg.Proof.ProofTTL,
-	}, nil
+	return development.NewProofHandler(development.ProofHandlerConfig{
+		AccessToken: cfg.Development.AccessToken,
+		AuthSigner:  authSigner,
+		MediaSigner: mediaSigner,
+		ProofTTL:    cfg.Proof.ProofTTL,
+	}, metrics)
 }
 
 func checkServerDatabase(ctx context.Context, db *pgxpool.Pool) error {
@@ -235,9 +235,12 @@ func (s *Server) closeWith(cause error) error {
 		profilerErr = s.profiler.Stop()
 		s.profiler = nil
 	}
-	resourceErr := s.resources.Close()
+	if s.db != nil {
+		s.db.Close()
+		s.db = nil
+	}
 	metricCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
 	metricErr := s.metrics.Shutdown(metricCtx)
 	cancel()
-	return oops.Join(cause, profilerErr, resourceErr, metricErr)
+	return oops.Join(cause, profilerErr, metricErr)
 }

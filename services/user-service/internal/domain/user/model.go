@@ -1,13 +1,12 @@
 package user
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/samber/oops"
 )
 
 type AccountStatus string
@@ -16,15 +15,6 @@ const (
 	StatusActive      AccountStatus = "active"
 	StatusRestricted  AccountStatus = "restricted"
 	StatusDeactivated AccountStatus = "deactivated"
-)
-
-var (
-	ErrNotFound             = errors.New("user not found")
-	ErrAccountNotActive     = errors.New("user account is not active")
-	ErrVersionConflict      = errors.New("user version conflict")
-	ErrIdempotencyConflict  = errors.New("user idempotency conflict")
-	ErrRegistrationConflict = errors.New("user registration conflict")
-	ErrTransitionInvalid    = errors.New("user status transition invalid")
 )
 
 type User struct {
@@ -66,11 +56,11 @@ func (p ProfilePatch) ChangedFields() []string {
 func NormalizeRegistrationID(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if len(value) < 1 || len(value) > 128 {
-		return "", fmt.Errorf("registrationId must contain 1 to 128 bytes")
+		return "", oops.New("registrationId must contain 1 to 128 bytes")
 	}
 	for _, r := range value {
 		if r <= 0x20 || r == 0x7f {
-			return "", fmt.Errorf("registrationId contains control or whitespace characters")
+			return "", oops.New("registrationId contains control or whitespace characters")
 		}
 	}
 	return value, nil
@@ -79,7 +69,7 @@ func NormalizeRegistrationID(value string) (string, error) {
 func NormalizePrivateName(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if count := utf8.RuneCountInString(value); count < 1 || count > 100 {
-		return "", fmt.Errorf("privateName must contain 1 to 100 characters")
+		return "", oops.New("privateName must contain 1 to 100 characters")
 	}
 	return value, nil
 }
@@ -87,7 +77,7 @@ func NormalizePrivateName(value string) (string, error) {
 func NormalizeNickname(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if count := utf8.RuneCountInString(value); count < 1 || count > 50 {
-		return "", fmt.Errorf("nickname must contain 1 to 50 characters")
+		return "", oops.New("nickname must contain 1 to 50 characters")
 	}
 	return value, nil
 }
@@ -98,7 +88,7 @@ func NormalizeIntroduction(value *string) (*string, error) {
 	}
 	normalized := strings.TrimSpace(*value)
 	if utf8.RuneCountInString(normalized) > 500 {
-		return nil, fmt.Errorf("introduction must contain at most 500 characters")
+		return nil, oops.New("introduction must contain at most 500 characters")
 	}
 	if normalized == "" {
 		return nil, nil
@@ -109,11 +99,11 @@ func NormalizeIntroduction(value *string) (*string, error) {
 func NormalizeMediaAssetID(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if len(value) < 1 || len(value) > 128 {
-		return "", fmt.Errorf("mediaAssetId must contain 1 to 128 bytes")
+		return "", oops.New("mediaAssetId must contain 1 to 128 bytes")
 	}
 	for _, r := range value {
 		if r <= 0x20 || r == 0x7f {
-			return "", fmt.Errorf("mediaAssetId contains control or whitespace characters")
+			return "", oops.New("mediaAssetId contains control or whitespace characters")
 		}
 	}
 	return value, nil
@@ -125,7 +115,7 @@ func ParseStatus(value string) (AccountStatus, error) {
 	case StatusActive, StatusRestricted, StatusDeactivated:
 		return status, nil
 	default:
-		return "", fmt.Errorf("unsupported account status %q", value)
+		return "", oops.Errorf("unsupported account status %q", value)
 	}
 }
 

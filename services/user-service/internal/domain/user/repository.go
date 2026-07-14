@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,7 +12,7 @@ import (
 	"github.com/samber/oops"
 )
 
-type Store struct {
+type UserRepository struct {
 	db *pgxpool.Pool
 }
 
@@ -63,26 +62,26 @@ type StatusHistory struct {
 	ChangedAt      time.Time
 }
 
-func NewStore(db *pgxpool.Pool) (*Store, error) {
+func NewUserRepository(db *pgxpool.Pool) (*UserRepository, error) {
 	if db == nil {
-		return nil, errors.New("postgres pool is required")
+		return nil, oops.In("user_repository").Code("user.database_required").New("postgres pool is required")
 	}
-	return &Store{db: db}, nil
+	return &UserRepository{db: db}, nil
 }
 
-func (s *Store) Begin(ctx context.Context) (pgx.Tx, error) {
-	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+func (r *UserRepository) Begin(ctx context.Context) (pgx.Tx, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
-		return nil, oops.In("user_store").Code("user.transaction_begin_failed").Wrap(err)
+		return nil, oops.In("user_repository").Code("user.transaction_begin_failed").Wrap(err)
 	}
 	return tx, nil
 }
 
-func (s *Store) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
-	return scanUser(s.db.QueryRow(ctx, userByIDQuery, id))
+func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
+	return scanUser(r.db.QueryRow(ctx, userByIDQuery, id))
 }
 
-func (s *Store) GetByIDTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) (User, error) {
+func (r *UserRepository) GetByIDTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) (User, error) {
 	return scanUser(tx.QueryRow(ctx, userByIDQuery, id))
 }
 
@@ -110,12 +109,12 @@ func scanUser(row pgx.Row) (User, error) {
 		return User{}, ErrNotFound
 	}
 	if err != nil {
-		return User{}, oops.In("user_store").Code("user.query_failed").Wrap(err)
+		return User{}, oops.In("user_repository").Code("user.query_failed").Wrap(err)
 	}
 	return current, nil
 }
 
-func (s *Store) ClaimIdempotency(ctx context.Context, tx pgx.Tx, record IdempotencyRecord) (IdempotencyRecord, bool, error) {
+func (r *UserRepository) ClaimIdempotency(ctx context.Context, tx pgx.Tx, record IdempotencyRecord) (IdempotencyRecord, bool, error) {
 	tag, err := tx.Exec(ctx, `
 		INSERT INTO user_idempotency_records (
 			operation, scope_id, idempotency_key, request_hash, created_at, expires_at
@@ -123,7 +122,7 @@ func (s *Store) ClaimIdempotency(ctx context.Context, tx pgx.Tx, record Idempote
 		ON CONFLICT (operation, scope_id, idempotency_key) DO NOTHING
 	`, record.Operation, record.ScopeID, record.Key, record.RequestHash, record.CreatedAt, record.ExpiresAt)
 	if err != nil {
-		return IdempotencyRecord{}, false, oops.In("user_store").Code("user.idempotency_claim_failed").Wrap(err)
+		return IdempotencyRecord{}, false, oops.In("user_repository").Code("user.idempotency_claim_failed").Wrap(err)
 	}
 	if tag.RowsAffected() == 1 {
 		return record, false, nil
@@ -147,7 +146,7 @@ func (s *Store) ClaimIdempotency(ctx context.Context, tx pgx.Tx, record Idempote
 		&current.ExpiresAt,
 	)
 	if err != nil {
-		return IdempotencyRecord{}, false, oops.In("user_store").Code("user.idempotency_query_failed").Wrap(err)
+		return IdempotencyRecord{}, false, oops.In("user_repository").Code("user.idempotency_query_failed").Wrap(err)
 	}
 	if !bytes.Equal(current.RequestHash, record.RequestHash) || current.ResultType == nil || current.ResultID == nil || current.ResultVersion == nil {
 		return IdempotencyRecord{}, false, ErrIdempotencyConflict
@@ -155,7 +154,7 @@ func (s *Store) ClaimIdempotency(ctx context.Context, tx pgx.Tx, record Idempote
 	return current, true, nil
 }
 
-func (s *Store) CompleteIdempotency(ctx context.Context, tx pgx.Tx, record IdempotencyRecord, resultType, resultID string, resultVersion int64) error {
+func (r *UserRepository) CompleteIdempotency(ctx context.Context, tx pgx.Tx, record IdempotencyRecord, resultType, resultID string, resultVersion int64) error {
 	tag, err := tx.Exec(ctx, `
 		UPDATE user_idempotency_records
 		SET result_type = $4, result_id = $5, result_version = $6
@@ -163,15 +162,15 @@ func (s *Store) CompleteIdempotency(ctx context.Context, tx pgx.Tx, record Idemp
 		  AND result_type IS NULL
 	`, record.Operation, record.ScopeID, record.Key, resultType, resultID, resultVersion)
 	if err != nil {
-		return oops.In("user_store").Code("user.idempotency_complete_failed").Wrap(err)
+		return oops.In("user_repository").Code("user.idempotency_complete_failed").Wrap(err)
 	}
 	if tag.RowsAffected() != 1 {
-		return oops.In("user_store").Code("user.idempotency_record_invalid").New("idempotency record was not exclusively completed")
+		return oops.In("user_repository").Code("user.idempotency_record_invalid").New("idempotency record was not exclusively completed")
 	}
 	return nil
 }
 
-func (s *Store) Create(ctx context.Context, tx pgx.Tx, input CreateInput) (User, error) {
+func (r *UserRepository) Create(ctx context.Context, tx pgx.Tx, input CreateInput) (User, error) {
 	current := User{
 		ID:             input.UserID,
 		RegistrationID: input.RegistrationID,
@@ -189,7 +188,7 @@ func (s *Store) Create(ctx context.Context, tx pgx.Tx, input CreateInput) (User,
 		) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7)
 	`, current.ID, current.RegistrationID, current.AccountStatus, input.PrivateNameCiphertext, current.Nickname, current.Introduction, input.Now)
 	if err != nil {
-		return User{}, oops.In("user_store").Code("user.create_failed").Wrap(err)
+		return User{}, oops.In("user_repository").Code("user.create_failed").Wrap(err)
 	}
 	for _, agreement := range input.Agreements {
 		if _, err := tx.Exec(ctx, `
@@ -197,13 +196,13 @@ func (s *Store) Create(ctx context.Context, tx pgx.Tx, input CreateInput) (User,
 				user_id, agreement_code, agreement_version, accepted_at
 			) VALUES ($1, $2, $3, $4)
 		`, current.ID, agreement.Code, agreement.Version, agreement.AcceptedAt); err != nil {
-			return User{}, oops.In("user_store").Code("user.agreement_create_failed").Wrap(err)
+			return User{}, oops.In("user_repository").Code("user.agreement_create_failed").Wrap(err)
 		}
 	}
 	return current, nil
 }
 
-func (s *Store) UpdateProfile(ctx context.Context, tx pgx.Tx, id uuid.UUID, expectedVersion int64, patch ProfilePatch, now time.Time) (MutationResult, error) {
+func (r *UserRepository) UpdateProfile(ctx context.Context, tx pgx.Tx, id uuid.UUID, expectedVersion int64, patch ProfilePatch, now time.Time) (MutationResult, error) {
 	nickname := patch.Nickname
 	var result MutationResult
 	err := tx.QueryRow(ctx, `
@@ -222,15 +221,15 @@ func (s *Store) UpdateProfile(ctx context.Context, tx pgx.Tx, id uuid.UUID, expe
 		&result.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return MutationResult{}, s.classifyActiveMutation(ctx, tx, id, expectedVersion)
+		return MutationResult{}, r.classifyActiveMutation(ctx, tx, id, expectedVersion)
 	}
 	if err != nil {
-		return MutationResult{}, oops.In("user_store").Code("user.profile_update_failed").Wrap(err)
+		return MutationResult{}, oops.In("user_repository").Code("user.profile_update_failed").Wrap(err)
 	}
 	return result, nil
 }
 
-func (s *Store) UpdateProfileImage(ctx context.Context, tx pgx.Tx, id uuid.UUID, mediaAssetID string, expectedVersion int64, now time.Time) (MutationResult, error) {
+func (r *UserRepository) UpdateProfileImage(ctx context.Context, tx pgx.Tx, id uuid.UUID, mediaAssetID string, expectedVersion int64, now time.Time) (MutationResult, error) {
 	var result MutationResult
 	err := tx.QueryRow(ctx, `
 		UPDATE users
@@ -243,15 +242,15 @@ func (s *Store) UpdateProfileImage(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 		RETURNING user_id, user_version, updated_at
 	`, id, mediaAssetID, now, expectedVersion).Scan(&result.UserID, &result.Version, &result.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return MutationResult{}, s.classifyActiveMutation(ctx, tx, id, expectedVersion)
+		return MutationResult{}, r.classifyActiveMutation(ctx, tx, id, expectedVersion)
 	}
 	if err != nil {
-		return MutationResult{}, oops.In("user_store").Code("user.profile_image_update_failed").Wrap(err)
+		return MutationResult{}, oops.In("user_repository").Code("user.profile_image_update_failed").Wrap(err)
 	}
 	return result, nil
 }
 
-func (s *Store) ChangeStatus(
+func (r *UserRepository) ChangeStatus(
 	ctx context.Context,
 	tx pgx.Tx,
 	id uuid.UUID,
@@ -291,7 +290,7 @@ func (s *Store) ChangeStatus(
 		&result.PreviousStatus,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		current, queryErr := s.GetByIDTx(ctx, tx, id)
+		current, queryErr := r.GetByIDTx(ctx, tx, id)
 		if queryErr != nil {
 			return StatusMutationResult{}, queryErr
 		}
@@ -301,7 +300,7 @@ func (s *Store) ChangeStatus(
 		return StatusMutationResult{}, ErrTransitionInvalid
 	}
 	if err != nil {
-		return StatusMutationResult{}, oops.In("user_store").Code("user.status_update_failed").Wrap(err)
+		return StatusMutationResult{}, oops.In("user_repository").Code("user.status_update_failed").Wrap(err)
 	}
 	result.ChangedStatus = target
 	result.StatusChangeID = statusChangeID
@@ -313,12 +312,12 @@ func (s *Store) ChangeStatus(
 		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`, statusChangeID, id, result.PreviousStatus, target, reasonCode, changedBy, now)
 	if err != nil {
-		return StatusMutationResult{}, oops.In("user_store").Code("user.status_history_create_failed").Wrap(err)
+		return StatusMutationResult{}, oops.In("user_repository").Code("user.status_history_create_failed").Wrap(err)
 	}
 	return result, nil
 }
 
-func (s *Store) GetStatusHistory(ctx context.Context, tx pgx.Tx, id uuid.UUID) (StatusHistory, error) {
+func (r *UserRepository) GetStatusHistory(ctx context.Context, tx pgx.Tx, id uuid.UUID) (StatusHistory, error) {
 	var history StatusHistory
 	err := tx.QueryRow(ctx, `
 		SELECT status_change_id, user_id, previous_status, changed_status,
@@ -338,13 +337,13 @@ func (s *Store) GetStatusHistory(ctx context.Context, tx pgx.Tx, id uuid.UUID) (
 		return StatusHistory{}, ErrNotFound
 	}
 	if err != nil {
-		return StatusHistory{}, oops.In("user_store").Code("user.status_history_query_failed").Wrap(err)
+		return StatusHistory{}, oops.In("user_repository").Code("user.status_history_query_failed").Wrap(err)
 	}
 	return history, nil
 }
 
-func (s *Store) classifyActiveMutation(ctx context.Context, tx pgx.Tx, id uuid.UUID, expectedVersion int64) error {
-	current, err := s.GetByIDTx(ctx, tx, id)
+func (r *UserRepository) classifyActiveMutation(ctx context.Context, tx pgx.Tx, id uuid.UUID, expectedVersion int64) error {
+	current, err := r.GetByIDTx(ctx, tx, id)
 	if err != nil {
 		return err
 	}
@@ -354,6 +353,6 @@ func (s *Store) classifyActiveMutation(ctx context.Context, tx pgx.Tx, id uuid.U
 	if current.AccountStatus != StatusActive {
 		return ErrAccountNotActive
 	}
-	return oops.In("user_store").Code("user.conditional_update_failed").
-		New(fmt.Sprintf("user %s matched no conditional update classification", id))
+	return oops.In("user_repository").Code("user.conditional_update_failed").
+		Errorf("user %s matched no conditional update classification", id)
 }
