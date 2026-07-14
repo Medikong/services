@@ -4,9 +4,13 @@ version = "0.1.0"
 description = "DropMong catalog API service"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic==1.18.5",
+    "asyncpg>=0.30.0,<1.0.0",
     "fastapi==0.124.0",
+    "middleware",
     "observability",
     "orjson>=3.11.0,<4.0.0",
+    "sqlalchemy[asyncio]>=2.0.45,<3.0.0",
     "uvicorn[standard]>=0.49.0,<1.0.0",
 ]
 
@@ -14,13 +18,59 @@ dependencies = [
 test = [
     "httpx>=0.28.0,<1.0.0",
     "pytest>=9.0.0,<10.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../../packages/errors/src", "../../packages/middleware/src", "../../packages/observability/src"]
+testpaths = ["tests"]
+markers = ["postgres: requires TEST_DATABASE_URL and a disposable PostgreSQL database"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",
+    "CPY001",
+    "D203",
+    "D213",
+    "EXE002",
+    "FBT001",
+    "FBT002",
+    "FIX002",
+    "ISC001",
+    "TD002",
+    "TD003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "D", "INP001", "PLR2004", "S101", "SLF001"]
+"migrations/**/*.py" = ["INP001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+pythonPlatform = "All"
+include = ["app"]
+exclude = ["**/__pycache__", "**/.venv"]
+extraPaths = ["../../packages/observability/src", "../../packages/middleware/src"]
+venvPath = "."
+venv = ".venv"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedVariable = "error"
+reportMissingParameterType = "error"
+reportMissingTypeStubs = "none"
+reportUnusedFunction = "none"
 
 [tool.uv.sources]
 errors = { path = "../../packages/errors", editable = true }
 middleware = { path = "../../packages/middleware", editable = true }
 observability = { path = "../../packages/observability", editable = true }
-
-[tool.pytest.ini_options]
-pythonpath = [".", "../../packages/errors/src", "../../packages/middleware/src", "../../packages/observability/src"]
-testpaths = ["tests"]

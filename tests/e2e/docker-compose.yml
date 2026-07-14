@@ -148,16 +148,28 @@ services:
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
 
+  catalog-migrate:
+    build:
+      context: ../..
+      dockerfile: services/catalog-service/Dockerfile
+    environment:
+      <<: *service-e2e-env
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/catalog_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "app.migrations", "upgrade"]
+
   catalog-service:
     build:
       context: ../..
       dockerfile: services/catalog-service/Dockerfile
     environment:
       <<: *service-e2e-env
-      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/catalog_service
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/catalog_service
     depends_on:
-      postgres:
-        condition: service_healthy
+      catalog-migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${CATALOG_SERVICE_PORT:-18084}:8081"
     healthcheck:

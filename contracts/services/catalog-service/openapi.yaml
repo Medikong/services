@@ -60,6 +60,7 @@ components:
         - name
         - price
         - remainingQuantity
+        - inventoryVersion
       properties:
         id:
           type: string
@@ -79,6 +80,11 @@ components:
           minimum: 0
           examples:
             - 42
+        inventoryVersion:
+          type: integer
+          minimum: 0
+          examples:
+            - 0
     DropSummary:
       type: object
       required:

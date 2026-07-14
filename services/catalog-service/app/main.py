@@ -1,179 +1,107 @@
-import os
-from datetime import UTC, datetime
-from enum import StrEnum
-from typing import Final
+"""Catalog FastAPI composition root."""
 
-from fastapi import FastAPI, HTTPException, Query, status
+import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Annotated, Final
+
+from fastapi import FastAPI, HTTPException, Query, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from middleware import is_safe_request_id
 from observability import (
+    REQUEST_ID_HEADER,
     RequestIdMiddleware,
     configure_process_observability,
     create_request_log_middleware,
     instrument_fastapi_app,
     observability_config_from_env,
-    request_id_middleware_options,
 )
-from pydantic import BaseModel, ConfigDict, Field
 
+from app.catalog import CatalogReadiness, DropDetail
+from app.db import Database, create_database
+from app.postgres import PostgresCatalogRepository
+from app.repository import CatalogRepository
+from app.schemas import (
+    DropDetailResponse,
+    DropListResponse,
+    HealthResponse,
+    PageInfo,
+    ReadinessResponse,
+    drop_response,
+    drop_summary,
+)
+from app.store import CatalogStore
 
 SERVICE_NAME: Final = "catalog-service"
 SERVICE_VERSION: Final = "0.1.0"
 SERVICE_ENVIRONMENT: Final = "local"
 
 
-class DropStatus(StrEnum):
-    UPCOMING = "UPCOMING"
-    OPEN = "OPEN"
-    SOLD_OUT = "SOLD_OUT"
-    CLOSED = "CLOSED"
+def create_app(repository: CatalogRepository | None = None) -> FastAPI:
+    """Create the Catalog API with an injected or PostgreSQL repository."""
+    database: Database | None = None
+    if repository is None:
+        database = create_database()
+        repository = PostgresCatalogRepository(database.sessions)
+    store = CatalogStore(repository)
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
+        yield
+        if database is not None:
+            await database.engine.dispose()
 
-class ProductSummary(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: str
-    name: str
-    price: int = Field(ge=0)
-    remainingQuantity: int = Field(ge=0)
-
-
-class DropSummary(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: str
-    title: str
-    status: DropStatus
-    opensAt: datetime
-    closesAt: datetime | None = None
-    products: tuple[ProductSummary, ...]
-
-
-class DropDetail(DropSummary):
-    description: str
-
-
-class PageInfo(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    nextCursor: str | None = None
-    hasNext: bool
-
-
-class DropListResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    data: tuple[DropSummary, ...]
-    pageInfo: PageInfo
-
-
-class DropDetailResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    data: DropDetail
-
-
-class HealthResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    status: str
-    service: str
-    timestamp: datetime
-
-
-class ReadinessResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    status: str
-    service: str
-    checks: dict[str, str]
-    timestamp: datetime
-
-
-DROP_CATALOG: Final = (
-    DropDetail(
-        id="drop-001",
-        title="DropMong July Limited Drop",
-        status=DropStatus.OPEN,
-        opensAt=datetime(2026, 7, 3, 10, 0, tzinfo=UTC),
-        closesAt=datetime(2026, 7, 10, 10, 0, tzinfo=UTC),
-        description="한정 수량으로 판매되는 DropMong 첫 번째 공개 드롭입니다.",
-        products=(
-            ProductSummary(
-                id="product-001",
-                name="DropMong Starter Kit",
-                price=50000,
-                remainingQuantity=42,
-            ),
-        ),
-    ),
-    DropDetail(
-        id="drop-sold-out-001",
-        title="DropMong Sold Out Scenario Drop",
-        status=DropStatus.OPEN,
-        opensAt=datetime(2026, 7, 3, 10, 0, tzinfo=UTC),
-        closesAt=datetime(2026, 7, 10, 10, 0, tzinfo=UTC),
-        description="품절과 동시성 시나리오 검증을 위한 독립 드롭입니다.",
-        products=(
-            ProductSummary(
-                id="product-sold-out-001",
-                name="DropMong Concurrency Kit",
-                price=50000,
-                remainingQuantity=42,
-            ),
-        ),
-    ),
-)
-
-
-def create_app() -> FastAPI:
     app = FastAPI(
         title="DropMong Catalog Service API",
         version=SERVICE_VERSION,
         default_response_class=ORJSONResponse,
+        lifespan=lifespan,
     )
     _configure_observability(app)
 
-    @app.get("/healthz", response_model=HealthResponse)
-    def healthz() -> HealthResponse:
+    @app.get("/healthz")
+    async def healthz() -> HealthResponse:
         return HealthResponse(status="ok", service=SERVICE_NAME, timestamp=_utc_now())
 
-    @app.get("/readyz", response_model=ReadinessResponse)
-    def readyz() -> ReadinessResponse:
-        return ReadinessResponse(
-            status="ready",
-            service=SERVICE_NAME,
-            checks={"catalog": "ok"},
-            timestamp=_utc_now(),
-        )
+    @app.get("/readyz")
+    async def readyz(response: Response) -> ReadinessResponse:
+        return _readiness_response(await store.readiness(), response)
 
     @app.get("/metrics", response_class=PlainTextResponse)
-    def metrics() -> str:
+    async def metrics() -> str:
         return (
-            "# HELP service_ready Service readiness state. Ready is 1, not ready is 0.\n"
+            "# HELP service_ready Service readiness state. "
+            "Ready is 1, not ready is 0.\n"
             "# TYPE service_ready gauge\n"
-            'service_ready{service_name="catalog-service",service_version="0.1.0",service_environment="local"} 1\n'
+            'service_ready{service_name="catalog-service",'
+            'service_version="0.1.0",service_environment="local"} 1\n'
         )
 
-    @app.get("/drops", response_model=DropListResponse)
-    def list_drops(
-        limit: int = Query(default=20, ge=1, le=100),
-        cursor: str | None = Query(default=None),
+    @app.get("/drops")
+    async def list_drops(
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        cursor: Annotated[str | None, Query()] = None,
     ) -> DropListResponse:
-        start = _start_index_after(cursor)
-        selected = DROP_CATALOG[start : start + limit]
-        has_next = start + limit < len(DROP_CATALOG)
+        drops = await store.list_drops()
+        start = _start_index_after(drops, cursor)
+        selected = drops[start : start + limit]
+        has_next = start + limit < len(drops)
         next_cursor = selected[-1].id if has_next and selected else None
         return DropListResponse(
-            data=tuple(_drop_summary(drop) for drop in selected),
-            pageInfo=PageInfo(nextCursor=next_cursor, hasNext=has_next),
+            data=tuple(drop_summary(drop) for drop in selected),
+            page_info=PageInfo(next_cursor=next_cursor, has_next=has_next),
         )
 
-    @app.get("/drops/{drop_id}", response_model=DropDetailResponse)
-    def get_drop(drop_id: str) -> DropDetailResponse:
-        for drop in DROP_CATALOG:
-            if drop.id == drop_id:
-                return DropDetailResponse(data=drop)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="drop not found")
+    @app.get("/drops/{drop_id}")
+    async def get_drop(drop_id: str) -> DropDetailResponse:
+        drop = await store.get_drop(drop_id)
+        if drop is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="drop not found",
+            )
+        return DropDetailResponse(data=drop_response(drop))
 
     return app
 
@@ -181,29 +109,51 @@ def create_app() -> FastAPI:
 def _configure_observability(app: FastAPI) -> None:
     config = observability_config_from_env(SERVICE_NAME, env=os.environ)
     configure_process_observability(config)
-    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
-    app.middleware("http")(create_request_log_middleware(config))
+    app.add_middleware(
+        RequestIdMiddleware,
+        header_name=REQUEST_ID_HEADER,
+        update_request_header=True,
+        validator=is_safe_request_id,
+    )
+    _ = app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
 
 
-def _drop_summary(drop: DropDetail) -> DropSummary:
-    return DropSummary(
-        id=drop.id,
-        title=drop.title,
-        status=drop.status,
-        opensAt=drop.opensAt,
-        closesAt=drop.closesAt,
-        products=drop.products,
+def _readiness_response(
+    readiness: CatalogReadiness,
+    response: Response,
+) -> ReadinessResponse:
+    match readiness:
+        case CatalogReadiness.READY:
+            response.status_code = status.HTTP_200_OK
+            readiness_status = "ready"
+            checks = {"catalog": "ok"}
+        case CatalogReadiness.MIGRATION_REQUIRED:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            readiness_status = "not_ready"
+            checks = {"catalog": "migration_required"}
+        case CatalogReadiness.DATABASE_UNAVAILABLE:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            readiness_status = "not_ready"
+            checks = {
+                "catalog": "migration_required",
+                "database": "unavailable",
+            }
+    return ReadinessResponse(
+        status=readiness_status,
+        service=SERVICE_NAME,
+        checks=checks,
+        timestamp=_utc_now(),
     )
 
 
-def _start_index_after(cursor: str | None) -> int:
+def _start_index_after(drops: tuple[DropDetail, ...], cursor: str | None) -> int:
     if cursor is None:
         return 0
-    for index, drop in enumerate(DROP_CATALOG):
-        if drop.id == cursor:
-            return index + 1
-    return len(DROP_CATALOG)
+    return next(
+        (index + 1 for index, drop in enumerate(drops) if drop.id == cursor),
+        len(drops),
+    )
 
 
 def _utc_now() -> datetime:
