@@ -5,7 +5,12 @@ from typing import Final, Protocol
 
 import anyio
 from aiokafka.errors import KafkaError
-from contracts import PaymentApprovedEvent, PaymentFailedEvent
+from contracts import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    RefundCompletedEvent,
+    RefundFailedEvent,
+)
 from observability import capture_current_trace_context
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,6 +33,12 @@ class OutboxMessage:
     message_key: str
     payload: RelayPayload
     trace_context: TraceContextPayload | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxAggregate:
+    aggregate_type: str
+    aggregate_id: str
 
 
 class OutboxPublisher(Protocol):
@@ -97,13 +108,41 @@ def add_payment_outbox_event(
     event: PaymentApprovedEvent | PaymentFailedEvent,
 ) -> None:
     """Stage a terminal payment event in the caller's transaction."""
+    _add_outbox_event(
+        session,
+        event,
+        OutboxAggregate(aggregate_type="payment", aggregate_id=event.paymentId),
+    )
+
+
+def add_refund_outbox_event(
+    session: AsyncSession,
+    event: RefundCompletedEvent | RefundFailedEvent,
+) -> None:
+    _add_outbox_event(
+        session,
+        event,
+        OutboxAggregate(aggregate_type="refund", aggregate_id=event.refundId),
+    )
+
+
+def _add_outbox_event(
+    session: AsyncSession,
+    event: (
+        PaymentApprovedEvent
+        | PaymentFailedEvent
+        | RefundCompletedEvent
+        | RefundFailedEvent
+    ),
+    aggregate: OutboxAggregate,
+) -> None:
     trace_context = capture_current_trace_context()
     session.add(
         OutboxEventRecord(
             event_id=event.eventId,
             event_type=event.eventType,
-            aggregate_type="payment",
-            aggregate_id=event.paymentId,
+            aggregate_type=aggregate.aggregate_type,
+            aggregate_id=aggregate.aggregate_id,
             topic=event.eventType,
             message_key=event.orderId,
             payload=event.model_dump(mode="json"),

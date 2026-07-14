@@ -13,10 +13,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.messaging import KafkaRuntimeConfig, kafka_runtime_from_config
-from app.kafka_workers import run_order_created_consumer_worker, run_outbox_worker
+from app.kafka_workers import (
+    run_order_created_consumer_worker,
+    run_outbox_worker,
+    run_refund_worker,
+    run_refund_requested_consumer_worker,
+)
 from app.metrics import PaymentMetrics
+from app.messaging import KafkaRuntimeConfig, kafka_runtime_from_config
 from app.postgres import PostgresPaymentRepository
+from app.refund_messaging import refund_requested_consumer_factory
+from app.refund_postgres import PostgresRefundRepository
+from app.refund_worker import RefundWorker
+from app.refunds import MockRefundProvider, RefundRequestRepository
 from app.repository import PaymentRepository
 from app.store import PaymentStore
 
@@ -32,6 +41,12 @@ class AppResources:
     session_factory: async_sessionmaker[AsyncSession] | None = None
     kafka_bootstrap_servers: str = ""
     metrics: PaymentMetrics | None = None
+    refund_repository: RefundRequestRepository | None = None
+    refund_worker: RefundWorker | None = None
+
+
+class RefundConfigurationError(RuntimeError):
+    pass
 
 
 def resources_from_env(metrics: PaymentMetrics | None = None) -> AppResources:
@@ -54,12 +69,18 @@ def resources_from_env(metrics: PaymentMetrics | None = None) -> AppResources:
         connect_args={"timeout": 3.0},
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    refund_repository = PostgresRefundRepository(
+        session_factory,
+        max_attempts=_refund_max_attempts(),
+    )
     return AppResources(
         repository=PostgresPaymentRepository(session_factory),
         engine=engine,
         session_factory=session_factory,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
         metrics=metrics,
+        refund_repository=refund_repository,
+        refund_worker=RefundWorker(refund_repository, MockRefundProvider()),
     )
 
 
@@ -75,6 +96,10 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
                 or PaymentMetrics("payment-service", "unknown", "unknown"),
             ),
         )
+        refund_consumer_factory = refund_requested_consumer_factory(
+            resources.kafka_bootstrap_servers,
+            resources.refund_repository,
+        )
         try:
             async with anyio.create_task_group() as task_group:
                 if runtime.order_created_consumer_factory is not None:
@@ -87,6 +112,13 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
                         run_outbox_worker,
                         runtime.outbox_worker_factory,
                     )
+                if refund_consumer_factory is not None:
+                    task_group.start_soon(
+                        run_refund_requested_consumer_worker,
+                        refund_consumer_factory,
+                    )
+                if resources.refund_worker is not None:
+                    task_group.start_soon(run_refund_worker, resources.refund_worker)
                 yield
                 task_group.cancel_scope.cancel()
         finally:
@@ -113,3 +145,18 @@ def _async_database_url(database_url: str) -> str:
     if database_url.startswith("postgresql+psycopg://"):
         return database_url.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
     return database_url
+
+
+def _refund_max_attempts() -> int:
+    raw_value = os.getenv("REFUND_MAX_ATTEMPTS", "3")
+    try:
+        max_attempts = int(raw_value)
+    except ValueError as error:
+        raise RefundConfigurationError(
+            f"REFUND_MAX_ATTEMPTS must be an integer, got {raw_value!r}",
+        ) from error
+    if max_attempts < 1:
+        raise RefundConfigurationError(
+            f"REFUND_MAX_ATTEMPTS must be positive, got {max_attempts}",
+        )
+    return max_attempts
