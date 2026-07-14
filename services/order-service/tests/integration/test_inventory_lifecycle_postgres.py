@@ -1,8 +1,10 @@
 from datetime import timedelta
 
 import pytest
+
+from app.cancellations import CancellationRequested, RequestCancellationCommand
 from app.expiry import OrderExpiryWorker
-from app.models import OrderId
+from app.models import IdempotencyKey, OrderId
 from app.order_config import OrderPaymentPolicy
 from app.postgres import PostgresOrderRepository
 from app.store import OrderCreated
@@ -15,7 +17,6 @@ from tests.integration.inventory_lifecycle_support import (
     inventory_outbox,
     inventory_repository,
     inventory_state,
-    mark_cancel_pending,
     order_status,
     outbox_types,
     product,
@@ -157,14 +158,30 @@ async def test_refund_completion_releases_sold_inventory_once() -> None:
         await repository.apply_payment_approved(
             approved(created.order.id, created.order.userId, created.order.amount)
         )
-        await mark_cancel_pending(session_factory, created.order.id)
-        completed_refund = refund(created.order.id, "001", "evt-refund-completed-001")
+        cancellation = await repository.request_cancellation(
+            RequestCancellationCommand(
+                order_id=created.order.id,
+                user_id=created.order.userId,
+                idempotency_key=IdempotencyKey("cancel-inventory-refund"),
+                reason="customer request",
+            )
+        )
+        assert isinstance(cancellation, CancellationRequested)
+        completed_refund = refund(
+            created.order,
+            cancellation.cancellation.id,
+            "evt-refund-completed-001",
+        )
 
         # When
         first_result = await repository.apply_refund_completed(completed_refund)
         duplicate_result = await repository.apply_refund_completed(completed_refund)
         second_delivery = await repository.apply_refund_completed(
-            refund(created.order.id, "001", "evt-refund-completed-002")
+            refund(
+                created.order,
+                cancellation.cancellation.id,
+                "evt-refund-completed-002",
+            )
         )
 
         # Then

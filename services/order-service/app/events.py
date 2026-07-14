@@ -11,7 +11,7 @@ from contracts import (
     RefundRequestedEvent,
 )
 
-from app.models import IdempotencyKey, Order
+from app.models import Cancellation, IdempotencyKey, Order
 from app.records import InventoryItemRecord
 
 PRODUCER_NAME = "order-service"
@@ -67,6 +67,64 @@ def order_expired_notification_event(
         notificationType=NotificationType.ORDER_EXPIRED,
         title="주문 결제 시간이 만료되었습니다",
         message="결제 시간이 지나 예약된 재고가 해제되었습니다.",
+        correlationId=order.id,
+    )
+
+
+def order_canceled_notification_event(
+    order: Order,
+    occurred_at: datetime,
+) -> NotificationRequestedEvent:
+    return NotificationRequestedEvent(
+        eventId=f"evt-notification-order_canceled-{order.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        notificationId=f"notification-order_canceled-{order.id}",
+        orderId=order.id,
+        notificationType=NotificationType.ORDER_CANCELED,
+        title="주문이 취소되었습니다",
+        message="전액 환불과 재고 복구가 완료되었습니다.",
+        correlationId=order.id,
+    )
+
+
+def refund_failed_notification_event(
+    order: Order,
+    occurred_at: datetime,
+) -> NotificationRequestedEvent:
+    return NotificationRequestedEvent(
+        eventId=f"evt-notification-refund_failed-{order.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        notificationId=f"notification-refund_failed-{order.id}",
+        orderId=order.id,
+        notificationType=NotificationType.REFUND_FAILED,
+        title="환불 처리에 실패했습니다",
+        message="환불 처리에 실패했습니다. 고객센터에 문의해 주세요.",
+        correlationId=order.id,
+    )
+
+
+def refund_requested_event(
+    cancellation: Cancellation,
+    order: Order,
+    payment_id: str,
+) -> RefundRequestedEvent:
+    return RefundRequestedEvent(
+        eventId=f"evt-refund-requested-{cancellation.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=cancellation.createdAt,
+        producer=PRODUCER_NAME,
+        refundId=cancellation.id,
+        orderId=order.id,
+        paymentId=payment_id,
+        amount=order.amount,
+        reason=cancellation.reason,
         correlationId=order.id,
     )
 

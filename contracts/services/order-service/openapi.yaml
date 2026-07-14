@@ -71,6 +71,44 @@ paths:
         "500":
           $ref: "../../common/components.yaml#/components/responses/InternalServerError"
   /orders/{order_id}/cancellations:
+    get:
+      operationId: getOrderCancellation
+      summary: 주문 취소 및 환불 상태 조회
+      parameters:
+        - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
+        - $ref: "../../common/components.yaml#/components/parameters/traceparent"
+        - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - CUSTOMER
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+      responses:
+        "200":
+          description: 현재 취소 및 환불 처리 상태.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationResponse"
+        "401":
+          $ref: "../../common/components.yaml#/components/responses/Unauthorized"
+        "403":
+          $ref: "../../common/components.yaml#/components/responses/Forbidden"
+        "404":
+          $ref: "../../common/components.yaml#/components/responses/NotFound"
+        "422":
+          $ref: "../../common/components.yaml#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "../../common/components.yaml#/components/responses/InternalServerError"
     post:
       operationId: cancelOrder
       summary: 배송 전 주문 취소 및 전액 환불 요청

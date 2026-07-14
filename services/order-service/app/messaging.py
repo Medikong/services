@@ -7,6 +7,8 @@ from aiokafka import AIOKafkaConsumer
 from contracts import (
     PAYMENT_APPROVED_TOPIC,
     PAYMENT_FAILED_TOPIC,
+    REFUND_COMPLETED_TOPIC,
+    REFUND_FAILED_TOPIC,
     PaymentApprovedEvent,
     PaymentFailedEvent,
 )
@@ -22,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.metrics import OrderMetrics
 from app.outbox import OutboxMessage, OutboxRelay
 from app.repository import OrderRepository
+from app.refund_messaging import handle_refund_message
 from app.store import (
     PaymentAlreadyApplied,
     PaymentApplied,
@@ -169,6 +172,8 @@ async def handle_payment_message(
             await handle_payment_approved_message(message, repository)
         case topic if topic == PAYMENT_FAILED_TOPIC:
             await handle_payment_failed_message(message, repository)
+        case topic if topic in (REFUND_COMPLETED_TOPIC, REFUND_FAILED_TOPIC):
+            await handle_refund_message(message, repository)
         case _:
             return
 
@@ -240,6 +245,8 @@ def kafka_runtime_from_config(config: KafkaRuntimeConfig) -> KafkaRuntime:
         consumer = AIOKafkaConsumer(
             PAYMENT_APPROVED_TOPIC,
             PAYMENT_FAILED_TOPIC,
+            REFUND_COMPLETED_TOPIC,
+            REFUND_FAILED_TOPIC,
             bootstrap_servers=config.bootstrap_servers,
             group_id="order-service-payment-events",
             auto_offset_reset="earliest",

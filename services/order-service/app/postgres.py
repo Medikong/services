@@ -1,24 +1,31 @@
 from datetime import datetime
 from uuid import uuid4
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
+from contracts import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    RefundCompletedEvent,
+    RefundFailedEvent,
+)
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.catalog import PRODUCTS_FOR_SALE, ProductForSale, product_for
+from app.cancellations import RequestCancellationCommand, RequestCancellationResult
 from app.events import inventory_changed_event, order_created_event
 from app.metrics import OrderMetrics
-from app.models import Order, OrderId, OrderStatus
+from app.models import Cancellation, Order, OrderId, OrderStatus, UserId
 from app.outbox import add_outbox_event
 from app.order_config import OrderPaymentPolicy
 from app.postgres_mapping import order_from_record
+from app.postgres_cancellations import get_cancellation, request_cancellation
 from app.postgres_payments import apply_payment_approved, apply_payment_failed
 from app.postgres_inventory import (
-    apply_refund_completed,
     expire_due_order,
     expire_pending_order,
 )
+from app.postgres_refunds import apply_refund_completed, apply_refund_failed
 from app.records import Base as Base
 from app.records import InventoryItemRecord, OrderRecord
 from app.store import (
@@ -98,6 +105,7 @@ class PostgresOrderRepository:
                 idempotency_key=command.idempotency_key,
                 created_at=created_at,
                 expires_at=created_at + self._policy.ttl,
+                fulfillment_status="NOT_STARTED",
             )
             inventory.reserved_quantity += command.quantity
             inventory.version += 1
@@ -138,6 +146,19 @@ class PostgresOrderRepository:
                 return None
             return order_from_record(record)
 
+    async def request_cancellation(
+        self,
+        command: RequestCancellationCommand,
+    ) -> RequestCancellationResult:
+        return await request_cancellation(self._session_factory, command)
+
+    async def get_cancellation(
+        self,
+        order_id: OrderId,
+        user_id: UserId,
+    ) -> Cancellation | None:
+        return await get_cancellation(self._session_factory, order_id, user_id)
+
     async def apply_payment_approved(
         self,
         event: PaymentApprovedEvent,
@@ -162,6 +183,9 @@ class PostgresOrderRepository:
 
     async def apply_refund_completed(self, event: RefundCompletedEvent) -> bool:
         return await apply_refund_completed(self._session_factory, event)
+
+    async def apply_refund_failed(self, event: RefundFailedEvent) -> bool:
+        return await apply_refund_failed(self._session_factory, event)
 
     async def _replayed_order(
         self,

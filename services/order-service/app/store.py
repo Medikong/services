@@ -1,10 +1,25 @@
 from datetime import UTC, datetime
 from typing import assert_never
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent
+from contracts import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    RefundCompletedEvent,
+    RefundFailedEvent,
+)
 
 from app.catalog import PRODUCTS_FOR_SALE, ProductForSale, product_for
+from app.cancellations import (
+    InMemoryCancellationEntry,
+    InMemoryRefundState,
+    RequestCancellationCommand,
+    RequestCancellationResult,
+    apply_in_memory_refund_completed,
+    apply_in_memory_refund_failed,
+    request_in_memory_cancellation,
+)
 from app.models import (
+    Cancellation,
     DropId,
     IdempotencyKey,
     Order,
@@ -36,28 +51,6 @@ from app.store_contracts import (
     ProductUnavailable,
 )
 
-__all__ = (
-    "CreateOrderCommand",
-    "CreateOrderResult",
-    "InventorySeed",
-    "OrderAlreadyCreated",
-    "OrderCreated",
-    "OrderIdempotencyConflict",
-    "OrderStore",
-    "PaymentAlreadyApplied",
-    "PaymentApplied",
-    "PaymentApprovalResult",
-    "PaymentEventOrderMissing",
-    "PaymentFailureAlreadyApplied",
-    "PaymentFailureApplied",
-    "PaymentFailureResult",
-    "PaymentIgnored",
-    "ProductSoldOut",
-    "ProductUnavailable",
-    "order_matches_command",
-    "order_request_fingerprint",
-)
-
 
 class OrderStore:
     def __init__(
@@ -70,6 +63,8 @@ class OrderStore:
             (item.drop_id, item.product_id): item.total_quantity for item in inventory
         }
         self._orders: dict[OrderId, Order] = {}
+        self._cancellations: dict[OrderId, InMemoryCancellationEntry] = {}
+        self._processed_refund_event_ids: set[str] = set()
         self._idempotency_index: dict[
             tuple[UserId, IdempotencyKey], IdempotencyEntry
         ] = {}
@@ -121,6 +116,49 @@ class OrderStore:
 
     async def get_order(self, order_id: OrderId) -> Order | None:
         return self._orders.get(order_id)
+
+    async def request_cancellation(
+        self,
+        command: RequestCancellationCommand,
+    ) -> RequestCancellationResult:
+        return request_in_memory_cancellation(
+            self._orders,
+            self._cancellations,
+            command,
+        )
+
+    async def get_cancellation(
+        self,
+        order_id: OrderId,
+        user_id: UserId,
+    ) -> Cancellation | None:
+        entry = self._cancellations.get(order_id)
+        if entry is None or entry.user_id != user_id:
+            return None
+        return entry.cancellation
+
+    async def apply_refund_completed(self, event: RefundCompletedEvent) -> bool:
+        applied = apply_in_memory_refund_completed(
+            InMemoryRefundState(
+                self._orders,
+                self._cancellations,
+                self._processed_refund_event_ids,
+            ),
+            event,
+        )
+        if applied:
+            self._release_reserved_quantity(self._orders[OrderId(event.orderId)])
+        return applied
+
+    async def apply_refund_failed(self, event: RefundFailedEvent) -> bool:
+        return apply_in_memory_refund_failed(
+            InMemoryRefundState(
+                self._orders,
+                self._cancellations,
+                self._processed_refund_event_ids,
+            ),
+            event,
+        )
 
     async def apply_payment_approved(
         self,

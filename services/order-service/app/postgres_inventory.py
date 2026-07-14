@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import assert_never
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
+from contracts import PaymentApprovedEvent, PaymentFailedEvent
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,7 +13,6 @@ from app.events import (
 from app.models import OrderId, OrderStatus
 from app.metrics import OrderMetrics
 from app.outbox import add_outbox_event
-from app.postgres_inbox import record_processed_event
 from app.postgres_mapping import order_from_record
 from app.records import InventoryItemRecord, OrderRecord
 
@@ -168,50 +166,6 @@ async def _expire_locked_order(
         session,
         order_expired_notification_event(expired_order, occurred_at),
     )
-
-
-async def apply_refund_completed(
-    session_factory: async_sessionmaker[AsyncSession],
-    event: RefundCompletedEvent,
-) -> bool:
-    async with session_factory() as session:
-        order = await _locked_order(session, OrderId(event.orderId))
-        if order is None:
-            await record_processed_event(session, event)
-            await session.commit()
-            return False
-        if not await record_processed_event(session, event):
-            return False
-        match OrderStatus(order.status):
-            case OrderStatus.CANCEL_PENDING:
-                inventory = await _locked_inventory(session, order)
-                inventory.sold_quantity -= order.quantity
-                inventory.version += 1
-                order.status = OrderStatus.CANCELED.value
-                order.canceled_at = event.occurredAt
-                add_outbox_event(
-                    session,
-                    inventory_changed_event(
-                        inventory,
-                        cause_id=f"refund:{event.refundId}",
-                        occurred_at=event.occurredAt,
-                        user_id=order.user_id,
-                        order_id=order.id,
-                    ),
-                )
-                await session.commit()
-                return True
-            case (
-                OrderStatus.PENDING_PAYMENT
-                | OrderStatus.CONFIRMED
-                | OrderStatus.PAYMENT_FAILED
-                | OrderStatus.CANCELED
-                | OrderStatus.EXPIRED
-            ):
-                await session.commit()
-                return False
-            case unreachable:
-                assert_never(unreachable)
 
 
 async def _locked_order(session: AsyncSession, order_id: OrderId) -> OrderRecord | None:

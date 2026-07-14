@@ -138,9 +138,8 @@ def test_create_order_returns_409_when_idempotency_key_payload_changes() -> None
     # Then
     assert first_response.status_code == 201
     assert second_response.status_code == 409
-    assert (
-        second_response.json()["detail"]
-        == "idempotency key reused with different order request"
+    assert second_response.json()["error"]["message"] == (
+        "idempotency key reused with different order request"
     )
 
 

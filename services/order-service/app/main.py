@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
-from fastapi.responses import ORJSONResponse, PlainTextResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse, ORJSONResponse, PlainTextResponse
 from middleware import is_safe_request_id
 from observability import (
     REQUEST_ID_HEADER,
@@ -13,6 +13,9 @@ from observability import (
     create_request_log_middleware,
     instrument_fastapi_app,
     observability_config_from_env,
+    error_response,
+    record_exception,
+    register_error_handlers,
 )
 
 from app.models import (
@@ -28,6 +31,7 @@ from app.models import (
     UserRole,
 )
 from app.db import AppResources, lifespan_for, resources_from_env
+from app.cancellation_http import cancellation_router
 from app.metrics import OrderMetrics
 from app.repository import OrderRepository
 from app.schema import database_migration_is_current
@@ -72,6 +76,22 @@ def create_app(
         lifespan=lifespan_for(resources),
     )
     _configure_observability(app)
+    register_error_handlers(app, service_name=SERVICE_NAME, domain="order")
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected_error(
+        request: Request,
+        exc: Exception,
+    ) -> JSONResponse:
+        record_exception(exc, service_name=SERVICE_NAME)
+        return error_response(
+            request,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "order.internal_error",
+            "Unexpected server error.",
+        )
+
+    app.include_router(cancellation_router(resources.repository))
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:

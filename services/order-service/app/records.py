@@ -4,6 +4,7 @@ from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     String,
@@ -91,6 +92,40 @@ class InventoryItemRecord(Base):
     reserved_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     sold_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+class CancellationRequestRecord(Base):
+    __tablename__ = "cancellation_requests"
+    __table_args__ = (
+        UniqueConstraint("order_id", name="uq_cancellation_requests_order_id"),
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_cancellation_requests_user_idempotency_key",
+        ),
+        CheckConstraint(
+            "refund_status IN ('REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED')",
+            name="ck_cancellation_requests_refund_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    order_id: Mapped[str] = mapped_column(
+        ForeignKey("orders.id"),
+        nullable=False,
+    )
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    refund_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
 
 
 class ProcessedPaymentEventRecord(Base):

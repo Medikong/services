@@ -1,6 +1,11 @@
 from datetime import UTC, datetime
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
+from contracts import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    RefundCompletedEvent,
+    RefundFailedEvent,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +14,12 @@ from app.records import ProcessedEventRecord
 
 async def record_processed_event(
     session: AsyncSession,
-    event: PaymentApprovedEvent | PaymentFailedEvent | RefundCompletedEvent,
+    event: (
+        PaymentApprovedEvent
+        | PaymentFailedEvent
+        | RefundCompletedEvent
+        | RefundFailedEvent
+    ),
 ) -> bool:
     statement = (
         insert(ProcessedEventRecord)

@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import StrEnum, unique
 from typing import NewType
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
+
+from contracts import FulfillmentStatus, RefundStatus
 
 DropId = NewType("DropId", str)
 IdempotencyKey = NewType("IdempotencyKey", str)
@@ -47,9 +49,52 @@ class Order(BaseModel):
     quantity: int = Field(ge=1)
     amount: int = Field(ge=0)
     status: OrderStatus
+    fulfillmentStatus: FulfillmentStatus = FulfillmentStatus.NOT_STARTED
     paymentId: str | None = None
     createdAt: datetime
     confirmedAt: datetime | None = None
+    cancelPendingAt: datetime | None = None
+    canceledAt: datetime | None = None
+
+
+class CancelOrderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class Cancellation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    orderId: str
+    reason: str
+    orderStatus: OrderStatus
+    refundStatus: RefundStatus
+    createdAt: datetime
+    completedAt: datetime | None = None
+
+
+class CancellationResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    data: Cancellation
+
+
+class ErrorDetail(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    message: str
+    details: dict[str, JsonValue] | None = None
+
+
+class ErrorResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    error: ErrorDetail
+    requestId: str
+    occurredAt: datetime
 
 
 class OrderResponse(BaseModel):

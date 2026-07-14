@@ -1,8 +1,14 @@
 from typing import Protocol
 
-from contracts import PaymentApprovedEvent, PaymentFailedEvent
+from contracts import (
+    PaymentApprovedEvent,
+    PaymentFailedEvent,
+    RefundCompletedEvent,
+    RefundFailedEvent,
+)
 
-from app.models import Order, OrderId
+from app.cancellations import RequestCancellationCommand, RequestCancellationResult
+from app.models import Cancellation, Order, OrderId, UserId
 from app.store import (
     CreateOrderCommand,
     CreateOrderResult,
@@ -16,6 +22,17 @@ class OrderRepository(Protocol):
 
     async def get_order(self, order_id: OrderId) -> Order | None: ...
 
+    async def request_cancellation(
+        self,
+        command: RequestCancellationCommand,
+    ) -> RequestCancellationResult: ...
+
+    async def get_cancellation(
+        self,
+        order_id: OrderId,
+        user_id: UserId,
+    ) -> Cancellation | None: ...
+
     async def apply_payment_approved(
         self,
         event: PaymentApprovedEvent,
@@ -25,3 +42,7 @@ class OrderRepository(Protocol):
         self,
         event: PaymentFailedEvent,
     ) -> PaymentFailureResult: ...
+
+    async def apply_refund_completed(self, event: RefundCompletedEvent) -> bool: ...
+
+    async def apply_refund_failed(self, event: RefundFailedEvent) -> bool: ...

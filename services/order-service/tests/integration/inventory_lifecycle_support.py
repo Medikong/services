@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.catalog import ProductForSale
-from app.models import DropId, IdempotencyKey, ProductId, UserId
+from app.models import DropId, IdempotencyKey, Order, ProductId, UserId
 from app.postgres import Base, PostgresOrderRepository
 from app.store import CreateOrderCommand
 
@@ -134,16 +134,6 @@ async def outbox_types(
     return list(rows)
 
 
-async def mark_cancel_pending(
-    session_factory: async_sessionmaker[AsyncSession], order_id: str
-) -> None:
-    async with session_factory.begin() as session:
-        await session.execute(
-            text("UPDATE orders SET status='CANCEL_PENDING' WHERE id=:order_id"),
-            {"order_id": order_id},
-        )
-
-
 async def order_status(
     session_factory: async_sessionmaker[AsyncSession], order_id: str
 ) -> str:
@@ -210,15 +200,15 @@ def failed(
     )
 
 
-def refund(order_id: str, refund_id: str, event_id: str) -> RefundCompletedEvent:
+def refund(order: Order, refund_id: str, event_id: str) -> RefundCompletedEvent:
     return RefundCompletedEvent(
         eventId=event_id,
-        userId="user",
-        sourceId="payment",
+        userId=order.userId,
+        sourceId=refund_id,
         occurredAt=OCCURRED_AT,
         producer="payment-service",
         refundId=refund_id,
-        orderId=order_id,
-        paymentId=f"payment-{order_id}",
-        amount=500000,
+        orderId=order.id,
+        paymentId=f"payment-{order.id}",
+        amount=order.amount,
     )
