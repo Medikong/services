@@ -1,30 +1,29 @@
 from datetime import UTC, datetime
 from hashlib import blake2b
-from typing import Final, assert_never
+from typing import Final
 from uuid import uuid4
 
 from contracts import PaymentApprovedEvent, PaymentFailedEvent
-from sqlalchemy import DateTime, Index, Integer, String, UniqueConstraint, func, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.catalog import PRODUCT_CATALOG, ProductForSale, product_for
-from app.models import Order, OrderId, OrderStatus, PaymentId
+from app.events import order_created_event
+from app.models import Order, OrderId, OrderStatus
+from app.outbox import add_outbox_event
+from app.postgres_mapping import order_from_record
+from app.postgres_payments import apply_payment_approved, apply_payment_failed
+from app.records import Base as Base
+from app.records import OrderRecord
 from app.store import (
     CreateOrderCommand,
     CreateOrderResult,
     OrderAlreadyCreated,
     OrderCreated,
     OrderIdempotencyConflict,
-    PaymentAlreadyApplied,
-    PaymentApplied,
     PaymentApprovalResult,
-    PaymentEventOrderMissing,
-    PaymentFailureAlreadyApplied,
-    PaymentFailureApplied,
     PaymentFailureResult,
-    PaymentIgnored,
     ProductSoldOut,
     ProductUnavailable,
     order_matches_command,
@@ -34,52 +33,6 @@ RESERVED_ORDER_STATUSES: Final = (
     OrderStatus.PENDING_PAYMENT.value,
     OrderStatus.CONFIRMED.value,
 )
-PROCESSED_PAYMENT_FAILED_TYPE: Final = "PAYMENT_FAILED"
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-class OrderRecord(Base):
-    __tablename__ = "orders"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "idempotency_key",
-            name="uq_orders_user_idempotency_key",
-        ),
-        Index("ix_orders_user_status", "user_id", "status"),
-        Index("ix_orders_product_status", "drop_id", "product_id", "status"),
-    )
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    drop_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    product_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False)
-    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    payment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    confirmed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-
-class ProcessedPaymentEventRecord(Base):
-    __tablename__ = "processed_payment_events"
-
-    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    order_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    payment_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    processed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
 
 
 class PostgresOrderRepository:
@@ -132,6 +85,10 @@ class PostgresOrderRepository:
                 created_at=datetime.now(UTC),
             )
             session.add(record)
+            add_outbox_event(
+                session,
+                order_created_event(order_from_record(record), command.idempotency_key),
+            )
             try:
                 await session.commit()
             except IntegrityError:
@@ -143,7 +100,7 @@ class PostgresOrderRepository:
                     return OrderAlreadyCreated(order=replayed_after_conflict)
                 raise
             return OrderCreated(
-                order=_order_from_record(record),
+                order=order_from_record(record),
                 idempotency_key=command.idempotency_key,
             )
 
@@ -152,92 +109,19 @@ class PostgresOrderRepository:
             record = await session.get(OrderRecord, order_id)
             if record is None:
                 return None
-            return _order_from_record(record)
+            return order_from_record(record)
 
     async def apply_payment_approved(
         self,
         event: PaymentApprovedEvent,
     ) -> PaymentApprovalResult:
-        order_id = OrderId(event.orderId)
-        async with self._session_factory() as session:
-            record = await session.get(OrderRecord, order_id)
-            if record is None:
-                return PaymentEventOrderMissing(order_id=order_id)
-
-            status = OrderStatus(record.status)
-            match status:
-                case OrderStatus.PENDING_PAYMENT:
-                    record.status = OrderStatus.CONFIRMED.value
-                    record.payment_id = PaymentId(event.paymentId)
-                    record.confirmed_at = event.occurredAt
-                    await session.commit()
-                    return PaymentApplied(order=_order_from_record(record))
-                case OrderStatus.CONFIRMED:
-                    return PaymentAlreadyApplied(order=_order_from_record(record))
-                case OrderStatus.PAYMENT_FAILED | OrderStatus.CANCELED | OrderStatus.EXPIRED:
-                    return PaymentIgnored(order=_order_from_record(record))
-                case unreachable:
-                    assert_never(unreachable)
+        return await apply_payment_approved(self._session_factory, event)
 
     async def apply_payment_failed(
         self,
         event: PaymentFailedEvent,
     ) -> PaymentFailureResult:
-        order_id = OrderId(event.orderId)
-        async with self._session_factory() as session:
-            result = await session.execute(
-                select(OrderRecord)
-                .where(OrderRecord.id == order_id)
-                .with_for_update(),
-            )
-            record = result.scalar_one_or_none()
-            if record is None:
-                return PaymentEventOrderMissing(order_id=order_id)
-
-            processed_event = await session.get(
-                ProcessedPaymentEventRecord,
-                event.eventId,
-            )
-            status = OrderStatus(record.status)
-            if processed_event is not None:
-                match status:
-                    case OrderStatus.PAYMENT_FAILED:
-                        return PaymentFailureAlreadyApplied(
-                            order=_order_from_record(record),
-                        )
-                    case (
-                        OrderStatus.PENDING_PAYMENT
-                        | OrderStatus.CONFIRMED
-                        | OrderStatus.CANCELED
-                        | OrderStatus.EXPIRED
-                    ):
-                        return PaymentIgnored(order=_order_from_record(record))
-                    case unreachable:
-                        assert_never(unreachable)
-
-            session.add(
-                ProcessedPaymentEventRecord(
-                    event_id=event.eventId,
-                    event_type=PROCESSED_PAYMENT_FAILED_TYPE,
-                    order_id=event.orderId,
-                    payment_id=event.paymentId,
-                    processed_at=datetime.now(UTC),
-                ),
-            )
-            match status:
-                case OrderStatus.PENDING_PAYMENT:
-                    record.status = OrderStatus.PAYMENT_FAILED.value
-                    record.payment_id = PaymentId(event.paymentId)
-                    await session.commit()
-                    return PaymentFailureApplied(order=_order_from_record(record))
-                case OrderStatus.PAYMENT_FAILED:
-                    await session.commit()
-                    return PaymentFailureAlreadyApplied(order=_order_from_record(record))
-                case OrderStatus.CONFIRMED | OrderStatus.CANCELED | OrderStatus.EXPIRED:
-                    await session.commit()
-                    return PaymentIgnored(order=_order_from_record(record))
-                case unreachable:
-                    assert_never(unreachable)
+        return await apply_payment_failed(self._session_factory, event)
 
     async def _replayed_order(
         self,
@@ -253,7 +137,7 @@ class PostgresOrderRepository:
         record = result.scalar_one_or_none()
         if record is None:
             return None
-        return _order_from_record(record)
+        return order_from_record(record)
 
 
 async def _lock_product_inventory(
@@ -287,18 +171,3 @@ def _inventory_lock_key(product: ProductForSale) -> int:
 
 def _new_order_id() -> OrderId:
     return OrderId(f"order-{uuid4().hex[:12]}")
-
-
-def _order_from_record(record: OrderRecord) -> Order:
-    return Order(
-        id=record.id,
-        userId=record.user_id,
-        dropId=record.drop_id,
-        productId=record.product_id,
-        quantity=record.quantity,
-        amount=record.amount,
-        status=OrderStatus(record.status),
-        paymentId=record.payment_id,
-        createdAt=record.created_at,
-        confirmedAt=record.confirmed_at,
-    )

@@ -1,11 +1,10 @@
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol, assert_never
+import logging
+from typing import Final, Protocol, assert_never
 
 from aiokafka import AIOKafkaConsumer
 from contracts import (
-    NOTIFICATION_REQUESTED_TOPIC,
-    ORDER_CREATED_TOPIC,
     PAYMENT_APPROVED_TOPIC,
     PAYMENT_FAILED_TOPIC,
     PaymentApprovedEvent,
@@ -18,9 +17,10 @@ from kafka_utils import (
     with_correlation_id,
 )
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.events import notification_requested_event, order_created_event
-from app.models import IdempotencyKey, Order
+from app.metrics import OrderMetrics
+from app.outbox import OutboxMessage, OutboxRelay
 from app.repository import OrderRepository
 from app.store import (
     PaymentAlreadyApplied,
@@ -31,30 +31,18 @@ from app.store import (
     PaymentIgnored,
 )
 
-
-class OrderEventPublisher(Protocol):
-    async def publish_order_created(
-        self,
-        order: Order,
-        idempotency_key: IdempotencyKey,
-    ) -> None: ...
-
-    async def publish_notification_requested(self, order: Order) -> None: ...
+LOGGER: Final = logging.getLogger(__name__)
 
 
-class NoopOrderEventPublisher:
-    async def publish_order_created(
-        self,
-        order: Order,
-        idempotency_key: IdempotencyKey,
-    ) -> None:
-        return None
-
-    async def publish_notification_requested(self, order: Order) -> None:
-        return None
+class OutboxPayloadError(RuntimeError):
+    pass
 
 
-class KafkaOrderEventPublisher:
+class KafkaRuntimeConfigurationError(RuntimeError):
+    pass
+
+
+class KafkaOutboxPublisher:
     def __init__(self, producer: TraceAwareKafkaProducer) -> None:
         self._producer = producer
 
@@ -64,26 +52,15 @@ class KafkaOrderEventPublisher:
     async def stop(self) -> None:
         await self._producer.stop()
 
-    async def publish_order_created(
-        self,
-        order: Order,
-        idempotency_key: IdempotencyKey,
-    ) -> None:
-        event = order_created_event(order, idempotency_key)
+    async def publish(self, message: OutboxMessage) -> None:
+        correlation_id = message.payload.get("correlationId")
+        if not isinstance(correlation_id, str):
+            raise OutboxPayloadError("outbox payload is missing correlationId")
         await self._producer.send_and_wait(
-            ORDER_CREATED_TOPIC,
-            event.model_dump(mode="json"),
-            with_correlation_id(event.correlationId),
-            key=event.orderId.encode("utf-8"),
-        )
-
-    async def publish_notification_requested(self, order: Order) -> None:
-        event = notification_requested_event(order)
-        await self._producer.send_and_wait(
-            NOTIFICATION_REQUESTED_TOPIC,
-            event.model_dump(mode="json"),
-            with_correlation_id(event.correlationId),
-            key=event.orderId.encode("utf-8"),
+            message.topic,
+            message.payload,
+            with_correlation_id(correlation_id),
+            key=message.message_key.encode("utf-8"),
         )
 
 
@@ -105,10 +82,50 @@ class KafkaConsumerClient(Protocol):
     def __aiter__(self) -> AsyncIterator[KafkaMessage]: ...
 
 
+@dataclass(slots=True)  # noqa: MUTABLE_OK
+class _ConsumedKafkaMessage:
+    """Mutable SDK-shaped message required by the tracing consumer protocol."""
+
+    topic: str
+    partition: int
+    offset: int
+    headers: Sequence[tuple[str | bytes, bytes]] | None
+    value: bytes | None
+
+
+class AIOKafkaConsumerClient:
+    def __init__(self, consumer: AIOKafkaConsumer) -> None:
+        self._consumer = consumer
+
+    async def start(self) -> None:
+        await self._consumer.start()
+
+    async def stop(self) -> None:
+        await self._consumer.stop()
+
+    async def commit(self) -> None:
+        await self._consumer.commit()
+
+    async def _messages(self) -> AsyncIterator[KafkaMessage]:
+        async for message in self._consumer:
+            yield _ConsumedKafkaMessage(
+                topic=message.topic,
+                partition=message.partition,
+                offset=message.offset,
+                headers=message.headers,
+                value=message.value,
+            )
+
+    def __aiter__(self) -> AsyncIterator[KafkaMessage]:
+        return self._messages()
+
+
 @dataclass(frozen=True, slots=True)
-class KafkaRuntime:
-    publisher: KafkaOrderEventPublisher | None
-    payment_consumer: "PaymentConsumer | None"
+class KafkaRuntimeConfig:
+    bootstrap_servers: str
+    repository: OrderRepository
+    session_factory: async_sessionmaker[AsyncSession] | None
+    metrics: OrderMetrics
 
 
 class PaymentConsumer:
@@ -116,11 +133,9 @@ class PaymentConsumer:
         self,
         consumer: KafkaConsumerClient,
         repository: OrderRepository,
-        event_publisher: OrderEventPublisher,
     ) -> None:
         self._consumer = consumer
         self._repository = repository
-        self._event_publisher = event_publisher
 
     async def start(self) -> None:
         await self._consumer.start()
@@ -130,22 +145,28 @@ class PaymentConsumer:
 
     async def run(self) -> None:
         async for message in self._consumer:
-            await handle_payment_message(
-                message,
-                self._repository,
-                self._event_publisher,
-            )
+            await handle_payment_message(message, self._repository)
             await self._consumer.commit()
+
+
+type PaymentConsumerFactory = Callable[[], PaymentConsumer]
+type OutboxWorkerFactory = Callable[[], tuple[KafkaOutboxPublisher, OutboxRelay]]
+
+
+@dataclass(frozen=True, slots=True)
+class KafkaRuntime:
+    payment_consumer_factory: PaymentConsumerFactory | None
+    outbox_worker_factory: OutboxWorkerFactory | None
 
 
 async def handle_payment_message(
     message: KafkaMessage,
     repository: OrderRepository,
-    event_publisher: OrderEventPublisher | None = None,
 ) -> None:
-    match message.topic:
+    # Kafka topic names are an open external set; unknown topics are rejected below.
+    match message.topic:  # noqa: MATCH_OK
         case topic if topic == PAYMENT_APPROVED_TOPIC:
-            await handle_payment_approved_message(message, repository, event_publisher)
+            await handle_payment_approved_message(message, repository)
         case topic if topic == PAYMENT_FAILED_TOPIC:
             await handle_payment_failed_message(message, repository)
         case _:
@@ -155,7 +176,6 @@ async def handle_payment_message(
 async def handle_payment_approved_message(
     message: KafkaMessage,
     repository: OrderRepository,
-    event_publisher: OrderEventPublisher | None = None,
 ) -> None:
     value = message.value
     if value is None:
@@ -168,12 +188,12 @@ async def handle_payment_approved_message(
         try:
             event = PaymentApprovedEvent.model_validate_json(value)
         except ValidationError:
+            LOGGER.warning("discarded invalid payment.approved event")
             return
         result = await repository.apply_payment_approved(event)
-        publisher = event_publisher or NoopOrderEventPublisher()
         match result:
-            case PaymentApplied(order=order) | PaymentAlreadyApplied(order=order):
-                await publisher.publish_notification_requested(order)
+            case PaymentApplied() | PaymentAlreadyApplied():
+                return
             case PaymentEventOrderMissing() | PaymentIgnored():
                 return
             case unreachable:
@@ -196,6 +216,7 @@ async def handle_payment_failed_message(
         try:
             event = PaymentFailedEvent.model_validate_json(value)
         except ValidationError:
+            LOGGER.warning("discarded invalid payment.failed event")
             return
         result = await repository.apply_payment_failed(event)
         match result:
@@ -207,30 +228,48 @@ async def handle_payment_failed_message(
                 assert_never(unreachable)
 
 
-def kafka_runtime_from_bootstrap(
-    repository: OrderRepository,
-    bootstrap_servers: str,
-) -> KafkaRuntime:
-    if bootstrap_servers == "":
-        return KafkaRuntime(publisher=None, payment_consumer=None)
+def kafka_runtime_from_config(config: KafkaRuntimeConfig) -> KafkaRuntime:
+    session_factory = config.session_factory
+    if config.bootstrap_servers == "" or session_factory is None:
+        return KafkaRuntime(
+            payment_consumer_factory=None,
+            outbox_worker_factory=None,
+        )
 
-    producer = create_kafka_producer(
-        bootstrap_servers,
-        client_id="order-service",
-    )
-    if producer is None:
-        return KafkaRuntime(publisher=None, payment_consumer=None)
+    def payment_consumer_factory() -> PaymentConsumer:
+        consumer = AIOKafkaConsumer(
+            PAYMENT_APPROVED_TOPIC,
+            PAYMENT_FAILED_TOPIC,
+            bootstrap_servers=config.bootstrap_servers,
+            group_id="order-service-payment-events",
+            auto_offset_reset="earliest",
+            enable_auto_commit=False,
+        )
+        return PaymentConsumer(
+            AIOKafkaConsumerClient(consumer),
+            config.repository,
+        )
 
-    consumer = AIOKafkaConsumer(
-        PAYMENT_APPROVED_TOPIC,
-        PAYMENT_FAILED_TOPIC,
-        bootstrap_servers=bootstrap_servers,
-        group_id="order-service-payment-events",
-        auto_offset_reset="earliest",
-        enable_auto_commit=False,
-    )
-    publisher = KafkaOrderEventPublisher(producer)
+    def outbox_worker_factory() -> tuple[KafkaOutboxPublisher, OutboxRelay]:
+        producer = create_kafka_producer(
+            config.bootstrap_servers,
+            client_id="order-service",
+        )
+        if producer is None:
+            raise KafkaRuntimeConfigurationError(
+                "Kafka producer requires bootstrap servers",
+            )
+        publisher = KafkaOutboxPublisher(producer)
+        return (
+            publisher,
+            OutboxRelay(
+                session_factory,
+                publisher,
+                config.metrics,
+            ),
+        )
+
     return KafkaRuntime(
-        publisher=publisher,
-        payment_consumer=PaymentConsumer(consumer, repository, publisher),
+        payment_consumer_factory=payment_consumer_factory,
+        outbox_worker_factory=outbox_worker_factory,
     )

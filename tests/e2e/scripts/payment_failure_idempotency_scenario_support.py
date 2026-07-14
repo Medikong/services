@@ -14,7 +14,9 @@ class _DatabaseCheck:
     failure_label: str
 
 
-def _database_checks(config: RunnerConfig, smoke: SmokeResult) -> tuple[_DatabaseCheck, ...]:
+def _database_checks(
+    config: RunnerConfig, smoke: SmokeResult
+) -> tuple[_DatabaseCheck, ...]:
     return (
         _DatabaseCheck(
             "payment_rows|distinct_ids|min_id|max_id",
@@ -27,14 +29,15 @@ def _database_checks(config: RunnerConfig, smoke: SmokeResult) -> tuple[_Databas
             "Payment SQL assertion",
         ),
         _DatabaseCheck(
-            "processed_payment_events|distinct_event_ids|min_order_id|min_payment_id",
+            "processed_events|distinct_event_ids|min_event_type|min_aggregate_type|min_aggregate_id",
             "order_service",
             "SELECT COUNT(*), COUNT(DISTINCT event_id), "
-            "COALESCE(MIN(order_id), ''), COALESCE(MIN(payment_id), '') "
-            "FROM processed_payment_events "
+            "COALESCE(MIN(event_type), ''), COALESCE(MIN(aggregate_type), ''), "
+            "COALESCE(MIN(aggregate_id), '') "
+            "FROM processed_events "
             f"WHERE event_id = '{smoke.event_id}';",
-            f"1|1|{smoke.order_id}|{smoke.payment_id}",
-            "Processed payment event SQL assertion",
+            f"1|1|payment.failed|order|{smoke.order_id}",
+            "Processed event SQL assertion",
         ),
         _DatabaseCheck(
             "order_rows|status|payment_id",

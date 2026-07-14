@@ -1,45 +1,16 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from inspect import getsource
 
 import anyio
-import pytest
 from fastapi.testclient import TestClient
 
 from app.messaging import handle_payment_approved_message
-from app.models import IdempotencyKey, Order
+from app.models import OrderId
 from app.main import create_app
 from app.store import OrderStore
 from contracts import PaymentApprovedEvent
-
-
-class RecordingOrderEventPublisher:
-    def __init__(self) -> None:
-        self.created_orders: list[tuple[str, IdempotencyKey]] = []
-        self.notification_orders: list[str] = []
-
-    async def publish_order_created(
-        self,
-        order: Order,
-        idempotency_key: IdempotencyKey,
-    ) -> None:
-        self.created_orders.append((order.id, idempotency_key))
-
-    async def publish_notification_requested(self, order: Order) -> None:
-        self.notification_orders.append(order.id)
-
-
-class FailingOnceOrderEventPublisher(RecordingOrderEventPublisher):
-    def __init__(self) -> None:
-        super().__init__()
-        self._should_fail = True
-
-    async def publish_notification_requested(self, order: Order) -> None:
-        if self._should_fail:
-            self._should_fail = False
-            msg = "temporary notification publish failure"
-            raise RuntimeError(msg)
-        await super().publish_notification_requested(order)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +22,12 @@ class FakeKafkaMessage:
     value: bytes | None
 
 
-def test_payment_approved_message_retries_notification_request_when_first_publish_fails() -> None:
+def test_payment_approved_message_applies_domain_change_without_direct_publish() -> (
+    None
+):
     # Given
     store = OrderStore()
-    publisher = FailingOnceOrderEventPublisher()
-    client = TestClient(create_app(store, publisher))
+    client = TestClient(create_app(store))
     create_response = client.post(
         "/orders",
         headers={
@@ -85,9 +57,22 @@ def test_payment_approved_message_retries_notification_request_when_first_publis
     )
 
     # When
-    with pytest.raises(RuntimeError):
-        anyio.run(handle_payment_approved_message, message, store, publisher)
-    anyio.run(handle_payment_approved_message, message, store, publisher)
+    anyio.run(handle_payment_approved_message, message, store)
 
     # Then
-    assert publisher.notification_orders == [order_id]
+    order = anyio.run(store.get_order, OrderId(order_id))
+    assert order is not None
+    assert order.status == "CONFIRMED"
+
+
+def test_http_and_consumer_paths_have_no_direct_publish_call() -> None:
+    # Given
+    source = "\n".join(
+        (getsource(create_app), getsource(handle_payment_approved_message))
+    )
+
+    # When
+    direct_publish_is_present = ".publish_" in source
+
+    # Then
+    assert direct_publish_is_present is False

@@ -28,7 +28,6 @@ from app.models import (
 )
 from app.db import AppResources, lifespan_for, resources_from_env
 from app.metrics import OrderMetrics
-from app.messaging import NoopOrderEventPublisher, OrderEventPublisher
 from app.repository import OrderRepository
 from app.schema import database_migration_is_current
 from app.store import (
@@ -58,13 +57,9 @@ class ReadOrderContext:
 
 def create_app(
     repository: OrderRepository | None = None,
-    event_publisher: OrderEventPublisher | None = None,
 ) -> FastAPI:
     resources = (
-        AppResources(
-            repository=repository,
-            event_publisher=event_publisher or NoopOrderEventPublisher(),
-        )
+        AppResources(repository=repository)
         if repository is not None
         else resources_from_env()
     )
@@ -75,6 +70,7 @@ def create_app(
         lifespan=lifespan_for(resources),
     )
     order_metrics = OrderMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
+    resources.metrics = order_metrics
     _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
@@ -135,11 +131,7 @@ def create_app(
             ),
         )
         match result:
-            case OrderCreated(order=order, idempotency_key=idempotency_key):
-                await resources.event_publisher.publish_order_created(
-                    order,
-                    idempotency_key,
-                )
+            case OrderCreated(order=order):
                 order_metrics.record_order_created()
                 return OrderResponse(data=order)
             case OrderAlreadyCreated(order=order):

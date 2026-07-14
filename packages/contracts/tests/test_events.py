@@ -23,6 +23,31 @@ DROP_ID = "89e11045-1c65-5685-9604-328d9012fda2"
 PRODUCT_ID = "5bc60aa7-7c55-5e06-9d32-17da50ee061b"
 PAYMENT_ID = "cceae4e4-ced3-5b24-9423-c3fc323a170a"
 NOTIFICATION_ID = "7fd695a1-831a-5092-a736-b3f9d1e828a2"
+PAYMENT_EVENT_TYPES = (
+    (PaymentApprovedEvent, "payment.approved"),
+    (PaymentFailedEvent, "payment.failed"),
+)
+OUTBOX_ORDER_EVENT_TYPES = (
+    (
+        OrderCreatedEvent,
+        "order.created",
+        {
+            "dropId": DROP_ID,
+            "productId": PRODUCT_ID,
+            "quantity": 1,
+            "amount": 50000,
+        },
+    ),
+    (
+        NotificationRequestedEvent,
+        "notification.requested",
+        {
+            "notificationId": NOTIFICATION_ID,
+            "title": "주문이 확정되었습니다",
+            "message": "DropMong 주문이 정상 처리되었습니다.",
+        },
+    ),
+)
 
 
 def test_event_topics_are_stable() -> None:
@@ -123,3 +148,88 @@ def test_business_event_rejects_event_id_too_long_for_storage() -> None:
                 "message": "DropMong 주문이 정상 처리되었습니다.",
             }
         )
+
+
+@pytest.mark.parametrize(("event_class", "event_type"), PAYMENT_EVENT_TYPES)
+@pytest.mark.parametrize("field", ("orderId", "paymentId"))
+def test_payment_event_ids_accept_database_boundary(
+    event_class: type[PaymentApprovedEvent] | type[PaymentFailedEvent],
+    event_type: str,
+    field: str,
+) -> None:
+    payload = {
+        "eventId": EVENT_ID,
+        "eventType": event_type,
+        "userId": "1",
+        "sourceId": SOURCE_ID,
+        "occurredAt": "2026-05-13T10:00:00Z",
+        "producer": "payment-service",
+        "orderId": ORDER_ID,
+        "paymentId": PAYMENT_ID,
+        "amount": 50000,
+        field: "x" * 64,
+    }
+
+    event = event_class.model_validate(payload)
+
+    assert getattr(event, field) == "x" * 64
+
+
+@pytest.mark.parametrize(("event_class", "event_type"), PAYMENT_EVENT_TYPES)
+@pytest.mark.parametrize("field", ("orderId", "paymentId"))
+def test_payment_event_ids_reject_values_larger_than_database_boundary(
+    event_class: type[PaymentApprovedEvent] | type[PaymentFailedEvent],
+    event_type: str,
+    field: str,
+) -> None:
+    payload = {
+        "eventId": EVENT_ID,
+        "eventType": event_type,
+        "userId": "1",
+        "sourceId": SOURCE_ID,
+        "occurredAt": "2026-05-13T10:00:00Z",
+        "producer": "payment-service",
+        "orderId": ORDER_ID,
+        "paymentId": PAYMENT_ID,
+        "amount": 50000,
+        field: "x" * 65,
+    }
+
+    with pytest.raises(ValidationError) as error:
+        event_class.model_validate(payload)
+
+    assert error.value.errors()[0]["loc"] == (field,)
+    assert error.value.errors()[0]["type"] == "string_too_long"
+
+
+@pytest.mark.parametrize(
+    ("event_class", "event_type", "event_fields"),
+    OUTBOX_ORDER_EVENT_TYPES,
+)
+@pytest.mark.parametrize("length", (64, 65))
+def test_order_outbox_event_ids_match_database_boundary(
+    event_class: type[OrderCreatedEvent] | type[NotificationRequestedEvent],
+    event_type: str,
+    event_fields: dict[str, str | int],
+    length: int,
+) -> None:
+    payload = {
+        "eventId": EVENT_ID,
+        "eventType": event_type,
+        "userId": "1",
+        "sourceId": SOURCE_ID,
+        "occurredAt": "2026-05-13T10:00:00Z",
+        "producer": "order-service",
+        "orderId": "o" * length,
+    } | event_fields
+
+    if length == 64:
+        event = event_class.model_validate(payload)
+        assert event.orderId == "o" * 64
+        return
+
+    with pytest.raises(ValidationError) as error:
+        event_class.model_validate(payload)
+
+    assert error.value.errors()[0]["loc"] == ("orderId",)
+    assert error.value.errors()[0]["type"] == "string_too_long"

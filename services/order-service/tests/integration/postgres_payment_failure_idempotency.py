@@ -30,7 +30,7 @@ from app.store import (
 )
 
 ORDER_TEST_DATABASE_URL: Final = "ORDER_TEST_DATABASE_URL"
-PROCESSED_PAYMENT_FAILED_TYPE: Final = "PAYMENT_FAILED"
+PROCESSED_PAYMENT_FAILED_TYPE: Final = "payment.failed"
 
 
 @pytest.mark.anyio
@@ -81,7 +81,9 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
                 case PaymentFailureAlreadyApplied():
                     already_applied_count += 1
                 case PaymentEventOrderMissing() | PaymentIgnored():
-                    pytest.fail(f"unexpected payment failure result: {type(result).__name__}")
+                    pytest.fail(
+                        f"unexpected payment failure result: {type(result).__name__}"
+                    )
                 case unreachable:
                     assert_never(unreachable)
 
@@ -91,8 +93,8 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
             (
                 event.eventId,
                 PROCESSED_PAYMENT_FAILED_TYPE,
+                "order",
                 event.orderId,
-                event.paymentId,
             ),
         ]
         assert await _persisted_order_failure_state(session_factory, order_id) == (
@@ -118,7 +120,9 @@ async def _postgres_schema(
     finally:
         await engine.dispose()
         async with admin_engine.begin() as connection:
-            await connection.execute(text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))
+            await connection.execute(
+                text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+            )
         await admin_engine.dispose()
 
 
@@ -137,8 +141,8 @@ async def _create_pending_order(
     match result:
         case OrderCreated(order=order):
             return OrderId(order.id)
-        case _:
-            pytest.fail(f"unexpected create order result: {type(result).__name__}")
+        case unreachable:
+            assert_never(unreachable)
 
 
 async def _fail_concurrently(
@@ -166,24 +170,18 @@ async def _processed_failure_rows(
     event_id: str,
 ) -> list[tuple[str, str, str, str]]:
     async with session_factory() as session:
-        table_result = await session.execute(
-            text("SELECT to_regclass('processed_payment_events')"),
-        )
-        if table_result.scalar_one() is None:
-            return []
-
         result = await session.execute(
             text(
                 """
-                SELECT event_id, event_type, order_id, payment_id
-                FROM processed_payment_events
+                SELECT event_id, event_type, aggregate_type, aggregate_id
+                FROM processed_events
                 WHERE event_id = :event_id
                 """,
             ),
             {"event_id": event_id},
         )
         return [
-            (row.event_id, row.event_type, row.order_id, row.payment_id)
+            (row.event_id, row.event_type, row.aggregate_type, row.aggregate_id)
             for row in result
         ]
 

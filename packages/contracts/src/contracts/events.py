@@ -119,7 +119,7 @@ class BusinessEvent(BaseModel):
 
 class OrderCreatedEvent(BusinessEvent):
     eventType: Literal["order.created"] = ORDER_CREATED_TOPIC
-    orderId: str
+    orderId: str = Field(min_length=1, max_length=64)
     dropId: str
     productId: str
     quantity: int = Field(ge=1)
@@ -129,15 +129,15 @@ class OrderCreatedEvent(BusinessEvent):
 
 class PaymentApprovedEvent(BusinessEvent):
     eventType: Literal["payment.approved"] = PAYMENT_APPROVED_TOPIC
-    orderId: str
-    paymentId: str
+    orderId: str = Field(min_length=1, max_length=64)
+    paymentId: str = Field(min_length=1, max_length=64)
     amount: int = Field(ge=0)
 
 
 class PaymentFailedEvent(BusinessEvent):
     eventType: Literal["payment.failed"] = PAYMENT_FAILED_TOPIC
-    orderId: str
-    paymentId: str
+    orderId: str = Field(min_length=1, max_length=64)
+    paymentId: str = Field(min_length=1, max_length=64)
     amount: int = Field(ge=0)
     reason: str | None = None
 
@@ -201,7 +201,7 @@ class RefundFailedEvent(BusinessEvent):
 class NotificationRequestedEvent(BusinessEvent):
     eventType: Literal["notification.requested"] = NOTIFICATION_REQUESTED_TOPIC
     notificationId: str
-    orderId: str
+    orderId: str = Field(min_length=1, max_length=64)
     notificationType: NotificationType = NotificationType.ORDER_CONFIRMED
     channel: Literal["IN_APP"] = "IN_APP"
     title: str

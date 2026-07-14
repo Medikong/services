@@ -1,18 +1,24 @@
 import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import anyio
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.messaging import (
     KafkaRuntime,
-    NoopOrderEventPublisher,
-    OrderEventPublisher,
-    kafka_runtime_from_bootstrap,
+    KafkaRuntimeConfig,
+    kafka_runtime_from_config,
 )
+from app.kafka_workers import run_outbox_worker, run_payment_consumer_worker
+from app.metrics import OrderMetrics
 from app.postgres import PostgresOrderRepository
 from app.repository import OrderRepository
 from app.store import OrderStore
@@ -25,10 +31,13 @@ class AppResources:
     """Resources mutated by lifespan after the async event loop starts."""
 
     repository: OrderRepository
-    event_publisher: OrderEventPublisher
     engine: AsyncEngine | None = None
+    session_factory: async_sessionmaker[AsyncSession] | None = None
     kafka_bootstrap_servers: str = ""
     kafka_runtime: KafkaRuntime | None = None
+    metrics: OrderMetrics = field(
+        default_factory=lambda: OrderMetrics("order-service", "unknown", "unknown"),
+    )
 
 
 def resources_from_env() -> AppResources:
@@ -38,7 +47,6 @@ def resources_from_env() -> AppResources:
         repository = OrderStore()
         return AppResources(
             repository=repository,
-            event_publisher=NoopOrderEventPublisher(),
             kafka_bootstrap_servers=kafka_bootstrap_servers,
         )
 
@@ -54,8 +62,8 @@ def resources_from_env() -> AppResources:
     repository = PostgresOrderRepository(session_factory)
     return AppResources(
         repository=repository,
-        event_publisher=NoopOrderEventPublisher(),
         engine=engine,
+        session_factory=session_factory,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
     )
 
@@ -66,27 +74,29 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
         runtime = resources.kafka_runtime
         try:
             if runtime is None and resources.kafka_bootstrap_servers != "":
-                runtime = kafka_runtime_from_bootstrap(
-                    resources.repository,
-                    resources.kafka_bootstrap_servers,
+                runtime = kafka_runtime_from_config(
+                    KafkaRuntimeConfig(
+                        bootstrap_servers=resources.kafka_bootstrap_servers,
+                        repository=resources.repository,
+                        session_factory=resources.session_factory,
+                        metrics=resources.metrics,
+                    ),
                 )
                 resources.kafka_runtime = runtime
-                if runtime.publisher is not None:
-                    resources.event_publisher = runtime.publisher
-            if runtime is not None and runtime.publisher is not None:
-                await runtime.publisher.start()
-            if runtime is not None and runtime.payment_consumer is not None:
-                await runtime.payment_consumer.start()
             async with anyio.create_task_group() as task_group:
-                if runtime is not None and runtime.payment_consumer is not None:
-                    task_group.start_soon(runtime.payment_consumer.run)
+                if runtime is not None and runtime.payment_consumer_factory is not None:
+                    task_group.start_soon(
+                        run_payment_consumer_worker,
+                        runtime.payment_consumer_factory,
+                    )
+                if runtime is not None and runtime.outbox_worker_factory is not None:
+                    task_group.start_soon(
+                        run_outbox_worker,
+                        runtime.outbox_worker_factory,
+                    )
                 yield
                 task_group.cancel_scope.cancel()
         finally:
-            if runtime is not None and runtime.payment_consumer is not None:
-                await runtime.payment_consumer.stop()
-            if runtime is not None and runtime.publisher is not None:
-                await runtime.publisher.stop()
             if resources.engine is not None:
                 await resources.engine.dispose()
 

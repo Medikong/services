@@ -80,8 +80,8 @@ def test_run_scenario_uses_compose_smoke_service_and_exact_database_assertions(
             query = argv[-1]
             if "FROM payments" in query:
                 stdout = "1|1|payment-1|payment-1\n"
-            elif "FROM processed_payment_events" in query:
-                stdout = "1|1|order-1|payment-1\n"
+            elif "FROM processed_events" in query:
+                stdout = "1|1|payment.failed|order|order-1\n"
             else:
                 stdout = "1|PAYMENT_FAILED|payment-1\n"
         return subprocess.CompletedProcess(argv, 0, stdout, "")
