@@ -48,7 +48,9 @@ async def test_approval_rolls_back_inbox_inventory_and_order_when_outbox_fails()
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "atomic"))
         assert isinstance(created, OrderCreated)
-        approval = approved(created.order.id)
+        approval = approved(
+            created.order.id, created.order.userId, created.order.amount
+        )
         suffix = blake2b(
             f"approve:{approval.eventId}".encode(), digest_size=16
         ).hexdigest()

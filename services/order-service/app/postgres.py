@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import uuid4
 
 from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
@@ -8,12 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.catalog import PRODUCTS_FOR_SALE, ProductForSale, product_for
 from app.events import inventory_changed_event, order_created_event
+from app.metrics import OrderMetrics
 from app.models import Order, OrderId, OrderStatus
 from app.outbox import add_outbox_event
+from app.order_config import OrderPaymentPolicy
 from app.postgres_mapping import order_from_record
 from app.postgres_payments import apply_payment_approved, apply_payment_failed
 from app.postgres_inventory import (
     apply_refund_completed,
+    expire_due_order,
     expire_pending_order,
 )
 from app.records import Base as Base
@@ -37,9 +40,13 @@ class PostgresOrderRepository:
         self,
         session_factory: async_sessionmaker[AsyncSession],
         catalog: tuple[ProductForSale, ...] = PRODUCTS_FOR_SALE,
+        policy: OrderPaymentPolicy = OrderPaymentPolicy(),
+        metrics: OrderMetrics | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._catalog = catalog
+        self._policy = policy
+        self._metrics = metrics
 
     async def create_order(self, command: CreateOrderCommand) -> CreateOrderResult:
         async with self._session_factory() as session:
@@ -79,7 +86,7 @@ class PostgresOrderRepository:
                     product_id=command.product_id,
                 )
 
-            created_at = datetime.now(UTC)
+            created_at = self._policy.clock()
             record = OrderRecord(
                 id=_new_order_id(),
                 user_id=command.user_id,
@@ -90,6 +97,7 @@ class PostgresOrderRepository:
                 status=OrderStatus.PENDING_PAYMENT.value,
                 idempotency_key=command.idempotency_key,
                 created_at=created_at,
+                expires_at=created_at + self._policy.ttl,
             )
             inventory.reserved_quantity += command.quantity
             inventory.version += 1
@@ -148,6 +156,9 @@ class PostgresOrderRepository:
         occurred_at: datetime,
     ) -> bool:
         return await expire_pending_order(self._session_factory, order_id, occurred_at)
+
+    async def expire_due_order(self, now: datetime) -> bool:
+        return await expire_due_order(self._session_factory, now, self._metrics)
 
     async def apply_refund_completed(self, event: RefundCompletedEvent) -> bool:
         return await apply_refund_completed(self._session_factory, event)

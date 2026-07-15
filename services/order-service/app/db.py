@@ -19,6 +19,8 @@ from app.messaging import (
 )
 from app.kafka_workers import run_outbox_worker, run_payment_consumer_worker
 from app.metrics import OrderMetrics
+from app.expiry import OrderExpiryWorker
+from app.order_config import order_payment_policy_from_env
 from app.postgres import PostgresOrderRepository
 from app.repository import OrderRepository
 from app.store import OrderStore
@@ -38,16 +40,19 @@ class AppResources:
     metrics: OrderMetrics = field(
         default_factory=lambda: OrderMetrics("order-service", "unknown", "unknown"),
     )
+    expiry_worker: OrderExpiryWorker | None = None
 
 
-def resources_from_env() -> AppResources:
+def resources_from_env(metrics: OrderMetrics | None = None) -> AppResources:
     database_url = os.getenv("DATABASE_URL", "")
     kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
+    order_metrics = metrics or OrderMetrics("order-service", "unknown", "unknown")
     if database_url == "":
         repository = OrderStore()
         return AppResources(
             repository=repository,
             kafka_bootstrap_servers=kafka_bootstrap_servers,
+            metrics=order_metrics,
         )
 
     engine = create_async_engine(
@@ -59,12 +64,19 @@ def resources_from_env() -> AppResources:
         pool_recycle=1800,
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    repository = PostgresOrderRepository(session_factory)
+    payment_policy = order_payment_policy_from_env()
+    repository = PostgresOrderRepository(
+        session_factory,
+        policy=payment_policy,
+        metrics=order_metrics,
+    )
     return AppResources(
         repository=repository,
         engine=engine,
         session_factory=session_factory,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
+        metrics=order_metrics,
+        expiry_worker=OrderExpiryWorker(repository, payment_policy.clock),
     )
 
 
@@ -94,6 +106,8 @@ def lifespan_for(resources: AppResources) -> FastAPILifespan:
                         run_outbox_worker,
                         runtime.outbox_worker_factory,
                     )
+                if resources.expiry_worker is not None:
+                    task_group.start_soon(resources.expiry_worker.run)
                 yield
                 task_group.cancel_scope.cancel()
         finally:

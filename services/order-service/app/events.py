@@ -5,8 +5,10 @@ from uuid import uuid4
 from contracts import (
     InventoryChangedEvent,
     NotificationRequestedEvent,
+    NotificationType,
     OrderCreatedEvent,
     OrderExpiredEvent,
+    RefundRequestedEvent,
 )
 
 from app.models import IdempotencyKey, Order
@@ -46,6 +48,25 @@ def notification_requested_event(order: Order) -> NotificationRequestedEvent:
         orderId=order.id,
         title="주문이 확정되었습니다",
         message="DropMong 주문이 정상 처리되었습니다.",
+        correlationId=order.id,
+    )
+
+
+def order_expired_notification_event(
+    order: Order,
+    occurred_at: datetime,
+) -> NotificationRequestedEvent:
+    return NotificationRequestedEvent(
+        eventId=f"evt-notification-order-expired-{order.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        notificationId=f"notification-order-expired-{order.id}",
+        orderId=order.id,
+        notificationType=NotificationType.ORDER_EXPIRED,
+        title="주문 결제 시간이 만료되었습니다",
+        message="결제 시간이 지나 예약된 재고가 해제되었습니다.",
         correlationId=order.id,
     )
 
@@ -121,4 +142,29 @@ def order_expired_event(order: Order, occurred_at: datetime) -> OrderExpiredEven
         quantity=order.quantity,
         amount=order.amount,
         correlationId=order.id,
+    )
+
+
+def late_approval_refund_requested_event(
+    order: Order,
+    payment_id: str,
+    occurred_at: datetime,
+) -> RefundRequestedEvent:
+    refund_suffix = blake2b(
+        f"expired:{order.id}:{payment_id}".encode("utf-8"),
+        digest_size=16,
+    ).hexdigest()
+    refund_id = f"refund-{refund_suffix}"
+    return RefundRequestedEvent(
+        eventId=f"evt-refund-requested-{refund_id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        correlationId=order.id,
+        refundId=refund_id,
+        orderId=order.id,
+        paymentId=payment_id,
+        amount=order.amount,
+        reason="ORDER_EXPIRED_LATE_APPROVAL",
     )

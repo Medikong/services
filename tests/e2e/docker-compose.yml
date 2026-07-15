@@ -65,6 +65,11 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.approved --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.failed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic order.confirmed --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic order.expired --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic inventory.changed --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic refund.requested --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic refund.completed --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic refund.failed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic notification.requested --partitions 1 --replication-factor 1
 
   tempo:
@@ -204,6 +209,7 @@ services:
       <<: *service-e2e-env
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/order_service
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ORDER_PAYMENT_TTL_SECONDS: "${ORDER_PAYMENT_TTL_SECONDS:-300}"
     depends_on:
       order-migrate:
         condition: service_completed_successfully

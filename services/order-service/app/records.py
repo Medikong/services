@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -30,6 +31,14 @@ class OrderRecord(Base):
         ),
         Index("ix_orders_user_status", "user_id", "status"),
         Index("ix_orders_product_status", "drop_id", "product_id", "status"),
+        Index(
+            "ix_orders_pending_expiry",
+            "expires_at",
+            "id",
+            postgresql_where=text(
+                "status = 'PENDING_PAYMENT' AND expires_at IS NOT NULL"
+            ),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

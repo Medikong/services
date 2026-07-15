@@ -176,29 +176,36 @@ def command(product_for_sale: ProductForSale, suffix: str) -> CreateOrderCommand
     )
 
 
-def approved(order_id: str) -> PaymentApprovedEvent:
+def approved(order_id: str, user_id: str, amount: int) -> PaymentApprovedEvent:
+    payment_id = f"payment-{order_id}"
     return PaymentApprovedEvent(
         eventId=f"evt-approved-{order_id}",
-        userId="user",
-        sourceId="payment",
+        userId=user_id,
+        sourceId=payment_id,
         occurredAt=OCCURRED_AT,
         producer="payment-service",
         orderId=order_id,
-        paymentId=f"payment-{order_id}",
-        amount=500000,
+        paymentId=payment_id,
+        amount=amount,
     )
 
 
-def failed(order_id: str, suffix: str) -> PaymentFailedEvent:
+def failed(
+    order_id: str,
+    user_id: str,
+    amount: int,
+    suffix: str,
+) -> PaymentFailedEvent:
+    payment_id = f"payment-{suffix}"
     return PaymentFailedEvent(
         eventId=f"evt-failed-{suffix}-{order_id}",
-        userId="user",
-        sourceId="payment",
+        userId=user_id,
+        sourceId=payment_id,
         occurredAt=OCCURRED_AT,
         producer="payment-service",
         orderId=order_id,
-        paymentId=f"payment-{suffix}",
-        amount=500000,
+        paymentId=payment_id,
+        amount=amount,
         reason="declined",
     )
 

@@ -5,13 +5,14 @@ from typing import Annotated, Final, assert_never
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
+from middleware import is_safe_request_id
 from observability import (
+    REQUEST_ID_HEADER,
     RequestIdMiddleware,
     configure_process_observability,
     create_request_log_middleware,
     instrument_fastapi_app,
     observability_config_from_env,
-    request_id_middleware_options,
 )
 
 from app.models import (
@@ -58,10 +59,11 @@ class ReadOrderContext:
 def create_app(
     repository: OrderRepository | None = None,
 ) -> FastAPI:
+    order_metrics = OrderMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
     resources = (
-        AppResources(repository=repository)
+        AppResources(repository=repository, metrics=order_metrics)
         if repository is not None
-        else resources_from_env()
+        else resources_from_env(order_metrics)
     )
     app = FastAPI(
         title="DropMong Order Service API",
@@ -69,8 +71,6 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
-    order_metrics = OrderMetrics(SERVICE_NAME, SERVICE_VERSION, SERVICE_ENVIRONMENT)
-    resources.metrics = order_metrics
     _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
@@ -181,7 +181,12 @@ def create_app(
 def _configure_observability(app: FastAPI) -> None:
     config = observability_config_from_env(SERVICE_NAME, env=os.environ)
     configure_process_observability(config)
-    app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
+    app.add_middleware(
+        RequestIdMiddleware,
+        header_name=REQUEST_ID_HEADER,
+        update_request_header=True,
+        validator=is_safe_request_id,
+    )
     app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
 

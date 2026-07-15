@@ -15,6 +15,23 @@ class UnsupportedDowngradeError(Exception):
 
 
 @final
+class ExpiryIndexDefinitionError(Exception):
+    __slots__ = ("actual",)
+
+    def __init__(self, actual: str) -> None:
+        self.actual = actual
+        super().__init__(str(self))
+
+    @override
+    def __str__(self) -> str:
+        return (
+            "ix_orders_pending_expiry definition mismatch: expected non-unique "
+            "btree (expires_at,id) WHERE status='PENDING_PAYMENT' AND "
+            f"expires_at IS NOT NULL; found {self.actual}"
+        )
+
+
+@final
 class LegacySchemaError(Exception):
     __slots__ = ("detail",)
 

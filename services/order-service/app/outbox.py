@@ -10,6 +10,7 @@ from contracts import (
     NotificationRequestedEvent,
     OrderCreatedEvent,
     OrderExpiredEvent,
+    RefundRequestedEvent,
 )
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -100,6 +101,7 @@ def add_outbox_event(
         | NotificationRequestedEvent
         | InventoryChangedEvent
         | OrderExpiredEvent
+        | RefundRequestedEvent
     ),
 ) -> None:
     """Stage a domain event in the caller's database transaction."""
@@ -114,6 +116,9 @@ def add_outbox_event(
             aggregate_type = "order"
             aggregate_id = order_id
         case OrderExpiredEvent(orderId=order_id):
+            aggregate_type = "order"
+            aggregate_id = order_id
+        case RefundRequestedEvent(orderId=order_id):
             aggregate_type = "order"
             aggregate_id = order_id
         case unreachable:

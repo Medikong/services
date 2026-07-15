@@ -28,6 +28,7 @@ class OrderMetrics:
         self._outbox_published_total = 0
         self._outbox_retry_total = 0
         self._outbox_dead_lettered_total = 0
+        self._expiry_missing_inventory_due = 0
 
     def record_order_created(self) -> None:
         self._orders_created_total += 1
@@ -51,6 +52,9 @@ class OrderMetrics:
                 self._outbox_dead_lettered_total += 1
             case unreachable:
                 assert_never(unreachable)
+
+    def set_expiry_missing_inventory_due(self, count: int) -> None:
+        self._expiry_missing_inventory_due = count
 
     def render(self) -> str:
         return "".join(
@@ -119,6 +123,16 @@ class OrderMetrics:
                     "order_outbox_relay_total",
                     f'{self._labels},outcome="dead_lettered"',
                     self._outbox_dead_lettered_total,
+                ),
+                _metric_header(
+                    "order_expiry_missing_inventory_due",
+                    "Whether a due pending order lacks its inventory row.",
+                    "gauge",
+                ),
+                _metric_sample(
+                    "order_expiry_missing_inventory_due",
+                    self._labels,
+                    self._expiry_missing_inventory_due,
                 ),
             ],
         )

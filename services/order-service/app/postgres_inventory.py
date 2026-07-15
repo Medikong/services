@@ -3,11 +3,16 @@ from datetime import datetime
 from typing import assert_never
 
 from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.events import inventory_changed_event, order_expired_event
+from app.events import (
+    inventory_changed_event,
+    order_expired_event,
+    order_expired_notification_event,
+)
 from app.models import OrderId, OrderStatus
+from app.metrics import OrderMetrics
 from app.outbox import add_outbox_event
 from app.postgres_inbox import record_processed_event
 from app.postgres_mapping import order_from_record
@@ -76,24 +81,93 @@ async def expire_pending_order(
             or OrderStatus(order.status) is not OrderStatus.PENDING_PAYMENT
         ):
             return False
-        inventory = await _locked_inventory(session, order)
-        inventory.reserved_quantity -= order.quantity
-        inventory.version += 1
-        order.status = OrderStatus.EXPIRED.value
-        expired_order = order_from_record(order)
-        add_outbox_event(
-            session,
-            inventory_changed_event(
-                inventory,
-                cause_id=f"expire:{order.id}",
-                occurred_at=occurred_at,
-                user_id=order.user_id,
-                order_id=order.id,
-            ),
-        )
-        add_outbox_event(session, order_expired_event(expired_order, occurred_at))
+        await _expire_locked_order(session, order, occurred_at)
         await session.commit()
         return True
+
+
+async def expire_due_order(
+    session_factory: async_sessionmaker[AsyncSession],
+    now: datetime,
+    metrics: OrderMetrics | None = None,
+) -> bool:
+    async with session_factory() as session:
+        if metrics is not None:
+            missing_inventory_due = int(
+                (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(OrderRecord)
+                        .outerjoin(
+                            InventoryItemRecord,
+                            and_(
+                                InventoryItemRecord.drop_id == OrderRecord.drop_id,
+                                InventoryItemRecord.product_id
+                                == OrderRecord.product_id,
+                            ),
+                        )
+                        .where(
+                            OrderRecord.status == OrderStatus.PENDING_PAYMENT.value,
+                            OrderRecord.expires_at.is_not(None),
+                            OrderRecord.expires_at <= now,
+                            InventoryItemRecord.drop_id.is_(None),
+                        )
+                    )
+                ).scalar_one()
+            )
+            metrics.set_expiry_missing_inventory_due(missing_inventory_due)
+        order = (
+            await session.execute(
+                select(OrderRecord)
+                .join(
+                    InventoryItemRecord,
+                    and_(
+                        InventoryItemRecord.drop_id == OrderRecord.drop_id,
+                        InventoryItemRecord.product_id == OrderRecord.product_id,
+                    ),
+                )
+                .where(
+                    OrderRecord.status == OrderStatus.PENDING_PAYMENT.value,
+                    OrderRecord.expires_at.is_not(None),
+                    OrderRecord.expires_at <= now,
+                )
+                .order_by(OrderRecord.expires_at, OrderRecord.id)
+                .limit(1)
+                .with_for_update(of=OrderRecord, skip_locked=True),
+            )
+        ).scalar_one_or_none()
+        if order is None:
+            return False
+        await _expire_locked_order(session, order, now)
+        await session.commit()
+        return True
+
+
+async def _expire_locked_order(
+    session: AsyncSession,
+    order: OrderRecord,
+    occurred_at: datetime,
+) -> None:
+    inventory = await _locked_inventory(session, order)
+    inventory.reserved_quantity -= order.quantity
+    inventory.version += 1
+    order.status = OrderStatus.EXPIRED.value
+    expired_order = order_from_record(order)
+    add_outbox_event(
+        session,
+        inventory_changed_event(
+            inventory,
+            cause_id=f"expire:{order.id}",
+            occurred_at=occurred_at,
+            user_id=order.user_id,
+            order_id=order.id,
+        ),
+    )
+    add_outbox_event(session, order_expired_event(expired_order, occurred_at))
+    add_outbox_event(
+        session,
+        order_expired_notification_event(expired_order, occurred_at),
+    )
 
 
 async def apply_refund_completed(

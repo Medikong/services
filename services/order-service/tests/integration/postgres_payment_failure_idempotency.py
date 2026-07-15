@@ -63,7 +63,7 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
         event = PaymentFailedEvent(
             eventId="evt-payment-failed-duplicate",
             userId=command.user_id,
-            sourceId="payment-service",
+            sourceId="payment-duplicate",
             occurredAt=datetime.now(UTC),
             producer="payment-service",
             orderId=order_id,

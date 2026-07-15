@@ -78,7 +78,7 @@ async def test_duplicate_payment_event_changes_order_and_outbox_once() -> None:
         event = PaymentApprovedEvent(
             eventId="evt-payment-approved-duplicate-001",
             userId=created.order.userId,
-            sourceId="payment-service",
+            sourceId="payment-duplicate-001",
             occurredAt=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
             producer="payment-service",
             orderId=created.order.id,
@@ -124,7 +124,7 @@ async def test_missing_order_payment_event_is_recorded_before_it_is_ignored() ->
         event = PaymentFailedEvent(
             eventId="evt-payment-failed-missing-order-001",
             userId="user-missing-order",
-            sourceId="payment-service",
+            sourceId="payment-missing-order",
             occurredAt=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
             producer="payment-service",
             orderId="order-missing",

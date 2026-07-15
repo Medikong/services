@@ -4,7 +4,10 @@ from contracts import PaymentApprovedEvent, PaymentFailedEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.events import notification_requested_event
+from app.events import (
+    late_approval_refund_requested_event,
+    notification_requested_event,
+)
 from app.models import OrderId, OrderStatus, PaymentId
 from app.outbox import add_outbox_event
 from app.postgres_inbox import record_processed_event
@@ -13,7 +16,7 @@ from app.postgres_inventory import (
     sell_reserved_inventory,
 )
 from app.postgres_mapping import order_from_record
-from app.records import OrderRecord
+from app.records import OrderRecord, OutboxEventRecord
 from app.store import (
     PaymentAlreadyApplied,
     PaymentApplied,
@@ -32,14 +35,19 @@ async def apply_payment_approved(
 ) -> PaymentApprovalResult:
     """Apply one approved event with its Inbox and result Outbox atomically."""
     order_id = OrderId(event.orderId)
+    valid_provenance = _payment_event_has_valid_provenance(event)
     async with session_factory() as session:
         record = await _locked_order(session, order_id)
         if record is None:
-            await record_processed_event(session, event)
-            await session.commit()
+            if valid_provenance:
+                await record_processed_event(session, event)
+                await session.commit()
             return PaymentEventOrderMissing(order_id=order_id)
         status = OrderStatus(record.status)
-        if not await record_processed_event(session, event):
+        if not valid_provenance or not _payment_event_matches_order(record, event):
+            return PaymentIgnored(order=order_from_record(record))
+        processed = await record_processed_event(session, event)
+        if not processed and status is not OrderStatus.EXPIRED:
             return _approval_replay_result(record, status)
         match status:
             case OrderStatus.PENDING_PAYMENT:
@@ -56,11 +64,24 @@ async def apply_payment_approved(
             case OrderStatus.CONFIRMED:
                 await session.commit()
                 return PaymentAlreadyApplied(order=order_from_record(record))
+            case OrderStatus.EXPIRED:
+                expired_order = order_from_record(record)
+                refund_event = late_approval_refund_requested_event(
+                    expired_order,
+                    event.paymentId,
+                    event.occurredAt,
+                )
+                if await session.get(OutboxEventRecord, refund_event.eventId) is None:
+                    add_outbox_event(
+                        session,
+                        refund_event,
+                    )
+                await session.commit()
+                return PaymentIgnored(order=order_from_record(record))
             case (
                 OrderStatus.PAYMENT_FAILED
                 | OrderStatus.CANCEL_PENDING
                 | OrderStatus.CANCELED
-                | OrderStatus.EXPIRED
             ):
                 await session.commit()
                 return PaymentIgnored(order=order_from_record(record))
@@ -74,13 +95,17 @@ async def apply_payment_failed(
 ) -> PaymentFailureResult:
     """Apply one failed event with its Inbox and order transition atomically."""
     order_id = OrderId(event.orderId)
+    valid_provenance = _payment_event_has_valid_provenance(event)
     async with session_factory() as session:
         record = await _locked_order(session, order_id)
         if record is None:
-            await record_processed_event(session, event)
-            await session.commit()
+            if valid_provenance:
+                await record_processed_event(session, event)
+                await session.commit()
             return PaymentEventOrderMissing(order_id=order_id)
         status = OrderStatus(record.status)
+        if not valid_provenance or not _payment_event_matches_order(record, event):
+            return PaymentIgnored(order=order_from_record(record))
         if not await record_processed_event(session, event):
             return _failure_replay_result(record, status)
         match status:
@@ -129,6 +154,24 @@ def _approval_replay_result(
             return PaymentIgnored(order=order_from_record(record))
         case unreachable:
             assert_never(unreachable)
+
+
+def _payment_event_has_valid_provenance(
+    event: PaymentApprovedEvent | PaymentFailedEvent,
+) -> bool:
+    return event.producer == "payment-service" and event.sourceId == event.paymentId
+
+
+def _payment_event_matches_order(
+    order: OrderRecord,
+    event: PaymentApprovedEvent | PaymentFailedEvent,
+) -> bool:
+    """Validate order-dependent fields at the payment-service Kafka boundary.
+
+    A self-consistent arbitrary payment ID cannot be distinguished locally;
+    payment-service remains authoritative when executing a refund request.
+    """
+    return event.userId == order.user_id and event.amount == order.amount
 
 
 def _failure_replay_result(

@@ -1,5 +1,10 @@
+from datetime import timedelta
+
 import pytest
+from app.expiry import OrderExpiryWorker
 from app.models import OrderId
+from app.order_config import OrderPaymentPolicy
+from app.postgres import PostgresOrderRepository
 from app.store import OrderCreated
 from tests.integration.inventory_lifecycle_support import (
     OCCURRED_AT,
@@ -27,12 +32,21 @@ async def test_payment_lifecycle_moves_inventory_once_and_emits_absolute_version
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "approval"))
         assert isinstance(created, OrderCreated)
-        approval = approved(created.order.id)
+        approval = approved(
+            created.order.id, created.order.userId, created.order.amount
+        )
 
         # When
         await repository.apply_payment_approved(approval)
         await repository.apply_payment_approved(approval)
-        await repository.apply_payment_failed(failed(created.order.id, "late"))
+        await repository.apply_payment_failed(
+            failed(
+                created.order.id,
+                created.order.userId,
+                created.order.amount,
+                "late",
+            )
+        )
 
         # Then
         assert await inventory_state(session_factory, product_for_sale) == (
@@ -57,7 +71,12 @@ async def test_failure_and_expiry_release_reserved_inventory_once() -> None:
             command(product_for_sale, "failure")
         )
         assert isinstance(failed_order, OrderCreated)
-        failure = failed(failed_order.order.id, "declined")
+        failure = failed(
+            failed_order.order.id,
+            failed_order.order.userId,
+            failed_order.order.amount,
+            "declined",
+        )
 
         # When
         await repository.apply_payment_failed(failure)
@@ -86,8 +105,46 @@ async def test_failure_and_expiry_release_reserved_inventory_once() -> None:
                 "order.created",
                 "inventory.changed",
                 "order.expired",
+                "notification.requested",
             ]
         )
+
+
+@pytest.mark.anyio
+async def test_due_order_expires_at_the_payment_deadline() -> None:
+    # Given
+    product_for_sale = product("deadline")
+    async with inventory_repository(product_for_sale) as (_, session_factory):
+        repository = PostgresOrderRepository(
+            session_factory,
+            catalog=(product_for_sale,),
+            policy=OrderPaymentPolicy(
+                ttl=timedelta(minutes=5),
+                clock=lambda: OCCURRED_AT,
+            ),
+        )
+        created = await repository.create_order(command(product_for_sale, "deadline"))
+        assert isinstance(created, OrderCreated)
+        clock_times = iter(
+            (
+                OCCURRED_AT + timedelta(minutes=5) - timedelta(microseconds=1),
+                OCCURRED_AT + timedelta(minutes=5),
+                OCCURRED_AT + timedelta(minutes=5, microseconds=1),
+            )
+        )
+        worker = OrderExpiryWorker(repository, lambda: next(clock_times))
+
+        # When
+        before_deadline = await worker.process_once()
+        at_deadline = await worker.process_once()
+        after_deadline = await worker.process_once()
+
+        # Then
+        assert before_deadline is False
+        assert at_deadline is True
+        assert after_deadline is False
+        assert await order_status(session_factory, created.order.id) == "EXPIRED"
+        assert await inventory_state(session_factory, product_for_sale) == (42, 0, 0, 2)
 
 
 @pytest.mark.anyio
@@ -97,7 +154,9 @@ async def test_refund_completion_releases_sold_inventory_once() -> None:
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "refund"))
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         await mark_cancel_pending(session_factory, created.order.id)
         completed_refund = refund(created.order.id, "001", "evt-refund-completed-001")
 

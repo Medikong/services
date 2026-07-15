@@ -124,7 +124,7 @@ def test_payment_consumer_commits_offset_only_after_database_commit() -> None:
     event = PaymentFailedEvent(
         eventId="evt-offset-ordering-001",
         userId="user-001",
-        sourceId="payment-service",
+        sourceId="payment-001",
         occurredAt=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
         producer="payment-service",
         orderId="order-001",
