@@ -21,7 +21,9 @@ async def test_postgres_http_cancellation_returns_accepted_contract() -> None:
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "http"))
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         async with AsyncClient(
             transport=ASGITransport(app=create_app(repository)),
             base_url="http://order-service",
@@ -86,7 +88,9 @@ async def test_postgres_http_cancellation_rejects_shipped_order() -> None:
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "shipped"))
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         async with session_factory.begin() as session:
             await session.execute(
                 text(

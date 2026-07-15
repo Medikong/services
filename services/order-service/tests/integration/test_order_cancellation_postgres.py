@@ -28,7 +28,9 @@ async def test_confirmed_order_cancellation_commits_request_and_refund_once() ->
             command(product_for_sale, "cancellation")
         )
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         cancellation = RequestCancellationCommand(
             order_id=created.order.id,
             user_id=created.order.userId,

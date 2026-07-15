@@ -117,10 +117,10 @@ async def test_late_approval_requests_exactly_one_full_refund() -> None:
             )
         )
         await repository.apply_refund_completed(
-            refund(created.order.id, "terminal", "evt-refund-completed-late")
+            refund(created.order, "terminal", "evt-refund-completed-late")
         )
         await repository.apply_refund_completed(
-            refund(created.order.id, "terminal", "evt-refund-completed-late")
+            refund(created.order, "terminal", "evt-refund-completed-late")
         )
 
         # Then
@@ -144,7 +144,7 @@ async def test_late_approval_requests_exactly_one_full_refund() -> None:
         ]
         assert await order_status(session_factory, created.order.id) == "EXPIRED"
         assert await inventory_state(session_factory, product_for_sale) == (42, 0, 0, 2)
-        assert await inbox_count(session_factory) == 4
+        assert await inbox_count(session_factory) == 3
 
 
 @pytest.mark.anyio

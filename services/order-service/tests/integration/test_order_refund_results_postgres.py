@@ -27,7 +27,9 @@ async def test_refund_results_are_idempotent_and_restore_sold_inventory_once() -
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "refund"))
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         requested = await repository.request_cancellation(
             RequestCancellationCommand(
                 order_id=created.order.id,
@@ -148,7 +150,9 @@ async def test_invalid_refund_result_does_not_poison_genuine_event_id() -> None:
     async with inventory_repository(product_for_sale) as (repository, session_factory):
         created = await repository.create_order(command(product_for_sale, "poison"))
         assert isinstance(created, OrderCreated)
-        await repository.apply_payment_approved(approved(created.order.id))
+        await repository.apply_payment_approved(
+            approved(created.order.id, created.order.userId, created.order.amount)
+        )
         requested = await repository.request_cancellation(
             RequestCancellationCommand(
                 order_id=created.order.id,
