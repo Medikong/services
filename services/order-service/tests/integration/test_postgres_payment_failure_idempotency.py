@@ -43,8 +43,8 @@ async def test_payment_failed_records_inbox_once_when_duplicate_event_races() ->
     database_url = os.environ[ORDER_TEST_DATABASE_URL]
     schema_name = f"payment_failure_idempotency_{uuid4().hex}"
     product = ProductForSale(
-        drop_id=DropId("drop-payment-failure-idempotency"),
-        product_id=ProductId("product-payment-failure-idempotency"),
+        drop_id=DropId("drop-failure"),
+        product_id=ProductId("product-failure"),
         unit_price=50000,
     )
     command = CreateOrderCommand(

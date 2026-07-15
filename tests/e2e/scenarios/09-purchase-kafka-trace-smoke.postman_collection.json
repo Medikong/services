@@ -28,8 +28,7 @@
               "pm.collectionVariables.unset('orderTraceSearchRetries');",
               "pm.collectionVariables.unset('paymentTraceSearchRetries');",
               "pm.collectionVariables.unset('orderTraceDetailRetries');",
-              "pm.collectionVariables.unset('paymentTraceDetailRetries');",
-              "pm.test('trace check state reset', function () { pm.expect(true).to.eql(true); });"
+              "pm.collectionVariables.unset('paymentTraceDetailRetries');"
             ]
           }
         }

@@ -287,7 +287,7 @@
             "exec": [
               "pm.test('status is 409', function () { pm.response.to.have.status(409); });",
               "const body = pm.response.json();",
-              "pm.test('stock is sold out', function () { pm.expect(body.detail).to.eql('product sold out'); });"
+              "pm.test('stock is sold out', function () { pm.expect(body.error.message).to.eql('product sold out'); });"
             ]
           }
         }
@@ -344,7 +344,6 @@
               "  if (retries < 5) {",
               "    pm.collectionVariables.set('paymentFailureReadyRetries', String(retries + 1));",
               "    postman.setNextRequest('Fail stock draining payment');",
-              "    pm.test('payment failure retry scheduled', function () { pm.expect(true).to.eql(true); });",
               "  } else {",
               "    pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "    pm.collectionVariables.unset('paymentFailureReadyRetries');",
@@ -411,7 +410,6 @@
               "  if (retries < 5) {",
               "    pm.collectionVariables.set('releasedStockRetries', String(retries + 1));",
               "    postman.setNextRequest('Create order after payment failure releases stock');",
-              "    pm.test('released stock retry scheduled', function () { pm.expect(true).to.eql(true); });",
               "  } else {",
               "    pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "    pm.collectionVariables.unset('releasedStockRetries');",

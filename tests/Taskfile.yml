@@ -32,6 +32,8 @@ vars:
   PURCHASE_CONCURRENCY_SMOKE_IMAGE: '{{default "python:3.12-slim" .PURCHASE_CONCURRENCY_SMOKE_IMAGE}}'
   PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
   PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
+  PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+  PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
   OBS_E2E_COMPOSE_FILE: '{{default "tests/e2e/observability/docker-compose.yml" .OBS_E2E_COMPOSE_FILE}}'
@@ -922,6 +924,68 @@ tasks:
       PAYMENT_FAILURE_IDEMPOTENCY_SCENARIO_TIMEOUT_SECONDS: '{{default "60" .PAYMENT_FAILURE_IDEMPOTENCY_SCENARIO_TIMEOUT_SECONDS}}'
     cmds:
       - '"{{.PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/scripts/run_payment_failure_idempotency.py"'
+
+  test-purchase-postgres-integration:
+    desc: Run purchase PostgreSQL tests; a missing database is fatal.
+    cmds:
+      - |
+        set -eu
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        project='{{.PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        cleanup() {
+          status="$?"
+          set +e
+          ${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans
+          cleanup_status="$?"
+          if [ "${status}" -ne 0 ]; then exit "${status}"; fi
+          exit "${cleanup_status}"
+        }
+        trap cleanup EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres
+        for service in order-service payment-service catalog-service notification-service; do
+          task --dir "${repo_root}/tests" test-runner-build SERVICE="${service}"
+        done
+        docker run --rm --network "${project}_default" \
+          -e ORDER_TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/order_service \
+          -e TEST_DATABASE_URL=postgresql://app:app@postgres:5432/order_service \
+          -v "${repo_root}":/workspace -w /workspace/services/order-service \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-order-service:local \
+          sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration tests/test_migrations.py tests/test_order_expiry_migration.py'
+        docker run --rm --network "${project}_default" \
+          -e PAYMENT_TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/payment_service \
+          -v "${repo_root}":/workspace -w /workspace/services/payment-service \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-payment-service:local \
+          sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration'
+        docker run --rm --network "${project}_default" \
+          -e TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/catalog_service \
+          -v "${repo_root}":/workspace -w /workspace/services/catalog-service \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-catalog-service:local \
+          sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/test_catalog_postgres.py tests/test_inventory_projection_postgres.py'
+        docker run --rm --network "${project}_default" \
+          -e NOTIFICATION_TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/notification_service \
+          -v "${repo_root}":/workspace -w /workspace/services/notification-service \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-notification-service:local \
+          sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration'
+
+  purchase-lifecycle-e2e:
+    desc: Run PostgreSQL, API/Kafka purchase, and notification replay gates.
+    env:
+      COMPOSE_PARALLEL_LIMIT: "1"
+    cmds:
+      - task: test-purchase-postgres-integration
+        vars:
+          PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{.PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}-postgres'
+      - task: purchase-e2e-with-metrics
+        vars:
+          E2E_COMPOSE_PROJECT: '{{.PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}-metrics'
+          E2E_NETWORK: '{{.PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}-metrics_default'
+          E2E_REPORT_NAME: purchase-lifecycle
+      - task: purchase-e2e-with-notification-metrics
+        vars:
+          E2E_COMPOSE_PROJECT: '{{.PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}-notifications'
 
   purchase-e2e-up:
     desc: Start the Python purchase-flow E2E Docker Compose services.

@@ -15,6 +15,8 @@ vars:
   DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
+  PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+  PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
   GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
@@ -285,6 +287,20 @@ tasks:
         vars:
           PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
           PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
+
+  test-purchase-postgres-integration:
+    desc: Run purchase migration and integration tests against required PostgreSQL 16.
+    cmds:
+      - task: tests:test-purchase-postgres-integration
+        vars:
+          PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{.PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+
+  purchase-lifecycle-e2e:
+    desc: Run durable purchase lifecycle gates with isolated Compose projects.
+    cmds:
+      - task: tests:purchase-lifecycle-e2e
+        vars:
+          PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{.PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
 
   purchase-internal-regression:
     desc: Run the Gateway-excluded, internal-only purchase regression from committed HEAD.

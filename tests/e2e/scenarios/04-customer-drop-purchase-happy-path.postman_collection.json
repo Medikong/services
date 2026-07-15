@@ -159,10 +159,22 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-              "const body = pm.response.json();",
-              "pm.test('payment is approved', function () { pm.expect(body.data.status).to.eql('APPROVED'); });",
-              "pm.environment.set('paymentId', body.data.id);"
+              "if (pm.response.code !== 201) {",
+              "  const retries = Number(pm.collectionVariables.get('paymentReadyRetries') || '0');",
+              "  if (retries < 5) {",
+              "    pm.collectionVariables.set('paymentReadyRetries', String(retries + 1));",
+              "    pm.execution.setNextRequest('Approve mock payment');",
+              "  } else {",
+              "    pm.test('status is 201 before retry timeout', function () { pm.response.to.have.status(201); });",
+              "    pm.collectionVariables.unset('paymentReadyRetries');",
+              "  }",
+              "} else {",
+              "  const body = pm.response.json();",
+              "  pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "  pm.test('payment is approved', function () { pm.expect(body.data.status).to.eql('APPROVED'); });",
+              "  pm.environment.set('paymentId', body.data.id);",
+              "  pm.collectionVariables.unset('paymentReadyRetries');",
+              "}"
             ]
           }
         }
@@ -223,7 +235,6 @@
               "  if (retries < 5) {",
               "    pm.collectionVariables.set('orderStatusRetries', String(retries + 1));",
               "    postman.setNextRequest('Get confirmed order');",
-              "    pm.test('order confirmation retry scheduled', function () { pm.expect(true).to.eql(true); });",
               "  } else {",
               "    pm.test('order is confirmed', function () { pm.expect(status).to.eql('CONFIRMED'); });",
               "    pm.collectionVariables.unset('orderStatusRetries');",
@@ -281,7 +292,6 @@
               "  if (retries < 5) {",
               "    pm.collectionVariables.set('notificationRetries', String(retries + 1));",
               "    postman.setNextRequest('List notifications');",
-              "    pm.test('notification retry scheduled', function () { pm.expect(true).to.eql(true); });",
               "  } else {",
               "    pm.test('order confirmed notification exists', function () { pm.expect(matched).to.eql(true); });",
               "    pm.collectionVariables.unset('notificationRetries');",

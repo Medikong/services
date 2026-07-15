@@ -11,7 +11,9 @@ ENV PATH="/workspace/services/catalog-service/.venv/bin:${PATH}"
 
 COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 
+COPY packages/contracts packages/contracts
 COPY packages/errors packages/errors
+COPY packages/kafka-utils packages/kafka-utils
 COPY packages/middleware packages/middleware
 COPY packages/observability packages/observability
 COPY services/catalog-service services/catalog-service

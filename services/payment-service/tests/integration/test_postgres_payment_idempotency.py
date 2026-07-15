@@ -35,9 +35,7 @@ PAYMENT_TEST_DATABASE_URL: Final = "PAYMENT_TEST_DATABASE_URL"
 @pytest.mark.anyio
 async def test_fail_mock_payment_replays_one_failure_when_two_sessions_race() -> None:
     # Given
-    database_url = os.getenv(PAYMENT_TEST_DATABASE_URL)
-    if database_url is None or database_url == "":
-        pytest.skip(f"{PAYMENT_TEST_DATABASE_URL} is not set")
+    database_url = os.environ[PAYMENT_TEST_DATABASE_URL]
 
     schema_name = f"payment_idempotency_{uuid4().hex}"
     order_created = OrderCreatedEvent(

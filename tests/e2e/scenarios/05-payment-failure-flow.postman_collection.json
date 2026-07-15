@@ -181,7 +181,6 @@
               "  if (retries < 5) {",
               "    pm.collectionVariables.set('paymentFailureOrderRetries', String(retries + 1));",
               "    postman.setNextRequest('Get failed order');",
-              "    pm.test('payment failure retry scheduled', function () { pm.expect(true).to.eql(true); });",
               "  } else {",
               "    pm.test('order is payment failed', function () { pm.expect(status).to.eql('PAYMENT_FAILED'); });",
               "    pm.collectionVariables.unset('paymentFailureOrderRetries');",
