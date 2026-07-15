@@ -11,7 +11,9 @@ YamlValue: TypeAlias = (
 
 
 def load_openapi(service: str) -> dict[str, YamlValue]:
-    contract_path = REPOSITORY_ROOT / "contracts" / "services" / service / "openapi.yaml"
+    contract_path = (
+        REPOSITORY_ROOT / "contracts" / "services" / service / "openapi.yaml"
+    )
     with contract_path.open(encoding="utf-8") as contract_file:
         return yaml.safe_load(contract_file)
 
