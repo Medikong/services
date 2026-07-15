@@ -96,9 +96,14 @@ def test_kafka_publisher_uses_stored_correlation_id_and_order_key(
     # Given
     producer = RecordingProducer()
     captured_correlation_ids: list[str] = []
+    captured_trace_contexts: list[dict[str, dict[str, str]]] = []
     monkeypatch.setattr(
         "app.messaging.with_correlation_id",
         lambda value: captured_correlation_ids.append(value),
+    )
+    monkeypatch.setattr(
+        "app.messaging.with_trace_context",
+        lambda value: captured_trace_contexts.append(value),
     )
     publisher = KafkaOutboxPublisher(cast(TraceAwareKafkaProducer, producer))
     message = OutboxMessage(
@@ -106,6 +111,11 @@ def test_kafka_publisher_uses_stored_correlation_id_and_order_key(
         topic="order.created",
         message_key="order-001",
         payload={"eventId": "event-001", "correlationId": "request-001"},
+        trace_context={
+            "carrier": {
+                "traceparent": "00-4f3b2c1a9d8e7f60123456789abcdef0-6f1a2b3c4d5e6f70-01"
+            }
+        },
     )
 
     # When
@@ -113,6 +123,7 @@ def test_kafka_publisher_uses_stored_correlation_id_and_order_key(
 
     # Then
     assert captured_correlation_ids == ["request-001"]
+    assert captured_trace_contexts == [message.trace_context]
     assert producer.topic == "order.created"
     assert producer.value == message.payload
     assert producer.key == b"order-001"

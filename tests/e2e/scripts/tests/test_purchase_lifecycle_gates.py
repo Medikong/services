@@ -40,6 +40,9 @@ def test_lifecycle_tasks_use_unique_compose_projects_and_cleanup() -> None:
     assert "postgres:16-alpine" in (
         REPOSITORY_ROOT / "tests/e2e/docker-compose.yml"
     ).read_text(encoding="utf-8")
+    assert "pg_isready -h 127.0.0.1" in (
+        REPOSITORY_ROOT / "tests/e2e/docker-compose.yml"
+    ).read_text(encoding="utf-8")
     assert "down -v --remove-orphans" in postgres_task
     assert "ORDER_TEST_DATABASE_URL" in postgres_task
     assert "PAYMENT_TEST_DATABASE_URL" in postgres_task

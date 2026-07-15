@@ -12,17 +12,19 @@ from contracts import (
     OrderExpiredEvent,
     RefundRequestedEvent,
 )
+from observability import capture_current_trace_context
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.metrics import OrderMetrics, OutboxRelayOutcome
-from app.records import OutboxEventRecord
+from app.records import JsonValue, OutboxEventRecord
 
 MAX_RETRY_DELAY: Final = timedelta(minutes=5)
 MAX_RELAY_ATTEMPTS: Final = 10
 MAX_ERROR_LENGTH: Final = 500
 RELAY_IDLE_DELAY_SECONDS: Final = 0.25
 type RelayPayload = Mapping[str, str | int | None]
+type TraceContextPayload = Mapping[str, JsonValue]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +33,7 @@ class OutboxMessage:
     topic: str
     message_key: str
     payload: RelayPayload
+    trace_context: TraceContextPayload | None = None
 
 
 class OutboxPublisher(Protocol):
@@ -62,6 +65,7 @@ class OutboxRelay:
                 topic=record.topic,
                 message_key=record.message_key,
                 payload=record.payload,
+                trace_context=record.trace_context,
             )
             try:
                 await self._publisher.publish(message)
@@ -123,6 +127,7 @@ def add_outbox_event(
             aggregate_id = order_id
         case unreachable:
             assert_never(unreachable)
+    trace_context = capture_current_trace_context()
     session.add(
         OutboxEventRecord(
             event_id=event.eventId,
@@ -132,6 +137,9 @@ def add_outbox_event(
             topic=event.eventType,
             message_key=aggregate_id,
             payload=event.model_dump(mode="json"),
+            trace_context=(
+                trace_context.as_dict() if trace_context is not None else None
+            ),
             occurred_at=event.occurredAt,
             attempts=0,
         ),

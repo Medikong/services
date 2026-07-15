@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 type EventPayload = dict[str, str | int | None]
+type JsonValue = str | int | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
 
 class Base(DeclarativeBase):
@@ -170,6 +171,10 @@ class OutboxEventRecord(Base):
     topic: Mapped[str] = mapped_column(String(128), nullable=False)
     message_key: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[EventPayload] = mapped_column(JSONB, nullable=False)
+    trace_context: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

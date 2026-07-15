@@ -24,6 +24,7 @@ class ColumnSpec:
     name: str
     sql_type: str
     nullable: bool = False
+    optional: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +185,7 @@ TARGET_TABLE_CONTRACTS: Final[Mapping[str, TableContract]] = MappingProxyType(
                 ColumnSpec("last_error", "TEXT", True),
                 ColumnSpec("published_at", "TIMESTAMP WITH TIME ZONE", True),
                 ColumnSpec("dead_lettered_at", "TIMESTAMP WITH TIME ZONE", True),
+                ColumnSpec("trace_context", "JSONB", True, True),
             ),
             primary_key=("event_id",),
             checks=(

@@ -1,5 +1,7 @@
 import logging
-from typing import Final, Protocol
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Final, Protocol, override
 
 import anyio
 from aiokafka.errors import KafkaError
@@ -13,8 +15,10 @@ from app.messaging import (
 from app.refund_messaging import RefundRequestedConsumerFactory
 from app.refund_worker import RefundWorker
 
-WORKER_RETRY_DELAY_SECONDS: Final = 1.0
-WORKER_STOP_TIMEOUT_SECONDS: Final = 5.0
+WORKER_MAX_ATTEMPTS: Final[int] = 5
+WORKER_RETRY_BASE_DELAY_SECONDS: Final[float] = 1.0
+WORKER_RETRY_MAX_DELAY_SECONDS: Final[float] = 4.0
+WORKER_STOP_TIMEOUT_SECONDS: Final[float] = 5.0
 LOGGER: Final = logging.getLogger(__name__)
 
 
@@ -22,65 +26,84 @@ class StoppableConsumer(Protocol):
     async def stop(self) -> None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class WorkerRetriesExhausted(RuntimeError):
+    worker_name: str
+    attempts: int
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.worker_name} worker failed after {self.attempts} attempts"
+
+
 async def run_outbox_worker(factory: OutboxWorkerFactory) -> None:
-    while True:
+    async def run_once() -> None:
         publisher, relay = factory()
         try:
             await publisher.start()
             await relay.run()
-        except (KafkaError, SQLAlchemyError, OSError, RuntimeError) as error:
-            LOGGER.warning("outbox worker restarting after %s", type(error).__name__)
         finally:
             await _stop_publisher(publisher)
-        await anyio.sleep(WORKER_RETRY_DELAY_SECONDS)
+
+    await _run_with_retries("outbox", run_once)
 
 
 async def run_order_created_consumer_worker(
     factory: OrderCreatedConsumerFactory,
 ) -> None:
-    while True:
+    async def run_once() -> None:
         consumer = factory()
         try:
             await consumer.start()
             await consumer.run()
-        except (KafkaError, SQLAlchemyError, OSError, RuntimeError) as error:
-            LOGGER.warning(
-                "order.created consumer restarting after %s",
-                type(error).__name__,
-            )
         finally:
             await _stop_consumer(consumer)
-        await anyio.sleep(WORKER_RETRY_DELAY_SECONDS)
+
+    await _run_with_retries("order.created consumer", run_once)
 
 
 async def run_refund_requested_consumer_worker(
     factory: RefundRequestedConsumerFactory,
 ) -> None:
-    while True:
+    async def run_once() -> None:
         consumer = factory()
         try:
             await consumer.start()
             await consumer.run()
-        except (KafkaError, SQLAlchemyError, OSError, RuntimeError) as error:
-            LOGGER.warning(
-                "refund.requested consumer restarting after %s",
-                type(error).__name__,
-            )
         finally:
             await _stop_consumer(consumer)
-        await anyio.sleep(WORKER_RETRY_DELAY_SECONDS)
+
+    await _run_with_retries("refund.requested consumer", run_once)
 
 
 async def run_refund_worker(worker: RefundWorker) -> None:
-    while True:
+    await _run_with_retries("refund", worker.run)
+
+
+async def _run_with_retries(
+    worker_name: str,
+    run_once: Callable[[], Awaitable[None]],
+) -> None:
+    for attempt in range(1, WORKER_MAX_ATTEMPTS + 1):
         try:
-            await worker.run()
-        except (SQLAlchemyError, OSError, RuntimeError) as error:
-            LOGGER.warning(
-                "refund worker restarting after %s",
-                type(error).__name__,
+            await run_once()
+            return
+        except (KafkaError, SQLAlchemyError, OSError, RuntimeError) as error:
+            if attempt == WORKER_MAX_ATTEMPTS:
+                raise WorkerRetriesExhausted(worker_name, attempt) from error
+            delay: float = min(
+                WORKER_RETRY_BASE_DELAY_SECONDS * 2.0 ** (attempt - 1),
+                WORKER_RETRY_MAX_DELAY_SECONDS,
             )
-        await anyio.sleep(WORKER_RETRY_DELAY_SECONDS)
+            LOGGER.warning(
+                "%s worker retrying after %s (attempt %d/%d, delay %.1fs)",
+                worker_name,
+                type(error).__name__,
+                attempt,
+                WORKER_MAX_ATTEMPTS,
+                delay,
+            )
+            await anyio.sleep(delay)
 
 
 async def _stop_publisher(publisher: KafkaOutboxPublisher) -> None:

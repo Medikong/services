@@ -295,6 +295,11 @@ tasks:
         vars:
           PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{.PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
 
+  test-purchase-contracts:
+    desc: Run shared purchase event and OpenAPI contract tests.
+    cmds:
+      - task: tests:test-purchase-contracts
+
   purchase-lifecycle-e2e:
     desc: Run durable purchase lifecycle gates with isolated Compose projects.
     cmds:
@@ -308,6 +313,7 @@ tasks:
       INTERNAL_REGRESSION_SOURCE_ROOT: '{{.TASKFILE_DIR}}'
       INTERNAL_REGRESSION_PROJECT_PREFIX: '{{default "dropmong-g009-internal-regression" .INTERNAL_REGRESSION_PROJECT_PREFIX}}'
       INTERNAL_REGRESSION_TASK_BIN: '{{default "" .INTERNAL_REGRESSION_TASK_BIN}}'
+      INTERNAL_REGRESSION_START_GATE: '{{default "1" .INTERNAL_REGRESSION_START_GATE}}'
     cmds:
       - '"{{.PYTHON_BIN}}" "{{.TASKFILE_DIR}}/tests/e2e/scripts/run_purchase_internal_regression.py"'
 

@@ -6,9 +6,16 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import TextIO
+
+from purchase_internal_regression_cleanup import (
+    CleanupFailure,
+    CleanupIO,
+    cleanup_resources,
+)
 
 from purchase_internal_regression_support import (
     PORT_VARIABLES,
@@ -18,6 +25,7 @@ from purchase_internal_regression_support import (
     build_gates,
     config_from_env,
     gate_argv,
+    parse_start_gate,
     validate_project_prefix,
 )
 
@@ -30,10 +38,6 @@ class RunnerExecutionError(RuntimeError):
     def __init__(self, message: str, exit_code: int = 1) -> None:
         super().__init__(message)
         self.exit_code = exit_code if 0 < exit_code < 256 else 1
-
-
-class CleanupFailure(RuntimeError):
-    """Report failure to remove the isolated clone."""
 
 
 def run_process(
@@ -88,7 +92,7 @@ def clone_committed_head(config: RunnerConfig, clone_root: Path) -> None:
         "-c",
         f"safe.directory={config.source_root}",
         "-c",
-        f"safe.directory={config.source_root / '.git'}",
+        f"safe.directory={config.git_dir}",
         "clone",
         "--no-hardlinks",
         "--quiet",
@@ -111,8 +115,15 @@ def run_gates(config: RunnerConfig, clone_root: Path, gates: tuple[Gate, ...]) -
         )
         environment = dict(os.environ)
         environment.update(gate.variables)
+        started_at = time.monotonic()
         result = run_process(argv, cwd=clone_root, env=environment)
+        duration_seconds = time.monotonic() - started_at
         _emit_output(result)
+        print(
+            f"gate={gate.task_name} duration_seconds={duration_seconds:.3f} "
+            f"exit_code={result.returncode}",
+            flush=True,
+        )
         if result.returncode != 0:
             raise RunnerExecutionError(
                 f"gate failed: {gate.task_name}",
@@ -124,7 +135,7 @@ def execute(config: RunnerConfig, *, run_token: str | None = None) -> None:
     """Clone committed HEAD, run all gates, and always remove the clone."""
     token = run_token or uuid.uuid4().hex[:8]
     run_prefix = f"{config.project_prefix}-{token}"
-    gates = build_gates(run_prefix)
+    gates = build_gates(run_prefix)[config.start_gate - 1 :]
     temporary_root = Path(tempfile.mkdtemp(prefix="purchase-internal-regression-"))
     clone_root = temporary_root / "services"
     print("Gateway JWT is excluded; this regression is internal only.", flush=True)
@@ -133,12 +144,21 @@ def execute(config: RunnerConfig, *, run_token: str | None = None) -> None:
         run_gates(config, clone_root, gates)
     finally:
         primary_failure = sys.exception()
+        cleanup_failure: CleanupFailure | None = None
+        try:
+            cleanup_resources(config, gates, CleanupIO(run_process, _emit_output))
+        except CleanupFailure as exc:
+            cleanup_failure = exc
         try:
             shutil.rmtree(temporary_root)
         except OSError as exc:
+            cleanup_failure = CleanupFailure(f"temporary clone cleanup failed: {exc}")
+        if cleanup_failure is not None:
             if primary_failure is None:
-                raise CleanupFailure(f"temporary clone cleanup failed: {exc}") from exc
-            LOGGER.error("cleanup failed after original failure: %s", exc)
+                raise cleanup_failure
+            LOGGER.error("cleanup failed after original failure: %s", cleanup_failure)
+        else:
+            print("cleanup remaining temp_clones=0", flush=True)
 
 
 def main() -> int:

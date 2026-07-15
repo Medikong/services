@@ -50,8 +50,12 @@ def _contract_issues(
 ) -> tuple[str, ...]:
     issues: list[str] = []
     actual_columns = inspector.get_columns(table_name)
-    expected_names = tuple(column.name for column in contract.columns)
     actual_names = tuple(column["name"] for column in actual_columns)
+    expected_names = tuple(
+        column.name
+        for column in contract.columns
+        if not column.optional or column.name in actual_names
+    )
     if actual_names != expected_names:
         issues.append(f"columns expected {expected_names}, found {actual_names}")
     actual_by_name = {column["name"]: column for column in actual_columns}
@@ -103,7 +107,9 @@ def _missing_columns(
 ) -> tuple[str, ...]:
     actual_names = {column["name"] for column in inspector.get_columns(table_name)}
     return tuple(
-        column.name for column in contract.columns if column.name not in actual_names
+        column.name
+        for column in contract.columns
+        if not column.optional and column.name not in actual_names
     )
 
 

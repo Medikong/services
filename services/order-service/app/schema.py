@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError, TimeoutError as SQLAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-ORDER_SCHEMA_REVISION: Final = "20260715_0002"
+ORDER_SCHEMA_REVISION: Final = "20260715_0003"
 DATABASE_READINESS_TIMEOUT_SECONDS: Final = 2.0
 
 

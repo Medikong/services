@@ -4,7 +4,7 @@ import anyio
 from kafka_utils import KafkaProducerOption, with_correlation_id, with_trace_context
 import pytest
 
-from app.kafka_workers import run_outbox_worker
+from app.kafka_workers import WorkerRetriesExhausted, run_outbox_worker
 from app.messaging import KafkaOutboxPublisher, OutboxWorkerRelay
 from app.outbox import OutboxMessage, RelayPayload, TraceContextPayload
 
@@ -126,7 +126,7 @@ def test_outbox_worker_recovery_uses_fresh_kafka_client(
         relay = FailingRelay() if len(publishers) == 1 else CompletingRelay()
         return publisher, relay
 
-    monkeypatch.setattr("app.kafka_workers.WORKER_RETRY_DELAY_SECONDS", 0)
+    monkeypatch.setattr("app.kafka_workers.WORKER_RETRY_BASE_DELAY_SECONDS", 0)
 
     # When
     with pytest.raises(WorkerComplete):
@@ -136,4 +136,33 @@ def test_outbox_worker_recovery_uses_fresh_kafka_client(
     assert len(publishers) == 2
     assert publishers[0] is not publishers[1]
     assert all(publisher.started for publisher in publishers)
+    assert all(publisher.stopped for publisher in publishers)
+
+
+def test_outbox_worker_raises_after_bounded_exponential_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    publishers: list[RestartRecordingPublisher] = []
+    delays: list[float] = []
+
+    def worker_factory() -> tuple[KafkaOutboxPublisher, OutboxWorkerRelay]:
+        publisher = RestartRecordingPublisher()
+        publishers.append(publisher)
+        return publisher, FailingRelay()
+
+    async def record_delay(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("app.kafka_workers.anyio.sleep", record_delay)
+
+    # When
+    with pytest.raises(WorkerRetriesExhausted) as raised:
+        anyio.run(run_outbox_worker, worker_factory)
+
+    # Then
+    assert raised.value.worker_name == "outbox"
+    assert raised.value.attempts == 5
+    assert len(publishers) == 5
+    assert delays == [1.0, 2.0, 4.0, 4.0]
     assert all(publisher.stopped for publisher in publishers)

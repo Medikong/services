@@ -89,7 +89,7 @@ def test_upgrade_creates_versioned_schema_on_fresh_database(
     assert result.returncode == 0, result.stderr
     tables, revision, inventory_count = anyio.run(schema_state, clean_database)
     assert tables == EXPECTED_TABLES
-    assert revision == "20260715_0002"
+    assert revision == "20260715_0003"
     assert inventory_count == 2
     assert expected_lifecycle_columns <= anyio.run(order_columns, clean_database)
 
@@ -318,7 +318,7 @@ def test_exact_unversioned_target_table_contract_is_accepted(
 
     # Then
     assert second_result.returncode == 0, second_result.stderr
-    assert anyio.run(current_revision, clean_database) == "20260715_0002"
+    assert anyio.run(current_revision, clean_database) == "20260715_0003"
 
 
 def test_contract_shaped_target_with_incompatible_rows_is_rejected(

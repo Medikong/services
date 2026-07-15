@@ -11,14 +11,18 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import purchase_internal_regression_support as support
 import run_purchase_internal_regression as runner
 
 
 EXPECTED_TASKS = (
     "test-services",
+    "test-purchase-contracts",
+    "test-purchase-postgres-integration",
     "purchase-e2e-with-metrics",
     "purchase-e2e-concurrency",
     "payment-failure-idempotency",
+    "purchase-lifecycle-e2e",
     "purchase-e2e-with-traces",
     "purchase-e2e-with-kafka-traces",
     "purchase-e2e-with-log-correlation",
@@ -32,13 +36,18 @@ def make_config(tmp_path: Path) -> runner.RunnerConfig:
     (source_root / ".git").mkdir()
     task_bin = tmp_path / "task.exe"
     git_bin = tmp_path / "git.exe"
+    docker_bin = tmp_path / "docker.exe"
     task_bin.touch()
     git_bin.touch()
+    docker_bin.touch()
     return runner.RunnerConfig(
         source_root=source_root,
+        git_dir=source_root / ".git",
         task_bin=task_bin,
         git_bin=git_bin,
+        docker_bin=docker_bin,
         project_prefix="dropmong-g009-internal-regression",
+        start_gate=1,
     )
 
 
@@ -56,8 +65,11 @@ def test_root_taskfile_exposes_both_internal_regression_wrappers() -> None:
     assert "  purchase-e2e-with-log-correlation:" in taskfile
     assert "task: tests:purchase-e2e-with-log-correlation" in taskfile
     assert "  purchase-internal-regression:" in taskfile
+    assert "  test-purchase-contracts:" in taskfile
+    assert "task: tests:test-purchase-contracts" in taskfile
     assert "{{.TASKFILE_DIR}}/tests/e2e/scripts/run_purchase_internal_regression.py" in taskfile
     assert "INTERNAL_REGRESSION_SOURCE_ROOT: '{{.TASKFILE_DIR}}'" in taskfile
+    assert "INTERNAL_REGRESSION_START_GATE:" in taskfile
     internal_task = taskfile.split("  purchase-internal-regression:", 1)[1]
     assert "bash" not in internal_task.split("\n  ", 1)[0].lower()
 
@@ -70,13 +82,20 @@ def test_gates_have_exact_order_projects_and_zero_ports(tmp_path: Path) -> None:
     assert dict(gates[0].variables)["SERVICES"] == (
         "catalog-service order-service payment-service notification-service"
     )
+    unit_args = dict(gates[0].variables)["PYTEST_ARGS"]
+    assert "--ignore=tests/integration" in unit_args
+    assert "--ignore=tests/test_migrations.py" in unit_args
+    assert "--ignore=tests/test_catalog_postgres.py" in unit_args
     project_values: list[str] = []
     network_values: list[str] = []
     project_keys = (
         None,
+        None,
+        "PURCHASE_POSTGRES_COMPOSE_PROJECT",
         "E2E_COMPOSE_PROJECT",
         "PURCHASE_CONCURRENCY_COMPOSE_PROJECT",
         "PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT",
+        "PURCHASE_LIFECYCLE_COMPOSE_PREFIX",
         "E2E_COMPOSE_PROJECT",
         "E2E_COMPOSE_PROJECT",
         "E2E_COMPOSE_PROJECT",
@@ -96,11 +115,11 @@ def test_gates_have_exact_order_projects_and_zero_ports(tmp_path: Path) -> None:
                 network_values.append(network)
             else:
                 assert "E2E_NETWORK" not in variables
-    assert len(project_values) == len(set(project_values)) == 7
+    assert len(project_values) == len(set(project_values)) == 9
     assert len(network_values) == len(set(network_values)) == 5
     suffixes = (
-        "metrics", "concurrency", "payment-failure", "traces", "kafka-traces",
-        "log-correlation", "notification-metrics",
+        "postgres", "metrics", "concurrency", "payment-failure", "lifecycle",
+        "traces", "kafka-traces", "log-correlation", "notification-metrics",
     )
     expected_projects = tuple(f"{run_prefix}-{suffix}" for suffix in suffixes)
     assert tuple(project_values) == expected_projects
@@ -139,6 +158,22 @@ def test_run_gates_fails_fast_and_preserves_output_and_code(
     assert "failed stderr" in output.err
 
 
+def test_windows_task_failure_code_is_preserved() -> None:
+    error = runner.RunnerExecutionError("task failed", 201)
+    assert error.exit_code == 201
+
+
+@pytest.mark.parametrize(("value", "expected"), (("1", 1), ("11", 11)))
+def test_resume_gate_boundary_is_parsed(value: str, expected: int) -> None:
+    assert runner.parse_start_gate(value) == expected
+
+
+@pytest.mark.parametrize("value", ("", "0", "12", "two"))
+def test_invalid_resume_gate_is_rejected(value: str) -> None:
+    with pytest.raises(runner.RunnerInputError):
+        runner.parse_start_gate(value)
+
+
 def test_clone_uses_safe_directories_and_no_hardlinks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -163,10 +198,19 @@ def test_clone_uses_safe_directories_and_no_hardlinks(
         "-c",
         f"safe.directory={config.source_root}",
         "-c",
-        f"safe.directory={config.source_root / '.git'}",
+        f"safe.directory={config.git_dir}",
     )
     assert argv[5:8] == ("clone", "--no-hardlinks", "--quiet")
     assert argv[-2:] == (str(config.source_root), str(clone_root))
+
+
+def test_linked_worktree_git_directory_is_resolved(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    git_dir = tmp_path / "main.git" / "worktrees" / "source"
+    git_dir.mkdir(parents=True)
+    (source_root / ".git").write_text(f"gitdir: {git_dir}\n", encoding="utf-8")
+    assert support._resolve_git_dir(source_root) == git_dir.resolve(strict=True)
 
 
 def test_cleanup_failure_does_not_mask_primary_failure(
@@ -187,6 +231,7 @@ def test_cleanup_failure_does_not_mask_primary_failure(
         "clone_committed_head",
         lambda *_args: (_ for _ in ()).throw(runner.RunnerExecutionError("gate", 29)),
     )
+    monkeypatch.setattr(runner, "cleanup_resources", lambda *_args: None)
     monkeypatch.setattr(
         runner.shutil,
         "rmtree",
@@ -231,6 +276,7 @@ def test_internal_only_message_is_explicit(
         lambda *_args: tmp_path / "clone",
     )
     monkeypatch.setattr(runner, "run_gates", lambda *_args: None)
+    monkeypatch.setattr(runner, "cleanup_resources", lambda *_args: None)
     runner.execute(config, run_token="a1b2c3d4")
     message = "Gateway JWT is excluded; this regression is internal only."
     assert message in capsys.readouterr().out

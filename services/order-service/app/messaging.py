@@ -17,6 +17,7 @@ from kafka_utils import (
     create_kafka_producer,
     start_consumer_span,
     with_correlation_id,
+    with_trace_context,
 )
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -63,6 +64,7 @@ class KafkaOutboxPublisher:
             message.topic,
             message.payload,
             with_correlation_id(correlation_id),
+            with_trace_context(message.trace_context),
             key=message.message_key.encode("utf-8"),
         )
 

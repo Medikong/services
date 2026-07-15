@@ -970,6 +970,20 @@ tasks:
           {{.TEST_RUNNER_IMAGE_PREFIX}}-notification-service:local \
           sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration'
 
+  test-purchase-contracts:
+    desc: Run shared purchase event and OpenAPI contract tests.
+    cmds:
+      - task: test-runner-build
+        vars:
+          SERVICE: order-service
+      - |
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        docker run --rm \
+          -v "${repo_root}":/workspace \
+          -w /workspace/packages/contracts \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-order-service:local \
+          sh -c 'PYTHONPATH=src python -m pytest -p no:cacheprovider -q --maxfail=1 tests'
+
   purchase-lifecycle-e2e:
     desc: Run PostgreSQL, API/Kafka purchase, and notification replay gates.
     env:
