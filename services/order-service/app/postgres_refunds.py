@@ -10,14 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.events import (
     inventory_changed_event,
+    late_approval_refund_id,
     order_canceled_notification_event,
+    payment_refunded_notification_event,
     refund_failed_notification_event,
 )
 from app.models import OrderId, OrderStatus
 from app.outbox import add_outbox_event
 from app.postgres_inbox import record_processed_event
 from app.postgres_mapping import order_from_record
-from app.records import CancellationRequestRecord, InventoryItemRecord, OrderRecord
+from app.records import (
+    CancellationRequestRecord,
+    InventoryItemRecord,
+    OrderRecord,
+    OutboxEventRecord,
+)
 from app.refund_validation import refund_event_is_valid
 
 
@@ -31,6 +38,19 @@ async def apply_refund_completed(
         order = await _locked_order(session, OrderId(event.orderId))
         if order is None:
             return False
+        match OrderStatus(order.status):
+            case OrderStatus.EXPIRED:
+                return await _apply_expired_refund_result(session, order, event)
+            case (
+                OrderStatus.PENDING_PAYMENT
+                | OrderStatus.CONFIRMED
+                | OrderStatus.PAYMENT_FAILED
+                | OrderStatus.CANCEL_PENDING
+                | OrderStatus.CANCELED
+            ):
+                pass
+            case unreachable_status:
+                assert_never(unreachable_status)
         cancellation = await _locked_cancellation(session, order.id)
         if cancellation is None or not _refund_matches(event, cancellation, order):
             await session.commit()
@@ -89,6 +109,19 @@ async def apply_refund_failed(
         order = await _locked_order(session, OrderId(event.orderId))
         if order is None:
             return False
+        match OrderStatus(order.status):
+            case OrderStatus.EXPIRED:
+                return await _apply_expired_refund_result(session, order, event)
+            case (
+                OrderStatus.PENDING_PAYMENT
+                | OrderStatus.CONFIRMED
+                | OrderStatus.PAYMENT_FAILED
+                | OrderStatus.CANCEL_PENDING
+                | OrderStatus.CANCELED
+            ):
+                pass
+            case unreachable_status:
+                assert_never(unreachable_status)
         cancellation = await _locked_cancellation(session, order.id)
         if cancellation is None or not _refund_matches(event, cancellation, order):
             await session.commit()
@@ -179,4 +212,46 @@ def _refund_matches(
         and event.amount == order.amount
         and event.sourceId == cancellation.id
         and event.occurredAt.utcoffset() is not None
+    )
+
+
+async def _apply_expired_refund_result(
+    session: AsyncSession,
+    order: OrderRecord,
+    event: RefundCompletedEvent | RefundFailedEvent,
+) -> bool:
+    if not _late_refund_matches(event, order):
+        return False
+    if not await record_processed_event(session, event):
+        return False
+    expired_order = order_from_record(order)
+    match event:
+        case RefundCompletedEvent():
+            notification = payment_refunded_notification_event(
+                expired_order,
+                event.occurredAt,
+            )
+        case RefundFailedEvent():
+            notification = refund_failed_notification_event(
+                expired_order,
+                event.occurredAt,
+            )
+        case unreachable:
+            assert_never(unreachable)
+    if await session.get(OutboxEventRecord, notification.eventId) is None:
+        add_outbox_event(session, notification)
+    await session.commit()
+    return True
+
+
+def _late_refund_matches(
+    event: RefundCompletedEvent | RefundFailedEvent,
+    order: OrderRecord,
+) -> bool:
+    return (
+        event.refundId == late_approval_refund_id(order.id, event.paymentId)
+        and event.sourceId == event.refundId
+        and event.orderId == order.id
+        and event.userId == order.user_id
+        and event.amount == order.amount
     )

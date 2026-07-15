@@ -80,9 +80,22 @@ async def test_failure_before_deadline_prevents_expiry() -> None:
         expired = await repository.expire_due_order(OCCURRED_AT + timedelta(days=365))
 
         # Then
+        async with session_factory() as session:
+            failed_notifications = (
+                await session.execute(
+                    text(
+                        "SELECT payload->>'notificationId', "
+                        "payload->>'notificationType' FROM outbox_events "
+                        "WHERE event_type='notification.requested'"
+                    )
+                )
+            ).all()
         assert expired is False
         assert await order_status(session_factory, created.order.id) == "PAYMENT_FAILED"
         assert await inventory_state(session_factory, product_for_sale) == (42, 0, 0, 2)
+        assert failed_notifications == [
+            (f"notification-payment-failed-{created.order.id}", "PAYMENT_FAILED")
+        ]
 
 
 @pytest.mark.anyio

@@ -77,7 +77,9 @@ def test_notification_requested_kafka_message_ignores_invalid_payload() -> None:
     assert _metric_value(metrics, "notification_requested_events_invalid_total") == 1
 
 
-def test_notification_requested_kafka_message_ignores_payload_invalid_for_notification_model() -> None:
+def test_notification_requested_kafka_message_ignores_payload_invalid_for_notification_model() -> (
+    None
+):
     # Given
     store = NotificationStore()
     metrics = NotificationMetrics("notification-service", "test", "test")
@@ -136,13 +138,14 @@ def test_notification_requested_kafka_message_counts_replay_without_duplicate() 
     # When
     anyio.run(handle_notification_requested_message, message, store, metrics)
     anyio.run(handle_notification_requested_message, message, store, metrics)
+    anyio.run(handle_notification_requested_message, message, store, metrics)
 
     # Then
     page = anyio.run(store.list_notifications, UserId("user-001"), 20)
     assert len(page.notifications) == 1
-    assert _metric_value(metrics, "notification_requested_events_consumed_total") == 2
+    assert _metric_value(metrics, "notification_requested_events_consumed_total") == 3
     assert _metric_value(metrics, "notifications_created_total") == 1
-    assert _metric_value(metrics, "notification_requested_events_replayed_total") == 1
+    assert _metric_value(metrics, "notification_requested_events_replayed_total") == 2
 
 
 class RejectingNotificationRepository:
@@ -161,7 +164,9 @@ class RejectingNotificationRepository:
         raise AssertionError(f"repository should not list {user_id}:{limit}:{cursor}")
 
 
-def test_notification_requested_kafka_message_ignores_event_id_too_long_for_storage() -> None:
+def test_notification_requested_kafka_message_ignores_event_id_too_long_for_storage() -> (
+    None
+):
     # Given
     payload = {
         "eventId": "e" * 129,
@@ -194,6 +199,8 @@ def test_notification_requested_kafka_message_ignores_event_id_too_long_for_stor
 
 def _metric_value(metrics: NotificationMetrics, name: str) -> int:
     sample = next(
-        line for line in metrics.render().splitlines() if line.startswith(f"{name}{'{'}")
+        line
+        for line in metrics.render().splitlines()
+        if line.startswith(f"{name}{'{'}")
     )
     return int(sample.rsplit(" ", maxsplit=1)[1])

@@ -100,6 +100,7 @@ async def test_failure_and_expiry_release_reserved_inventory_once() -> None:
         assert sorted(await outbox_types(session_factory)) == sorted(
             [
                 "inventory.changed",
+                "notification.requested",
                 "order.created",
                 "inventory.changed",
                 "inventory.changed",

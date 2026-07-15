@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.events import (
     late_approval_refund_requested_event,
     notification_requested_event,
+    payment_failed_notification_event,
 )
 from app.models import OrderId, OrderStatus, PaymentId
 from app.outbox import add_outbox_event
@@ -113,6 +114,13 @@ async def apply_payment_failed(
                 await release_reserved_inventory(session, record, event)
                 record.status = OrderStatus.PAYMENT_FAILED.value
                 record.payment_id = PaymentId(event.paymentId)
+                add_outbox_event(
+                    session,
+                    payment_failed_notification_event(
+                        order_from_record(record),
+                        event.occurredAt,
+                    ),
+                )
                 await session.commit()
                 return PaymentFailureApplied(order=order_from_record(record))
             case OrderStatus.PAYMENT_FAILED:

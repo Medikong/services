@@ -25,6 +25,8 @@ class KafkaConsumerClient(Protocol):
 
     async def stop(self) -> None: ...
 
+    async def commit(self) -> None: ...
+
     def __aiter__(self) -> AsyncIterator[KafkaMessage]: ...
 
 
@@ -52,7 +54,10 @@ class NotificationRequestedConsumer:
 
     async def run(self) -> None:
         async for message in self._consumer:
-            await handle_notification_requested_message(message, self._repository, self._metrics)
+            await handle_notification_requested_message(
+                message, self._repository, self._metrics
+            )
+            await self._consumer.commit()
 
 
 async def handle_notification_requested_message(
@@ -97,8 +102,10 @@ def kafka_runtime_from_bootstrap(
         bootstrap_servers=bootstrap_servers,
         group_id="notification-service-notification-requested",
         auto_offset_reset="earliest",
-        enable_auto_commit=True,
+        enable_auto_commit=False,
     )
     return KafkaRuntime(
-        notification_requested_consumer=NotificationRequestedConsumer(consumer, repository, metrics),
+        notification_requested_consumer=NotificationRequestedConsumer(
+            consumer, repository, metrics
+        ),
     )

@@ -71,6 +71,25 @@ def order_expired_notification_event(
     )
 
 
+def payment_failed_notification_event(
+    order: Order,
+    occurred_at: datetime,
+) -> NotificationRequestedEvent:
+    return NotificationRequestedEvent(
+        eventId=f"evt-notification-payment-failed-{order.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        notificationId=f"notification-payment-failed-{order.id}",
+        orderId=order.id,
+        notificationType=NotificationType.PAYMENT_FAILED,
+        title="결제에 실패했습니다",
+        message="결제가 승인되지 않아 예약된 재고가 해제되었습니다.",
+        correlationId=order.id,
+    )
+
+
 def order_canceled_notification_event(
     order: Order,
     occurred_at: datetime,
@@ -105,6 +124,25 @@ def refund_failed_notification_event(
         notificationType=NotificationType.REFUND_FAILED,
         title="환불 처리에 실패했습니다",
         message="환불 처리에 실패했습니다. 고객센터에 문의해 주세요.",
+        correlationId=order.id,
+    )
+
+
+def payment_refunded_notification_event(
+    order: Order,
+    occurred_at: datetime,
+) -> NotificationRequestedEvent:
+    return NotificationRequestedEvent(
+        eventId=f"evt-notification-payment-refunded-{order.id}",
+        userId=order.userId,
+        sourceId=order.id,
+        occurredAt=occurred_at,
+        producer=PRODUCER_NAME,
+        notificationId=f"notification-payment-refunded-{order.id}",
+        orderId=order.id,
+        notificationType=NotificationType.PAYMENT_REFUNDED,
+        title="결제가 환불되었습니다",
+        message="만료된 주문의 결제 금액이 전액 환불되었습니다.",
         correlationId=order.id,
     )
 
@@ -208,11 +246,7 @@ def late_approval_refund_requested_event(
     payment_id: str,
     occurred_at: datetime,
 ) -> RefundRequestedEvent:
-    refund_suffix = blake2b(
-        f"expired:{order.id}:{payment_id}".encode("utf-8"),
-        digest_size=16,
-    ).hexdigest()
-    refund_id = f"refund-{refund_suffix}"
+    refund_id = late_approval_refund_id(order.id, payment_id)
     return RefundRequestedEvent(
         eventId=f"evt-refund-requested-{refund_id}",
         userId=order.userId,
@@ -226,3 +260,11 @@ def late_approval_refund_requested_event(
         amount=order.amount,
         reason="ORDER_EXPIRED_LATE_APPROVAL",
     )
+
+
+def late_approval_refund_id(order_id: str, payment_id: str) -> str:
+    refund_suffix = blake2b(
+        f"expired:{order_id}:{payment_id}".encode("utf-8"),
+        digest_size=16,
+    ).hexdigest()
+    return f"refund-{refund_suffix}"
