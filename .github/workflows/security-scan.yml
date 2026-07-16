@@ -41,7 +41,7 @@ concurrency:
 
 env:
   AWS_REGION: ap-northeast-2
-  IMAGE_REGISTRY: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com
+  IMAGE_REGISTRY: 205623789422.dkr.ecr.ap-northeast-2.amazonaws.com
 
 jobs:
   detect-services:

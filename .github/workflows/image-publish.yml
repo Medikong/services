@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_REGISTRY: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com
+  IMAGE_REGISTRY: 205623789422.dkr.ecr.ap-northeast-2.amazonaws.com
   AWS_REGION: ap-northeast-2
   DOCKER_BUILD_PLATFORMS: linux/amd64,linux/arm64
 
@@ -141,7 +141,7 @@ jobs:
       - name: AWS 인증 (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::941141115079:role/github-actions-ecr-role
+          role-to-assume: arn:aws:iam::205623789422:role/github-actions-ecr-role
           aws-region: ap-northeast-2
 
       - name: Docker Buildx 설정
