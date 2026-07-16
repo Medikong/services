@@ -335,6 +335,25 @@ func (r *PostgresRepository) FindActive(ctx context.Context, sessionID uuid.UUID
 	return findActiveSession(ctx, r.pool, sessionID, false)
 }
 
+func (r *PostgresRepository) FindStatus(ctx context.Context, sessionID uuid.UUID) (Session, error) {
+	var current Session
+	err := r.pool.QueryRow(ctx, `
+		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
+			s.client_channel, s.remember_me, s.last_authenticated_at, s.absolute_expires_at,
+			CASE WHEN u.status = 'active' THEN s.session_status ELSE 'revoked' END
+		FROM auth_sessions s
+		JOIN auth_user_auth_states u ON u.user_id = s.user_id
+		WHERE s.session_id = $1
+	`, sessionID).Scan(
+		&current.ID, &current.UserID, &current.IdentityID, &current.IdentityLink, &current.Method,
+		&current.Channel, &current.RememberMe, &current.AuthenticatedAt, &current.ExpiresAt, &current.Status,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	return current, err
+}
+
 func findActiveSession(ctx context.Context, q rowQueryer, sessionID uuid.UUID, forUpdate bool) (Session, error) {
 	var s Session
 	query := `

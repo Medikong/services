@@ -228,6 +228,10 @@ func loadAuth(environment string) (AuthConfig, error) {
 	if err != nil {
 		return AuthConfig{}, err
 	}
+	jwtPrivateKey, err := secretStringEnv("AUTH_JWT_PRIVATE_KEY_PEM", "AUTH_JWT_PRIVATE_KEY_FILE")
+	if err != nil {
+		return AuthConfig{}, err
+	}
 	passwordMinLength, err := intEnv("AUTH_PASSWORD_MIN_LENGTH", 12)
 	if err != nil {
 		return AuthConfig{}, err
@@ -254,7 +258,7 @@ func loadAuth(environment string) (AuthConfig, error) {
 	return AuthConfig{
 		CredentialHMACKey:     stringEnv("AUTH_CREDENTIAL_HMAC_KEY", credentialDefault),
 		ReplayEncryptionKey:   stringEnv("AUTH_REPLAY_ENCRYPTION_KEY", replayDefault),
-		JWTPrivateKeyPEM:      strings.TrimSpace(os.Getenv("AUTH_JWT_PRIVATE_KEY_PEM")),
+		JWTPrivateKeyPEM:      jwtPrivateKey,
 		JWTKeyID:              strings.TrimSpace(os.Getenv("AUTH_JWT_KEY_ID")),
 		JWTIssuer:             stringEnv("AUTH_JWT_ISSUER", ServiceName),
 		JWTAudiences:          stringListEnv("AUTH_JWT_AUDIENCES", "dropmong-api"),

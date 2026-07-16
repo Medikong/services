@@ -32,18 +32,23 @@ type SessionRevoker interface {
 	RevokeForUser(context.Context, pgx.Tx, uuid.UUID, string) error
 }
 
+type StatusProjectionWriter interface {
+	RevokeUser(context.Context, uuid.UUID) error
+}
+
 type Config struct {
 	StrongAuthTTL time.Duration
 }
 
 type Service struct {
-	pool      *pgxpool.Pool
-	states    Repository
-	sessions  SessionRevoker
-	proofs    ProofVerifier
-	decisions AuthorizationDecisionPort
-	strongTTL time.Duration
-	now       func() time.Time
+	pool       *pgxpool.Pool
+	states     Repository
+	sessions   SessionRevoker
+	proofs     ProofVerifier
+	decisions  AuthorizationDecisionPort
+	strongTTL  time.Duration
+	now        func() time.Time
+	projection StatusProjectionWriter
 }
 
 type ApplyInput struct {
@@ -60,14 +65,18 @@ type ApplyOutput struct {
 	Applied       bool
 }
 
-func NewService(pool *pgxpool.Pool, states Repository, sessions SessionRevoker, proofs ProofVerifier, decisions AuthorizationDecisionPort, config Config) *Service {
+func NewService(pool *pgxpool.Pool, states Repository, sessions SessionRevoker, proofs ProofVerifier, decisions AuthorizationDecisionPort, config Config, projections ...StatusProjectionWriter) *Service {
 	if decisions == nil {
 		decisions = DenyAuthorizationDecisionPort{}
 	}
 	if config.StrongAuthTTL <= 0 {
 		config.StrongAuthTTL = 5 * time.Minute
 	}
-	return &Service{pool: pool, states: states, sessions: sessions, proofs: proofs, decisions: decisions, strongTTL: config.StrongAuthTTL, now: time.Now}
+	service := &Service{pool: pool, states: states, sessions: sessions, proofs: proofs, decisions: decisions, strongTTL: config.StrongAuthTTL, now: time.Now}
+	if len(projections) > 0 {
+		service.projection = projections[0]
+	}
+	return service
 }
 
 func (s *Service) Apply(ctx context.Context, input ApplyInput) (ApplyOutput, error) {
@@ -132,6 +141,11 @@ func (s *Service) Apply(ctx context.Context, input ApplyInput) (ApplyOutput, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return ApplyOutput{}, domain.Unavailable()
+	}
+	if s.projection != nil && (status == StatusRestricted || status == StatusDeactivated) {
+		if err := s.projection.RevokeUser(ctx, pathUserID); err != nil {
+			return ApplyOutput{}, domain.Unavailable()
+		}
 	}
 	return ApplyOutput{UserID: current.UserID, AccountStatus: current.Status, UserVersion: current.UserVersion, Applied: apply || replay}, nil
 }

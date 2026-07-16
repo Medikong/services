@@ -37,10 +37,15 @@ type Service struct {
 	idempotency idempotency.Repository
 	sessions    sessiondomain.Repository
 	outbox      outbox.Repository
+	projection  sessiondomain.StatusProjectionWriter
 }
 
-func NewService(pool *pgxpool.Pool, keys security.Keys, config Config, bootstrap *intent.BootstrapService, resets Repository, identities identity.Repository, challenges challenge.Repository, idempotency idempotency.Repository, sessions sessiondomain.Repository, outbox outbox.Repository) *Service {
-	return &Service{pool: pool, keys: keys, config: config, bootstrap: bootstrap, resets: resets, identities: identities, challenges: challenges, idempotency: idempotency, sessions: sessions, outbox: outbox}
+func NewService(pool *pgxpool.Pool, keys security.Keys, config Config, bootstrap *intent.BootstrapService, resets Repository, identities identity.Repository, challenges challenge.Repository, idempotency idempotency.Repository, sessions sessiondomain.Repository, outbox outbox.Repository, projections ...sessiondomain.StatusProjectionWriter) *Service {
+	service := &Service{pool: pool, keys: keys, config: config, bootstrap: bootstrap, resets: resets, identities: identities, challenges: challenges, idempotency: idempotency, sessions: sessions, outbox: outbox}
+	if len(projections) > 0 {
+		service.projection = projections[0]
+	}
+	return service
 }
 
 type StartInput struct{ IntentID, OwnerProof, CSRFToken, IdentifierType, Email, Phone, IdempotencyKey string }
@@ -378,7 +383,15 @@ func (s *Service) Complete(ctx context.Context, input CompleteInput) error {
 	if err := domain.AppendAudit(ctx, tx, "auth.password_reset.completed", "authentication_intent", *reset.IntentID, resetID, map[string]string{"status": "completed"}, input.IdempotencyKey); err != nil {
 		return domain.Unavailable()
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Unavailable()
+	}
+	if s.projection != nil {
+		if err := s.projection.RevokeUser(ctx, link.UserID); err != nil {
+			return domain.Unavailable()
+		}
+	}
+	return nil
 }
 
 func (s *Service) resetTTL() time.Duration {

@@ -16,6 +16,7 @@ import (
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/operational"
+	"github.com/Medikong/services/packages/go-platform/redisutil"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
 	"github.com/Medikong/services/services/auth-service/internal/domain/authentication"
 	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
@@ -37,11 +38,13 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
 	"github.com/Medikong/services/services/auth-service/internal/security"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
 	cfg        config.ServerConfig
 	db         *pgxpool.Pool
+	redis      *redis.Client
 	metrics    *observability.Metrics
 	health     *operational.Handler
 	publicHTTP *http.Server
@@ -67,7 +70,19 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		_ = metrics.Shutdown(context.Background())
 		return nil, oops.In("auth_server").Code("database.open_failed").Wrap(err)
 	}
+	var redisClient *redis.Client
+	if cfg.SessionStatus.Enabled {
+		redisClient, err = redisutil.Open(ctx, cfg.SessionStatus.Redis)
+		if err != nil {
+			db.Close()
+			_ = metrics.Shutdown(context.Background())
+			return nil, oops.In("auth_server").Code("redis.open_failed").Wrap(err)
+		}
+	}
 	cleanup := func() {
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
 		db.Close()
 		_ = metrics.Shutdown(context.Background())
 	}
@@ -75,14 +90,18 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		cleanup()
 		return nil, err
 	}
+	checks := map[string]operational.Check{
+		"database": func(ctx context.Context) error { return checkServerDatabase(ctx, db, cfg.Development) },
+	}
+	if redisClient != nil {
+		checks["redis"] = func(ctx context.Context) error { return redisClient.Ping(ctx).Err() }
+	}
 	health := operational.NewHandler(operational.Config{
 		Service:          cfg.Service.Name,
 		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
-		Checks: map[string]operational.Check{
-			"database": func(ctx context.Context) error { return checkServerDatabase(ctx, db, cfg.Development) },
-		},
-		Metrics:  metrics.Handler(),
-		SetReady: metrics.SetReady,
+		Checks:           checks,
+		Metrics:          metrics.Handler(),
+		SetReady:         metrics.SetReady,
 	})
 
 	retiringKeys := make(map[string]*rsa.PublicKey, len(cfg.Auth.JWTRetiringPublicKeys))
@@ -120,6 +139,22 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	})
 	outboxRepository := outbox.NewPostgresRepository(db)
 	sessionRepository := session.NewPostgresRepository(db)
+	var sessionProjection *session.StatusProjection
+	if redisClient != nil {
+		sessionProjection, err = session.NewStatusProjection(
+			sessionRepository, redisClient, cfg.SessionStatus.Timeout, cfg.SessionStatus.DBFallbackTimeout,
+		)
+		if err != nil {
+			cleanup()
+			return nil, err
+		}
+	}
+	sessionProjectionWriters := make([]session.StatusProjectionWriter, 0, 1)
+	userStateProjectionWriters := make([]userauthstate.StatusProjectionWriter, 0, 1)
+	if sessionProjection != nil {
+		sessionProjectionWriters = append(sessionProjectionWriters, sessionProjection)
+		userStateProjectionWriters = append(userStateProjectionWriters, sessionProjection)
+	}
 	passwordResetRepository := passwordreset.NewPostgresRepository(db)
 
 	bootstrapService := intent.NewBootstrapService(
@@ -135,7 +170,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		SessionTTL:           cfg.Auth.SessionTTL,
 		RememberMeSessionTTL: cfg.Auth.RememberMeSessionTTL,
 		RecoveryTTL:          cfg.Auth.RecoveryTTL,
-	}, sessionRepository, userAuthStateRepository, idempotencyRepository, outboxRepository)
+	}, sessionRepository, userAuthStateRepository, idempotencyRepository, outboxRepository, sessionProjectionWriters...)
 	emailSignInService := authentication.NewEmailService(
 		db, bootstrapService, identityRepository, intentRepository, sessionService,
 	)
@@ -149,7 +184,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		ChallengeTTL:          cfg.Auth.ChallengeTTL,
 		VirtualAdapterEnabled: cfg.Development.VirtualAdaptersEnabled,
 	}, bootstrapService, passwordResetRepository, identityRepository, challengeRepository,
-		idempotencyRepository, sessionRepository, outboxRepository)
+		idempotencyRepository, sessionRepository, outboxRepository, sessionProjectionWriters...)
 	reauthService := reauth.NewReauthService(
 		db, keys, identityRepository, reauth.NewPostgresRepository(db), sessionRepository,
 		idempotencyRepository, sessionService, cfg.Auth.ProofTTL, cfg.Auth.RecoveryTTL,
@@ -217,6 +252,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		userProofVerifier,
 		options.AuthorizationDecisionPort,
 		userauthstate.Config{StrongAuthTTL: cfg.Auth.ProofTTL},
+		userStateProjectionWriters...,
 	)
 
 	credentials := httpauth.New(cfg.Auth, cfg.Development)
@@ -247,7 +283,11 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	registration.RegisterRoutes(router, registrationController)
 	passwordreset.RegisterRoutes(router, passwordResetController)
 	identity.RegisterRoutes(router, identityController)
-	session.RegisterRoutes(router, sessionController)
+	if sessionProjection != nil {
+		session.RegisterRoutes(router, sessionController, session.NewExtAuthzController(keys, sessionProjection))
+	} else {
+		session.RegisterRoutes(router, sessionController)
+	}
 	operator.RegisterRoutes(router, operatorController)
 	userauthstate.RegisterRoutes(router, userAuthStateController)
 	if developmentController != nil {
@@ -266,6 +306,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	return &Server{
 		cfg:        cfg,
 		db:         db,
+		redis:      redisClient,
 		metrics:    metrics,
 		health:     health,
 		publicHTTP: httpserver.New(cfg.HTTP.PublicAddr, router),
@@ -371,6 +412,10 @@ func (s *Server) closeWith(cause error) error {
 	if s.db != nil {
 		s.db.Close()
 		s.db = nil
+	}
+	if s.redis != nil {
+		_ = s.redis.Close()
+		s.redis = nil
 	}
 	metricCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
 	metricErr := s.metrics.Shutdown(metricCtx)

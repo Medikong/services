@@ -26,13 +26,14 @@ func (c HTTPConfig) Validate() error {
 }
 
 type ServerConfig struct {
-	Service     ServiceConfig
-	HTTP        HTTPConfig
-	Lifecycle   LifecycleConfig
-	Postgres    platformdb.PostgresConfig
-	Auth        AuthConfig
-	Development DevelopmentConfig
-	Profile     ProfileConfig
+	Service       ServiceConfig
+	HTTP          HTTPConfig
+	Lifecycle     LifecycleConfig
+	Postgres      platformdb.PostgresConfig
+	Auth          AuthConfig
+	SessionStatus SessionStatusConfig
+	Development   DevelopmentConfig
+	Profile       ProfileConfig
 }
 
 func LoadServer() (ServerConfig, error) {
@@ -57,13 +58,17 @@ func LoadServer() (ServerConfig, error) {
 	if err != nil {
 		return ServerConfig{}, err
 	}
+	sessionStatus, err := loadSessionStatus()
+	if err != nil {
+		return ServerConfig{}, err
+	}
 	development, err := loadDevelopment()
 	if err != nil {
 		return ServerConfig{}, err
 	}
 	cfg := ServerConfig{
 		Service: service, HTTP: httpConfig, Lifecycle: lifecycle, Postgres: postgres,
-		Auth: authConfig, Development: development, Profile: profile,
+		Auth: authConfig, SessionStatus: sessionStatus, Development: development, Profile: profile,
 	}
 	if err := cfg.Validate(); err != nil {
 		return ServerConfig{}, err
@@ -81,6 +86,7 @@ func (c ServerConfig) Validate() error {
 			return validation.Validate(c.Postgres.DatabaseURL, validation.Required)
 		})),
 		validation.Field(&c.Profile),
+		validation.Field(&c.SessionStatus),
 	)
 	if err != nil {
 		return configErr.With("config", "server").Wrap(err)

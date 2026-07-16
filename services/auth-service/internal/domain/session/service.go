@@ -35,10 +35,15 @@ type Service struct {
 	states      statedomain.Repository
 	idempotency idempotency.Repository
 	outbox      outbox.Repository
+	projection  StatusProjectionWriter
 }
 
-func NewService(pool *pgxpool.Pool, keys security.Keys, config Config, sessions Repository, states statedomain.Repository, idempotency idempotency.Repository, outbox outbox.Repository) *Service {
-	return &Service{pool: pool, keys: keys, config: config, sessions: sessions, states: states, idempotency: idempotency, outbox: outbox}
+func NewService(pool *pgxpool.Pool, keys security.Keys, config Config, sessions Repository, states statedomain.Repository, idempotency idempotency.Repository, outbox outbox.Repository, projections ...StatusProjectionWriter) *Service {
+	service := &Service{pool: pool, keys: keys, config: config, sessions: sessions, states: states, idempotency: idempotency, outbox: outbox}
+	if len(projections) > 0 {
+		service.projection = projections[0]
+	}
+	return service
 }
 
 type Principal = domain.Principal
@@ -375,6 +380,11 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, csrfToken, idempote
 		if err := tx.Commit(ctx); err != nil {
 			return TokenSet{}, domain.Unavailable()
 		}
+		if s.projection != nil {
+			if err := s.projection.RevokeSession(ctx, current.ID); err != nil {
+				return TokenSet{}, domain.Unavailable()
+			}
+		}
 		return TokenSet{}, domain.Problem(401, "AUTH_SESSION_REVOKED", "Session을 갱신할 수 없습니다.")
 	}
 	state, err := s.states.FindForUpdate(ctx, tx, current.UserID)
@@ -512,6 +522,11 @@ func (s *Service) LogoutByWeb(ctx context.Context, webToken, csrfToken, idempote
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Unavailable()
 		}
+		if s.projection != nil {
+			if err := s.projection.RevokeSession(ctx, current.ID); err != nil {
+				return domain.Unavailable()
+			}
+		}
 		return nil
 	}
 	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
@@ -522,6 +537,11 @@ func (s *Service) LogoutByWeb(ctx context.Context, webToken, csrfToken, idempote
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Unavailable()
+	}
+	if s.projection != nil {
+		if err := s.projection.RevokeSession(ctx, current.ID); err != nil {
+			return domain.Unavailable()
+		}
 	}
 	return nil
 }
@@ -555,6 +575,11 @@ func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken, idempotency
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Unavailable()
 		}
+		if s.projection != nil {
+			if err := s.projection.RevokeSession(ctx, current.ID); err != nil {
+				return domain.Unavailable()
+			}
+		}
 		return nil
 	}
 	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
@@ -565,6 +590,11 @@ func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken, idempotency
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Unavailable()
+	}
+	if s.projection != nil {
+		if err := s.projection.RevokeSession(ctx, current.ID); err != nil {
+			return domain.Unavailable()
+		}
 	}
 	return nil
 }
