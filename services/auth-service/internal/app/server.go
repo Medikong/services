@@ -23,6 +23,7 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
 	"github.com/Medikong/services/services/auth-service/internal/domain/identity"
 	"github.com/Medikong/services/services/auth-service/internal/domain/intent"
+	"github.com/Medikong/services/services/auth-service/internal/domain/jwks"
 	"github.com/Medikong/services/services/auth-service/internal/domain/operator"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/domain/passwordreset"
@@ -34,7 +35,6 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
 	"github.com/Medikong/services/services/auth-service/internal/security"
-	transport "github.com/Medikong/services/services/auth-service/internal/transport"
 	"github.com/Medikong/services/services/auth-service/internal/transport/credential"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
@@ -230,6 +230,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	operatorController := operator.NewOperator(credentials, sessionService, operatorService)
 	actionResumeController := intent.NewActionResume(credentials, sessionService, actionResumeService)
 	userAuthStateController := userauthstate.NewUserAuthState(credentials, sessionService, userAuthStateService)
+	jwksController := jwks.NewController(keys)
 	var developmentController *development.DevelopmentController
 	if cfg.Development.RouteEnabled {
 		virtualMessageService := development.NewVirtualMessageService(
@@ -239,26 +240,18 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		developmentController = development.NewDevelopment(credentials, virtualMessageService, sessionService)
 	}
 
-	router, err := transport.NewRouter(transport.RouterConfig{
-		ServiceName:              cfg.Service.Name,
-		RequestTimeout:           cfg.HTTP.RequestTimeout,
-		DevelopmentRoutesEnabled: cfg.Development.RouteEnabled,
-	}, health, transport.Controllers{
-		Bootstrap:     bootstrapController,
-		SignIn:        signInController,
-		Session:       sessionController,
-		Registration:  registrationController,
-		PasswordReset: passwordResetController,
-		Identity:      identityController,
-		Operator:      operatorController,
-		ActionResume:  actionResumeController,
-		UserAuthState: userAuthStateController,
-		Development:   developmentController,
-		JWKS:          transport.NewJWKSHandler(keys),
-	})
-	if err != nil {
-		cleanup()
-		return nil, err
+	router := newRouter(cfg.Service.Name, cfg.HTTP.RequestTimeout, health)
+	jwks.RegisterRoutes(router, jwksController)
+	intent.RegisterRoutes(router, bootstrapController, actionResumeController)
+	authentication.RegisterRoutes(router, signInController)
+	registration.RegisterRoutes(router, registrationController)
+	passwordreset.RegisterRoutes(router, passwordResetController)
+	identity.RegisterRoutes(router, identityController)
+	session.RegisterRoutes(router, sessionController)
+	operator.RegisterRoutes(router, operatorController)
+	userauthstate.RegisterRoutes(router, userAuthStateController)
+	if developmentController != nil {
+		development.RegisterRoutes(router, developmentController)
 	}
 	profiler, err := observability.StartProfiler(cfg.Service, cfg.Profile)
 	if err != nil {

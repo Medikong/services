@@ -1,4 +1,4 @@
-package http
+package app
 
 import (
 	"context"
@@ -11,58 +11,20 @@ import (
 	"github.com/Medikong/services/packages/go-platform/httpapi"
 	platformmiddleware "github.com/Medikong/services/packages/go-platform/httpmiddleware"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	"github.com/Medikong/services/services/auth-service/internal/domain/authentication"
-	"github.com/Medikong/services/services/auth-service/internal/domain/development"
-	"github.com/Medikong/services/services/auth-service/internal/domain/identity"
-	"github.com/Medikong/services/services/auth-service/internal/domain/intent"
-	"github.com/Medikong/services/services/auth-service/internal/domain/operator"
-	"github.com/Medikong/services/services/auth-service/internal/domain/passwordreset"
-	"github.com/Medikong/services/services/auth-service/internal/domain/registration"
-	"github.com/Medikong/services/services/auth-service/internal/domain/session"
-	"github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
 
-type RouterConfig struct {
-	ServiceName              string
-	RequestTimeout           time.Duration
-	DevelopmentRoutesEnabled bool
-}
-
-type Controllers struct {
-	Bootstrap     *intent.BootstrapController
-	SignIn        *authentication.SignInController
-	Session       *session.SessionController
-	Registration  *registration.RegistrationController
-	PasswordReset *passwordreset.PasswordResetController
-	Identity      *identity.IdentityManagementController
-	Operator      *operator.OperatorController
-	ActionResume  *intent.ActionResumeController
-	UserAuthState *userauthstate.UserAuthStateController
-	Development   *development.DevelopmentController
-	JWKS          http.HandlerFunc
-}
-
-func NewRouter(cfg RouterConfig, health *operational.Handler, controllers Controllers) (http.Handler, error) {
-	if cfg.ServiceName == "" || cfg.RequestTimeout <= 0 || health == nil ||
-		controllers.Bootstrap == nil || controllers.SignIn == nil || controllers.Session == nil ||
-		controllers.Registration == nil || controllers.PasswordReset == nil || controllers.Identity == nil ||
-		controllers.Operator == nil || controllers.ActionResume == nil || controllers.UserAuthState == nil ||
-		controllers.JWKS == nil || (cfg.DevelopmentRoutesEnabled && controllers.Development == nil) {
-		return nil, oops.In("auth_router").Code("router.dependencies_required").
-			New("router configuration and handlers are required")
-	}
-
+func newRouter(serviceName string, requestTimeout time.Duration, health *operational.Handler) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(httputil.IDMiddleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return platformmiddleware.Stack(platformmiddleware.Config{
-			ServiceName:  cfg.ServiceName,
-			RoutePattern: RoutePattern,
+			ServiceName:  serviceName,
+			RoutePattern: routePattern,
 		}, next)
 	})
 	router.Use(recoverHTTP)
-	router.Use(timeoutHTTP(cfg.RequestTimeout))
+	router.Use(timeoutHTTP(requestTimeout))
 	router.Use(rejectWhileDraining(health))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, r, httpapi.NotFound("AUTH_ROUTE_NOT_FOUND").
@@ -74,23 +36,10 @@ func NewRouter(cfg RouterConfig, health *operational.Handler, controllers Contro
 			Public("요청 방식을 확인해주세요.").
 			New("auth method not allowed"))
 	})
-
-	RegisterJWKSRoute(router, controllers.JWKS)
-	intent.RegisterRoutes(router, controllers.Bootstrap, controllers.ActionResume)
-	authentication.RegisterRoutes(router, controllers.SignIn)
-	registration.RegisterRoutes(router, controllers.Registration)
-	passwordreset.RegisterRoutes(router, controllers.PasswordReset)
-	identity.RegisterRoutes(router, controllers.Identity)
-	session.RegisterRoutes(router, controllers.Session)
-	operator.RegisterRoutes(router, controllers.Operator)
-	userauthstate.RegisterRoutes(router, controllers.UserAuthState)
-	if cfg.DevelopmentRoutesEnabled {
-		development.RegisterRoutes(router, controllers.Development)
-	}
-	return router, nil
+	return router
 }
 
-func RoutePattern(r *http.Request) string {
+func routePattern(r *http.Request) string {
 	pattern := chi.RouteContext(r.Context()).RoutePattern()
 	if pattern == "" {
 		return "unmatched"
