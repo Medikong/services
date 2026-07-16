@@ -11,9 +11,62 @@ import (
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/samber/oops"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var configErr = oops.In("platform_redis_config").Code("config.invalid")
+
+type Option func(*clientOptions) error
+
+type clientOptions struct {
+	tracing []redisotel.TracingOption
+	metrics []redisotel.MetricsOption
+}
+
+func WithTracerProvider(provider trace.TracerProvider) Option {
+	return func(options *clientOptions) error {
+		if provider == nil {
+			return configErr.With("setting", "tracer_provider").New("tracer provider is required")
+		}
+		options.tracing = append(options.tracing, redisotel.WithTracerProvider(provider))
+		return nil
+	}
+}
+
+func WithMeterProvider(provider metric.MeterProvider) Option {
+	return func(options *clientOptions) error {
+		if provider == nil {
+			return configErr.With("setting", "meter_provider").New("meter provider is required")
+		}
+		options.metrics = append(options.metrics, redisotel.WithMeterProvider(provider))
+		return nil
+	}
+}
+
+func WithTracingOptions(tracingOptions ...redisotel.TracingOption) Option {
+	return func(options *clientOptions) error {
+		for _, option := range tracingOptions {
+			if option == nil {
+				return configErr.With("setting", "tracing_option").New("tracing option is required")
+			}
+		}
+		options.tracing = append(options.tracing, tracingOptions...)
+		return nil
+	}
+}
+
+func WithMetricsOptions(metricsOptions ...redisotel.MetricsOption) Option {
+	return func(options *clientOptions) error {
+		for _, option := range metricsOptions {
+			if option == nil {
+				return configErr.With("setting", "metrics_option").New("metrics option is required")
+			}
+		}
+		options.metrics = append(options.metrics, metricsOptions...)
+		return nil
+	}
+}
 
 type Config struct {
 	URL          string
@@ -74,8 +127,12 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func Open(ctx context.Context, cfg Config) (*goredis.Client, error) {
+func Open(ctx context.Context, cfg Config, optionFns ...Option) (*goredis.Client, error) {
 	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	clientConfig, err := applyOptions(optionFns)
+	if err != nil {
 		return nil, err
 	}
 	options, err := goredis.ParseURL(cfg.URL)
@@ -89,19 +146,81 @@ func Open(ctx context.Context, cfg Config) (*goredis.Client, error) {
 	options.WriteTimeout = cfg.WriteTimeout
 
 	client := goredis.NewClient(options)
-	if err := redisotel.InstrumentTracing(client); err != nil {
-		_ = client.Close()
-		return nil, oops.In("platform_redis").Code("redis.trace_instrumentation_failed").Wrap(err)
+	if err := prepareClient(ctx, client, clientConfig); err != nil {
+		return nil, err
 	}
-	if err := redisotel.InstrumentMetrics(client); err != nil {
+	return client, nil
+}
+
+func OpenCluster(
+	ctx context.Context,
+	options *goredis.ClusterOptions,
+	optionFns ...Option,
+) (*goredis.ClusterClient, error) {
+	if options == nil {
+		return nil, configErr.With("config", "redis_cluster").New("cluster options are required")
+	}
+	clientConfig, err := applyOptions(optionFns)
+	if err != nil {
+		return nil, err
+	}
+	client := goredis.NewClusterClient(options)
+	if err := prepareClient(ctx, client, clientConfig); err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func OpenFailover(
+	ctx context.Context,
+	options *goredis.FailoverOptions,
+	optionFns ...Option,
+) (*goredis.Client, error) {
+	if options == nil {
+		return nil, configErr.With("config", "redis_failover").New("failover options are required")
+	}
+	clientConfig, err := applyOptions(optionFns)
+	if err != nil {
+		return nil, err
+	}
+	client := goredis.NewFailoverClient(options)
+	if err := prepareClient(ctx, client, clientConfig); err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func applyOptions(optionFns []Option) (clientOptions, error) {
+	options := clientOptions{}
+	for _, option := range optionFns {
+		if option == nil {
+			return clientOptions{}, configErr.With("setting", "client_option").New("client option is required")
+		}
+		if err := option(&options); err != nil {
+			return clientOptions{}, err
+		}
+	}
+	return options, nil
+}
+
+func prepareClient(ctx context.Context, client goredis.UniversalClient, options clientOptions) error {
+	tracingOptions := append(
+		append([]redisotel.TracingOption{}, options.tracing...),
+		redisotel.WithDBStatement(false),
+	)
+	if err := redisotel.InstrumentTracing(client, tracingOptions...); err != nil {
 		_ = client.Close()
-		return nil, oops.In("platform_redis").Code("redis.metric_instrumentation_failed").Wrap(err)
+		return oops.In("platform_redis").Code("redis.trace_instrumentation_failed").Wrap(err)
+	}
+	if err := redisotel.InstrumentMetrics(client, options.metrics...); err != nil {
+		_ = client.Close()
+		return oops.In("platform_redis").Code("redis.metric_instrumentation_failed").Wrap(err)
 	}
 	if err := client.Ping(ctx).Err(); err != nil {
 		_ = client.Close()
-		return nil, oops.In("platform_redis").Code("redis.ping_failed").Wrap(err)
+		return oops.In("platform_redis").Code("redis.ping_failed").Wrap(err)
 	}
-	return client, nil
+	return nil
 }
 
 func intEnv(name string, fallback int) (int, error) {
