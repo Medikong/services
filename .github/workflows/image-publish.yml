@@ -294,7 +294,7 @@ jobs:
       - name: gitops repo 체크아웃
         uses: actions/checkout@v4
         with:
-          repository: Medikong/gitops
+          repository: Medikong/e-gitops
           token: ${{ secrets.GITOPS_TOKEN }}
           path: gitops
 
