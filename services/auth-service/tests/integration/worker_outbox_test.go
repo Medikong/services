@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/app"
-	"github.com/Medikong/services/services/auth-service/internal/application/outboxrelay"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/google/uuid"
@@ -44,7 +43,7 @@ func TestWorkerPublishesDomainOutboxWhenPublisherIsInjected(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit domain outbox event: %v", err)
 	}
-	publisher := &outboxrelay.RecordingPublisher{}
+	publisher := &outbox.RecordingPublisher{}
 	worker, err := app.NewWorkerWithPublisher(ctx, workerCfg, publisher)
 	if err != nil {
 		t.Fatalf("construct worker: %v", err)

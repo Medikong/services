@@ -9,8 +9,9 @@ import (
 type Channel string
 
 const (
-	ChannelWeb    Channel = "web"
-	ChannelMobile Channel = "mobile"
+	ChannelWeb     Channel = "web"
+	ChannelIOS     Channel = "ios"
+	ChannelAndroid Channel = "android"
 )
 
 type Session struct {
@@ -21,9 +22,6 @@ type Session struct {
 	Method          string
 	Channel         Channel
 	RememberMe      bool
-	Roles           []string
-	GrantID         uuid.UUID
-	GrantVersion    int64
 	AuthenticatedAt time.Time
 	ExpiresAt       time.Time
 	Status          string
@@ -35,6 +33,7 @@ type Credential struct {
 	Type                      string
 	Status                    string
 	SecretHash                []byte
+	CSRFHash                  []byte
 	FamilyID                  *uuid.UUID
 	ExpiresAt                 time.Time
 	DeliveryRecoveryExpiresAt *time.Time

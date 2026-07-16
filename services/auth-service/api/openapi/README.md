@@ -7,6 +7,6 @@
 - `source.json` records the source origin and SHA-256 values for the source tree and both bundles.
 - `redocly.yaml` is the source lint configuration copied with the bundle snapshot.
 
-From the service repository root, run `task auth-openapi-sync` when the archive contract changes. `task auth-openapi-check` re-bundles from the sibling archive checkout and rejects stale snapshots. In a service-only checkout, use `services/auth-service/scripts/check-openapi.sh --snapshot-only` to validate bundle integrity without the archive source tree.
+From the service repository root, run `task auth-openapi-sync` when the archive OpenAPI source changes. `task auth-openapi-check` re-bundles from the sibling archive checkout and rejects stale snapshots. In a service-only checkout, use `services/auth-service/scripts/check-openapi.sh --snapshot-only` to validate bundle integrity without the archive source tree.
 
 The production bundle must never contain `/api/v1/dev/` routes.

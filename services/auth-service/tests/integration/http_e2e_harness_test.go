@@ -17,16 +17,16 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/app"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/security"
-	httpcontract "github.com/Medikong/services/services/auth-service/internal/transport/httpcontract"
+	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/oops"
 )
 
 const (
 	httpE2ETestOrigin       = "https://app.example.test"
 	httpE2ECredentialKey    = "01234567890123456789012345678901"
 	httpE2EReplayKey        = "01234567890123456789012345678901"
-	httpE2EJWTKey           = "01234567890123456789012345678901"
 	httpE2EJWTIssuer        = "auth-http-e2e"
 	httpE2EDevelopmentToken = "auth-http-e2e-development-access"
 	httpE2EVirtualKey       = "01234567890123456789012345678901"
@@ -125,7 +125,7 @@ func newHTTPHarness(t *testing.T, development bool, options app.ServerOptions) *
 	t.Cleanup(db.Close)
 
 	runCtx, stop := context.WithCancel(ctx)
-	server, err := app.NewServerWithOptions(ctx, cfg, options)
+	server, err := app.NewServer(ctx, cfg, options)
 	if err != nil {
 		stop()
 		t.Fatal("construct HTTP E2E server")
@@ -185,11 +185,18 @@ func configureHTTPEnvironment(t *testing.T, databaseURL string) {
 	t.Setenv("DATABASE_URL", databaseURL)
 	t.Setenv("AUTH_CREDENTIAL_HMAC_KEY", httpE2ECredentialKey)
 	t.Setenv("AUTH_REPLAY_ENCRYPTION_KEY", httpE2EReplayKey)
-	t.Setenv("AUTH_JWT_SECRET", httpE2EJWTKey)
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", integrationJWTPrivateKeyPEM(t))
+	t.Setenv("AUTH_JWT_KEY_ID", "http-e2e-key")
 	t.Setenv("AUTH_JWT_ISSUER", httpE2EJWTIssuer)
+	t.Setenv("AUTH_JWT_AUDIENCES", "dropmong-api")
+	t.Setenv("AUTH_PROOF_PRIVATE_KEY", integrationAuthProofPrivateKey())
+	t.Setenv("AUTH_PROOF_KEY_ID", "auth-local-1")
+	t.Setenv("AUTH_USER_PROOF_PUBLIC_KEY", integrationUserProofPublicKey())
+	t.Setenv("AUTH_USER_PROOF_KEY_ID", "user-local-1")
+	t.Setenv("AUTH_USER_PROOF_ISSUER", "user-service")
 	t.Setenv("AUTH_ALLOWED_ORIGINS", httpE2ETestOrigin)
 	t.Setenv("AUTH_COOKIE_SECURE", "true")
-	t.Setenv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_session")
+	t.Setenv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_refresh")
 	t.Setenv("AUTH_FLOW_COOKIE_NAME", "__Host-dm_auth")
 	t.Setenv("AUTH_INTENT_TTL", "15m")
 	t.Setenv("AUTH_REGISTRATION_TTL", "30m")
@@ -330,7 +337,7 @@ func setHeaderIfPresent(header http.Header, name, value string) {
 
 func decodeHTTPEnvelope(t *testing.T, response *httpE2EResponse, wantStatus int, data any) httpE2EResponseMeta {
 	t.Helper()
-	assertHTTPContractResponse(t, response, wantStatus, "application/json")
+	assertHTTPResponse(t, response, wantStatus, "application/json")
 	var envelope struct {
 		Data json.RawMessage     `json:"data"`
 		Meta httpE2EResponseMeta `json:"meta"`
@@ -346,39 +353,48 @@ func decodeHTTPEnvelope(t *testing.T, response *httpE2EResponse, wantStatus int,
 	return envelope.Meta
 }
 
-func decodeHTTPProblem(t *testing.T, response *httpE2EResponse, wantStatus int, wantCode string) httpcontract.ProblemDetails {
+func decodeHTTPError(t *testing.T, response *httpE2EResponse, wantStatus int, wantCode string) httputil.Error {
 	t.Helper()
-	assertHTTPContractResponse(t, response, wantStatus, "application/problem+json")
-	var problem httpcontract.ProblemDetails
-	decodeHTTPJSON(t, response.body, &problem)
-	if problem.Status != wantStatus || problem.Code != wantCode || problem.RequestID != response.header.Get("X-Request-Id") {
-		t.Fatal("HTTP E2E ProblemDetails does not match the expected contract")
+	assertHTTPResponse(t, response, wantStatus, "application/json")
+	var apiError httputil.Error
+	decodeHTTPJSON(t, response.body, &apiError)
+	if apiError.Status != wantStatus || apiError.Code != wantCode || apiError.RequestID != response.header.Get("X-Request-Id") {
+		t.Fatal("HTTP E2E error does not match the expected response")
 	}
-	if problem.Type == "" || problem.Title == "" || problem.Detail == "" {
-		t.Fatal("HTTP E2E ProblemDetails is incomplete")
+	if apiError.Message == "" {
+		t.Fatal("HTTP E2E error is incomplete")
 	}
-	return problem
+	return apiError
+}
+
+func errorCode(err error) string {
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		return ""
+	}
+	code, _ := oopsErr.Code().(string)
+	return code
 }
 
 func assertHTTPNoContent(t *testing.T, response *httpE2EResponse, wantStatus int) {
 	t.Helper()
-	assertHTTPContractResponse(t, response, wantStatus, "")
+	assertHTTPResponse(t, response, wantStatus, "")
 	if len(bytes.TrimSpace(response.body)) != 0 {
 		t.Fatal("HTTP E2E no-content response contains a body")
 	}
 }
 
-func assertHTTPContractResponse(t *testing.T, response *httpE2EResponse, wantStatus int, wantMediaType string) {
+func assertHTTPResponse(t *testing.T, response *httpE2EResponse, wantStatus int, wantMediaType string) {
 	t.Helper()
 	if response == nil {
 		t.Fatal("HTTP E2E response is nil")
 	}
 	if response.status != wantStatus {
-		var safeProblem struct {
+		var safeError struct {
 			Code string `json:"code"`
 		}
-		_ = json.Unmarshal(response.body, &safeProblem)
-		t.Fatalf("HTTP E2E status = %d, want %d, problem code = %q", response.status, wantStatus, safeProblem.Code)
+		_ = json.Unmarshal(response.body, &safeError)
+		t.Fatalf("HTTP E2E status = %d, want %d, error code = %q", response.status, wantStatus, safeError.Code)
 	}
 	if response.header.Get("Cache-Control") != "no-store" {
 		t.Fatal("HTTP E2E response is missing Cache-Control: no-store")
@@ -405,11 +421,11 @@ func decodeHTTPJSON(t *testing.T, body []byte, target any) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		t.Fatal("decode HTTP E2E contract JSON")
+		t.Fatal("decode HTTP E2E response JSON")
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != io.EOF {
-		t.Fatal("HTTP E2E contract JSON has trailing data")
+		t.Fatal("HTTP E2E response JSON has trailing data")
 	}
 }
 
@@ -452,8 +468,12 @@ func namedResponseCookie(t *testing.T, response *httpE2EResponse, name string) *
 
 func assertCredentialCookie(t *testing.T, cookie *http.Cookie, name string) {
 	t.Helper()
-	if cookie == nil || cookie.Name != name || cookie.Value == "" || cookie.Path != "/" || !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode {
-		t.Fatal("HTTP E2E credential cookie attributes do not match the contract")
+	wantPath, wantSameSite := "/", http.SameSiteLaxMode
+	if name == "__Host-dm_refresh" {
+		wantPath, wantSameSite = "/api/v1/auth/sessions", http.SameSiteStrictMode
+	}
+	if cookie == nil || cookie.Name != name || cookie.Value == "" || cookie.Path != wantPath || !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != wantSameSite {
+		t.Fatal("HTTP E2E credential cookie attributes are invalid")
 	}
 }
 

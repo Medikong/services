@@ -7,20 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/application/bootstrap"
-	"github.com/Medikong/services/services/auth-service/internal/application/outboxrelay"
-	appregistration "github.com/Medikong/services/services/auth-service/internal/application/registration"
-	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
-	"github.com/Medikong/services/services/auth-service/internal/domain/access"
-	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
-	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
-	"github.com/Medikong/services/services/auth-service/internal/domain/identity"
-	"github.com/Medikong/services/services/auth-service/internal/domain/inbox"
-	"github.com/Medikong/services/services/auth-service/internal/domain/intent"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	registrationdomain "github.com/Medikong/services/services/auth-service/internal/domain/registration"
-	sessiondomain "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	"github.com/Medikong/services/services/auth-service/internal/security"
 	"github.com/google/uuid"
 )
 
@@ -61,17 +47,11 @@ type registrationHTTPVerifyData struct {
 	ChallengeID  string `json:"challengeId"`
 	Status       string `json:"status"`
 	Registration struct {
-		Status                string   `json:"status"`
-		VerifiedMethods       []string `json:"verifiedMethods"`
-		RequiredVerifications []string `json:"requiredVerifications"`
+		Status                      string   `json:"status"`
+		VerifiedMethods             []string `json:"verifiedMethods"`
+		RequiredVerifications       []string `json:"requiredVerifications"`
+		RegistrationCompletionProof string   `json:"registrationCompletionProof"`
 	} `json:"registration"`
-}
-
-type registrationHTTPPendingData struct {
-	RegistrationID string `json:"registrationId"`
-	Status         string `json:"status"`
-	Retryable      bool   `json:"retryable"`
-	StatusPath     string `json:"statusPath"`
 }
 
 type registrationHTTPStatusData struct {
@@ -87,15 +67,21 @@ type registrationHTTPCompletedData struct {
 	Status             string `json:"status"`
 	CredentialDelivery string `json:"credentialDelivery"`
 	UserID             string `json:"userId"`
-	SessionID          string `json:"sessionId"`
-	CSRFToken          string `json:"csrfToken"`
-	Next               struct {
+	Session            struct {
+		SessionID string    `json:"sessionId"`
+		ExpiresAt time.Time `json:"expiresAt"`
+	} `json:"session"`
+	Access struct {
+		AccessToken          string    `json:"accessToken"`
+		AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	} `json:"access"`
+	Next struct {
 		Path     string `json:"path"`
 		IntentID string `json:"intentId"`
 	} `json:"next"`
 }
 
-func TestProductionHTTPRegistrationContract(t *testing.T) {
+func TestProductionHTTPRegistrationAPI(t *testing.T) {
 	harness := newProductionHTTPHarness(t)
 	email := "registration-" + uuid.NewString() + "@example.test"
 	phoneCountryCode, phoneNationalNumber := "+82", "1012345678"
@@ -111,7 +97,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			"X-Client-Channel": "web",
 		}),
 	})
-	decodeHTTPProblem(t, invalidRedirect, http.StatusBadRequest, "AUTH_REDIRECT_INVALID")
+	decodeHTTPError(t, invalidRedirect, http.StatusBadRequest, "AUTH_REDIRECT_INVALID")
 
 	intentData, authFlowCookie := registrationHTTPCreateWebIntent(t, harness, "/drops/registration")
 	methodsResponse := harness.do(httpE2ERequest{
@@ -122,7 +108,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 	var methodsData registrationHTTPMethodsData
 	decodeHTTPEnvelope(t, methodsResponse, http.StatusOK, &methodsData)
 	if methodsData.IntentID != intentData.AuthIntentID || len(methodsData.Methods) != 2 {
-		t.Fatal("API.A.300-02 success data does not match the contract")
+		t.Fatal("API.A.300-02 success data does not match the expected result")
 	}
 
 	missingIntent := harness.do(httpE2ERequest{
@@ -130,7 +116,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		Path:        "/api/v1/auth/methods?intentId=" + uuid.NewString(),
 		Credentials: httpE2ECredentials{AuthFlowCookie: authFlowCookie},
 	})
-	decodeHTTPProblem(t, missingIntent, http.StatusNotFound, "AUTH_INTENT_NOT_FOUND")
+	decodeHTTPError(t, missingIntent, http.StatusNotFound, "AUTH_INTENT_NOT_FOUND")
 
 	registrationBody := registrationHTTPBody(intentData.AuthIntentID, email, password, phoneCountryCode, phoneNationalNumber, profileRequestID, agreementReceiptID)
 	registrationBody["unexpected"] = true
@@ -145,7 +131,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			Origin:         harness.origin,
 		},
 	})
-	decodeHTTPProblem(t, strictJSON, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+	decodeHTTPError(t, strictJSON, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 	assertResponseOmits(t, strictJSON, email, phone, password)
 
 	missingCSRF := harness.do(httpE2ERequest{
@@ -155,7 +141,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		Headers:     registrationHTTPHeaders(uuid.NewString(), nil),
 		Credentials: httpE2ECredentials{AuthFlowCookie: authFlowCookie, Origin: harness.origin},
 	})
-	decodeHTTPProblem(t, missingCSRF, http.StatusForbidden, "AUTH_CSRF_INVALID")
+	decodeHTTPError(t, missingCSRF, http.StatusForbidden, "AUTH_CSRF_INVALID")
 	assertResponseOmits(t, missingCSRF, email, phone, password)
 
 	invalidOrigin := harness.do(httpE2ERequest{
@@ -169,7 +155,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			Origin:         "https://untrusted.example.test",
 		},
 	})
-	decodeHTTPProblem(t, invalidOrigin, http.StatusForbidden, "AUTH_CSRF_INVALID")
+	decodeHTTPError(t, invalidOrigin, http.StatusForbidden, "AUTH_CSRF_INVALID")
 	assertResponseOmits(t, invalidOrigin, email, phone, password)
 
 	startKey := uuid.NewString()
@@ -187,7 +173,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 	var startData registrationHTTPStartData
 	decodeHTTPEnvelope(t, startResponse, http.StatusCreated, &startData)
 	if startData.RegistrationID == "" || startData.Status != "pending_verification" || len(startData.RequiredVerifications) != 2 || startData.RegistrationStatusToken == "" || startData.ExpiresAt.IsZero() || startData.RegistrationStatusTokenExpireAt.IsZero() {
-		t.Fatal("API.A.300-03 success data does not match the contract")
+		t.Fatal("API.A.300-03 success data does not match the expected result")
 	}
 	assertResponseOmits(t, startResponse, email, phone, password)
 
@@ -203,7 +189,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			Origin:         harness.origin,
 		},
 	})
-	decodeHTTPProblem(t, identifierConflict, http.StatusConflict, "AUTH_IDENTIFIER_UNAVAILABLE")
+	decodeHTTPError(t, identifierConflict, http.StatusConflict, "AUTH_IDENTIFIER_UNAVAILABLE")
 	assertResponseOmits(t, identifierConflict, email, phone, password)
 
 	preAuthCredentials := httpE2ECredentials{
@@ -211,15 +197,18 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		CSRFToken:      intentData.CSRFToken,
 		Origin:         harness.origin,
 	}
+	createdUserID := uuid.New()
+	userCreationProof := signUserCreationProof(t, startData.RegistrationID, createdUserID, 1)
+	completionBody := map[string]any{"userId": createdUserID.String(), "userCreationProof": userCreationProof}
 	completeKey := uuid.NewString()
 	verificationRequired := harness.do(httpE2ERequest{
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID + "/complete",
-		JSON:        map[string]any{},
+		JSON:        completionBody,
 		Headers:     registrationHTTPHeaders(completeKey, nil),
 		Credentials: preAuthCredentials,
 	})
-	decodeHTTPProblem(t, verificationRequired, http.StatusConflict, "AUTH_VERIFICATION_REQUIRED")
+	decodeHTTPError(t, verificationRequired, http.StatusConflict, "AUTH_VERIFICATION_REQUIRED")
 
 	invalidMethod := harness.do(httpE2ERequest{
 		Method:      http.MethodPost,
@@ -228,7 +217,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		Headers:     registrationHTTPHeaders(uuid.NewString(), nil),
 		Credentials: preAuthCredentials,
 	})
-	decodeHTTPProblem(t, invalidMethod, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+	decodeHTTPError(t, invalidMethod, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 
 	emailChallenge := registrationHTTPIssueChallenge(t, harness, startData.RegistrationID, "email", preAuthCredentials)
 	emailCode := decryptDeliveryCode(t, harness.ctx, harness.db, emailChallenge.ChallengeID)
@@ -239,7 +228,7 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		uuid.NewString(),
 		preAuthCredentials,
 	))
-	decodeHTTPProblem(t, wrongEmailVerification, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
+	decodeHTTPError(t, wrongEmailVerification, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
 	assertResponseOmits(t, wrongEmailVerification, email, phone, password, emailCode)
 
 	emailVerifyKey := uuid.NewString()
@@ -258,26 +247,15 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 		return harness.do(registrationHTTPVerifyRequest(startData.RegistrationID, phoneChallenge.ChallengeID, phoneCode, phoneVerifyKey, preAuthCredentials))
 	})
 	for _, response := range concurrentResponses {
-		registrationHTTPDecodeVerified(t, response, phoneChallenge.ChallengeID, 2)
+		proof := registrationHTTPDecodeVerified(t, response, phoneChallenge.ChallengeID, 2)
+		if proof == "" {
+			t.Fatal("API.A.300-05 did not return registrationCompletionProof after both verifications")
+		}
 		assertResponseOmits(t, response, email, phone, password, phoneCode)
 	}
 	phoneVerificationRetry := harness.do(registrationHTTPVerifyRequest(startData.RegistrationID, phoneChallenge.ChallengeID, phoneCode, phoneVerifyKey, preAuthCredentials))
 	registrationHTTPDecodeVerified(t, phoneVerificationRetry, phoneChallenge.ChallengeID, 2)
 	registrationHTTPAssertChallengeExactlyOnce(t, harness, phoneChallenge.ChallengeID, phoneVerifyKey, 1)
-
-	pendingResponse := harness.do(httpE2ERequest{
-		Method:      http.MethodPost,
-		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID + "/complete",
-		JSON:        map[string]any{},
-		Headers:     registrationHTTPHeaders(completeKey, nil),
-		Credentials: preAuthCredentials,
-	})
-	var pendingData registrationHTTPPendingData
-	decodeHTTPEnvelope(t, pendingResponse, http.StatusAccepted, &pendingData)
-	if pendingData.RegistrationID != startData.RegistrationID || pendingData.Status != "awaiting_user_link" || !pendingData.Retryable || pendingData.StatusPath == "" || pendingResponse.header.Get("Location") != pendingData.StatusPath || pendingResponse.header.Get("Retry-After") != "2" {
-		t.Fatal("API.A.300-06 accepted response does not match the contract")
-	}
-	assertResponseOmits(t, pendingResponse, email, phone, password, emailCode, phoneCode)
 
 	statusByToken := harness.do(httpE2ERequest{
 		Method: http.MethodGet,
@@ -286,14 +264,14 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			RegistrationStatusToken: startData.RegistrationStatusToken,
 		},
 	})
-	registrationHTTPDecodeStatus(t, statusByToken, startData.RegistrationID, "awaiting_user_link")
+	registrationHTTPDecodeStatus(t, statusByToken, startData.RegistrationID, "pending_verification")
 
 	statusByAuthFlow := harness.do(httpE2ERequest{
 		Method:      http.MethodGet,
 		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID,
 		Credentials: httpE2ECredentials{AuthFlowCookie: authFlowCookie},
 	})
-	registrationHTTPDecodeStatus(t, statusByAuthFlow, startData.RegistrationID, "awaiting_user_link")
+	registrationHTTPDecodeStatus(t, statusByAuthFlow, startData.RegistrationID, "pending_verification")
 
 	statusNotFound := harness.do(httpE2ERequest{
 		Method: http.MethodGet,
@@ -302,23 +280,42 @@ func TestProductionHTTPRegistrationContract(t *testing.T) {
 			RegistrationStatusToken: "rst_invalid_fixture",
 		},
 	})
-	decodeHTTPProblem(t, statusNotFound, http.StatusNotFound, "AUTH_REGISTRATION_NOT_FOUND")
+	decodeHTTPError(t, statusNotFound, http.StatusNotFound, "AUTH_REGISTRATION_NOT_FOUND")
 
-	registrationHTTPConsumeUserLinkTwice(t, harness, startData.RegistrationID)
+	invalidProofResponse := harness.do(httpE2ERequest{
+		Method:      http.MethodPost,
+		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID + "/complete",
+		JSON:        map[string]any{"userId": createdUserID.String(), "userCreationProof": userCreationProof + "tampered"},
+		Headers:     registrationHTTPHeaders(uuid.NewString(), nil),
+		Credentials: preAuthCredentials,
+	})
+	decodeHTTPError(t, invalidProofResponse, http.StatusForbidden, "AUTH_USER_CREATION_PROOF_INVALID")
 	completedResponse := harness.do(httpE2ERequest{
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID + "/complete",
-		JSON:        map[string]any{},
+		JSON:        completionBody,
 		Headers:     registrationHTTPHeaders(completeKey, nil),
 		Credentials: preAuthCredentials,
 	})
 	var completedData registrationHTTPCompletedData
 	decodeHTTPEnvelope(t, completedResponse, http.StatusOK, &completedData)
-	if completedData.RegistrationID != startData.RegistrationID || completedData.Status != "completed" || completedData.CredentialDelivery != "web_session" || completedData.UserID == "" || completedData.SessionID == "" || completedData.CSRFToken == "" || completedData.Next.Path != "/drops/registration" || completedData.Next.IntentID != intentData.AuthIntentID {
-		t.Fatal("API.A.300-06 completed response does not match the contract")
+	if completedData.RegistrationID != startData.RegistrationID || completedData.Status != "completed" || completedData.CredentialDelivery != "web_jwt_refresh_cookie" || completedData.UserID != createdUserID.String() || completedData.Session.SessionID == "" || completedData.Session.ExpiresAt.IsZero() || completedData.Access.AccessToken == "" || completedData.Access.AccessTokenExpiresAt.IsZero() || completedData.Next.Path != "/drops/registration" || completedData.Next.IntentID != intentData.AuthIntentID {
+		t.Fatal("API.A.300-06 completed response does not match the expected result")
 	}
-	sessionCookie := responseCookie(t, completedResponse, "__Host-dm_session")
-	assertCredentialCookie(t, sessionCookie, "__Host-dm_session")
+	replayedResponse := harness.do(httpE2ERequest{
+		Method:      http.MethodPost,
+		Path:        "/api/v1/auth/registrations/" + startData.RegistrationID + "/complete",
+		JSON:        completionBody,
+		Headers:     registrationHTTPHeaders(completeKey, nil),
+		Credentials: preAuthCredentials,
+	})
+	var replayedData registrationHTTPCompletedData
+	decodeHTTPEnvelope(t, replayedResponse, http.StatusOK, &replayedData)
+	if replayedData.Session.SessionID != completedData.Session.SessionID || replayedData.Access.AccessToken != completedData.Access.AccessToken {
+		t.Fatal("API.A.300-06 idempotent retry did not replay the same logical session")
+	}
+	sessionCookie := responseCookie(t, completedResponse, "__Host-dm_refresh")
+	assertCredentialCookie(t, sessionCookie, "__Host-dm_refresh")
 	if sessionCookie.MaxAge <= 0 {
 		t.Fatal("remembered registration session is missing Max-Age")
 	}
@@ -339,7 +336,7 @@ func registrationHTTPCreateWebIntent(t *testing.T, harness *httpE2EHarness, retu
 	var data registrationHTTPIntentData
 	decodeHTTPEnvelope(t, response, http.StatusCreated, &data)
 	if data.AuthIntentID == "" || data.CSRFToken == "" || data.NextPath == "" || data.ExpiresAt.IsZero() {
-		t.Fatal("API.A.300-01 success data does not match the contract")
+		t.Fatal("API.A.300-01 success data does not match the expected result")
 	}
 	cookie := responseCookie(t, response, "__Host-dm_auth")
 	assertCredentialCookie(t, cookie, "__Host-dm_auth")
@@ -379,7 +376,7 @@ func registrationHTTPIssueChallenge(t *testing.T, harness *httpE2EHarness, regis
 	var data registrationHTTPChallengeData
 	decodeHTTPEnvelope(t, response, http.StatusCreated, &data)
 	if data.ChallengeID == "" || data.Method != method || data.MaskedDestination == "" || data.ExpiresAt.IsZero() || data.ResendAvailableAt.IsZero() {
-		t.Fatal("API.A.300-04 success data does not match the contract")
+		t.Fatal("API.A.300-04 success data does not match the expected result")
 	}
 	return data
 }
@@ -394,13 +391,18 @@ func registrationHTTPVerifyRequest(registrationID, challengeID, code, idempotenc
 	}
 }
 
-func registrationHTTPDecodeVerified(t *testing.T, response *httpE2EResponse, challengeID string, wantMethods int) {
+func registrationHTTPDecodeVerified(t *testing.T, response *httpE2EResponse, challengeID string, wantMethods int) string {
 	t.Helper()
 	var data registrationHTTPVerifyData
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
-	if data.ChallengeID != challengeID || data.Status != "verified" || data.Registration.Status != "pending_verification" || len(data.Registration.VerifiedMethods) != wantMethods || len(data.Registration.RequiredVerifications) != 2 {
-		t.Fatal("API.A.300-05 success data does not match the contract")
+	wantStatus := "pending_verification"
+	if wantMethods == 2 {
+		wantStatus = "verified"
 	}
+	if data.ChallengeID != challengeID || data.Status != "verified" || data.Registration.Status != wantStatus || len(data.Registration.VerifiedMethods) != wantMethods || len(data.Registration.RequiredVerifications) != 2 {
+		t.Fatal("API.A.300-05 success data does not match the expected result")
+	}
+	return data.Registration.RegistrationCompletionProof
 }
 
 func registrationHTTPDifferentCode(code string) string {
@@ -467,133 +469,6 @@ func registrationHTTPDecodeStatus(t *testing.T, response *httpE2EResponse, regis
 	var data registrationHTTPStatusData
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
 	if data.RegistrationID != registrationID || data.Status != wantStatus || !data.Retryable || len(data.VerifiedMethods) != 2 || data.ExpiresAt.IsZero() {
-		t.Fatal("API.A.300-28 success data does not match the contract")
+		t.Fatal("API.A.300-28 success data does not match the expected result")
 	}
-}
-
-func registrationHTTPConsumeUserLinkTwice(t *testing.T, harness *httpE2EHarness, registrationIDValue string) {
-	t.Helper()
-	registrationID, err := uuid.Parse(registrationIDValue)
-	if err != nil {
-		t.Fatal("prepare HTTP E2E User link fixture")
-	}
-	var causationID uuid.UUID
-	if err := harness.db.QueryRow(harness.ctx, `
-		SELECT verification_completed_event_id
-		FROM auth_registrations
-		WHERE registration_id=$1
-	`, registrationID).Scan(&causationID); err != nil {
-		t.Fatal("read HTTP E2E User link causation")
-	}
-	outboxRepository := outbox.NewPostgresRepository(harness.db)
-	publisher := &outboxrelay.RecordingPublisher{}
-	relay, err := outboxrelay.New(outboxRepository, publisher, outboxrelay.Config{
-		WorkerID:     "http-e2e-context",
-		BatchSize:    100,
-		PollInterval: time.Second,
-		Lease:        time.Minute,
-		MaxAttempts:  3,
-		BaseBackoff:  time.Second,
-		MaxBackoff:   time.Minute,
-	})
-	if err != nil {
-		t.Fatal("construct HTTP E2E outbox relay")
-	}
-	result, err := relay.RunOnce(harness.ctx)
-	if err != nil || result.Published == 0 {
-		t.Fatal("publish HTTP E2E registration events")
-	}
-	foundVerificationCompletion := false
-	for _, published := range publisher.Events {
-		if published.ID == causationID && published.Type == "Auth.RegistrationVerificationCompleted" {
-			foundVerificationCompletion = true
-			break
-		}
-	}
-	if !foundVerificationCompletion {
-		t.Fatal("HTTP E2E registration completion was not published")
-	}
-
-	// The concrete Context transport is the only remaining external Port. The
-	// test publishes the durable outbound event above, then injects the narrow,
-	// versioned inbound contract without inventing an address or credential.
-	service := registrationHTTPInboxConsumer(harness)
-	event := appregistration.UserLinkEvent{
-		SourceEventID:  uuid.New(),
-		CausationID:    causationID,
-		RegistrationID: registrationID,
-		UserID:         uuid.New(),
-		LinkRequestID:  uuid.New(),
-	}
-	if err := service.ConsumeUserLinkEvent(harness.ctx, event); err != nil {
-		t.Fatal("consume HTTP E2E User link event")
-	}
-	if err := service.ConsumeUserLinkEvent(harness.ctx, event); err != nil {
-		t.Fatal("consume duplicate HTTP E2E User link event")
-	}
-
-	var inboxCount, linkCount, auditCount int
-	if err := harness.db.QueryRow(harness.ctx, `
-		SELECT count(*)
-		FROM auth_inbox_messages
-		WHERE consumer_name='context_user_link' AND source_event_id=$1 AND process_status='processed'
-	`, event.SourceEventID).Scan(&inboxCount); err != nil {
-		t.Fatal("count HTTP E2E User link inbox messages")
-	}
-	if err := harness.db.QueryRow(harness.ctx, `
-		SELECT count(*)
-		FROM auth_identity_links
-		WHERE user_id=$1 AND link_status='active'
-	`, event.UserID).Scan(&linkCount); err != nil {
-		t.Fatal("count HTTP E2E User identity links")
-	}
-	if err := harness.db.QueryRow(harness.ctx, `
-		SELECT count(*)
-		FROM audit_outbox
-		WHERE event_name='auth.registration.linked' AND idempotency_key=$1
-	`, "user-link:"+event.SourceEventID.String()).Scan(&auditCount); err != nil {
-		t.Fatal("count HTTP E2E User link audit records")
-	}
-	if inboxCount != 1 || linkCount != 2 || auditCount != 1 {
-		t.Fatal("HTTP E2E User link inbox did not deduplicate the event")
-	}
-}
-
-func registrationHTTPInboxConsumer(harness *httpE2EHarness) *appregistration.Service {
-	keys := security.Keys{
-		CredentialHMAC: []byte(httpE2ECredentialKey),
-		ReplayKey:      []byte(httpE2EReplayKey),
-		JWTKey:         []byte(httpE2EJWTKey),
-		JWTIssuer:      httpE2EJWTIssuer,
-	}
-	intentRepository := intent.NewPostgresRepository(harness.db)
-	idempotencyRepository := idempotency.NewPostgresRepository(harness.db)
-	bootstrapService := bootstrap.NewService(harness.db, keys, bootstrap.Config{IntentTTL: 15 * time.Minute}, intentRepository, idempotencyRepository)
-	identityRepository := identity.NewPostgresRepository(harness.db)
-	outboxRepository := outbox.NewPostgresRepository(harness.db)
-	accessRepository := access.NewPostgresRepository(harness.db)
-	sessionService := appsession.NewService(
-		harness.db,
-		keys,
-		appsession.Config{AccessTTL: 5 * time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RememberMeSessionTTL: 24 * time.Hour, RecoveryTTL: 2 * time.Minute},
-		sessiondomain.NewPostgresRepository(harness.db),
-		accessRepository,
-		idempotencyRepository,
-		outboxRepository,
-	)
-	return appregistration.NewService(
-		harness.db,
-		keys,
-		appregistration.Config{RegistrationTTL: 30 * time.Minute, StatusTokenRetention: 5 * time.Minute, ChallengeTTL: 10 * time.Minute, SessionDeliveryWindow: 10 * time.Minute},
-		bootstrapService,
-		registrationdomain.NewPostgresRepository(harness.db),
-		challenge.NewPostgresRepository(harness.db, challenge.PostgresOptions{}),
-		identityRepository,
-		idempotencyRepository,
-		inbox.NewPostgresRepository(harness.db),
-		outboxRepository,
-		accessRepository,
-		intentRepository,
-		sessionService,
-	)
 }

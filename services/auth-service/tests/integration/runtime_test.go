@@ -51,7 +51,7 @@ func TestRuntimeReadinessAndOutdatedSchemaRefusal(t *testing.T) {
 	if _, err := db.Exec(ctx, "DROP TABLE auth_dev_goose_db_version"); err != nil {
 		t.Fatalf("drop development migration version: %v", err)
 	}
-	if _, err := app.NewServer(ctx, serverCfg); err == nil {
+	if _, err := app.NewServer(ctx, serverCfg, app.ServerOptions{}); err == nil {
 		t.Fatal("NewServer() error = nil with an outdated development schema")
 	}
 	assertTableMissing(t, ctx, db, "auth_dev_goose_db_version")
@@ -93,6 +93,10 @@ func configureDevelopmentEnvironment(t *testing.T, databaseURL string) {
 	t.Setenv("AUTH_VIRTUAL_ADAPTERS_ENABLED", "true")
 	t.Setenv("AUTH_DEV_ACCESS_TOKEN", "integration-development-token")
 	t.Setenv("AUTH_VIRTUAL_MESSAGE_KEY", "01234567890123456789012345678901")
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", integrationJWTPrivateKeyPEM(t))
+	t.Setenv("AUTH_JWT_KEY_ID", "integration-key")
+	t.Setenv("AUTH_JWT_ISSUER", "integration")
+	t.Setenv("AUTH_JWT_AUDIENCES", "dropmong-api")
 }
 
 func migrateSchemas(t *testing.T, ctx context.Context, postgres platformdb.PostgresConfig) *pgxpool.Pool {
@@ -125,7 +129,7 @@ func migrateProductionSchemas(t *testing.T, ctx context.Context, postgres platfo
 func testServerReadiness(t *testing.T, cfg config.ServerConfig) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	server, err := app.NewServer(ctx, cfg)
+	server, err := app.NewServer(ctx, cfg, app.ServerOptions{})
 	if err != nil {
 		cancel()
 		t.Fatalf("NewServer() error = %v", err)

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/application/outboxrelay"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/google/uuid"
 )
@@ -34,8 +33,8 @@ func TestDomainOutboxRelayPublishesOnlyAfterAcknowledgement(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit event: %v", err)
 	}
-	publisher := &outboxrelay.RecordingPublisher{}
-	relay, err := outboxrelay.New(repository, publisher, outboxrelay.Config{WorkerID: "integration-worker", BatchSize: 10, PollInterval: time.Second, Lease: time.Minute, MaxAttempts: 3, BaseBackoff: time.Second, MaxBackoff: time.Minute})
+	publisher := &outbox.RecordingPublisher{}
+	relay, err := outbox.New(repository, publisher, outbox.Config{WorkerID: "integration-worker", BatchSize: 10, PollInterval: time.Second, Lease: time.Minute, MaxAttempts: 3, BaseBackoff: time.Second, MaxBackoff: time.Minute})
 	if err != nil {
 		t.Fatalf("create relay: %v", err)
 	}
@@ -44,7 +43,7 @@ func TestDomainOutboxRelayPublishesOnlyAfterAcknowledgement(t *testing.T) {
 		t.Fatalf("relay event: %v", err)
 	}
 	if result.Claimed != 1 || result.Published != 1 || len(publisher.Events) != 1 || publisher.Events[0].ID != event.ID {
-		t.Fatal("outbox relay acknowledgement does not match the contract")
+		t.Fatal("outbox relay acknowledgement does not match the expected result")
 	}
 	var status string
 	if err := db.QueryRow(ctx, `SELECT publish_status FROM auth_outbox_events WHERE event_id=$1`, event.ID).Scan(&status); err != nil {

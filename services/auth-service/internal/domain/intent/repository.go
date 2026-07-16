@@ -12,6 +12,7 @@ import (
 type Repository interface {
 	Create(context.Context, pgx.Tx, CreateParams) error
 	FindActiveForUpdate(context.Context, pgx.Tx, uuid.UUID) (Intent, error)
+	FindCompletionReplayForUpdate(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) (Intent, error)
 	RotateOwnerProof(context.Context, pgx.Tx, uuid.UUID, []byte, []byte) error
 	SetRememberMe(context.Context, pgx.Tx, uuid.UUID, bool) error
 	Consume(context.Context, pgx.Tx, uuid.UUID, uuid.UUID, string) error

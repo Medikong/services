@@ -28,7 +28,7 @@ func TestChallengeTracksAttemptsAndClosesAtLimit(t *testing.T) {
 	for attempt := 0; attempt < 2; attempt++ {
 		result, err := challenge.Consume(now.Add(time.Duration(attempt+1)*time.Minute), false)
 		if !errors.Is(err, ErrVerificationFailed) || !result.Changed {
-			t.Fatalf("challenge mismatch attempt %d did not match the contract", attempt)
+			t.Fatalf("challenge mismatch attempt %d did not match the expected result", attempt)
 		}
 	}
 	if challenge.Status != StatusFailed || challenge.ClosedAt == nil || challenge.AttemptCount != 2 {

@@ -10,9 +10,10 @@ import (
 	"testing"
 )
 
-// Aggregate repositories sit at the bottom of the service. They may use pgx
-// directly, but must not acquire application or HTTP dependencies.
-func TestDomainDoesNotDependOnUpperLayersOrGenericStores(t *testing.T) {
+// Domain packages may contain HTTP controllers, but only controller files may
+// depend on HTTP credentials and utilities. Domain rules and persistence stay
+// free of transport dependencies.
+func TestDomainPackageBoundaries(t *testing.T) {
 	t.Helper()
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -39,10 +40,16 @@ func TestDomainDoesNotDependOnUpperLayersOrGenericStores(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		controllerFile := strings.HasSuffix(filepath.Base(path), "controller.go")
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, "\"")
-			if strings.Contains(importPath, "/internal/application/") || strings.Contains(importPath, "/internal/transport/") {
-				t.Fatalf("domain package %s imports forbidden upper-layer package %s", filepath.Base(path), importPath)
+			allowedHTTPImport := strings.HasSuffix(importPath, "/internal/transport/credential") ||
+				strings.HasSuffix(importPath, "/internal/transport/httputil")
+			if strings.Contains(importPath, "/internal/transport/") && (!controllerFile || !allowedHTTPImport) {
+				t.Fatalf("domain package %s imports forbidden transport package %s", filepath.Base(path), importPath)
+			}
+			if controllerFile && strings.Contains(importPath, "jackc/pgx") {
+				t.Fatalf("domain controller %s imports postgres package %s", filepath.Base(path), importPath)
 			}
 		}
 		return nil

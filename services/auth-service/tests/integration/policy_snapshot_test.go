@@ -10,14 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/application"
-	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
-	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
-	"github.com/Medikong/services/services/auth-service/internal/domain/access"
+	"github.com/Medikong/services/services/auth-service/internal/domain"
 	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
-	operatordomain "github.com/Medikong/services/services/auth-service/internal/domain/operator"
+	appoperator "github.com/Medikong/services/services/auth-service/internal/domain/operator"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/domain/policy"
+	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/security"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,36 +63,24 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 	db := migratedDomainPool(t, ctx)
 	operatorID := uuid.New()
 	if _, err := db.Exec(ctx, `
-		INSERT INTO auth_user_auth_states (user_id, status, restriction_version, effective_at)
-		VALUES ($1, 'active', 1, now())
-	`, operatorID); err != nil {
+		INSERT INTO auth_user_auth_states (user_id, status, user_version, status_change_id, effective_at)
+		VALUES ($1, 'active', 1, $2, now())
+	`, operatorID, uuid.NewString()); err != nil {
 		t.Fatalf("seed operator state: %v", err)
 	}
-	if _, err := db.Exec(ctx, `
-		INSERT INTO auth_access_grants (
-			access_grant_id, user_id, roles, permissions, grant_version, grant_status, source, source_revision, valid_from
-		) VALUES ($1, $2, ARRAY['platform_operator'], ARRAY['auth.policy.read','auth.policy.write'], 1, 'active', 'test', 'test', now())
-	`, uuid.New(), operatorID); err != nil {
-		t.Fatalf("seed operator grant: %v", err)
-	}
-	keys := security.Keys{
-		CredentialHMAC: []byte("01234567890123456789012345678901"),
-		ReplayKey:      []byte("01234567890123456789012345678901"),
-		JWTKey:         []byte("01234567890123456789012345678901"),
-		JWTIssuer:      "integration",
-	}
+	keys := integrationSecurityKeys(t)
 	service := appoperator.NewService(
-		db, keys, operatordomain.NewPostgresRepository(db), policy.NewPostgresRepository(db), access.NewPostgresRepository(db),
-		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.DenyApprovalPort{},
+		db, keys, appoperator.NewPostgresRepository(db), policy.NewPostgresRepository(db),
+		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.DenyApprovalPort{}, allowAuthorizationDecision{},
 	)
-	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Channel: "web", Method: "email_password", AuthenticatedAt: time.Now().UTC(), GrantVersion: 1}
-	before, err := service.PolicyView(ctx, principal)
+	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Method: "email_password", AuthenticatedAt: time.Now().UTC()}
+	before, err := service.PolicyView(ctx, principal, "allow")
 	if err != nil {
 		t.Fatalf("read global policy: %v", err)
 	}
 	key := uuid.NewString()
 	input := appoperator.PolicyUpdateInput{
-		Principal: principal, Name: "login-lock", IfMatch: fmt.Sprintf("\"policy-%d\"", before.Version), IdempotencyKey: key,
+		Principal: principal, Name: "login-lock", IfMatch: fmt.Sprintf("\"policy-%d\"", before.Version), IdempotencyKey: key, AuthorizationDecision: "allow",
 		Patch: map[string]any{"policyName": "login-lock", "failureThreshold": float64(6), "changeReason": "TEST_POLICY_UPDATE"},
 	}
 	updated, err := service.UpdatePolicy(ctx, input)
@@ -111,7 +97,7 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 	if replayed.Name != updated.Name || replayed.Version != updated.Version || replayed.Status != updated.Status || !replayed.EffectiveAt.Equal(updated.EffectiveAt) {
 		t.Fatalf("replayed policy update=%#v, want %#v", replayed, updated)
 	}
-	after, err := service.PolicyView(ctx, principal)
+	after, err := service.PolicyView(ctx, principal, "allow")
 	if err != nil {
 		t.Fatalf("read updated global policy: %v", err)
 	}
@@ -127,7 +113,7 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 	}
 
 	concurrentInput := appoperator.PolicyUpdateInput{
-		Principal: principal, Name: "login-lock", IfMatch: fmt.Sprintf("\"policy-%d\"", after.Version), IdempotencyKey: uuid.NewString(),
+		Principal: principal, Name: "login-lock", IfMatch: fmt.Sprintf("\"policy-%d\"", after.Version), IdempotencyKey: uuid.NewString(), AuthorizationDecision: "allow",
 		Patch: map[string]any{"policyName": "login-lock", "lockSeconds": float64(901), "changeReason": "TEST_POLICY_CONCURRENT_REPLAY"},
 	}
 	type updateResult struct {
@@ -172,18 +158,18 @@ func TestManualActionReplaysOriginalActionResult(t *testing.T) {
 	defer cancel()
 	db := migratedDomainPool(t, ctx)
 	operatorID := uuid.New()
-	seedOperatorGrant(t, ctx, db, operatorID, []string{"auth.case.execute", "auth.identity_link.revoke"})
+	seedOperatorState(t, ctx, db, operatorID)
 	targetUserID, identityID, linkID := uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, targetUserID, identityID, linkID)
-	keys := testOperatorKeys()
+	keys := testOperatorKeys(t)
 	service := appoperator.NewService(
-		db, keys, operatordomain.NewPostgresRepository(db), policy.NewPostgresRepository(db), access.NewPostgresRepository(db),
-		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.StaticApprovalPort{Allow: true},
+		db, keys, appoperator.NewPostgresRepository(db), policy.NewPostgresRepository(db),
+		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.StaticApprovalPort{Allow: true}, allowAuthorizationDecision{},
 	)
-	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Channel: "web", Method: "email_password", AuthenticatedAt: time.Now().UTC(), GrantVersion: 1}
+	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Method: "email_password", AuthenticatedAt: time.Now().UTC()}
 	input := appoperator.ManualInput{
 		Principal: principal, CaseID: "case-123", TargetType: "identity_link", TargetID: linkID.String(), Action: "revoke_identity_link",
-		ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-123", EvidenceRef: "evidence-123", ExpectedVersion: 0, IdempotencyKey: uuid.NewString(),
+		ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-123", EvidenceRef: "evidence-123", ExpectedVersion: 0, IdempotencyKey: uuid.NewString(), AuthorizationDecision: "allow",
 	}
 	firstID, firstVersion, err := service.Manual(ctx, input)
 	if err != nil {
@@ -211,9 +197,9 @@ func TestManualActionRepositoryTransactionIsAtomic(t *testing.T) {
 	db := migratedDomainPool(t, ctx)
 	operatorID, targetUserID, identityID, linkID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, targetUserID, identityID, linkID)
-	keys := testOperatorKeys()
+	keys := testOperatorKeys(t)
 	idempotencyRepository := idempotency.NewPostgresRepository(db)
-	operatorRepository := operatordomain.NewPostgresRepository(db)
+	operatorRepository := appoperator.NewPostgresRepository(db)
 	tx := beginDomainTx(t, ctx, db)
 	actionID := uuid.New()
 	record := idempotency.NewRecord("manual_auth_action", keys.Hash("manual_auth_action", operatorID.String()), keys.Hash("manual-key"), keys.Hash("revoke_identity_link", "identity_link", linkID.String(), "CUSTOMER_SUPPORT"), &actionID, nil, time.Now().UTC().Add(time.Hour))
@@ -221,7 +207,7 @@ func TestManualActionRepositoryTransactionIsAtomic(t *testing.T) {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("create manual idempotency record: %v", err)
 	}
-	version, err := operatorRepository.ApplyManual(ctx, tx, operatordomain.ManualAction{ID: actionID, OperatorID: operatorID, CaseID: "case-atomic", TargetType: "identity_link", TargetID: linkID.String(), Action: "revoke_identity_link", ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-atomic", EvidenceRef: "evidence-atomic", ExpectedVersion: 0, IdempotencyID: &record.ID})
+	version, err := operatorRepository.ApplyManual(ctx, tx, appoperator.ManualAction{ID: actionID, OperatorID: operatorID, CaseID: "case-atomic", TargetType: "identity_link", TargetID: linkID.String(), Action: "revoke_identity_link", ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-atomic", EvidenceRef: "evidence-atomic", ExpectedVersion: 0, IdempotencyID: &record.ID})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("apply manual repository action: %v", err)
@@ -234,35 +220,24 @@ func TestManualActionRepositoryTransactionIsAtomic(t *testing.T) {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("append manual domain outbox: %v", err)
 	}
-	if err := application.AppendAudit(ctx, tx, "auth.manual_action.completed", "operator", operatorID, actionID, map[string]string{"action": "revoke_identity_link"}, "manual-key"); err != nil {
+	if err := domain.AppendAudit(ctx, tx, "auth.manual_action.completed", "operator", operatorID, actionID, map[string]string{"action": "revoke_identity_link"}, "manual-key"); err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("append manual audit outbox: %v", err)
 	}
 	commitDomainTx(t, ctx, tx)
 }
 
-func seedOperatorGrant(t *testing.T, ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, permissions []string) {
+func seedOperatorState(t *testing.T, ctx context.Context, db *pgxpool.Pool, userID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(ctx, `
-		INSERT INTO auth_user_auth_states (user_id, status, restriction_version, effective_at)
-		VALUES ($1, 'active', 1, now())
-	`, userID); err != nil {
+		INSERT INTO auth_user_auth_states (user_id, status, user_version, status_change_id, effective_at)
+		VALUES ($1, 'active', 1, $2, now())
+	`, userID, uuid.NewString()); err != nil {
 		t.Fatalf("seed operator state: %v", err)
-	}
-	if _, err := db.Exec(ctx, `
-		INSERT INTO auth_access_grants (
-			access_grant_id, user_id, roles, permissions, grant_version, grant_status, source, source_revision, valid_from
-		) VALUES ($1, $2, ARRAY['platform_operator'], $3, 1, 'active', 'test', 'test', now())
-	`, uuid.New(), userID, permissions); err != nil {
-		t.Fatalf("seed operator grant: %v", err)
 	}
 }
 
-func testOperatorKeys() security.Keys {
-	return security.Keys{
-		CredentialHMAC: []byte("01234567890123456789012345678901"),
-		ReplayKey:      []byte("01234567890123456789012345678901"),
-		JWTKey:         []byte("01234567890123456789012345678901"),
-		JWTIssuer:      "integration",
-	}
+func testOperatorKeys(t *testing.T) security.Keys {
+	t.Helper()
+	return integrationSecurityKeys(t)
 }

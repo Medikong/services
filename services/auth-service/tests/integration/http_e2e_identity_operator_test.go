@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/app"
-	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
-	"github.com/Medikong/services/services/auth-service/internal/security"
+	appoperator "github.com/Medikong/services/services/auth-service/internal/domain/operator"
 	"github.com/google/uuid"
 )
 
@@ -28,14 +27,30 @@ type identityE2EWebSession struct {
 	CredentialDelivery string         `json:"credentialDelivery"`
 	Next               map[string]any `json:"next"`
 	Cookie             *http.Cookie   `json:"-"`
+	Session            struct {
+		SessionID string    `json:"sessionId"`
+		ExpiresAt time.Time `json:"expiresAt"`
+	} `json:"session"`
+	Access struct {
+		AccessToken          string    `json:"accessToken"`
+		AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	} `json:"access"`
 }
 
 type identityE2EReauthentication struct {
-	Proof      string       `json:"reauthenticationProof"`
-	Purpose    string       `json:"purpose"`
-	ExpiresAt  time.Time    `json:"expiresAt"`
-	SessionID  string       `json:"sessionId"`
-	CSRFToken  string       `json:"csrfToken"`
+	Proof     string    `json:"reauthenticationProof"`
+	Purpose   string    `json:"purpose"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	Session   struct {
+		SessionID string    `json:"sessionId"`
+		ExpiresAt time.Time `json:"expiresAt"`
+	} `json:"session"`
+	Access struct {
+		AccessToken          string    `json:"accessToken"`
+		AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	} `json:"access"`
+	SessionID  string       `json:"-"`
+	CSRFToken  string       `json:"-"`
 	Delivery   string       `json:"credentialDelivery"`
 	NewCookie  *http.Cookie `json:"-"`
 	OldCookie  *http.Cookie `json:"-"`
@@ -112,13 +127,13 @@ type identityE2ESessionRevocationRule struct {
 	Scopes  []string `json:"scopes"`
 }
 
-func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
+func TestHTTPIdentityOperatorAndActionE2E(t *testing.T) {
 	approval := &appoperator.StaticApprovalPort{}
-	harness := newProductionHTTPHarness(t, app.ServerOptions{ApprovalPort: approval})
+	harness := newProductionHTTPHarness(t, app.ServerOptions{ApprovalPort: approval, AuthorizationDecisionPort: allowAuthorizationDecision{}})
 
 	t.Run("production server excludes API.A.300-30", func(t *testing.T) {
 		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/dev/auth/verification-messages/" + uuid.NewString()})
-		decodeHTTPProblem(t, response, http.StatusNotFound, "AUTH_ROUTE_NOT_FOUND")
+		decodeHTTPError(t, response, http.StatusNotFound, "AUTH_ROUTE_NOT_FOUND")
 	})
 
 	userID, emailIdentityID, emailLinkID := uuid.New(), uuid.New(), uuid.New()
@@ -138,7 +153,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			},
 			Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		decodeHTTPError(t, response, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
 		assertResponseOmits(t, response, email, wrongPassword, session.Cookie.Value, session.CSRFToken)
 	})
 
@@ -147,6 +162,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 		linkReauthentication = reauthenticateIdentityE2E(t, harness, session, password, "link_identity")
 		session.Cookie = linkReauthentication.NewCookie
 		session.CSRFToken = linkReauthentication.CSRFToken
+		session.Access = linkReauthentication.Access
 	})
 
 	t.Run("API.A.300-18 error", func(t *testing.T) {
@@ -161,7 +177,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			Headers:     http.Header{"Idempotency-Key": {uuid.NewString()}},
 			Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusGone, "AUTH_REAUTHENTICATION_PROOF_INVALID")
+		decodeHTTPError(t, response, http.StatusGone, "AUTH_REAUTHENTICATION_PROOF_INVALID")
 	})
 
 	linkKey := uuid.NewString()
@@ -208,7 +224,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			JSON:    map[string]any{"channel": "sms"},
 			Headers: http.Header{"Idempotency-Key": {uuid.NewString()}}, Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusNotFound, "AUTH_IDENTITY_LINK_NOT_FOUND")
+		decodeHTTPError(t, response, http.StatusNotFound, "AUTH_IDENTITY_LINK_NOT_FOUND")
 	})
 
 	var linkChallengeID string
@@ -242,7 +258,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			},
 			Headers: http.Header{"Idempotency-Key": {uuid.NewString()}}, Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
+		decodeHTTPError(t, response, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
 		assertResponseOmits(t, response, linkCode, session.Cookie.Value, session.CSRFToken)
 	})
 
@@ -271,6 +287,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 		reauthenticated := reauthenticateIdentityE2E(t, harness, session, password, "link_identity")
 		session.Cookie = reauthenticated.NewCookie
 		session.CSRFToken = reauthenticated.CSRFToken
+		session.Access = reauthenticated.Access
 		var data struct {
 			IdentityLinkID string `json:"identityLinkId"`
 			Status         string `json:"status"`
@@ -298,6 +315,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 		replacementReauthentication = reauthenticateIdentityE2E(t, harness, session, password, "replace_phone")
 		session.Cookie = replacementReauthentication.NewCookie
 		session.CSRFToken = replacementReauthentication.CSRFToken
+		session.Access = replacementReauthentication.Access
 	})
 
 	t.Run("API.A.300-21 error", func(t *testing.T) {
@@ -309,7 +327,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			},
 			Headers: http.Header{"Idempotency-Key": {uuid.NewString()}}, Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusGone, "AUTH_REAUTHENTICATION_PROOF_INVALID")
+		decodeHTTPError(t, response, http.StatusGone, "AUTH_REAUTHENTICATION_PROOF_INVALID")
 	})
 
 	replacementKey := uuid.NewString()
@@ -348,7 +366,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			JSON:   map[string]any{}, Headers: http.Header{"Idempotency-Key": {uuid.NewString()}},
 			Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusNotFound, "AUTH_IDENTITY_LINK_NOT_FOUND")
+		decodeHTTPError(t, response, http.StatusNotFound, "AUTH_IDENTITY_LINK_NOT_FOUND")
 	})
 
 	var replacementChallengeID string
@@ -382,7 +400,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			},
 			Headers: http.Header{"Idempotency-Key": {uuid.NewString()}}, Credentials: identitySessionCredentials(session),
 		})
-		decodeHTTPProblem(t, response, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
+		decodeHTTPError(t, response, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
 	})
 
 	t.Run("API.A.300-23 success, recovery, and expired recovery", func(t *testing.T) {
@@ -395,22 +413,26 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 				"challengeId": replacementChallengeID,
 				"proof":       map[string]any{"type": "code", "value": replacementCode},
 			},
-			Headers: http.Header{"Idempotency-Key": {key}},
-			Credentials: httpE2ECredentials{
-				SessionCookie: oldCookie, CSRFToken: oldCSRF, Origin: httpE2ETestOrigin,
-			},
+			Headers:     http.Header{"Idempotency-Key": {key}},
+			Credentials: identitySessionCredentials(session),
 		}
 		var first struct {
 			ReplacementID      string `json:"replacementId"`
 			Status             string `json:"status"`
 			CredentialDelivery string `json:"credentialDelivery"`
-			SessionID          string `json:"sessionId"`
-			CSRFToken          string `json:"csrfToken"`
+			Session            struct {
+				SessionID string    `json:"sessionId"`
+				ExpiresAt time.Time `json:"expiresAt"`
+			} `json:"session"`
+			Access struct {
+				AccessToken          string    `json:"accessToken"`
+				AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+			} `json:"access"`
 		}
 		firstResponse := harness.do(request)
 		decodeHTTPEnvelope(t, firstResponse, http.StatusOK, &first)
-		newCookie := responseCookie(t, firstResponse, "__Host-dm_session")
-		assertCredentialCookie(t, newCookie, "__Host-dm_session")
+		newCookie := responseCookie(t, firstResponse, "__Host-dm_refresh")
+		assertCredentialCookie(t, newCookie, "__Host-dm_refresh")
 		if newCookie.MaxAge <= 0 || newCookie.MaxAge > oldCookie.MaxAge {
 			t.Fatal("remembered replacement session did not preserve its cookie lifetime")
 		}
@@ -418,27 +440,33 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			ReplacementID      string `json:"replacementId"`
 			Status             string `json:"status"`
 			CredentialDelivery string `json:"credentialDelivery"`
-			SessionID          string `json:"sessionId"`
-			CSRFToken          string `json:"csrfToken"`
+			Session            struct {
+				SessionID string    `json:"sessionId"`
+				ExpiresAt time.Time `json:"expiresAt"`
+			} `json:"session"`
+			Access struct {
+				AccessToken          string    `json:"accessToken"`
+				AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+			} `json:"access"`
 		}
 		recoveryResponse := harness.do(request)
 		decodeHTTPEnvelope(t, recoveryResponse, http.StatusOK, &recovered)
-		recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_session")
-		if recovered.ReplacementID != first.ReplacementID || recovered.SessionID != first.SessionID || recovered.CSRFToken != first.CSRFToken || recoveredCookie.Value != newCookie.Value {
+		recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_refresh")
+		if recovered.ReplacementID != first.ReplacementID || recovered.Session.SessionID != first.Session.SessionID || recovered.Access.AccessToken != first.Access.AccessToken || recoveredCookie.Value != newCookie.Value {
 			t.Fatal("phone-replacement delivery recovery changed the original result")
 		}
-		keys := security.Keys{CredentialHMAC: []byte(httpE2ECredentialKey)}
 		if _, err := harness.db.Exec(harness.ctx, `
-			UPDATE auth_session_credentials
-			SET delivery_recovery_expires_at = now() - interval '1 second'
-			WHERE secret_hash = $1
-		`, keys.Hash(oldCookie.Value)); err != nil {
+			UPDATE auth_idempotency_replay_payloads
+			SET expires_at = now() - interval '1 second'
+			WHERE payload_kind = 'phone_replacement_credential_delivery'
+		`); err != nil {
 			t.Fatal("expire phone-replacement recovery fixture")
 		}
-		decodeHTTPProblem(t, harness.do(request), http.StatusGone, "AUTH_SESSION_DELIVERY_EXPIRED")
+		decodeHTTPError(t, harness.do(request), http.StatusGone, "AUTH_SESSION_DELIVERY_EXPIRED")
 		session.Cookie = newCookie
-		session.CSRFToken = first.CSRFToken
-		session.SessionID = first.SessionID
+		session.CSRFToken = oldCSRF
+		session.SessionID = first.Session.SessionID
+		session.Access = first.Access
 	})
 
 	var actionSession identityE2EWebSession
@@ -455,7 +483,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 			JSON: map[string]any{}, Headers: http.Header{"Idempotency-Key": {uuid.NewString()}},
 			Credentials: identitySessionCredentials(actionSession),
 		})
-		decodeHTTPProblem(t, response, http.StatusGone, "AUTH_INTENT_EXPIRED")
+		decodeHTTPError(t, response, http.StatusGone, "AUTH_INTENT_EXPIRED")
 	})
 
 	t.Run("API.A.300-29 success and replay", func(t *testing.T) {
@@ -488,15 +516,8 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 	operatorPassword := "operator-http-e2e-password"
 	operatorEmail := identityFixtureEmail(operatorIdentityID)
 	seedEmailPrincipal(t, harness.ctx, harness.db, operatorID, operatorIdentityID, operatorLinkID, operatorPassword)
-	if _, err := harness.db.Exec(harness.ctx, `
-		UPDATE auth_access_grants
-		SET roles = ARRAY['platform_operator'],
-			permissions = ARRAY['auth.case.read','auth.policy.read','auth.policy.write','auth.case.execute','auth.identity_link.revoke']
-		WHERE user_id = $1
-	`, operatorID); err != nil {
-		t.Fatal("seed HTTP E2E operator grant")
-	}
 	operatorSession := signInIdentityE2EWeb(t, harness, operatorEmail, operatorPassword, false, "navigation", nil)
+	operatorCredentials := httpE2ECredentials{AccessToken: operatorSession.Access.AccessToken}
 	targetUserID, targetIdentityID, targetLinkID := uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, harness.ctx, harness.db, targetUserID, targetIdentityID, targetLinkID)
 
@@ -504,17 +525,17 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 		response := harness.do(httpE2ERequest{
 			Method: http.MethodGet, Path: "/api/v1/operator/auth/users/" + targetUserID.String(),
 			Headers:     http.Header{"X-Audit-Reason-Code": {"CUSTOMER_SUPPORT"}},
-			Credentials: httpE2ECredentials{SessionCookie: actionSession.Cookie},
+			Credentials: operatorCredentials,
 		})
-		decodeHTTPProblem(t, response, http.StatusForbidden, "AUTH_FORBIDDEN")
+		decodeHTTPError(t, response, http.StatusForbidden, "AUTH_FORBIDDEN")
 	})
 
 	t.Run("API.A.300-24 success", func(t *testing.T) {
 		var data identityE2EOperatorUser
 		response := harness.do(httpE2ERequest{
 			Method: http.MethodGet, Path: "/api/v1/operator/auth/users/" + targetUserID.String(),
-			Headers:     http.Header{"X-Audit-Reason-Code": {"CUSTOMER_SUPPORT"}},
-			Credentials: httpE2ECredentials{SessionCookie: operatorSession.Cookie},
+			Headers:     http.Header{"X-Audit-Reason-Code": {"CUSTOMER_SUPPORT"}, "X-Authorization-Decision": {"allow"}},
+			Credentials: operatorCredentials,
 		})
 		decodeHTTPEnvelope(t, response, http.StatusOK, &data)
 		if data.UserID != targetUserID.String() || data.Status != "active" || len(data.Identities) != 1 {
@@ -528,18 +549,18 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 	})
 
 	t.Run("API.A.300-25 error", func(t *testing.T) {
-		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/operator/auth/policies", Credentials: httpE2ECredentials{SessionCookie: actionSession.Cookie}})
-		decodeHTTPProblem(t, response, http.StatusForbidden, "AUTH_FORBIDDEN")
+		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/operator/auth/policies", Credentials: operatorCredentials})
+		decodeHTTPError(t, response, http.StatusForbidden, "AUTH_FORBIDDEN")
 	})
 
 	var policyETag string
 	t.Run("API.A.300-25 success", func(t *testing.T) {
 		var data identityE2EPolicy
-		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/operator/auth/policies", Credentials: httpE2ECredentials{SessionCookie: operatorSession.Cookie}})
+		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/operator/auth/policies", Headers: http.Header{"X-Authorization-Decision": {"allow"}}, Credentials: operatorCredentials})
 		decodeHTTPEnvelope(t, response, http.StatusOK, &data)
 		policyETag = response.header.Get("ETag")
 		if data.Version < 1 || data.Status != "active" || data.EffectiveAt.IsZero() || data.LoginLock.FailureThreshold < 1 || data.SessionTTL.MobileRefreshSeconds < 1 || data.RefreshRotation.ReuseAction != "revoke_family_and_session" || len(data.VerificationRules) == 0 || len(data.SessionRevocationRules) == 0 || policyETag != fmt.Sprintf("\"policy-%d\"", data.Version) {
-			t.Fatal("operator policy response is missing its version contract")
+			t.Fatal("operator policy response is missing its version field")
 		}
 	})
 
@@ -547,18 +568,18 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 	t.Run("API.A.300-26 error", func(t *testing.T) {
 		response := harness.do(httpE2ERequest{
 			Method: http.MethodPatch, Path: "/api/v1/operator/auth/policies/login-lock", JSON: policyPatch,
-			Headers:     http.Header{"Idempotency-Key": {uuid.NewString()}, "If-Match": {"\"policy-0\""}},
-			Credentials: identitySessionCredentials(operatorSession),
+			Headers:     http.Header{"Idempotency-Key": {uuid.NewString()}, "If-Match": {"\"policy-0\""}, "X-Authorization-Decision": {"allow"}},
+			Credentials: operatorCredentials,
 		})
-		decodeHTTPProblem(t, response, http.StatusPreconditionFailed, "AUTH_POLICY_PRECONDITION_FAILED")
+		decodeHTTPError(t, response, http.StatusPreconditionFailed, "AUTH_POLICY_PRECONDITION_FAILED")
 	})
 
 	t.Run("API.A.300-26 success and replay", func(t *testing.T) {
 		key := uuid.NewString()
 		request := httpE2ERequest{
 			Method: http.MethodPatch, Path: "/api/v1/operator/auth/policies/login-lock", JSON: policyPatch,
-			Headers:     http.Header{"Idempotency-Key": {key}, "If-Match": {policyETag}},
-			Credentials: identitySessionCredentials(operatorSession),
+			Headers:     http.Header{"Idempotency-Key": {key}, "If-Match": {policyETag}, "X-Authorization-Decision": {"allow"}},
+			Credentials: operatorCredentials,
 		}
 		var first struct {
 			Name        string    `json:"name"`
@@ -597,11 +618,11 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 	}
 	manualRequest := httpE2ERequest{
 		Method: http.MethodPost, Path: "/api/v1/operator/auth/manual-actions", JSON: manualBody,
-		Headers: http.Header{"Idempotency-Key": {manualKey}}, Credentials: identitySessionCredentials(operatorSession),
+		Headers: http.Header{"Idempotency-Key": {manualKey}, "X-Authorization-Decision": {"allow"}}, Credentials: operatorCredentials,
 	}
 	t.Run("API.A.300-27 approval error", func(t *testing.T) {
 		approval.Allow = false
-		decodeHTTPProblem(t, harness.do(manualRequest), http.StatusConflict, "AUTH_APPROVAL_REQUIRED")
+		decodeHTTPError(t, harness.do(manualRequest), http.StatusConflict, "AUTH_APPROVAL_REQUIRED")
 	})
 
 	t.Run("API.A.300-27 success and replay", func(t *testing.T) {
@@ -630,7 +651,7 @@ func TestHTTPIdentityOperatorAndActionContractE2E(t *testing.T) {
 	})
 }
 
-func TestHTTPDevelopmentVirtualMessageContractE2E(t *testing.T) {
+func TestHTTPDevelopmentVirtualMessageE2E(t *testing.T) {
 	harness := newDevelopmentHTTPHarness(t)
 	intent := createIdentityE2EMobileIntent(t, harness)
 	email := "development-" + uuid.NewString() + "@example.test"
@@ -661,7 +682,7 @@ func TestHTTPDevelopmentVirtualMessageContractE2E(t *testing.T) {
 			Method: http.MethodGet, Path: "/api/v1/dev/auth/verification-messages/" + challengeID,
 			Credentials: httpE2ECredentials{AuthFlowToken: intent.AuthFlowToken, DevelopmentAccessToken: "invalid-development-access"},
 		})
-		decodeHTTPProblem(t, response, http.StatusNotFound, "AUTH_VIRTUAL_MESSAGE_NOT_FOUND")
+		decodeHTTPError(t, response, http.StatusNotFound, "AUTH_VIRTUAL_MESSAGE_NOT_FOUND")
 	})
 
 	var virtualCode string
@@ -698,7 +719,7 @@ func TestHTTPDevelopmentVirtualMessageContractE2E(t *testing.T) {
 			Method: http.MethodGet, Path: "/api/v1/dev/auth/verification-messages/" + challengeID,
 			Credentials: httpE2ECredentials{AuthFlowToken: intent.AuthFlowToken, DevelopmentAccessToken: httpE2EDevelopmentToken},
 		})
-		decodeHTTPProblem(t, response, http.StatusGone, "AUTH_VIRTUAL_MESSAGE_UNAVAILABLE")
+		decodeHTTPError(t, response, http.StatusGone, "AUTH_VIRTUAL_MESSAGE_UNAVAILABLE")
 	})
 }
 
@@ -732,7 +753,7 @@ func createIdentityE2EMobileIntent(t *testing.T, harness *httpE2EHarness) identi
 	response := harness.do(httpE2ERequest{
 		Method: http.MethodPost, Path: "/api/v1/auth/intents",
 		JSON:    map[string]any{"returnPath": "/drops/http-e2e", "intentType": "navigation"},
-		Headers: http.Header{"X-Client-Channel": {"mobile"}, "Idempotency-Key": {uuid.NewString()}},
+		Headers: http.Header{"X-Client-Channel": {"ios"}, "Idempotency-Key": {uuid.NewString()}},
 	})
 	var data struct {
 		ID            string    `json:"authIntentId"`
@@ -765,22 +786,24 @@ func completeIdentityE2EWebSignIn(t *testing.T, harness *httpE2EHarness, intent 
 	})
 	var data identityE2EWebSession
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
-	data.Cookie = responseCookie(t, response, "__Host-dm_session")
-	assertCredentialCookie(t, data.Cookie, "__Host-dm_session")
+	data.SessionID = data.Session.SessionID
+	data.CSRFToken = intent.CSRFToken
+	data.Cookie = responseCookie(t, response, "__Host-dm_refresh")
+	assertCredentialCookie(t, data.Cookie, "__Host-dm_refresh")
 	if rememberMe && data.Cookie.MaxAge <= 0 {
 		t.Fatal("remembered web session is missing Max-Age")
 	}
 	if !rememberMe && data.Cookie.MaxAge != 0 {
 		t.Fatal("non-remembered web session unexpectedly has Max-Age")
 	}
-	if data.UserID == "" || data.SessionID == "" || data.CSRFToken == "" {
+	if data.UserID == "" || data.SessionID == "" || data.Access.AccessToken == "" || data.CSRFToken == "" {
 		t.Fatal("web sign-in response is incomplete")
 	}
 	return data
 }
 
 func identitySessionCredentials(session identityE2EWebSession) httpE2ECredentials {
-	return httpE2ECredentials{SessionCookie: session.Cookie, CSRFToken: session.CSRFToken, Origin: httpE2ETestOrigin}
+	return httpE2ECredentials{AccessToken: session.Access.AccessToken}
 }
 
 func reauthenticateIdentityE2E(t *testing.T, harness *httpE2EHarness, session identityE2EWebSession, password, purpose string) identityE2EReauthentication {
@@ -794,17 +817,21 @@ func reauthenticateIdentityE2E(t *testing.T, harness *httpE2EHarness, session id
 	var first identityE2EReauthentication
 	firstResponse := harness.do(request)
 	decodeHTTPEnvelope(t, firstResponse, http.StatusOK, &first)
-	first.NewCookie = responseCookie(t, firstResponse, "__Host-dm_session")
+	first.SessionID = first.Session.SessionID
+	first.CSRFToken = session.CSRFToken
+	first.NewCookie = responseCookie(t, firstResponse, "__Host-dm_refresh")
 	first.OldCookie = session.Cookie
 	first.RequestKey = key
-	assertCredentialCookie(t, first.NewCookie, "__Host-dm_session")
+	assertCredentialCookie(t, first.NewCookie, "__Host-dm_refresh")
 	if (session.Cookie.MaxAge == 0 && first.NewCookie.MaxAge != 0) || (session.Cookie.MaxAge > 0 && (first.NewCookie.MaxAge <= 0 || first.NewCookie.MaxAge > session.Cookie.MaxAge)) {
-		t.Fatal("reauthentication changed the remember-me cookie contract")
+		t.Fatal("reauthentication changed the remember-me cookie behavior")
 	}
 	var recovered identityE2EReauthentication
 	recoveryResponse := harness.do(request)
 	decodeHTTPEnvelope(t, recoveryResponse, http.StatusOK, &recovered)
-	recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_session")
+	recovered.SessionID = recovered.Session.SessionID
+	recovered.CSRFToken = session.CSRFToken
+	recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_refresh")
 	if recovered.Proof != first.Proof || recovered.SessionID != first.SessionID || recovered.CSRFToken != first.CSRFToken || recoveredCookie.Value != first.NewCookie.Value {
 		t.Fatal("reauthentication delivery recovery changed the original result")
 	}

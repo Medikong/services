@@ -336,7 +336,7 @@ func sameUUID(value *uuid.UUID, expected uuid.UUID) bool {
 }
 
 func validClientChannel(value string) bool {
-	return value == "web" || value == "mobile"
+	return value == "web" || value == "ios" || value == "android"
 }
 
 func validVerifiedMethods(values []Method) bool {

@@ -4,16 +4,22 @@
 package security
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -24,7 +30,10 @@ type Keys struct {
 	CredentialHMAC []byte
 	ReplayKey      []byte
 	JWTKey         []byte
+	JWTKeyID       string
 	JWTIssuer      string
+	JWTAudiences   []string
+	JWTVerifyKeys  map[string]*rsa.PublicKey
 	VirtualKey     []byte
 	Random         io.Reader
 	Now            func() time.Time
@@ -37,8 +46,16 @@ func (k Keys) Validate(virtualEnabled bool) error {
 	if len(k.ReplayKey) != 32 {
 		return errors.New("replay encryption key must be exactly 32 bytes")
 	}
-	if len(k.JWTKey) < 32 || strings.TrimSpace(k.JWTIssuer) == "" {
-		return errors.New("JWT key and issuer are required")
+	if _, err := parseRSAPrivateKey(k.JWTKey); err != nil {
+		return fmt.Errorf("JWT private key is invalid: %w", err)
+	}
+	if strings.TrimSpace(k.JWTKeyID) == "" || strings.TrimSpace(k.JWTIssuer) == "" || len(k.JWTAudiences) == 0 {
+		return errors.New("JWT key ID, issuer, and audience are required")
+	}
+	for keyID, publicKey := range k.JWTVerifyKeys {
+		if strings.TrimSpace(keyID) == "" || keyID == k.JWTKeyID || publicKey == nil {
+			return errors.New("retiring JWT keys require a distinct key ID and RSA public key")
+		}
 	}
 	if virtualEnabled && len(k.VirtualKey) < 32 {
 		return errors.New("virtual message key must be at least 32 bytes")
@@ -158,39 +175,44 @@ func (k Keys) CSRF(credentialID uuid.UUID, rawCredential string) string {
 }
 
 type Claims struct {
-	Issuer            string   `json:"iss"`
-	Subject           string   `json:"sub"`
-	SessionID         string   `json:"sid"`
-	Roles             []string `json:"roles"`
-	PermissionVersion int64    `json:"permission_version"`
-	IssuedAt          int64    `json:"iat"`
-	ExpiresAt         int64    `json:"exp"`
-	TokenID           string   `json:"jti"`
+	Issuer    string   `json:"iss"`
+	Subject   string   `json:"sub"`
+	SessionID string   `json:"sid"`
+	Audience  []string `json:"aud"`
+	IssuedAt  int64    `json:"iat"`
+	ExpiresAt int64    `json:"exp"`
+	TokenID   string   `json:"jti"`
 }
 
-func (k Keys) SignAccessToken(userID, sessionID string, roles []string, version int64, ttl time.Duration) (string, time.Time, error) {
+func (k Keys) SignAccessToken(userID, sessionID string, ttl time.Duration) (string, time.Time, error) {
+	privateKey, err := parseRSAPrivateKey(k.JWTKey)
+	if err != nil {
+		return "", time.Time{}, err
+	}
 	now := k.now()
 	expiresAt := now.Add(ttl)
 	claims := Claims{
-		Issuer:            k.JWTIssuer,
-		Subject:           userID,
-		SessionID:         sessionID,
-		Roles:             roles,
-		PermissionVersion: version,
-		IssuedAt:          now.Unix(),
-		ExpiresAt:         expiresAt.Unix(),
-		TokenID:           uuid.NewString(),
+		Issuer: k.JWTIssuer, Subject: userID, SessionID: sessionID,
+		Audience: append([]string(nil), k.JWTAudiences...),
+		IssuedAt: now.Unix(), ExpiresAt: expiresAt.Unix(), TokenID: uuid.NewString(),
 	}
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	header := base64.RawURLEncoding.EncodeToString([]byte("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"))
+	headerJSON, err := json.Marshal(map[string]string{"alg": "RS256", "kid": k.JWTKeyID, "typ": "JWT"})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	header := base64.RawURLEncoding.EncodeToString(headerJSON)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payload)
 	unsigned := header + "." + encodedPayload
-	h := hmac.New(sha256.New, k.JWTKey)
-	_, _ = h.Write([]byte(unsigned))
-	return unsigned + "." + base64.RawURLEncoding.EncodeToString(h.Sum(nil)), expiresAt, nil
+	digest := sha256.Sum256([]byte(unsigned))
+	signature, err := rsa.SignPKCS1v15(k.random(), privateKey, cryptoHashSHA256, digest[:])
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return unsigned + "." + base64.RawURLEncoding.EncodeToString(signature), expiresAt, nil
 }
 
 func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
@@ -198,13 +220,28 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 	if len(parts) != 3 {
 		return Claims{}, errors.New("malformed JWT")
 	}
+	headerPayload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return Claims{}, errors.New("malformed JWT header")
+	}
+	var header struct {
+		Algorithm string `json:"alg"`
+		KeyID     string `json:"kid"`
+		Type      string `json:"typ"`
+	}
+	if err := json.Unmarshal(headerPayload, &header); err != nil || header.Algorithm != "RS256" || header.Type != "JWT" || header.KeyID == "" {
+		return Claims{}, errors.New("invalid JWT protected header")
+	}
+	publicKey, err := k.verificationKey(header.KeyID)
+	if err != nil {
+		return Claims{}, err
+	}
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return Claims{}, errors.New("malformed JWT signature")
 	}
-	h := hmac.New(sha256.New, k.JWTKey)
-	_, _ = h.Write([]byte(parts[0] + "." + parts[1]))
-	if !hmac.Equal(signature, h.Sum(nil)) {
+	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	if err := rsa.VerifyPKCS1v15(publicKey, cryptoHashSHA256, digest[:], signature); err != nil {
 		return Claims{}, errors.New("invalid JWT signature")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -215,8 +252,120 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return Claims{}, err
 	}
-	if claims.Issuer != k.JWTIssuer || claims.Subject == "" || claims.SessionID == "" || claims.ExpiresAt <= k.now().Unix() {
-		return Claims{}, fmt.Errorf("expired or invalid JWT")
+	now := k.now().Unix()
+	if claims.Issuer != k.JWTIssuer || claims.Subject == "" || claims.SessionID == "" || claims.TokenID == "" || claims.IssuedAt > now+30 || claims.ExpiresAt <= now || claims.ExpiresAt <= claims.IssuedAt || !containsAudience(claims.Audience, k.JWTAudiences) {
+		return Claims{}, errors.New("expired or invalid JWT")
 	}
 	return claims, nil
+}
+
+const cryptoHashSHA256 = crypto.SHA256
+
+func parseRSAPrivateKey(value []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(value)
+	if block == nil {
+		return nil, errors.New("PEM block is required")
+	}
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		privateKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("private key must be RSA")
+		}
+		return privateKey, privateKey.Validate()
+	}
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return privateKey, privateKey.Validate()
+}
+
+func ParseRSAPublicKeyPEM(value []byte) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode(value)
+	if block == nil {
+		return nil, errors.New("PEM block is required")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err == nil {
+		publicKey, ok := parsed.(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New("public key must be RSA")
+		}
+		return publicKey, nil
+	}
+	publicKey, pkcs1Err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if pkcs1Err != nil {
+		return nil, err
+	}
+	return publicKey, nil
+}
+
+func (k Keys) verificationKey(keyID string) (*rsa.PublicKey, error) {
+	if keyID == k.JWTKeyID {
+		privateKey, err := parseRSAPrivateKey(k.JWTKey)
+		if err != nil {
+			return nil, err
+		}
+		return &privateKey.PublicKey, nil
+	}
+	if key := k.JWTVerifyKeys[keyID]; key != nil {
+		return key, nil
+	}
+	return nil, errors.New("unknown JWT key ID")
+}
+
+func containsAudience(actual, allowed []string) bool {
+	for _, candidate := range actual {
+		for _, expected := range allowed {
+			if candidate == expected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type JWK struct {
+	KeyType   string `json:"kty"`
+	Use       string `json:"use"`
+	Algorithm string `json:"alg"`
+	KeyID     string `json:"kid"`
+	Modulus   string `json:"n"`
+	Exponent  string `json:"e"`
+}
+
+type JWKSet struct {
+	Keys []JWK `json:"keys"`
+}
+
+func (k Keys) JWKS() (JWKSet, error) {
+	active, err := k.verificationKey(k.JWTKeyID)
+	if err != nil {
+		return JWKSet{}, err
+	}
+	result := JWKSet{Keys: []JWK{rsaJWK(k.JWTKeyID, active)}}
+	keyIDs := make([]string, 0, len(k.JWTVerifyKeys))
+	for keyID, publicKey := range k.JWTVerifyKeys {
+		if keyID != k.JWTKeyID && publicKey != nil {
+			keyIDs = append(keyIDs, keyID)
+		}
+	}
+	sort.Strings(keyIDs)
+	for _, keyID := range keyIDs {
+		result.Keys = append(result.Keys, rsaJWK(keyID, k.JWTVerifyKeys[keyID]))
+	}
+	return result, nil
+}
+
+func rsaJWK(keyID string, key *rsa.PublicKey) JWK {
+	exponent := make([]byte, 4)
+	binary.BigEndian.PutUint32(exponent, uint32(key.E))
+	for len(exponent) > 1 && exponent[0] == 0 {
+		exponent = exponent[1:]
+	}
+	return JWK{
+		KeyType: "RSA", Use: "sig", Algorithm: "RS256", KeyID: keyID,
+		Modulus:  base64.RawURLEncoding.EncodeToString(key.N.Bytes()),
+		Exponent: base64.RawURLEncoding.EncodeToString(exponent),
+	}
 }

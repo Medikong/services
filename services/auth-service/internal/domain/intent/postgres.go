@@ -89,6 +89,24 @@ func (r *PostgresRepository) FindActiveForUpdate(ctx context.Context, tx pgx.Tx,
 	return result, err
 }
 
+func (r *PostgresRepository) FindCompletionReplayForUpdate(ctx context.Context, tx pgx.Tx, id, sessionID uuid.UUID) (Intent, error) {
+	var result Intent
+	err := tx.QueryRow(ctx, `
+		SELECT intent_id, client_channel, return_path, intent_type, action_context,
+			owner_proof_hash, csrf_secret_hash, expires_at, status, remember_me
+		FROM auth_authentication_intents
+		WHERE intent_id = $1 AND status = 'consumed' AND consumed_by_session_id = $2
+		FOR UPDATE
+	`, id, sessionID).Scan(
+		&result.ID, &result.Channel, &result.ReturnPath, &result.Type, &result.ActionContext,
+		&result.OwnerProofHash, &result.CSRFHash, &result.ExpiresAt, &result.Status, &result.RememberMe,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Intent{}, ErrNotFound
+	}
+	return result, err
+}
+
 func (r *PostgresRepository) RotateOwnerProof(ctx context.Context, tx pgx.Tx, id uuid.UUID, ownerProofHash, csrfHash []byte) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE auth_authentication_intents

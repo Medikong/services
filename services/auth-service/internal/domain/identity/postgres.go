@@ -234,7 +234,7 @@ func (r *PostgresRepository) RequestedLinkForUpdate(ctx context.Context, tx pgx.
 func (r *PostgresRepository) FindActiveLinkForIdentityUser(ctx context.Context, tx pgx.Tx, identityID, userID uuid.UUID) (Link, error) {
 	var link Link
 	err := tx.QueryRow(ctx, `
-		SELECT identity_link_id, identity_id, user_id, identity_type, link_status, intent_expires_at
+		SELECT identity_link_id, identity_id, user_id, identity_type, link_status, COALESCE(intent_expires_at, now())
 		FROM auth_identity_links
 		WHERE identity_id = $1 AND user_id = $2 AND link_status = 'active'
 		FOR UPDATE
