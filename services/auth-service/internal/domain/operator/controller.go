@@ -5,18 +5,18 @@ import (
 	"net/http"
 
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
 
 type OperatorController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	sessions    *appsession.Service
 	service     *Service
 }
 
-func NewOperator(credentials *httpcredential.Credentials, sessions *appsession.Service, service *Service) *OperatorController {
+func NewOperator(credentials *httpauth.Credentials, sessions *appsession.Service, service *Service) *OperatorController {
 	return &OperatorController{credentials: credentials, sessions: sessions, service: service}
 }
 func (c *OperatorController) User(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,7 @@ func (c *OperatorController) Manual(w http.ResponseWriter, r *http.Request) {
 }
 func (c *OperatorController) principal(w http.ResponseWriter, r *http.Request) (appsession.Principal, bool) {
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return appsession.Principal{}, false
 	}

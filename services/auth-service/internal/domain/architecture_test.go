@@ -41,9 +41,11 @@ func TestDomainPackageBoundaries(t *testing.T) {
 		controllerFile := strings.HasSuffix(filepath.Base(path), "controller.go")
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, "\"")
-			allowedHTTPImport := strings.HasSuffix(importPath, "/internal/transport/credential") ||
+			allowedHTTPImport := strings.HasSuffix(importPath, "/internal/platform/httpauth") ||
 				strings.HasSuffix(importPath, "/internal/transport/httputil")
-			if strings.Contains(importPath, "/internal/transport/") && (!controllerFile || !allowedHTTPImport) {
+			httpBoundaryImport := strings.Contains(importPath, "/internal/transport/") ||
+				strings.HasSuffix(importPath, "/internal/platform/httpauth")
+			if httpBoundaryImport && (!controllerFile || !allowedHTTPImport) {
 				t.Fatalf("domain package %s imports forbidden transport package %s", filepath.Base(path), importPath)
 			}
 			if controllerFile && strings.Contains(importPath, "jackc/pgx") {

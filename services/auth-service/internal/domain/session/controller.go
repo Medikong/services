@@ -8,24 +8,24 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/domain"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
 
 type SessionController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	csrf        *httputil.CSRF
 	service     *Service
 }
 
-func NewSession(credentials *httpcredential.Credentials, csrf *httputil.CSRF, service *Service) *SessionController {
+func NewSession(credentials *httpauth.Credentials, csrf *httputil.CSRF, service *Service) *SessionController {
 	return &SessionController{credentials: credentials, csrf: csrf, service: service}
 }
 
 func (c *SessionController) Refresh(w http.ResponseWriter, r *http.Request) {
 	credential, credentialErr := c.credentials.Session(r)
 	refreshToken, csrfToken := "", ""
-	if credentialErr == nil && credential.Channel == httpcredential.Web {
+	if credentialErr == nil && credential.Channel == httpauth.Web {
 		refreshToken = credential.Token
 		var problem error
 		csrfToken, problem = c.csrf.Token(r)
@@ -33,9 +33,9 @@ func (c *SessionController) Refresh(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, r, problem)
 			return
 		}
-	} else if credentialErr != nil && credentialErr.Kind == httpcredential.Missing {
-		var refreshErr *httpcredential.Error
-		refreshToken, refreshErr = httpcredential.RefreshToken(r)
+	} else if credentialErr != nil && credentialErr.Kind == httpauth.Missing {
+		var refreshErr *httpauth.Error
+		refreshToken, refreshErr = httpauth.RefreshToken(r)
 		if refreshErr != nil {
 			httputil.WriteCredentialError(w, r, refreshErr)
 			return
@@ -74,8 +74,8 @@ func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil && credentialErr.Kind == httpcredential.Missing {
-		refresh, refreshErr := httpcredential.RefreshToken(r)
+	if credentialErr != nil && credentialErr.Kind == httpauth.Missing {
+		refresh, refreshErr := httpauth.RefreshToken(r)
 		if refreshErr != nil {
 			httputil.WriteCredentialError(w, r, refreshErr)
 			return
@@ -91,11 +91,11 @@ func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return
 	}
-	if credential.Channel == httpcredential.Mobile {
-		httputil.WriteCredentialError(w, r, &httpcredential.Error{Kind: httpcredential.Malformed})
+	if credential.Channel == httpauth.Mobile {
+		httputil.WriteCredentialError(w, r, &httpauth.Error{Kind: httpauth.Malformed})
 		return
 	}
-	if credential.Channel == httpcredential.Web {
+	if credential.Channel == httpauth.Web {
 		csrf, problem := c.csrf.Token(r)
 		if problem != nil {
 			httputil.WriteError(w, r, problem)
@@ -109,7 +109,7 @@ func (c *SessionController) Logout(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteNoContent(w, r)
 		return
 	}
-	httputil.WriteCredentialError(w, r, &httpcredential.Error{Kind: httpcredential.Malformed})
+	httputil.WriteCredentialError(w, r, &httpauth.Error{Kind: httpauth.Malformed})
 }
 
 // logoutRequest allows an omitted body, but a supplied JSON value must be an
@@ -141,7 +141,7 @@ func decodeOptionalLogoutRequest(w http.ResponseWriter, r *http.Request) error {
 func (c *SessionController) Context(w http.ResponseWriter, r *http.Request) {
 	httputil.VaryCredentials(w)
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return
 	}

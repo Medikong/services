@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Medikong/services/packages/go-platform/httpapi"
-	"github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	"github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/samber/oops"
 )
 
@@ -67,8 +67,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	_ = json.NewEncoder(w).Encode(Error{Status: status, Code: code, Message: message, RequestID: requestID})
 }
 
-func WriteCredentialError(w http.ResponseWriter, r *http.Request, err *credential.Error) {
-	if err != nil && err.Kind == credential.Multiple {
+func WriteCredentialError(w http.ResponseWriter, r *http.Request, err *httpauth.Error) {
+	if err != nil && err.Kind == httpauth.Multiple {
 		WriteError(w, r, httpapi.BadRequest("AUTH_MULTIPLE_CREDENTIALS").
 			Public("인증 정보를 확인한 뒤 다시 시도해주세요.").
 			Wrap(err))

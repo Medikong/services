@@ -10,11 +10,11 @@ import (
 
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
-	"github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	"github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 )
 
 func TestSignInCompletedResponseUsesChannelSpecificOpenAPIShape(t *testing.T) {
-	credentials := credential.New(config.AuthConfig{SessionCookieName: "__Host-dm_refresh", AuthFlowCookieName: "__Host-dm_auth"}, config.DevelopmentConfig{})
+	credentials := httpauth.New(config.AuthConfig{SessionCookieName: "__Host-dm_refresh", AuthFlowCookieName: "__Host-dm_auth"}, config.DevelopmentConfig{})
 	controller := NewSignIn(credentials, nil, nil, nil)
 	common := Completed{Issued: appsession.Issued{TokenSet: appsession.TokenSet{UserID: "user", SessionID: "session", AccessToken: "access", RefreshToken: "refresh", AccessTokenExpiresAt: time.Now().Add(time.Minute), RefreshTokenExpiresAt: time.Now().Add(time.Hour)}, CSRFToken: "csrf", ExpiresAt: time.Now().Add(time.Hour)}, NextPath: "/drops/one", IntentID: "intent"}
 

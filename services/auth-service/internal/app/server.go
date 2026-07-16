@@ -33,9 +33,9 @@ import (
 	"github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
+	"github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
 	"github.com/Medikong/services/services/auth-service/internal/security"
-	"github.com/Medikong/services/services/auth-service/internal/transport/credential"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
 
@@ -219,7 +219,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		userauthstate.Config{StrongAuthTTL: cfg.Auth.ProofTTL},
 	)
 
-	credentials := credential.New(cfg.Auth, cfg.Development)
+	credentials := httpauth.New(cfg.Auth, cfg.Development)
 	csrf := httputil.NewCSRF(cfg.Auth.AllowedOrigins)
 	bootstrapController := intent.NewBootstrap(credentials, bootstrapService)
 	signInController := authentication.NewSignIn(credentials, csrf, emailSignInService, phoneSignInService)

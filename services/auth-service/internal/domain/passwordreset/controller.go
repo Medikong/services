@@ -4,18 +4,18 @@ import (
 	"net/http"
 
 	"github.com/Medikong/services/services/auth-service/internal/domain"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
 
 type PasswordResetController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	csrf        *httputil.CSRF
 	service     *Service
 }
 
-func NewPasswordReset(credentials *httpcredential.Credentials, csrf *httputil.CSRF, service *Service) *PasswordResetController {
+func NewPasswordReset(credentials *httpauth.Credentials, csrf *httputil.CSRF, service *Service) *PasswordResetController {
 	return &PasswordResetController{credentials: credentials, csrf: csrf, service: service}
 }
 
@@ -121,7 +121,7 @@ func (c *PasswordResetController) Complete(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if (credential.Channel == httpcredential.Web && request.CredentialDelivery != "web_auth_flow") || (credential.Channel == httpcredential.Mobile && request.CredentialDelivery != "mobile_reset_grant") {
+	if (credential.Channel == httpauth.Web && request.CredentialDelivery != "web_auth_flow") || (credential.Channel == httpauth.Mobile && request.CredentialDelivery != "mobile_reset_grant") {
 		httputil.WriteError(w, r, domain.Problem(400, "AUTH_INPUT_INVALID", "요청 채널과 credentialDelivery가 일치하지 않습니다."))
 		return
 	}
@@ -133,23 +133,23 @@ func (c *PasswordResetController) Complete(w http.ResponseWriter, r *http.Reques
 	httputil.WriteNoContent(w, r)
 }
 
-func (c *PasswordResetController) preAuth(w http.ResponseWriter, r *http.Request) (httpcredential.PreAuth, string, bool) {
+func (c *PasswordResetController) preAuth(w http.ResponseWriter, r *http.Request) (httpauth.PreAuth, string, bool) {
 	credential, err := c.credentials.PreAuth(r)
 	if err != nil {
 		httputil.WriteCredentialError(w, r, err)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
 	if credential.IntentID == "" {
 		httputil.WriteError(w, r, domain.Problem(404, "AUTH_INTENT_NOT_FOUND", "인증 요청을 찾을 수 없습니다."))
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
-	if credential.Channel != httpcredential.Web {
+	if credential.Channel != httpauth.Web {
 		return credential, "", true
 	}
 	csrf, problem := c.csrf.Token(r)
 	if problem != nil {
 		httputil.WriteError(w, r, problem)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
 	return credential, csrf, true
 }

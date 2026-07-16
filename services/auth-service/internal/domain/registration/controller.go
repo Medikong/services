@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
@@ -12,12 +12,12 @@ import (
 // RegistrationController handles the public HTTP shape and delegates state
 // changes to the registration service.
 type RegistrationController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	csrf        *httputil.CSRF
 	service     *Service
 }
 
-func NewRegistration(credentials *httpcredential.Credentials, csrf *httputil.CSRF, service *Service) *RegistrationController {
+func NewRegistration(credentials *httpauth.Credentials, csrf *httputil.CSRF, service *Service) *RegistrationController {
 	return &RegistrationController{credentials: credentials, csrf: csrf, service: service}
 }
 
@@ -153,7 +153,7 @@ func (c *RegistrationController) Complete(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if result.Issued.WebCookie != "" {
-		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpcredential.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
+		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpauth.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
 		c.credentials.ClearAuthFlowCookie(w)
 		httputil.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"registrationId": result.RegistrationID, "status": result.Status, "credentialDelivery": "web_jwt_refresh_cookie",
@@ -176,12 +176,12 @@ func (c *RegistrationController) Status(w http.ResponseWriter, r *http.Request) 
 	ownerProof, csrf := "", ""
 	if credential, credentialErr := c.credentials.PreAuth(r); credentialErr == nil {
 		ownerProof = credential.Token
-		if credential.Channel == httpcredential.Web {
+		if credential.Channel == httpauth.Web {
 			// GET needs no CSRF check, but a supplied token is not required either.
 			csrf = strings.TrimSpace(r.Header.Get("X-CSRF-Token"))
 		}
 	}
-	statusToken, _ := httpcredential.RegistrationStatusToken(r)
+	statusToken, _ := httpauth.RegistrationStatusToken(r)
 	result, err := c.service.Status(r.Context(), StatusInput{
 		RegistrationID: chi.URLParam(r, "registrationId"), OwnerProof: ownerProof, CSRFToken: csrf, StatusToken: statusToken,
 	})
@@ -195,19 +195,19 @@ func (c *RegistrationController) Status(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (c *RegistrationController) preAuth(w http.ResponseWriter, r *http.Request) (httpcredential.PreAuth, string, bool) {
+func (c *RegistrationController) preAuth(w http.ResponseWriter, r *http.Request) (httpauth.PreAuth, string, bool) {
 	credential, err := c.credentials.PreAuth(r)
 	if err != nil {
 		httputil.WriteCredentialError(w, r, err)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
-	if credential.Channel != httpcredential.Web {
+	if credential.Channel != httpauth.Web {
 		return credential, "", true
 	}
 	csrf, problem := c.csrf.Token(r)
 	if problem != nil {
 		httputil.WriteError(w, r, problem)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
 	return credential, csrf, true
 }

@@ -5,16 +5,16 @@ import (
 	"strings"
 	"time"
 
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
 
 type BootstrapController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	service     *BootstrapService
 }
 
-func NewBootstrap(credentials *httpcredential.Credentials, service *BootstrapService) *BootstrapController {
+func NewBootstrap(credentials *httpauth.Credentials, service *BootstrapService) *BootstrapController {
 	return &BootstrapController{credentials: credentials, service: service}
 }
 
@@ -43,7 +43,7 @@ func (c *BootstrapController) CreateIntent(w http.ResponseWriter, r *http.Reques
 	}
 	if result.Channel == "web" {
 		seconds := int(time.Until(result.ExpiresAt).Seconds())
-		c.credentials.SetAuthFlowCookie(w, httpcredential.EncodeAuthFlow(result.IntentID, result.OwnerProof), seconds)
+		c.credentials.SetAuthFlowCookie(w, httpauth.EncodeAuthFlow(result.IntentID, result.OwnerProof), seconds)
 		httputil.WriteJSON(w, r, http.StatusCreated, map[string]any{
 			"authIntentId": result.IntentID,
 			"expiresAt":    result.ExpiresAt,
@@ -56,7 +56,7 @@ func (c *BootstrapController) CreateIntent(w http.ResponseWriter, r *http.Reques
 		"authIntentId":  result.IntentID,
 		"expiresAt":     result.ExpiresAt,
 		"nextPath":      "/auth/signin",
-		"authFlowToken": httpcredential.EncodeAuthFlow(result.IntentID, result.OwnerProof),
+		"authFlowToken": httpauth.EncodeAuthFlow(result.IntentID, result.OwnerProof),
 	})
 }
 

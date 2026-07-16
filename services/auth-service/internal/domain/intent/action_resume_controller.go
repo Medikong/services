@@ -4,18 +4,18 @@ import (
 	"net/http"
 
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
 
 type ActionResumeController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	sessions    *appsession.Service
 	service     *ActionResumeService
 }
 
-func NewActionResume(credentials *httpcredential.Credentials, sessions *appsession.Service, service *ActionResumeService) *ActionResumeController {
+func NewActionResume(credentials *httpauth.Credentials, sessions *appsession.Service, service *ActionResumeService) *ActionResumeController {
 	return &ActionResumeController{credentials: credentials, sessions: sessions, service: service}
 }
 func (c *ActionResumeController) Resume(w http.ResponseWriter, r *http.Request) {
@@ -25,9 +25,9 @@ func (c *ActionResumeController) Resume(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		if credentialErr == nil {
-			credentialErr = &httpcredential.Error{Kind: httpcredential.Rejected}
+			credentialErr = &httpauth.Error{Kind: httpauth.Rejected}
 		}
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return

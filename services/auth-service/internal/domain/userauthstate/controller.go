@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Medikong/services/services/auth-service/internal/domain"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
@@ -15,12 +15,12 @@ type SessionAuthenticator interface {
 }
 
 type UserAuthStateController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	sessions    SessionAuthenticator
 	service     *Service
 }
 
-func NewUserAuthState(credentials *httpcredential.Credentials, sessions SessionAuthenticator, service *Service) *UserAuthStateController {
+func NewUserAuthState(credentials *httpauth.Credentials, sessions SessionAuthenticator, service *Service) *UserAuthStateController {
 	return &UserAuthStateController{credentials: credentials, sessions: sessions, service: service}
 }
 
@@ -35,7 +35,7 @@ func (c *UserAuthStateController) Apply(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return
 	}

@@ -3,19 +3,19 @@ package authentication
 import (
 	"net/http"
 
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
 
 type SignInController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	csrf        *httputil.CSRF
 	email       *EmailService
 	phone       *PhoneService
 }
 
-func NewSignIn(credentials *httpcredential.Credentials, csrf *httputil.CSRF, email *EmailService, phone *PhoneService) *SignInController {
+func NewSignIn(credentials *httpauth.Credentials, csrf *httputil.CSRF, email *EmailService, phone *PhoneService) *SignInController {
 	return &SignInController{credentials: credentials, csrf: csrf, email: email, phone: phone}
 }
 
@@ -70,19 +70,19 @@ func (c *SignInController) PhoneVerify(w http.ResponseWriter, r *http.Request) {
 	c.writeIssued(w, r, issued)
 }
 
-func (c *SignInController) preAuth(w http.ResponseWriter, r *http.Request) (httpcredential.PreAuth, string, bool) {
+func (c *SignInController) preAuth(w http.ResponseWriter, r *http.Request) (httpauth.PreAuth, string, bool) {
 	credential, err := c.credentials.PreAuth(r)
 	if err != nil {
 		httputil.WriteCredentialError(w, r, err)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
-	if credential.Channel != httpcredential.Web {
+	if credential.Channel != httpauth.Web {
 		return credential, "", true
 	}
 	csrf, problem := c.csrf.Token(r)
 	if problem != nil {
 		httputil.WriteError(w, r, problem)
-		return httpcredential.PreAuth{}, "", false
+		return httpauth.PreAuth{}, "", false
 	}
 	return credential, csrf, true
 }
@@ -106,7 +106,7 @@ func (c *SignInController) Email(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	csrf := ""
-	if credential.Channel == httpcredential.Web {
+	if credential.Channel == httpauth.Web {
 		var problem error
 		csrf, problem = c.csrf.Token(r)
 		if problem != nil {
@@ -132,7 +132,7 @@ func (c *SignInController) Email(w http.ResponseWriter, r *http.Request) {
 
 func (c *SignInController) writeIssued(w http.ResponseWriter, r *http.Request, issued Completed) {
 	if issued.WebCookie != "" {
-		c.credentials.SetSessionCookie(w, issued.WebCookie, httpcredential.CookieMaxAge(issued.RememberMe, issued.RefreshTokenExpiresAt))
+		c.credentials.SetSessionCookie(w, issued.WebCookie, httpauth.CookieMaxAge(issued.RememberMe, issued.RefreshTokenExpiresAt))
 		c.credentials.ClearAuthFlowCookie(w)
 		httputil.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"credentialDelivery": "web_jwt_refresh_cookie",

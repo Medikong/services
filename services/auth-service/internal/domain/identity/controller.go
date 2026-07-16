@@ -7,7 +7,7 @@ import (
 
 	"github.com/Medikong/services/services/auth-service/internal/domain"
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 )
@@ -31,14 +31,14 @@ type ReauthenticationService interface {
 }
 
 type IdentityManagementController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	csrf        *httputil.CSRF
 	session     *appsession.Service
 	reauth      ReauthenticationService
 	links       *LinkService
 }
 
-func NewIdentityManagement(credentials *httpcredential.Credentials, csrf *httputil.CSRF, session *appsession.Service, reauth ReauthenticationService, links *LinkService) *IdentityManagementController {
+func NewIdentityManagement(credentials *httpauth.Credentials, csrf *httputil.CSRF, session *appsession.Service, reauth ReauthenticationService, links *LinkService) *IdentityManagementController {
 	return &IdentityManagementController{credentials: credentials, csrf: csrf, session: session, reauth: reauth, links: links}
 }
 
@@ -59,9 +59,9 @@ func (c *IdentityManagementController) Reauthenticate(w http.ResponseWriter, r *
 		return
 	}
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		if credentialErr == nil {
-			credentialErr = &httpcredential.Error{Kind: httpcredential.Rejected}
+			credentialErr = &httpauth.Error{Kind: httpauth.Rejected}
 		}
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return
@@ -218,9 +218,9 @@ func (c *IdentityManagementController) CompleteReplacement(w http.ResponseWriter
 		return
 	}
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		if credentialErr == nil {
-			credentialErr = &httpcredential.Error{Kind: httpcredential.Rejected}
+			credentialErr = &httpauth.Error{Kind: httpauth.Rejected}
 		}
 		httputil.WriteCredentialError(w, r, credentialErr)
 		return
@@ -240,7 +240,7 @@ func (c *IdentityManagementController) CompleteReplacement(w http.ResponseWriter
 
 func (c *IdentityManagementController) writeReplacementCompletion(w http.ResponseWriter, r *http.Request, result CompleteLinkOutput) {
 	if result.Issued.WebCookie != "" {
-		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpcredential.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
+		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpauth.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
 		httputil.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"replacementId": result.LinkID, "status": "active", "credentialDelivery": "web_jwt_refresh_cookie",
 			"session": map[string]any{"sessionId": result.Issued.SessionID, "expiresAt": result.Issued.ExpiresAt},
@@ -250,25 +250,25 @@ func (c *IdentityManagementController) writeReplacementCompletion(w http.Respons
 	}
 	httputil.WriteJSON(w, r, http.StatusOK, map[string]any{"replacementId": result.LinkID, "status": "active", "credentialDelivery": "mobile_tokens", "session": map[string]any{"sessionId": result.Issued.SessionID, "expiresAt": result.Issued.ExpiresAt}, "tokens": map[string]any{"accessToken": result.Issued.AccessToken, "accessTokenExpiresAt": result.Issued.AccessTokenExpiresAt, "refreshToken": result.Issued.RefreshToken, "refreshTokenExpiresAt": result.Issued.RefreshTokenExpiresAt}})
 }
-func (c *IdentityManagementController) principal(w http.ResponseWriter, r *http.Request) (appsession.Principal, httpcredential.Session, bool) {
+func (c *IdentityManagementController) principal(w http.ResponseWriter, r *http.Request) (appsession.Principal, httpauth.Session, bool) {
 	credential, credentialErr := c.credentials.Session(r)
-	if credentialErr != nil || credential.Channel != httpcredential.Mobile {
+	if credentialErr != nil || credential.Channel != httpauth.Mobile {
 		if credentialErr == nil {
-			credentialErr = &httpcredential.Error{Kind: httpcredential.Rejected}
+			credentialErr = &httpauth.Error{Kind: httpauth.Rejected}
 		}
 		httputil.WriteCredentialError(w, r, credentialErr)
-		return appsession.Principal{}, httpcredential.Session{}, false
+		return appsession.Principal{}, httpauth.Session{}, false
 	}
 	principal, err := c.session.Authenticate(r.Context(), "", credential.Token)
 	if err != nil {
 		httputil.WriteError(w, r, err)
-		return appsession.Principal{}, httpcredential.Session{}, false
+		return appsession.Principal{}, httpauth.Session{}, false
 	}
 	return principal, credential, true
 }
 func (c *IdentityManagementController) writeReauth(w http.ResponseWriter, r *http.Request, result ReauthOutput) {
 	if result.Issued.WebCookie != "" {
-		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpcredential.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
+		c.credentials.SetSessionCookie(w, result.Issued.WebCookie, httpauth.CookieMaxAge(result.Issued.RememberMe, result.Issued.RefreshTokenExpiresAt))
 		httputil.WriteJSON(w, r, http.StatusOK, map[string]any{
 			"reauthenticationProof": result.Proof, "purpose": result.Purpose, "expiresAt": result.ExpiresAt, "credentialDelivery": "web_jwt_refresh_cookie",
 			"session": map[string]any{"sessionId": result.Issued.SessionID, "expiresAt": result.Issued.ExpiresAt},

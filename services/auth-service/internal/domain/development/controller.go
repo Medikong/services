@@ -5,19 +5,19 @@ import (
 
 	"github.com/Medikong/services/services/auth-service/internal/domain"
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	httpcredential "github.com/Medikong/services/services/auth-service/internal/transport/credential"
+	httpauth "github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type DevelopmentController struct {
-	credentials *httpcredential.Credentials
+	credentials *httpauth.Credentials
 	virtual     *VirtualMessageService
 	sessions    *appsession.Service
 }
 
-func NewDevelopment(credentials *httpcredential.Credentials, virtual *VirtualMessageService, sessions *appsession.Service) *DevelopmentController {
+func NewDevelopment(credentials *httpauth.Credentials, virtual *VirtualMessageService, sessions *appsession.Service) *DevelopmentController {
 	return &DevelopmentController{credentials: credentials, virtual: virtual, sessions: sessions}
 }
 
@@ -28,27 +28,27 @@ func (c *DevelopmentController) VirtualMessage(w http.ResponseWriter, r *http.Re
 	}
 	ownerProof, csrf := "", ""
 	preAuth, preAuthErr := c.credentials.PreAuth(r)
-	if preAuthErr != nil && preAuthErr.Kind != httpcredential.Missing {
+	if preAuthErr != nil && preAuthErr.Kind != httpauth.Missing {
 		httputil.WriteError(w, r, domain.Problem(404, "AUTH_VIRTUAL_MESSAGE_NOT_FOUND", "가상 인증 메시지를 찾을 수 없습니다."))
 		return
 	}
 	if preAuthErr == nil {
 		ownerProof = preAuth.Token
 	}
-	if preAuthErr == nil && preAuth.Channel == httpcredential.Web {
+	if preAuthErr == nil && preAuth.Channel == httpauth.Web {
 		// GET has no CSRF requirement; passing the optional header lets the
 		// application verify it if a future challenge kind requires it.
 		csrf = r.Header.Get("X-CSRF-Token")
 	}
 	var sessionUserID *uuid.UUID
 	sessionCredential, sessionCredentialErr := c.credentials.Session(r)
-	if sessionCredentialErr != nil && sessionCredentialErr.Kind != httpcredential.Missing {
+	if sessionCredentialErr != nil && sessionCredentialErr.Kind != httpauth.Missing {
 		httputil.WriteError(w, r, domain.Problem(404, "AUTH_VIRTUAL_MESSAGE_NOT_FOUND", "가상 인증 메시지를 찾을 수 없습니다."))
 		return
 	}
 	if sessionCredentialErr == nil {
 		webToken, mobileToken := "", ""
-		if sessionCredential.Channel == httpcredential.Web {
+		if sessionCredential.Channel == httpauth.Web {
 			webToken = sessionCredential.Token
 		} else {
 			mobileToken = sessionCredential.Token
