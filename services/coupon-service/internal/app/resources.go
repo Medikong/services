@@ -4,7 +4,7 @@ import (
 	"context"
 
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
-	platformredis "github.com/Medikong/services/packages/go-platform/redis"
+	platformredis "github.com/Medikong/services/packages/go-platform/redisutil"
 	"github.com/Medikong/services/services/coupon-service/internal/platform/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	redis "github.com/redis/go-redis/v9"

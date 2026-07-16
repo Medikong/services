@@ -9,7 +9,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/samber/oops"
 
-	platformredis "github.com/Medikong/services/packages/go-platform/redis"
+	platformredis "github.com/Medikong/services/packages/go-platform/redisutil"
 )
 
 const ServiceName = "coupon-service"
