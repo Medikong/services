@@ -10,6 +10,7 @@ vars:
   API_BENCHMARK_DOC_DIR: '{{default "../workspace/docs/evidence/services/api-integration-test-benchmark/half-year-early-growth" .API_BENCHMARK_DOC_DIR}}'
   UNIT_REPORT_DIR: '{{default "tests/tmp/reports/unit" .UNIT_REPORT_DIR}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
+  E2E_PYTHON_BIN: '{{default "python3" .E2E_PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
@@ -22,6 +23,7 @@ vars:
   PURCHASE_E2E_PAYMENT_SERVICE_URL: '{{default "http://payment-service:8083" .PURCHASE_E2E_PAYMENT_SERVICE_URL}}'
   PURCHASE_E2E_NOTIFICATION_SERVICE_URL: '{{default "http://notification-service:8084" .PURCHASE_E2E_NOTIFICATION_SERVICE_URL}}'
   PURCHASE_E2E_SCENARIOS: '{{default "01-drop-catalog-smoke 02-order-create 03-payment-approve 04-customer-drop-purchase-happy-path 05-payment-failure-flow 06-sold-out-concurrency-flow" .PURCHASE_E2E_SCENARIOS}}'
+  AUTH_E2E_COMPOSE_SERVICES: '{{default "postgres redis kafka kafka-init auth-migrate auth-provider auth-service auth-worker protected-echo auth-docker-socket-proxy auth-control auth-edge-probe auth-test-consumer auth-gateway" .AUTH_E2E_COMPOSE_SERVICES}}'
   PURCHASE_E2E_METRIC_SCENARIOS: '{{default "04-customer-drop-purchase-happy-path 05-payment-failure-flow 06-sold-out-concurrency-flow" .PURCHASE_E2E_METRIC_SCENARIOS}}'
   PURCHASE_E2E_METRICS_COLLECTION: '{{default "07-purchase-flow-metrics" .PURCHASE_E2E_METRICS_COLLECTION}}'
   PURCHASE_E2E_TRACE_SCENARIO: '{{default "04-customer-drop-purchase-happy-path" .PURCHASE_E2E_TRACE_SCENARIO}}'
@@ -46,6 +48,23 @@ vars:
   OBS_E2E_EXCLUSION_CHECK_SECONDS: '{{default "8" .OBS_E2E_EXCLUSION_CHECK_SECONDS}}'
 
 tasks:
+  e2e:
+    desc: Run the selected Docker Compose E2E scenario with SCENARIO=<purchase-name|auth/folder>; empty runs all.
+    internal: true
+    env:
+      E2E_ROOT_DIR: '{{.ROOT_DIR}}'
+      E2E_DOCKER_COMPOSE: '{{.DOCKER_COMPOSE}}'
+      E2E_COMPOSE_FILE: '{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+      E2E_COMPOSE_PROJECT: '{{.E2E_COMPOSE_PROJECT}}'
+      E2E_NEWMAN_IMAGE: '{{.NEWMAN_IMAGE}}'
+      E2E_WAIT_TIMEOUT_SECONDS: '{{.E2E_WAIT_TIMEOUT_SECONDS}}'
+      E2E_PURCHASE_SERVICES: '{{.PURCHASE_E2E_COMPOSE_SERVICES}}'
+      E2E_PURCHASE_COLLECTIONS: '{{.PURCHASE_E2E_SCENARIOS}}'
+      E2E_AUTH_SERVICES: '{{.AUTH_E2E_COMPOSE_SERVICES}}'
+      E2E_SCENARIO: '{{default "" .SCENARIO}}'
+    cmds:
+      - '"{{.E2E_PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/scripts/run_e2e.py"'
+
   test-runner-build:
     desc: Build service-scoped Docker Python test runner images. Optionally set SERVICE=<service-name>.
     cmds:
@@ -457,6 +476,7 @@ tasks:
 
   purchase-e2e:
     desc: Run Python purchase-flow Newman E2E scenarios. Optionally set SCENARIO=<scenario-name>.
+    internal: true
     cmds:
       - |
         set -e
@@ -925,11 +945,13 @@ tasks:
 
   purchase-e2e-up:
     desc: Start the Python purchase-flow E2E Docker Compose services.
+    internal: true
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" up -d --build --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} {{.PURCHASE_E2E_COMPOSE_SERVICES}}'
 
   purchase-e2e-newman:
     desc: Run Python purchase-flow Newman collections against an already running stack.
+    internal: true
     cmds:
       - |
         set -e
@@ -965,6 +987,7 @@ tasks:
 
   purchase-e2e-down:
     desc: Stop the Python purchase-flow E2E Docker Compose stack.
+    internal: true
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}" down -v --remove-orphans'
 

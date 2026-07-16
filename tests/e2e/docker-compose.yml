@@ -5,6 +5,26 @@ x-service-e2e-env: &service-e2e-env
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}"
   OTEL_PYTHON_FASTAPI_EXCLUDED_URLS: "/healthz,/readyz,/metrics"
 
+x-auth-e2e-env: &auth-e2e-env
+  SERVICE_NAME: auth-service
+  SERVICE_VERSION: e2e
+  SERVICE_ENVIRONMENT: e2e
+  DATABASE_URL: postgres://app:app@postgres:5432/auth_service?sslmode=disable
+  AUTH_CREDENTIAL_HMAC_KEY: auth-e2e-credential-hmac-key-0001
+  AUTH_REPLAY_ENCRYPTION_KEY: auth-e2e-replay-key-32-bytes-000
+  AUTH_JWT_PRIVATE_KEY_FILE: /run/secrets/auth_e2e_jwt
+  AUTH_JWT_KEY_ID: auth-e2e-rsa-1
+  AUTH_JWT_ISSUER: auth-service
+  AUTH_JWT_AUDIENCES: dropmong-api
+  AUTH_PROOF_PRIVATE_KEY: nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2DXWpgBgrEKt9VL/tPJZAc6DuFy89qmIyWvAhpo9wdRGg
+  AUTH_PROOF_KEY_ID: auth-e2e-1
+  AUTH_USER_PROOF_PUBLIC_KEY: 11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo
+  AUTH_USER_PROOF_KEY_ID: user-e2e-1
+  AUTH_USER_PROOF_ISSUER: user-service
+  AUTH_COOKIE_SECURE: "true"
+  AUTH_ALLOWED_ORIGINS: https://app.e2e.test
+  OTEL_TRACES_EXPORTER: none
+
 services:
   redis:
     image: valkey/valkey:8-alpine
@@ -13,6 +33,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks: [default, auth-internal]
 
   postgres:
     image: postgres:16-alpine
@@ -27,6 +48,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks: [default, auth-internal]
 
   kafka:
     image: apache/kafka:3.8.1
@@ -51,6 +73,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 20
+    networks: [default, auth-internal]
 
   kafka-init:
     image: apache/kafka:3.8.1
@@ -66,6 +89,187 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.failed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic order.confirmed --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic notification.requested --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic auth.e2e.events --partitions 1 --replication-factor 1
+
+  auth-migrate:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      <<: *auth-e2e-env
+      MIGRATION_TIMEOUT: 2m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [auth-internal]
+
+  auth-provider:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: tests/e2e/scripts/Dockerfile.auth-support
+    command: ["provider"]
+    environment:
+      AUTH_E2E_ADMIN_TOKEN: auth-e2e-admin-control-secret-001
+      AUTH_E2E_PROVIDER_TOKEN: auth-e2e-provider-secret-00000001
+      AUTH_E2E_USER_PROOF_PRIVATE_KEY: nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2DXWpgBgrEKt9VL/tPJZAc6DuFy89qmIyWvAhpo9wdRGg
+      AUTH_E2E_USER_PROOF_KEY_ID: user-e2e-1
+    networks: [auth-edge, auth-internal]
+
+  auth-service:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      <<: *auth-e2e-env
+      HTTP_ADDR: :8080
+      ADMIN_ADDR: :9090
+      AUTH_SESSION_STATUS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_DIAL_TIMEOUT: 200ms
+      REDIS_READ_TIMEOUT: 200ms
+      REDIS_WRITE_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_DB_TIMEOUT: 100ms
+    secrets: [auth_e2e_jwt]
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks: [auth-internal]
+
+  auth-worker:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/worker"]
+    environment:
+      <<: *auth-e2e-env
+      WORKER_ADMIN_ADDR: :9092
+      AUTH_OUTBOX_BROKER_ENABLED: "true"
+      AUTH_OUTBOX_BROKERS: kafka:29092
+      AUTH_OUTBOX_TOPIC: auth.e2e.events
+      AUTH_OUTBOX_PUBLISH_TIMEOUT: 500ms
+      AUTH_DELIVERY_ENABLED: "true"
+      AUTH_EMAIL_PROVIDER_URL: http://auth-provider:8080/v1/email
+      AUTH_SMS_PROVIDER_URL: http://auth-provider:8080/v1/sms
+      AUTH_EMAIL_PROVIDER_BEARER_TOKEN: auth-e2e-provider-secret-00000001
+      AUTH_SMS_PROVIDER_BEARER_TOKEN: auth-e2e-provider-secret-00000001
+      AUTH_PROVIDER_TIMEOUT: 300ms
+      AUTH_DELIVERY_POLL_INTERVAL: 100ms
+      AUTH_DELIVERY_LEASE: 1s
+      AUTH_DELIVERY_BATCH_SIZE: 20
+      AUTH_DELIVERY_MAX_ATTEMPTS: 5
+      AUTH_DELIVERY_BASE_BACKOFF: 100ms
+      AUTH_DELIVERY_MAX_BACKOFF: 400ms
+      AUDIT_BATCH_SIZE: 50
+      AUDIT_POLL_INTERVAL: 100ms
+      AUDIT_LEASE: 2s
+      AUDIT_PUBLISH_TIMEOUT: 500ms
+      AUDIT_MAX_ATTEMPTS: 5
+      AUDIT_BASE_BACKOFF: 100ms
+      AUDIT_MAX_BACKOFF: 400ms
+      AUDIT_OUTBOX_RETENTION: 24h
+      AUDIT_CLEANUP_LIMIT: 1000
+    secrets: [auth_e2e_jwt]
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      auth-provider:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [auth-internal]
+
+  protected-echo:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: tests/e2e/scripts/Dockerfile.auth-support
+    command: ["echo"]
+    environment:
+      AUTH_E2E_ADMIN_TOKEN: auth-e2e-admin-control-secret-001
+    networks: [auth-protected]
+
+  auth-docker-socket-proxy:
+    profiles: [auth]
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: "1"
+      EXEC: "1"
+      INFO: "1"
+      PING: "1"
+      POST: "1"
+      ALLOW_RESTARTS: "1"
+      ALLOW_START: "1"
+      ALLOW_STOP: "1"
+      VERSION: "1"
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [auth-internal]
+
+  auth-control:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: tests/e2e/scripts/Dockerfile.auth-support
+    command: ["control"]
+    environment:
+      AUTH_E2E_ADMIN_TOKEN: auth-e2e-admin-control-secret-001
+      AUTH_E2E_COMPOSE_PROJECT: ${AUTH_E2E_COMPOSE_PROJECT:-dropmong-e2e}
+      AUTH_E2E_DOCKER_URL: http://auth-docker-socket-proxy:2375
+    depends_on:
+      auth-docker-socket-proxy:
+        condition: service_started
+    networks: [auth-edge, auth-internal, auth-protected]
+
+  auth-edge-probe:
+    profiles: [auth]
+    build:
+      context: ../..
+      dockerfile: tests/e2e/scripts/Dockerfile.auth-support
+    command: ["edge-probe"]
+    environment:
+      AUTH_E2E_ADMIN_TOKEN: auth-e2e-admin-control-secret-001
+    networks: [auth-edge]
+
+  auth-test-consumer:
+    profiles: [auth]
+    image: apache/kafka:3.8.1
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - exec /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:29092 --topic auth.e2e.events --group auth-e2e-consumer --from-beginning
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [auth-internal]
+
+  auth-gateway:
+    profiles: [auth]
+    image: envoyproxy/envoy:v1.35.0
+    command: ["-c", "/etc/envoy/auth.yaml", "--log-level", "warning"]
+    volumes:
+      - ./envoy-auth.yaml:/etc/envoy/auth.yaml:ro
+    depends_on:
+      auth-service:
+        condition: service_started
+      auth-worker:
+        condition: service_started
+      protected-echo:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_GATEWAY_PORT:-18088}:8080"
+    networks: [auth-edge, auth-internal, auth-protected]
 
   tempo:
     image: grafana/tempo:2.7.2
@@ -280,3 +484,14 @@ services:
 
 volumes:
   tempo-data:
+
+secrets:
+  auth_e2e_jwt:
+    file: ${AUTH_E2E_JWT_PRIVATE_KEY_FILE:?run the E2E entrypoint to generate the test JWT key}
+
+networks:
+  auth-edge:
+  auth-internal:
+    internal: true
+  auth-protected:
+    internal: true
