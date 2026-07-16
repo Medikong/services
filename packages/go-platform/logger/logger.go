@@ -5,9 +5,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -128,7 +130,137 @@ func Err(err error) slog.Attr {
 	if err == nil {
 		return slog.Any("error", nil)
 	}
+	if oopsErr, ok := oops.AsOops(err); ok {
+		ctx, sensitiveValues := redactContext(oopsErr.Context())
+		attrs := []any{slog.String("message", redactText(oopsErr.Error(), sensitiveValues))}
+		if code := oopsErr.Code(); code != nil {
+			attrs = append(attrs, slog.Any("code", code))
+		}
+		if domain := oopsErr.Domain(); domain != "" {
+			attrs = append(attrs, slog.String("domain", domain))
+		}
+		if len(ctx) > 0 {
+			attrs = append(attrs, slog.Any("context", ctx))
+		}
+		if stacktrace := oopsErr.Stacktrace(); stacktrace != "" {
+			attrs = append(attrs, slog.String("stacktrace", redactText(stacktrace, sensitiveValues)))
+		}
+		return slog.Group("error", attrs...)
+	}
 	return slog.String("error", err.Error())
+}
+
+func redactContext(ctx map[string]any) (map[string]any, []string) {
+	redacted := make(map[string]any, len(ctx))
+	var sensitiveValues []string
+	for key, value := range ctx {
+		if isSensitiveKey(key) {
+			collectStrings(reflect.ValueOf(value), 0, &sensitiveValues)
+			redacted[key] = "[REDACTED]"
+			continue
+		}
+		redacted[key] = redactNested(value, 0, &sensitiveValues)
+	}
+	return redacted, sensitiveValues
+}
+
+func redactNested(value any, depth int, sensitiveValues *[]string) any {
+	if value == nil {
+		return value
+	}
+	if depth >= 16 {
+		return "[TRUNCATED]"
+	}
+	rv := reflect.ValueOf(value)
+	for rv.Kind() == reflect.Interface || rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Map:
+		if rv.Type().Key().Kind() != reflect.String {
+			return "[UNSUPPORTED]"
+		}
+		out := make(map[string]any, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			key := iter.Key().String()
+			item := iter.Value()
+			if isSensitiveKey(key) {
+				collectStrings(item, depth+1, sensitiveValues)
+				out[key] = "[REDACTED]"
+				continue
+			}
+			out[key] = redactNested(item.Interface(), depth+1, sensitiveValues)
+		}
+		return out
+	case reflect.Slice, reflect.Array:
+		out := make([]any, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			out[i] = redactNested(rv.Index(i).Interface(), depth+1, sensitiveValues)
+		}
+		return out
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.String:
+		return value
+	default:
+		return "[UNSUPPORTED]"
+	}
+}
+
+func collectStrings(value reflect.Value, depth int, values *[]string) {
+	if !value.IsValid() || depth >= 16 {
+		return
+	}
+	for value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return
+		}
+		value = value.Elem()
+	}
+	switch value.Kind() {
+	case reflect.String:
+		if text := value.String(); text != "" {
+			*values = append(*values, text)
+		}
+	case reflect.Map:
+		iter := value.MapRange()
+		for iter.Next() {
+			collectStrings(iter.Value(), depth+1, values)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			collectStrings(value.Index(i), depth+1, values)
+		}
+	case reflect.Struct:
+		for i := 0; i < value.NumField(); i++ {
+			collectStrings(value.Field(i), depth+1, values)
+		}
+	}
+}
+
+func isSensitiveKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	for _, fragment := range []string{
+		"authorization", "cookie", "password", "passwd", "secret", "token", "proof", "credential", "panic",
+		"private_name", "privatename", "database_url", "databaseurl", "redis_url", "redisurl",
+		"api_key", "apikey", "private_key", "privatekey", "signing_key", "signingkey", "encryption_key", "encryptionkey",
+	} {
+		if strings.Contains(normalized, fragment) {
+			return true
+		}
+	}
+	return normalized == "key" || strings.HasSuffix(normalized, "_key")
+}
+
+func redactText(text string, sensitiveValues []string) string {
+	for _, value := range sensitiveValues {
+		text = strings.ReplaceAll(text, value, "[REDACTED]")
+	}
+	return text
 }
 
 type traceHandler struct {

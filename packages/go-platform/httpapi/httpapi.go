@@ -1,80 +1,71 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
+	"math"
 	"net/http"
+	"strings"
 	"time"
 
-	apperrors "github.com/Medikong/services/packages/go-platform/errors"
 	"github.com/Medikong/services/packages/go-platform/requestcontext"
 	"github.com/samber/oops"
 )
 
 const (
 	OopsHTTPStatusCodeKey = "http.status_code"
-	OopsDetailsKey        = "http.response.details"
 )
 
-func NewError(statusCode int, code, message string, details map[string]any) error {
-	builder := oops.
-		Code(code).
-		Public(message).
-		With(OopsHTTPStatusCodeKey, statusCode)
-	if len(details) > 0 {
-		builder = builder.With(OopsDetailsKey, cloneDetails(details))
-	}
-	return builder.New(message)
+const (
+	internalErrorCode    = "common.internal"
+	internalErrorMessage = "요청 처리 중 오류가 발생했습니다."
+)
+
+type ErrorResponse struct {
+	Error      ErrorBody `json:"error"`
+	RequestID  string    `json:"requestId"`
+	OccurredAt time.Time `json:"occurredAt"`
 }
 
-func WrapError(err error, statusCode int, code, message string, details map[string]any) error {
-	if err == nil {
-		return NewError(statusCode, code, message, details)
-	}
-	builder := oops.
-		Code(code).
-		Public(message).
-		With(OopsHTTPStatusCodeKey, statusCode)
-	if len(details) > 0 {
-		builder = builder.With(OopsDetailsKey, cloneDetails(details))
-	}
-	return builder.Wrap(err)
+type ErrorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
-func BadRequest(code, message string) error {
-	return NewError(http.StatusBadRequest, code, message, nil)
+func Error(statusCode int, code string) oops.OopsErrorBuilder {
+	return oops.Code(code).With(OopsHTTPStatusCodeKey, statusCode)
 }
 
-func Unauthorized(code, message string) error {
-	return NewError(http.StatusUnauthorized, code, message, nil)
+func BadRequest(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusBadRequest, code)
 }
 
-func Forbidden(code, message string) error {
-	return NewError(http.StatusForbidden, code, message, nil)
+func Unauthorized(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusUnauthorized, code)
 }
 
-func NotFound(code, message string) error {
-	return NewError(http.StatusNotFound, code, message, nil)
+func Forbidden(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusForbidden, code)
 }
 
-func MethodNotAllowed(code, message string) error {
-	return NewError(http.StatusMethodNotAllowed, code, message, nil)
+func NotFound(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusNotFound, code)
 }
 
-func Conflict(code, message string) error {
-	return NewError(http.StatusConflict, code, message, nil)
+func MethodNotAllowed(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusMethodNotAllowed, code)
 }
 
-func Unprocessable(code, message string) error {
-	return NewError(http.StatusUnprocessableEntity, code, message, nil)
+func Conflict(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusConflict, code)
 }
 
-func GatewayTimeout(code, message string) error {
-	return NewError(http.StatusGatewayTimeout, code, message, nil)
+func Unprocessable(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusUnprocessableEntity, code)
 }
 
-func Internal(err error) error {
-	return WrapError(err, http.StatusInternalServerError, "common.internal", "요청 처리 중 오류가 발생했습니다.", nil)
+func GatewayTimeout(code string) oops.OopsErrorBuilder {
+	return Error(http.StatusGatewayTimeout, code)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
@@ -87,119 +78,99 @@ func DecodeJSON(r *http.Request, dst any) error {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
-		return BadRequest("common.invalid_json", "요청 JSON을 해석할 수 없습니다.")
+		return BadRequest("common.invalid_json").
+			Public("요청 JSON을 해석할 수 없습니다.").
+			Wrap(err)
 	}
 	return nil
 }
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
-	if oopsErr, ok := oops.AsOops(err); ok {
-		writeOops(w, r, oopsErr)
-		return
-	}
-
-	if oopsErr, ok := oops.AsOops(Internal(err)); ok {
-		writeOops(w, r, oopsErr)
-		return
-	}
+	statusCode, code, message := publicError(err)
+	ReportError(r.Context(), err, statusCode, code)
+	writeErrorResponse(w, r, statusCode, code, message)
 }
 
-func writeOops(w http.ResponseWriter, r *http.Request, err oops.OopsError) {
-	ctx := err.Context()
-	statusCode := statusCodeFromContext(ctx)
-	code := ""
-	if value := err.Code(); value != nil {
-		code = fmt.Sprint(value)
+func publicError(err error) (int, string, string) {
+	if oopsErr, ok := oops.AsOops(err); ok {
+		for _, layer := range oopsErr.Layers() {
+			statusCode, ok := statusCodeFromContext(layer.Context)
+			if !ok {
+				continue
+			}
+			code := layerCode(layer.Code)
+			if code == "" {
+				code = internalErrorCode
+			}
+			message := strings.TrimSpace(layer.Public)
+			if message == "" {
+				message = internalErrorMessage
+			}
+			return statusCode, code, message
+		}
 	}
-	if code == "" {
-		code = "common.internal"
-	}
-	message := err.Public()
-	if message == "" {
-		message = "요청 처리 중 오류가 발생했습니다."
-	}
+	return http.StatusInternalServerError, internalErrorCode, internalErrorMessage
+}
+
+func layerCode(value any) string {
+	code, _ := value.(string)
+	return strings.TrimSpace(code)
+}
+
+func writeErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, code, message string) {
 	requestID := requestcontext.RequestID(r.Context())
 	if requestID == "" {
 		requestID = r.Header.Get(requestcontext.RequestIDHeader)
 	}
-	WriteJSON(w, statusCode, apperrors.ErrorResponse{
-		Error: apperrors.ErrorBody{
+	WriteJSON(w, statusCode, ErrorResponse{
+		Error: ErrorBody{
 			Code:    code,
 			Message: message,
-			Details: detailsFromContext(ctx),
 		},
 		RequestID:  requestID,
 		OccurredAt: time.Now().UTC(),
 	})
 }
 
-func OopsDetails(kv ...any) map[string]any {
-	if len(kv) == 0 {
-		return nil
-	}
-	details := make(map[string]any, len(kv)/2)
-	for i := 0; i < len(kv); i += 2 {
-		key, ok := kv[i].(string)
-		if !ok || key == "" {
-			continue
-		}
-		if i+1 >= len(kv) {
-			details[key] = nil
-			continue
-		}
-		details[key] = kv[i+1]
-	}
-	return details
-}
-
-func cloneDetails(details map[string]any) map[string]any {
-	if len(details) == 0 {
-		return nil
-	}
-	out := make(map[string]any, len(details))
-	for key, value := range details {
-		out[key] = value
-	}
-	return out
-}
-
-func ErrorCode(err error) string {
-	if oopsErr, ok := oops.AsOops(err); ok {
-		return fmt.Sprint(oopsErr.Code())
-	}
-	return ""
-}
-
-func statusCodeFromContext(ctx map[string]any) int {
+func statusCodeFromContext(ctx map[string]any) (int, bool) {
 	value, ok := ctx[OopsHTTPStatusCodeKey]
 	if !ok {
-		return http.StatusInternalServerError
+		return 0, false
 	}
+	var statusCode int
 	switch typed := value.(type) {
 	case int:
-		if typed != 0 {
-			return typed
-		}
+		statusCode = typed
 	case int64:
-		if typed != 0 {
-			return int(typed)
-		}
+		statusCode = int(typed)
 	case float64:
-		if typed != 0 {
-			return int(typed)
+		if math.Trunc(typed) != typed {
+			return 0, false
 		}
+		statusCode = int(typed)
+	default:
+		return 0, false
 	}
-	return http.StatusInternalServerError
+	if statusCode < 400 || statusCode > 599 {
+		return 0, false
+	}
+	return statusCode, true
 }
 
-func detailsFromContext(ctx map[string]any) map[string]any {
-	value, ok := ctx[OopsDetailsKey]
-	if !ok {
-		return nil
+type ErrorReporter func(error, int, string)
+
+type errorReporterContextKey struct{}
+
+func WithErrorReporter(ctx context.Context, reporter ErrorReporter) context.Context {
+	if reporter == nil {
+		return ctx
 	}
-	details, ok := value.(map[string]any)
-	if !ok {
-		return nil
+	return context.WithValue(ctx, errorReporterContextKey{}, reporter)
+}
+
+func ReportError(ctx context.Context, err error, statusCode int, code string) {
+	reporter, ok := ctx.Value(errorReporterContextKey{}).(ErrorReporter)
+	if ok {
+		reporter(err, statusCode, code)
 	}
-	return cloneDetails(details)
 }

@@ -7,7 +7,7 @@ import (
 
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	platformmiddleware "github.com/Medikong/services/packages/go-platform/httpmiddleware"
-	platformredis "github.com/Medikong/services/packages/go-platform/redis"
+	platformredis "github.com/Medikong/services/packages/go-platform/redisutil"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 

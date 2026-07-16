@@ -24,6 +24,7 @@ func Stack(config Config, next http.Handler) http.Handler {
 		},
 		Metrics(config),
 		AccessLog(config),
+		ErrorLog(config),
 		Recovery,
 	)(next)
 }

@@ -7,16 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/application"
-	appidentity "github.com/Medikong/services/services/auth-service/internal/application/identitymanagement"
-	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
-	"github.com/Medikong/services/services/auth-service/internal/domain/access"
 	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
 	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
 	"github.com/Medikong/services/services/auth-service/internal/domain/identity"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/domain/reauth"
-	sessiondomain "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	appstate "github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
 	"github.com/Medikong/services/services/auth-service/internal/security"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,11 +26,11 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 	userID, emailID, emailLinkID := uuid.New(), uuid.New(), uuid.New()
 	password := "correct horse battery staple"
 	seedEmailPrincipal(t, ctx, db, userID, emailID, emailLinkID, password)
-	keys := testOperatorKeys()
-	sessionRepository := sessiondomain.NewPostgresRepository(db)
-	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, access.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db))
+	keys := testOperatorKeys(t)
+	sessionRepository := appsession.NewPostgresRepository(db)
+	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, appstate.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db))
 	tx := beginDomainTx(t, ctx, db)
-	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web"})
+	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web", WebCSRFToken: "test-csrf-token"})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("issue initial web session: %v", err)
@@ -43,10 +40,10 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 	if err != nil {
 		t.Fatalf("parse session ID: %v", err)
 	}
-	service := appidentity.NewReauthService(db, keys, identity.NewPostgresRepository(db), reauth.NewPostgresRepository(db), sessionRepository, idempotency.NewPostgresRepository(db), sessionService, 5*time.Minute, 5*time.Minute)
-	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified", GrantVersion: 1}
+	service := reauth.NewReauthService(db, keys, identity.NewPostgresRepository(db), reauth.NewPostgresRepository(db), sessionRepository, idempotency.NewPostgresRepository(db), sessionService, 5*time.Minute, 5*time.Minute)
+	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified"}
 	key := uuid.NewString()
-	result, err := service.Reauthenticate(ctx, appidentity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: key, PreviousWebCookie: initial.WebCookie})
+	result, err := service.Reauthenticate(ctx, identity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: key, PreviousWebCookie: initial.WebCookie})
 	if err != nil {
 		t.Fatalf("reauthenticate: %v", err)
 	}
@@ -63,7 +60,7 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 	if newPrincipal.SessionID != sessionID || newPrincipal.Method != "email_password" {
 		t.Fatalf("unexpected rebound principal: %#v", newPrincipal)
 	}
-	replayed, err := service.Reauthenticate(ctx, appidentity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: key, PreviousWebCookie: initial.WebCookie})
+	replayed, err := service.Reauthenticate(ctx, identity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: key, PreviousWebCookie: initial.WebCookie})
 	if err != nil {
 		t.Fatalf("replay reauthentication: %v", err)
 	}
@@ -77,13 +74,13 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 	if recovered.Proof != result.Proof || recovered.Issued.WebCookie != result.Issued.WebCookie {
 		t.Fatal("recovery did not return the original reauthentication delivery")
 	}
-	if _, err := service.RecoverWebDelivery(ctx, initial.WebCookie, initial.CSRFToken, "replace_phone", password, uuid.NewString()); application.AsError(err).Code != "AUTH_SESSION_REQUIRED" {
+	if _, err := service.RecoverWebDelivery(ctx, initial.WebCookie, initial.CSRFToken, "replace_phone", password, uuid.NewString()); errorCode(err) != "AUTH_SESSION_REQUIRED" {
 		t.Fatalf("wrong recovery key error=%v", err)
 	}
 	if _, err := db.Exec(ctx, `UPDATE auth_session_credentials SET delivery_recovery_expires_at = now() - interval '1 second' WHERE secret_hash = $1`, keys.Hash(initial.WebCookie)); err != nil {
 		t.Fatalf("expire reauthentication delivery: %v", err)
 	}
-	if _, err := service.RecoverWebDelivery(ctx, initial.WebCookie, initial.CSRFToken, "replace_phone", password, key); application.AsError(err).Code != "AUTH_SESSION_DELIVERY_EXPIRED" {
+	if _, err := service.RecoverWebDelivery(ctx, initial.WebCookie, initial.CSRFToken, "replace_phone", password, key); errorCode(err) != "AUTH_SESSION_DELIVERY_EXPIRED" {
 		t.Fatalf("expired recovery error=%v", err)
 	}
 }
@@ -95,12 +92,12 @@ func TestMethodLinkStartReplaysBeforeConsumingProofAgain(t *testing.T) {
 	userID, emailID, emailLinkID := uuid.New(), uuid.New(), uuid.New()
 	password := "correct horse battery staple"
 	seedEmailPrincipal(t, ctx, db, userID, emailID, emailLinkID, password)
-	keys := testOperatorKeys()
-	sessionRepository := sessiondomain.NewPostgresRepository(db)
+	keys := testOperatorKeys(t)
+	sessionRepository := appsession.NewPostgresRepository(db)
 	idempotencyRepository := idempotency.NewPostgresRepository(db)
-	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, access.NewPostgresRepository(db), idempotencyRepository, outbox.NewPostgresRepository(db))
+	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, appstate.NewPostgresRepository(db), idempotencyRepository, outbox.NewPostgresRepository(db))
 	tx := beginDomainTx(t, ctx, db)
-	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web"})
+	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web", WebCSRFToken: "test-csrf-token"})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("issue session: %v", err)
@@ -110,15 +107,15 @@ func TestMethodLinkStartReplaysBeforeConsumingProofAgain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse session ID: %v", err)
 	}
-	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified", GrantVersion: 1}
-	reauthService := appidentity.NewReauthService(db, keys, identity.NewPostgresRepository(db), reauth.NewPostgresRepository(db), sessionRepository, idempotencyRepository, sessionService, 5*time.Minute, 5*time.Minute)
-	linkService := appidentity.NewLinkService(db, keys, reauthService, identity.NewPostgresRepository(db), challenge.NewPostgresRepository(db, challenge.PostgresOptions{}), sessionRepository, sessionService, idempotencyRepository, outbox.NewPostgresRepository(db), false, 10*time.Minute, 5*time.Minute)
-	reauthenticated, err := reauthService.Reauthenticate(ctx, appidentity.ReauthInput{Principal: principal, Purpose: "link_identity", Password: password, IdempotencyKey: uuid.NewString(), PreviousWebCookie: initial.WebCookie})
+	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified"}
+	reauthService := reauth.NewReauthService(db, keys, identity.NewPostgresRepository(db), reauth.NewPostgresRepository(db), sessionRepository, idempotencyRepository, sessionService, 5*time.Minute, 5*time.Minute)
+	linkService := identity.NewLinkService(db, keys, reauthService, identity.NewPostgresRepository(db), challenge.NewPostgresRepository(db, challenge.PostgresOptions{}), sessionRepository, sessionService, idempotencyRepository, outbox.NewPostgresRepository(db), false, 10*time.Minute, 5*time.Minute)
+	reauthenticated, err := reauthService.Reauthenticate(ctx, identity.ReauthInput{Principal: principal, Purpose: "link_identity", Password: password, IdempotencyKey: uuid.NewString(), PreviousWebCookie: initial.WebCookie})
 	if err != nil {
 		t.Fatalf("reauthenticate for link: %v", err)
 	}
 	key := uuid.NewString()
-	input := appidentity.StartLinkInput{Principal: principal, Phone: "+821098765432", Proof: reauthenticated.Proof, IdempotencyKey: key}
+	input := identity.StartLinkInput{Principal: principal, Phone: "+821098765432", Proof: reauthenticated.Proof, IdempotencyKey: key}
 	started, err := linkService.StartLink(ctx, input)
 	if err != nil {
 		t.Fatalf("start method link: %v", err)
@@ -130,8 +127,8 @@ func TestMethodLinkStartReplaysBeforeConsumingProofAgain(t *testing.T) {
 	if replayed.LinkID != started.LinkID || !replayed.ExpiresAt.Equal(started.ExpiresAt) || replayed.Existing {
 		t.Fatalf("method link start replay=%#v first=%#v", replayed, started)
 	}
-	_, err = linkService.StartLink(ctx, appidentity.StartLinkInput{Principal: principal, Phone: "+821011112222", Proof: reauthenticated.Proof, IdempotencyKey: key})
-	if appErr := application.AsError(err); appErr == nil || appErr.Code != "AUTH_IDEMPOTENCY_CONFLICT" {
+	_, err = linkService.StartLink(ctx, identity.StartLinkInput{Principal: principal, Phone: "+821011112222", Proof: reauthenticated.Proof, IdempotencyKey: key})
+	if errorCode(err) != "AUTH_IDEMPOTENCY_CONFLICT" {
 		t.Fatalf("method link start conflict error=%v", err)
 	}
 }
@@ -145,18 +142,18 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 	seedEmailPrincipal(t, ctx, db, userID, emailID, emailLinkID, password)
 	phoneID, phoneLinkID := uuid.New(), uuid.New()
 	seedPhoneLink(t, ctx, db, userID, phoneID, phoneLinkID, "+821012345678")
-	keys := testOperatorKeys()
+	keys := testOperatorKeys(t)
 	keys.VirtualKey = []byte("01234567890123456789012345678901")
-	sessionRepository := sessiondomain.NewPostgresRepository(db)
+	sessionRepository := appsession.NewPostgresRepository(db)
 	idempotencyRepository := idempotency.NewPostgresRepository(db)
-	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, access.NewPostgresRepository(db), idempotencyRepository, outbox.NewPostgresRepository(db))
+	sessionService := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessionRepository, appstate.NewPostgresRepository(db), idempotencyRepository, outbox.NewPostgresRepository(db))
 	tx := beginDomainTx(t, ctx, db)
-	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web"})
+	initial, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: emailID, IdentityLink: emailLinkID, Method: "registration_verified", Channel: "web", WebCSRFToken: "test-csrf-token"})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("issue initial session: %v", err)
 	}
-	other, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: phoneID, IdentityLink: phoneLinkID, Method: "phone_otp", Channel: "mobile"})
+	other, err := sessionService.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: phoneID, IdentityLink: phoneLinkID, Method: "phone_otp", Channel: "ios"})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("issue old phone session: %v", err)
@@ -172,16 +169,16 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 	}
 	identityRepository := identity.NewPostgresRepository(db)
 	challengeRepository := challenge.NewPostgresRepository(db, challenge.PostgresOptions{VirtualProjectionEnabled: true})
-	reauthService := appidentity.NewReauthService(db, keys, identityRepository, reauth.NewPostgresRepository(db), sessionRepository, idempotencyRepository, sessionService, 5*time.Minute, 5*time.Minute)
-	linkService := appidentity.NewLinkService(db, keys, reauthService, identityRepository, challengeRepository, sessionRepository, sessionService, idempotencyRepository, outbox.NewPostgresRepository(db), true, 10*time.Minute, 5*time.Minute)
-	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified", GrantVersion: 1}
+	reauthService := reauth.NewReauthService(db, keys, identityRepository, reauth.NewPostgresRepository(db), sessionRepository, idempotencyRepository, sessionService, 5*time.Minute, 5*time.Minute)
+	linkService := identity.NewLinkService(db, keys, reauthService, identityRepository, challengeRepository, sessionRepository, sessionService, idempotencyRepository, outbox.NewPostgresRepository(db), true, 10*time.Minute, 5*time.Minute)
+	principal := appsession.Principal{Authenticated: true, SessionID: sessionID, UserID: userID, Channel: "web", Method: "registration_verified"}
 	reauthKey := uuid.NewString()
-	reauthenticated, err := reauthService.Reauthenticate(ctx, appidentity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: reauthKey, PreviousWebCookie: initial.WebCookie})
+	reauthenticated, err := reauthService.Reauthenticate(ctx, identity.ReauthInput{Principal: principal, Purpose: "replace_phone", Password: password, IdempotencyKey: reauthKey, PreviousWebCookie: initial.WebCookie})
 	if err != nil {
 		t.Fatalf("reauthenticate before phone replacement: %v", err)
 	}
 	startKey := uuid.NewString()
-	startInput := appidentity.ReplacementInput{Principal: principal, Phone: "+821098765432", Proof: reauthenticated.Proof, IdempotencyKey: startKey}
+	startInput := identity.ReplacementInput{Principal: principal, Phone: "+821098765432", Proof: reauthenticated.Proof, IdempotencyKey: startKey}
 	started, err := linkService.StartReplacement(ctx, startInput)
 	if err != nil {
 		t.Fatalf("start replacement: %v", err)
@@ -193,11 +190,11 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 	if startReplay.LinkID != started.LinkID || !startReplay.ExpiresAt.Equal(started.ExpiresAt) {
 		t.Fatalf("same start key did not replay the original link: %#v != %#v", startReplay, started)
 	}
-	_, err = linkService.StartReplacement(ctx, appidentity.ReplacementInput{Principal: principal, Phone: "+821011112222", Proof: reauthenticated.Proof, IdempotencyKey: startKey})
-	if appErr := application.AsError(err); appErr == nil || appErr.Code != "AUTH_IDEMPOTENCY_CONFLICT" {
+	_, err = linkService.StartReplacement(ctx, identity.ReplacementInput{Principal: principal, Phone: "+821011112222", Proof: reauthenticated.Proof, IdempotencyKey: startKey})
+	if errorCode(err) != "AUTH_IDEMPOTENCY_CONFLICT" {
 		t.Fatalf("replacement start conflict error=%v", err)
 	}
-	issued, err := linkService.IssuePhoneReplacement(ctx, appidentity.IssueLinkInput{Principal: principal, LinkID: started.LinkID, IdempotencyKey: uuid.NewString()})
+	issued, err := linkService.IssuePhoneReplacement(ctx, identity.IssueLinkInput{Principal: principal, LinkID: started.LinkID, IdempotencyKey: uuid.NewString()})
 	if err != nil {
 		t.Fatalf("issue replacement challenge: %v", err)
 	}
@@ -220,7 +217,7 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 		t.Fatal("invalid virtual code length")
 	}
 	key := uuid.NewString()
-	completed, err := linkService.CompletePhoneReplacement(ctx, appidentity.CompleteLinkInput{Principal: principal, LinkID: started.LinkID, ChallengeID: issued.ChallengeID, Code: code, IdempotencyKey: key, PreviousWebCookie: reauthenticated.Issued.WebCookie})
+	completed, err := linkService.CompletePhoneReplacement(ctx, identity.CompleteLinkInput{Principal: principal, LinkID: started.LinkID, ChallengeID: issued.ChallengeID, Code: code, IdempotencyKey: key, PreviousWebCookie: reauthenticated.Issued.WebCookie})
 	if err != nil {
 		t.Fatalf("complete replacement: %v", err)
 	}
@@ -233,14 +230,14 @@ func TestPhoneReplacementKeepsReauthenticatedSessionAndReplaysDelivery(t *testin
 	if current, err := sessionService.Authenticate(ctx, completed.Issued.WebCookie, ""); err != nil || current.SessionID != sessionID || current.Method != "email_password" {
 		t.Fatalf("current rebound session=%#v err=%v", current, err)
 	}
-	replayed, err := linkService.CompletePhoneReplacement(ctx, appidentity.CompleteLinkInput{Principal: principal, LinkID: started.LinkID, ChallengeID: issued.ChallengeID, Code: code, IdempotencyKey: key, PreviousWebCookie: reauthenticated.Issued.WebCookie})
+	replayed, err := linkService.CompletePhoneReplacement(ctx, identity.CompleteLinkInput{Principal: principal, LinkID: started.LinkID, ChallengeID: issued.ChallengeID, Code: code, IdempotencyKey: key, PreviousWebCookie: reauthenticated.Issued.WebCookie})
 	if err != nil {
 		t.Fatalf("replay replacement: %v", err)
 	}
 	if replayed.Issued.WebCookie != completed.Issued.WebCookie || replayed.LinkID != completed.LinkID {
 		t.Fatal("same replacement key did not replay the original delivery")
 	}
-	recovered, err := linkService.RecoverPhoneReplacementWebDelivery(ctx, reauthenticated.Issued.WebCookie, reauthenticated.Issued.CSRFToken, started.LinkID, issued.ChallengeID, code, key)
+	recovered, err := linkService.RecoverPhoneReplacementWebDelivery(ctx, reauthenticated.Issued.WebCookie, initial.CSRFToken, started.LinkID, issued.ChallengeID, code, key)
 	if err != nil {
 		t.Fatalf("recover replacement delivery: %v", err)
 	}
@@ -292,14 +289,8 @@ func seedEmailPrincipal(t *testing.T, ctx context.Context, db *pgxpool.Pool, use
 	`, uuid.New(), identityID, hash); err != nil {
 		t.Fatalf("seed password credential: %v", err)
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO auth_user_auth_states (user_id,status,restriction_version,effective_at) VALUES ($1,'active',1,now())`, userID); err != nil {
+	if _, err := db.Exec(ctx, `INSERT INTO auth_user_auth_states (user_id,status,user_version,status_change_id,effective_at) VALUES ($1,'active',1,$2,now())`, userID, uuid.NewString()); err != nil {
 		t.Fatalf("seed email state: %v", err)
-	}
-	if _, err := db.Exec(ctx, `
-		INSERT INTO auth_access_grants (access_grant_id,user_id,roles,permissions,grant_version,grant_status,source,source_revision,valid_from)
-		VALUES ($1,$2,ARRAY['customer'],ARRAY[]::text[],1,'active','test','test',now())
-	`, uuid.New(), userID); err != nil {
-		t.Fatalf("seed email grant: %v", err)
 	}
 }
 

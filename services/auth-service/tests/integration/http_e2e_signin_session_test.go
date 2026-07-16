@@ -3,11 +3,11 @@
 package integration_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -48,6 +48,11 @@ type httpE2ESessionData struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
+type httpE2EAccessData struct {
+	AccessToken          string    `json:"accessToken"`
+	AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+}
+
 type httpE2ETokenData struct {
 	AccessToken           string    `json:"accessToken"`
 	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`
@@ -61,6 +66,7 @@ type httpE2EAuthenticationData struct {
 	CSRFToken          string             `json:"csrfToken"`
 	CredentialDelivery string             `json:"credentialDelivery"`
 	Session            httpE2ESessionData `json:"session"`
+	Access             httpE2EAccessData  `json:"access"`
 	Tokens             httpE2ETokenData   `json:"tokens"`
 	Next               httpE2ENext        `json:"next"`
 }
@@ -87,17 +93,20 @@ type httpE2EPasswordResetVerifyData struct {
 }
 
 type httpE2ERefreshData struct {
-	SessionID             string    `json:"sessionId"`
-	AccessToken           string    `json:"accessToken"`
-	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`
-	RefreshToken          string    `json:"refreshToken"`
-	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"`
+	CredentialDelivery    string             `json:"credentialDelivery"`
+	Session               httpE2ESessionData `json:"session"`
+	Access                httpE2EAccessData  `json:"access"`
+	Tokens                httpE2ETokenData   `json:"tokens"`
+	SessionID             string             `json:"-"`
+	AccessToken           string             `json:"-"`
+	AccessTokenExpiresAt  time.Time          `json:"-"`
+	RefreshToken          string             `json:"-"`
+	RefreshTokenExpiresAt time.Time          `json:"-"`
 }
 
 type httpE2EContextData struct {
 	Authenticated     bool                  `json:"authenticated"`
 	UserID            string                `json:"userId"`
-	Roles             []string              `json:"roles"`
 	Session           httpE2EContextSession `json:"session"`
 	LinkedMethodTypes []string              `json:"linkedMethodTypes"`
 	CSRFToken         string                `json:"csrfToken"`
@@ -116,8 +125,30 @@ type httpE2EConcurrentResult struct {
 	err      error
 }
 
-func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
+func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 	harness := newProductionHTTPHarness(t)
+	t.Run("JWKS active key and conditional cache", func(t *testing.T) {
+		response := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/.well-known/jwks.json"})
+		if response.status != http.StatusOK || !strings.HasPrefix(response.header.Get("Cache-Control"), "public, max-age=") || response.header.Get("ETag") == "" || response.header.Get("Content-Type") != "application/json" {
+			t.Fatal("JWKS response headers do not match the public cache behavior")
+		}
+		var document struct {
+			Keys []struct {
+				KeyID     string `json:"kid"`
+				Algorithm string `json:"alg"`
+				Use       string `json:"use"`
+				Modulus   string `json:"n"`
+				Exponent  string `json:"e"`
+			} `json:"keys"`
+		}
+		if err := json.Unmarshal(response.body, &document); err != nil || len(document.Keys) != 1 || document.Keys[0].KeyID != "http-e2e-key" || document.Keys[0].Algorithm != "RS256" || document.Keys[0].Use != "sig" || document.Keys[0].Modulus == "" || document.Keys[0].Exponent == "" {
+			t.Fatal("JWKS active public key is incomplete")
+		}
+		cached := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/.well-known/jwks.json", Headers: http.Header{"If-None-Match": {response.header.Get("ETag")}}})
+		if cached.status != http.StatusNotModified || len(cached.body) != 0 {
+			t.Fatal("JWKS conditional request did not return 304")
+		}
+	})
 	userID, emailID, emailLinkID := uuid.New(), uuid.New(), uuid.New()
 	phoneID, phoneLinkID := uuid.New(), uuid.New()
 	email := "email-" + emailID.String() + "@example.test"
@@ -125,7 +156,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 	seedPhoneLink(t, harness.ctx, harness.db, userID, phoneID, phoneLinkID, httpE2EPhone)
 
 	if !t.Run("API.A.300-07", func(t *testing.T) {
-		wrongFlow := createHTTPPreAuth(t, harness, "mobile")
+		wrongFlow := createHTTPPreAuth(t, harness, "ios")
 		wrong := harness.do(httpE2ERequest{
 			Method: http.MethodPost,
 			Path:   "/api/v1/auth/signins/email",
@@ -138,7 +169,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: wrongFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, wrong, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		decodeHTTPError(t, wrong, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
 		assertResponseOmits(t, wrong, email, httpE2EWrongPassword, wrongFlow.authFlowToken)
 
 		webFlow := createHTTPPreAuth(t, harness, "web")
@@ -146,7 +177,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		assertWebAuthenticationDelivery(t, webResponse, webData, false)
 		assertResponseOmits(t, webResponse, email, httpE2EInitialPassword)
 
-		mobileFlow := createHTTPPreAuth(t, harness, "mobile")
+		mobileFlow := createHTTPPreAuth(t, harness, "ios")
 		mobileResponse, mobileData := signInEmailHTTP(t, harness, mobileFlow, email, httpE2EInitialPassword, true)
 		assertMobileAuthenticationDelivery(t, mobileResponse, mobileData)
 		assertResponseOmits(t, mobileResponse, email, httpE2EInitialPassword)
@@ -157,7 +188,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 	var phoneFlow httpE2EPreAuth
 	var phoneChallengeID, phoneCode string
 	if !t.Run("API.A.300-08", func(t *testing.T) {
-		phoneFlow = createHTTPPreAuth(t, harness, "mobile")
+		phoneFlow = createHTTPPreAuth(t, harness, "ios")
 		invalid := harness.do(httpE2ERequest{
 			Method: http.MethodPost,
 			Path:   "/api/v1/auth/signins/phone/challenges",
@@ -169,7 +200,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: phoneFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+		decodeHTTPError(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 		assertResponseOmits(t, invalid, httpE2EPhone, phoneFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -204,7 +235,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: phoneFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, wrong, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
+		decodeHTTPError(t, wrong, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
 		assertResponseOmits(t, wrong, httpE2EPhone, phoneCode, wrongCode, phoneFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -225,7 +256,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 	var resetFlow httpE2EPreAuth
 	var passwordResetID string
 	if !t.Run("API.A.300-10", func(t *testing.T) {
-		resetFlow = createHTTPPreAuth(t, harness, "mobile")
+		resetFlow = createHTTPPreAuth(t, harness, "ios")
 		invalid := harness.do(httpE2ERequest{
 			Method: http.MethodPost,
 			Path:   "/api/v1/auth/password-resets",
@@ -236,7 +267,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: resetFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+		decodeHTTPError(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 		assertResponseOmits(t, invalid, email, resetFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -269,7 +300,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: resetFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+		decodeHTTPError(t, invalid, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 		assertResponseOmits(t, invalid, email, resetFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -301,7 +332,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: resetFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, wrong, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
+		decodeHTTPError(t, wrong, http.StatusBadRequest, "AUTH_CHALLENGE_FAILED")
 		assertResponseOmits(t, wrong, email, resetCode, wrongCode, resetFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -337,7 +368,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: resetFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, weak, http.StatusUnprocessableEntity, "AUTH_PASSWORD_POLICY_NOT_MET")
+		decodeHTTPError(t, weak, http.StatusUnprocessableEntity, "AUTH_PASSWORD_POLICY_NOT_MET")
 		assertResponseOmits(t, weak, email, resetCode, resetGrant, weakPassword, resetFlow.authFlowToken)
 
 		response := harness.do(httpE2ERequest{
@@ -355,7 +386,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		assertHTTPNoContent(t, response, http.StatusNoContent)
 		assertResponseOmits(t, response, email, resetCode, resetGrant, httpE2ENewPassword, resetFlow.authFlowToken)
 
-		verificationFlow := createHTTPPreAuth(t, harness, "mobile")
+		verificationFlow := createHTTPPreAuth(t, harness, "ios")
 		oldPassword := harness.do(httpE2ERequest{
 			Method: http.MethodPost,
 			Path:   "/api/v1/auth/signins/email",
@@ -368,7 +399,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: verificationFlow.credentials(harness.origin),
 		})
-		decodeHTTPProblem(t, oldPassword, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		decodeHTTPError(t, oldPassword, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
 		assertResponseOmits(t, oldPassword, email, httpE2EInitialPassword, verificationFlow.authFlowToken)
 
 		newPassword, data := signInEmailHTTP(t, harness, verificationFlow, email, httpE2ENewPassword, false)
@@ -391,7 +422,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		assertResponseOmits(t, secondResponse, postResetMobile.Tokens.RefreshToken)
 		refreshedForLogout = first
 
-		_, concurrentSession := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "mobile"), email, httpE2ENewPassword, false)
+		_, concurrentSession := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "ios"), email, httpE2ENewPassword, false)
 		assertMobileAuthenticationDelivery(t, nil, concurrentSession)
 		concurrentKey := uuid.NewString()
 		const requestCount = 4
@@ -419,6 +450,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			}
 			var data httpE2ERefreshData
 			decodeHTTPEnvelope(t, result.response, http.StatusOK, &data)
+			normalizeHTTPRefresh(&data)
 			assertCompleteHTTPRefresh(t, data)
 			assertResponseOmits(t, result.response, concurrentSession.Tokens.RefreshToken)
 			if concurrentFirst == nil {
@@ -434,13 +466,46 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		}
 
 		reuse := harness.do(httpE2ERequest{
+			Method:      http.MethodPost,
+			Path:        "/api/v1/auth/sessions/refresh",
+			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
+			Credentials: httpE2ECredentials{RefreshToken: concurrentSession.Tokens.RefreshToken},
+		})
+		decodeHTTPError(t, reuse, http.StatusUnauthorized, "AUTH_SESSION_REVOKED")
+		assertResponseOmits(t, reuse, concurrentSession.Tokens.RefreshToken)
+
+		webFlow := createHTTPPreAuth(t, harness, "web")
+		webSignInResponse, webSession := signInEmailHTTP(t, harness, webFlow, email, httpE2ENewPassword, true)
+		oldCookie := responseCookie(t, webSignInResponse, "__Host-dm_refresh")
+		webKey := uuid.NewString()
+		webRequest := httpE2ERequest{
 			Method:  http.MethodPost,
 			Path:    "/api/v1/auth/sessions/refresh",
-			JSON:    map[string]any{"refreshToken": concurrentSession.Tokens.RefreshToken},
-			Headers: idempotencyHTTPHeaders(uuid.NewString()),
-		})
-		decodeHTTPProblem(t, reuse, http.StatusUnauthorized, "AUTH_SESSION_REVOKED")
-		assertResponseOmits(t, reuse, concurrentSession.Tokens.RefreshToken)
+			Headers: idempotencyHTTPHeaders(webKey),
+			Credentials: httpE2ECredentials{
+				SessionCookie: oldCookie, CSRFToken: webSession.CSRFToken, Origin: harness.origin,
+			},
+		}
+		webFirstResponse := harness.do(webRequest)
+		var webFirst httpE2ERefreshData
+		decodeHTTPEnvelope(t, webFirstResponse, http.StatusOK, &webFirst)
+		normalizeHTTPRefresh(&webFirst)
+		if webFirst.CredentialDelivery != "web_jwt_refresh_cookie" || webFirst.SessionID == "" || webFirst.AccessToken == "" || !webFirst.RefreshTokenExpiresAt.IsZero() {
+			t.Fatal("web refresh response is incomplete")
+		}
+		newCookie := responseCookie(t, webFirstResponse, "__Host-dm_refresh")
+		assertCredentialCookie(t, newCookie, "__Host-dm_refresh")
+		webReplayResponse := harness.do(webRequest)
+		var webReplay httpE2ERefreshData
+		decodeHTTPEnvelope(t, webReplayResponse, http.StatusOK, &webReplay)
+		normalizeHTTPRefresh(&webReplay)
+		replayedCookie := responseCookie(t, webReplayResponse, "__Host-dm_refresh")
+		if !sameHTTPRefresh(webFirst, webReplay) || replayedCookie.Value != newCookie.Value {
+			t.Fatal("web refresh replay changed the original credential delivery")
+		}
+		webReuseRequest := webRequest
+		webReuseRequest.Headers = idempotencyHTTPHeaders(uuid.NewString())
+		decodeHTTPError(t, harness.do(webReuseRequest), http.StatusUnauthorized, "AUTH_SESSION_REVOKED")
 	}) {
 		t.FailNow()
 	}
@@ -452,7 +517,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			RawJSON:     []byte(`{}`),
 			Credentials: httpE2ECredentials{RefreshToken: refreshedForLogout.RefreshToken},
 		})
-		decodeHTTPProblem(t, missingKey, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+		decodeHTTPError(t, missingKey, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 		assertResponseOmits(t, missingKey, refreshedForLogout.RefreshToken)
 		invalidKey := harness.do(httpE2ERequest{
 			Method:      http.MethodPost,
@@ -461,16 +526,15 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders("not-a-uuid"),
 			Credentials: httpE2ECredentials{RefreshToken: refreshedForLogout.RefreshToken},
 		})
-		decodeHTTPProblem(t, invalidKey, http.StatusBadRequest, "AUTH_INPUT_INVALID")
+		decodeHTTPError(t, invalidKey, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 		assertResponseOmits(t, invalidKey, refreshedForLogout.RefreshToken)
 
 		for _, test := range []struct {
-			name   string
-			body   []byte
-			reason string
+			name string
+			body []byte
 		}{
-			{name: "unknown field", body: []byte(`{"unexpected":true}`), reason: "additional_property"},
-			{name: "trailing value", body: []byte(`{} {}`), reason: "trailing_data"},
+			{name: "unknown field", body: []byte(`{"unexpected":true}`)},
+			{name: "trailing value", body: []byte(`{} {}`)},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				response := harness.do(httpE2ERequest{
@@ -480,10 +544,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 					Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 					Credentials: httpE2ECredentials{RefreshToken: refreshedForLogout.RefreshToken},
 				})
-				problem := decodeHTTPProblem(t, response, http.StatusBadRequest, "AUTH_INPUT_INVALID")
-				if len(problem.Violations) != 1 || problem.Violations[0].Reason != test.reason {
-					t.Fatal("logout strict JSON error does not identify the contract violation")
-				}
+				decodeHTTPError(t, response, http.StatusBadRequest, "AUTH_INPUT_INVALID")
 				assertResponseOmits(t, response, refreshedForLogout.RefreshToken)
 			})
 		}
@@ -508,10 +569,10 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(logoutKey),
 			Credentials: httpE2ECredentials{RefreshToken: postResetMobile.Tokens.RefreshToken},
 		})
-		decodeHTTPProblem(t, conflict, http.StatusConflict, "AUTH_IDEMPOTENCY_CONFLICT")
+		decodeHTTPError(t, conflict, http.StatusConflict, "AUTH_IDEMPOTENCY_CONFLICT")
 		assertResponseOmits(t, conflict, postResetMobile.Tokens.RefreshToken)
 
-		otherMobileResponse, otherMobile := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "mobile"), email, httpE2ENewPassword, false)
+		otherMobileResponse, otherMobile := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "ios"), email, httpE2ENewPassword, false)
 		assertMobileAuthenticationDelivery(t, otherMobileResponse, otherMobile)
 		independentScope := harness.do(httpE2ERequest{
 			Method:      http.MethodPost,
@@ -529,12 +590,12 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
 			Credentials: httpE2ECredentials{RefreshToken: "invalid-refresh-credential"},
 		})
-		decodeHTTPProblem(t, missing, http.StatusUnauthorized, "AUTH_SESSION_REQUIRED")
+		decodeHTTPError(t, missing, http.StatusUnauthorized, "AUTH_SESSION_REQUIRED")
 		assertResponseOmits(t, missing, "invalid-refresh-credential")
 
 		webResponse, web := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "web"), email, httpE2ENewPassword, true)
 		assertWebAuthenticationDelivery(t, webResponse, web, true)
-		webCookie := responseCookie(t, webResponse, "__Host-dm_session")
+		webCookie := responseCookie(t, webResponse, "__Host-dm_refresh")
 		missingCSRF := harness.do(httpE2ERequest{
 			Method:  http.MethodPost,
 			Path:    "/api/v1/auth/sessions/logout",
@@ -544,7 +605,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 				Origin:        harness.origin,
 			},
 		})
-		decodeHTTPProblem(t, missingCSRF, http.StatusForbidden, "AUTH_CSRF_INVALID")
+		decodeHTTPError(t, missingCSRF, http.StatusForbidden, "AUTH_CSRF_INVALID")
 		assertResponseOmits(t, missingCSRF, webCookie.Value, web.CSRFToken)
 
 		webLogoutRequest := httpE2ERequest{
@@ -559,24 +620,31 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		}
 		webLogout := harness.do(webLogoutRequest)
 		assertHTTPNoContent(t, webLogout, http.StatusNoContent)
-		clearedResponseCookie(t, webLogout, "__Host-dm_session")
+		clearedResponseCookie(t, webLogout, "__Host-dm_refresh")
 		assertResponseOmits(t, webLogout, webCookie.Value, web.CSRFToken)
 		webLogoutReplay := harness.do(webLogoutRequest)
 		assertHTTPNoContent(t, webLogoutReplay, http.StatusNoContent)
-		clearedResponseCookie(t, webLogoutReplay, "__Host-dm_session")
+		clearedResponseCookie(t, webLogoutReplay, "__Host-dm_refresh")
 	}) {
 		t.FailNow()
 	}
 
 	if !t.Run("API.A.300-16", func(t *testing.T) {
-		anonymous := harness.do(httpE2ERequest{Method: http.MethodGet, Path: "/api/v1/auth/context"})
-		var anonymousData httpE2EContextData
-		decodeHTTPEnvelope(t, anonymous, http.StatusOK, &anonymousData)
-		if anonymousData.Authenticated || anonymous.header.Get("Vary") != "Cookie, Authorization" {
-			t.Fatal("anonymous auth context does not match the contract")
+		anonymous := harness.do(httpE2ERequest{
+			Method: http.MethodGet,
+			Path:   "/api/v1/auth/context",
+			Headers: http.Header{
+				"X-User-Id":    []string{uuid.NewString()},
+				"X-Session-Id": []string{uuid.NewString()},
+				"X-Token-Id":   []string{uuid.NewString()},
+			},
+		})
+		decodeHTTPError(t, anonymous, http.StatusUnauthorized, "AUTH_SESSION_REQUIRED")
+		if anonymous.header.Get("Vary") != "Cookie, Authorization" {
+			t.Fatal("unauthenticated auth context is missing the Vary header")
 		}
 
-		mobileResponse, mobile := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "mobile"), email, httpE2ENewPassword, false)
+		mobileResponse, mobile := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "ios"), email, httpE2ENewPassword, false)
 		assertMobileAuthenticationDelivery(t, mobileResponse, mobile)
 		bearer := harness.do(httpE2ERequest{
 			Method:      http.MethodGet,
@@ -585,22 +653,17 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 		})
 		var bearerData httpE2EContextData
 		decodeHTTPEnvelope(t, bearer, http.StatusOK, &bearerData)
-		assertAuthenticatedHTTPContext(t, bearer, bearerData, userID.String(), "mobile")
+		assertAuthenticatedHTTPContext(t, bearer, bearerData, userID.String(), "ios")
 
 		webResponse, web := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "web"), email, httpE2ENewPassword, false)
 		assertWebAuthenticationDelivery(t, webResponse, web, false)
-		webCookie := responseCookie(t, webResponse, "__Host-dm_session")
+		webCookie := responseCookie(t, webResponse, "__Host-dm_refresh")
 		webContext := harness.do(httpE2ERequest{
 			Method:      http.MethodGet,
 			Path:        "/api/v1/auth/context",
 			Credentials: httpE2ECredentials{SessionCookie: webCookie},
 		})
-		var webData httpE2EContextData
-		decodeHTTPEnvelope(t, webContext, http.StatusOK, &webData)
-		assertAuthenticatedHTTPContext(t, webContext, webData, userID.String(), "web")
-		if webData.CSRFToken == "" || webData.CSRFToken != web.CSRFToken {
-			t.Fatal("web auth context is missing the session-bound CSRF token")
-		}
+		decodeHTTPError(t, webContext, http.StatusUnauthorized, "AUTH_SESSION_REQUIRED")
 
 		multiple := harness.do(httpE2ERequest{
 			Method: http.MethodGet,
@@ -610,7 +673,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionContracts(t *testing.T) {
 				AccessToken:   mobile.Tokens.AccessToken,
 			},
 		})
-		decodeHTTPProblem(t, multiple, http.StatusBadRequest, "AUTH_MULTIPLE_CREDENTIALS")
+		decodeHTTPError(t, multiple, http.StatusBadRequest, "AUTH_MULTIPLE_CREDENTIALS")
 		if multiple.header.Get("Vary") != "Cookie, Authorization" {
 			t.Fatal("multiple-credential auth context is missing the Vary header")
 		}
@@ -651,7 +714,7 @@ func createHTTPPreAuth(t *testing.T, harness *httpE2EHarness, channel string) ht
 		}
 		return result
 	}
-	if channel != "mobile" || result.authFlowToken == "" || result.csrfToken != "" || len(response.cookies) != 0 {
+	if channel != "ios" || result.authFlowToken == "" || result.csrfToken != "" || len(response.cookies) != 0 {
 		t.Fatal("mobile authentication intent used the wrong credential delivery")
 	}
 	return result
@@ -680,6 +743,9 @@ func signInEmailHTTP(t *testing.T, harness *httpE2EHarness, flow httpE2EPreAuth,
 	})
 	var data httpE2EAuthenticationData
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
+	if flow.channel == "web" {
+		data.CSRFToken = flow.csrfToken
+	}
 	return response, data
 }
 
@@ -688,11 +754,11 @@ func assertWebAuthenticationDelivery(t *testing.T, response *httpE2EResponse, da
 	if response == nil {
 		t.Fatal("web authentication response is nil")
 	}
-	if data.CredentialDelivery != "web_session" || data.UserID == "" || data.SessionID == "" || data.CSRFToken == "" || data.Next.Path == "" {
+	if data.CredentialDelivery != "web_jwt_refresh_cookie" || data.UserID == "" || data.Session.SessionID == "" || data.Session.ExpiresAt.IsZero() || data.Access.AccessToken == "" || data.Access.AccessTokenExpiresAt.IsZero() || data.CSRFToken == "" || data.Next.Path == "" {
 		t.Fatal("web authentication response is incomplete")
 	}
-	sessionCookie := responseCookie(t, response, "__Host-dm_session")
-	assertCredentialCookie(t, sessionCookie, "__Host-dm_session")
+	sessionCookie := responseCookie(t, response, "__Host-dm_refresh")
+	assertCredentialCookie(t, sessionCookie, "__Host-dm_refresh")
 	clearedResponseCookie(t, response, "__Host-dm_auth")
 	if (!rememberMe && sessionCookie.MaxAge != 0) || (rememberMe && sessionCookie.MaxAge <= 0) {
 		t.Fatal("web session cookie persistence does not match rememberMe")
@@ -715,13 +781,14 @@ func assertMobileAuthenticationDelivery(t *testing.T, response *httpE2EResponse,
 func refreshHTTP(t *testing.T, harness *httpE2EHarness, refreshToken, idempotencyKey string) (*httpE2EResponse, httpE2ERefreshData) {
 	t.Helper()
 	response := harness.do(httpE2ERequest{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/auth/sessions/refresh",
-		JSON:    map[string]any{"refreshToken": refreshToken},
-		Headers: idempotencyHTTPHeaders(idempotencyKey),
+		Method:      http.MethodPost,
+		Path:        "/api/v1/auth/sessions/refresh",
+		Headers:     idempotencyHTTPHeaders(idempotencyKey),
+		Credentials: httpE2ECredentials{RefreshToken: refreshToken},
 	})
 	var data httpE2ERefreshData
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
+	normalizeHTTPRefresh(&data)
 	assertCompleteHTTPRefresh(t, data)
 	return response, data
 }
@@ -729,18 +796,14 @@ func refreshHTTP(t *testing.T, harness *httpE2EHarness, refreshToken, idempotenc
 // concurrentRefreshHTTP intentionally avoids testing.T so worker goroutines
 // can report failures back to the test goroutine without calling FailNow.
 func concurrentRefreshHTTP(harness *httpE2EHarness, refreshToken, idempotencyKey string) (*httpE2EResponse, error) {
-	body, err := json.Marshal(map[string]any{"refreshToken": refreshToken})
-	if err != nil {
-		return nil, errors.New("encode concurrent refresh request")
-	}
 	requestID := uuid.NewString()
-	request, err := http.NewRequestWithContext(harness.ctx, http.MethodPost, harness.baseURL+"/api/v1/auth/sessions/refresh", bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(harness.ctx, http.MethodPost, harness.baseURL+"/api/v1/auth/sessions/refresh", nil)
 	if err != nil {
 		return nil, errors.New("create concurrent refresh request")
 	}
-	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Idempotency-Key", idempotencyKey)
 	request.Header.Set("X-Request-Id", requestID)
+	request.Header.Set("X-Refresh-Token", refreshToken)
 	response, err := harness.client.Do(request)
 	if err != nil {
 		return nil, errors.New("execute concurrent refresh request")
@@ -767,13 +830,24 @@ func assertCompleteHTTPRefresh(t *testing.T, data httpE2ERefreshData) {
 	}
 }
 
+func normalizeHTTPRefresh(data *httpE2ERefreshData) {
+	data.SessionID = data.Session.SessionID
+	if data.CredentialDelivery == "web_jwt_refresh_cookie" {
+		data.AccessToken = data.Access.AccessToken
+		data.AccessTokenExpiresAt = data.Access.AccessTokenExpiresAt
+		return
+	}
+	data.AccessToken, data.AccessTokenExpiresAt = data.Tokens.AccessToken, data.Tokens.AccessTokenExpiresAt
+	data.RefreshToken, data.RefreshTokenExpiresAt = data.Tokens.RefreshToken, data.Tokens.RefreshTokenExpiresAt
+}
+
 func sameHTTPRefresh(left, right httpE2ERefreshData) bool {
 	return left.SessionID == right.SessionID && left.AccessToken == right.AccessToken && left.RefreshToken == right.RefreshToken && left.AccessTokenExpiresAt.Equal(right.AccessTokenExpiresAt) && left.RefreshTokenExpiresAt.Equal(right.RefreshTokenExpiresAt)
 }
 
 func assertAuthenticatedHTTPContext(t *testing.T, response *httpE2EResponse, data httpE2EContextData, userID, channel string) {
 	t.Helper()
-	if !data.Authenticated || data.UserID != userID || len(data.Roles) == 0 || data.Session.SessionID == "" || data.Session.Channel != channel || data.Session.AuthenticationMethod == "" || data.Session.AuthenticatedAt.IsZero() || data.Session.ExpiresAt.IsZero() {
+	if !data.Authenticated || data.UserID != userID || data.Session.SessionID == "" || data.Session.Channel != channel || data.Session.AuthenticationMethod == "" || data.Session.AuthenticatedAt.IsZero() || data.Session.ExpiresAt.IsZero() {
 		t.Fatal("authenticated context response is incomplete")
 	}
 	if response.header.Get("Vary") != "Cookie, Authorization" {

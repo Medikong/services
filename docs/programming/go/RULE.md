@@ -29,7 +29,7 @@
 
 ## 핵심 원칙
 
-- 레이어 경계를 지킵니다. composition root는 의존성을 조립하고, service는 role interface와 repository interface만 사용하며, storage, message broker, provider 구현 세부사항은 service로 새지 않게 합니다.
+- 책임 경계를 지킵니다. composition root는 의존성을 조립하고, 도메인 service는 role interface와 repository interface만 사용하며, storage, message broker, provider 구현 세부사항은 service로 새지 않게 합니다.
 - 공통 기능은 `packages/go-*` 아래에 둡니다. 서비스 루트 바로 아래에 임의 공통 패키지를 만들지 않습니다.
 - 변경 범위는 좁게 유지합니다. 현재 경계 안에서 해결할 수 있는 요청에 불필요한 대형 리팩터링을 붙이지 않습니다.
 - 실패를 빈 성공처럼 숨기지 않습니다. unsupported capability, route 없음, remote error, storage error, invalid input은 명시적인 error로 반환하고, 가능한 경우 service, domain, operation, resource id, provider, status 맥락을 포함합니다.
@@ -50,16 +50,21 @@
 ## 도메인 기반 패키지 구조
 
 - 기본 구조는 계층형 `model/`, `service/`, `repository/`, `store/` 폴더가 아니라 도메인 단위 패키지입니다.
-- `internal` 바로 아래 1차 레벨은 `app`, `transport`, `domain`, `platform`, `common`을 기본으로 합니다.
+- 폴더와 패키지는 기술 계층이 아니라 의존 관계와 도메인 경계를 나타냅니다. `controller.go`, `service.go`, `repository.go` 같은 파일 역할을 같은 이름의 공용 패키지로 모으지 않습니다.
+- `internal` 바로 아래 1차 레벨은 `app`, `domain`, `platform`, `common`을 기본으로 합니다. `transport`는 기본 패키지가 아닙니다.
 - `internal/app`은 composition root입니다. dependency wiring만 담당하고 도메인 로직을 넣지 않습니다.
-- `internal/transport`는 HTTP, gRPC, worker 같은 입출력 경계만 담당합니다. 비즈니스 규칙은 handler에 두지 않습니다.
-- `internal/domain`은 서비스 내부 도메인 규칙, use case, repository port, 도메인이 소유한 persistence/message adapter를 함께 둡니다.
+- `internal/domain`은 서비스 내부 도메인 규칙, use case, controller, route, repository port와 도메인이 소유한 persistence/message adapter를 함께 둡니다.
+- 각 도메인은 자신의 HTTP route와 controller를 직접 소유합니다. gRPC service나 message consumer가 필요할 때도 같은 도메인 패키지에 둡니다.
+- 중앙 router 패키지에서 모든 도메인 controller를 나열하거나 API 경로를 대신 등록하지 않습니다. 각 도메인은 `routes.go` 같은 파일로 자신의 method와 path를 controller에 연결합니다.
+- `internal/app`은 공통 HTTP router나 worker runtime을 만들고 도메인별 등록 함수를 호출할 수 있지만, method, path, request/response 변환과 업무 규칙을 직접 구현하지 않습니다.
+- HTTP 서버 설정과 공통 middleware는 표준 라이브러리와 `packages/go-platform` 구현을 먼저 사용합니다. broker client, connection policy처럼 서비스별 통합 정책이 필요한 실행 기술만 `internal/platform`에 둡니다.
+- `internal/transport/http`, `internal/transport/grpc`, `internal/transport/worker`처럼 전달 기술별 폴더를 기본 골격으로 만들지 않습니다. 기술 종류가 아니라 기능을 소유한 도메인 패키지에서 진입점을 찾을 수 있어야 합니다.
 - `internal/platform`은 외부 라이브러리를 다시 감싸는 얇은 wrapper가 아니라, 이 프로젝트의 실행 정책과 기술 통합 지점을 담습니다. 설정 로딩, connection policy, readiness, migration, telemetry bootstrap처럼 여러 도메인이 공유하는 프로젝트 기준 코드만 둡니다.
 - `internal/common`은 서비스 내부 여러 도메인이 공유하는 순수 유틸리티만 둡니다. 비즈니스 규칙, 외부 기술 통합 정책, 특정 도메인 개념을 넣지 않습니다.
 - 특정 도메인의 SQL, MongoDB, Redis, Kafka 구현은 전역 `store/` 또는 `adapter/` 폴더가 아니라 해당 도메인 패키지 안에 둡니다.
 - 단순히 외부 라이브러리 API 이름만 바꾸는 wrapper는 만들지 않습니다. 프로젝트 공통 기본값, timeout, pool, retry, readiness, migration, telemetry correlation 같은 정책이 있을 때만 `internal/platform`에 둡니다.
 - 서비스 간 공유 계약과 공통 데이터 모델은 `internal`에 두지 않습니다. 언어 중립 계약은 `contracts/`, generated Go 계약 타입은 `packages/go-contracts`에 둡니다.
-- `common`, `platform`, `transport`가 비대해지면 먼저 도메인에 둘 수 없는지 확인합니다.
+- `common`, `platform`이 비대해지면 먼저 도메인에 둘 수 없는지 확인합니다.
 
 기본 골격은 다음과 같습니다.
 
@@ -72,12 +77,12 @@ services/<service-name>/
 │   └── openapi.yaml
 ├── internal/
 │   ├── app/
-│   ├── transport/
-│   │   ├── http/
-│   │   ├── grpc/
-│   │   └── worker/
+│   │   ├── server.go
+│   │   └── worker.go
 │   ├── domain/
 │   │   ├── <domain-a>/
+│   │   │   ├── routes.go
+│   │   │   ├── controller.go
 │   │   │   ├── model.go
 │   │   │   ├── command.go
 │   │   │   ├── service.go
@@ -85,9 +90,12 @@ services/<service-name>/
 │   │   │   ├── postgres_repository.go
 │   │   │   ├── redis_repository.go
 │   │   │   ├── publisher.go
+│   │   │   ├── consumer.go
 │   │   │   ├── validation.go
 │   │   │   └── errors.go
 │   │   └── <domain-b>/
+│   │       ├── routes.go
+│   │       ├── controller.go
 │   │       ├── model.go
 │   │       ├── service.go
 │   │       ├── repository.go
@@ -111,7 +119,11 @@ services/<service-name>/
 └── README.md
 ```
 
+위 파일은 배치 위치를 보여 주는 예시입니다. 실제 도메인에 필요한 파일만 만들고, 사용하지 않는 controller, consumer, repository 골격을 미리 생성하지 않습니다.
+
 예를 들어 쿠폰 도메인의 Redis admission gate는 `internal/domain/coupon/redis_gate.go`에 둡니다. 쿠폰 발급 SQL은 `internal/domain/coupon/postgres_repository.go`에 둡니다. Redis/Valkey를 어떤 timeout, pool, readiness 정책으로 붙일지는 `internal/platform/cache`에 둡니다. PostgreSQL 연결 정책과 readiness는 `internal/platform/database`, migration runner는 `internal/platform/migration`에 둡니다. 트랜잭션 경계는 공용 platform 패키지로 숨기지 않고, 해당 도메인 use case나 repository 구현에서 명시적으로 드러냅니다.
+
+쿠폰 HTTP API가 있다면 method와 path 등록은 `internal/domain/coupon/routes.go`, 요청·응답 변환은 `internal/domain/coupon/controller.go`가 맡습니다. `internal/app/server.go`는 표준 라이브러리나 `packages/go-platform/httpserver`로 서버와 공통 middleware를 준비하고 쿠폰 route를 등록할 뿐, 쿠폰 API 경로를 다시 선언하지 않습니다.
 
 ## 함수 설계
 
@@ -175,9 +187,9 @@ if err != nil {
 
 ## Storage
 
-- PostgreSQL repository는 service layer interface를 구현합니다. service layer가 SQL이나 driver-specific type에 의존하지 않게 합니다. 트랜잭션이 필요한 경우 해당 use case의 일관성 경계를 코드에서 명시적으로 드러냅니다.
+- PostgreSQL repository는 해당 도메인의 repository interface를 구현합니다. 도메인 service가 SQL이나 driver-specific type에 의존하지 않게 합니다. 트랜잭션이 필요한 경우 해당 use case의 일관성 경계를 코드에서 명시적으로 드러냅니다.
 - MongoDB가 필요한 서비스는 collection validator와 index를 runtime 또는 storage package spec으로 관리합니다. repository 메서드마다 같은 invariant를 반복 방어하지 않습니다.
-- repository 구현체는 가능한 한 package 내부 타입으로 두고, 생성자는 service layer repository interface를 반환하거나 interface에 맞는 concrete를 반환합니다.
+- repository 구현체는 가능한 한 package 내부 타입으로 두고, 생성자는 도메인의 repository interface를 반환하거나 interface에 맞는 concrete를 반환합니다.
 - repository 생성 시점에 결정되는 invariant는 생성자에서 검증합니다.
 
 ## Messaging & Async

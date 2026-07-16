@@ -1,0 +1,26 @@
+openapi: 3.1.0
+info:
+  title: DropMong User Operational API
+  version: 1.0.0
+  description: 외부에 공개하지 않는 admin listener 계약입니다.
+paths:
+  /healthz:
+    get:
+      operationId: userHealth
+      responses:
+        '200':
+          description: 프로세스가 실행 중입니다.
+  /readyz:
+    get:
+      operationId: userReadiness
+      responses:
+        '200':
+          description: DB와 schema가 지원 범위에 있고 요청을 받을 수 있습니다.
+        '503':
+          description: DB, schema 또는 drain 상태 때문에 요청을 받지 않습니다.
+  /metrics:
+    get:
+      operationId: userMetrics
+      responses:
+        '200':
+          description: Prometheus/OpenMetrics 지표입니다.

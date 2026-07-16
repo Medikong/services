@@ -7,12 +7,10 @@ import (
 	"testing"
 	"time"
 
-	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
-	"github.com/Medikong/services/services/auth-service/internal/domain/access"
 	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	sessiondomain "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	"github.com/Medikong/services/services/auth-service/internal/security"
+	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	appstate "github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,13 +22,13 @@ func TestRefreshReuseRevokesSessionAndRefreshFamily(t *testing.T) {
 	userID, identityID, linkID := uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, userID, identityID, linkID)
 
-	keys := security.Keys{CredentialHMAC: []byte("01234567890123456789012345678901"), ReplayKey: []byte("01234567890123456789012345678901"), JWTKey: []byte("01234567890123456789012345678901"), JWTIssuer: "integration"}
-	service := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, sessiondomain.NewPostgresRepository(db), access.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db))
+	keys := integrationSecurityKeys(t)
+	service := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, appsession.NewPostgresRepository(db), appstate.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db))
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		t.Fatalf("begin session issuance: %v", err)
 	}
-	issued, err := service.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: identityID, IdentityLink: linkID, Method: "phone_otp", Channel: "mobile"})
+	issued, err := service.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: identityID, IdentityLink: linkID, Method: "phone_otp", Channel: "ios"})
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("issue mobile session: %v", err)
@@ -40,11 +38,11 @@ func TestRefreshReuseRevokesSessionAndRefreshFamily(t *testing.T) {
 	}
 
 	firstKey := uuid.NewString()
-	first, err := service.Refresh(ctx, issued.RefreshToken, firstKey)
+	first, err := service.Refresh(ctx, issued.RefreshToken, "", firstKey)
 	if err != nil {
 		t.Fatalf("rotate refresh credential: %v", err)
 	}
-	replayed, err := service.Refresh(ctx, issued.RefreshToken, firstKey)
+	replayed, err := service.Refresh(ctx, issued.RefreshToken, "", firstKey)
 	if err != nil {
 		t.Fatalf("replay rotated refresh credential: %v", err)
 	}
@@ -65,7 +63,7 @@ func TestRefreshReuseRevokesSessionAndRefreshFamily(t *testing.T) {
 	if rotationEvents != 1 {
 		t.Fatalf("refresh outbox events=%d, want 1", rotationEvents)
 	}
-	if _, err := service.Refresh(ctx, issued.RefreshToken, uuid.NewString()); err == nil {
+	if _, err := service.Refresh(ctx, issued.RefreshToken, "", uuid.NewString()); err == nil {
 		t.Fatal("reused refresh token unexpectedly succeeded")
 	}
 	var status string
@@ -92,10 +90,7 @@ func seedRefreshPrincipal(t *testing.T, ctx context.Context, db *pgxpool.Pool, u
 	if _, err := db.Exec(ctx, `INSERT INTO auth_identity_links (identity_link_id,identity_id,identity_type,user_id,link_status,link_reason,activated_at) VALUES ($1,$2,'phone',$3,'active','signup',now())`, linkID, identityID, userID); err != nil {
 		t.Fatalf("seed refresh link: %v", err)
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO auth_user_auth_states (user_id,status,restriction_version,effective_at) VALUES ($1,'active',1,now())`, userID); err != nil {
+	if _, err := db.Exec(ctx, `INSERT INTO auth_user_auth_states (user_id,status,user_version,status_change_id,effective_at) VALUES ($1,'active',1,$2,now())`, userID, uuid.NewString()); err != nil {
 		t.Fatalf("seed refresh state: %v", err)
-	}
-	if _, err := db.Exec(ctx, `INSERT INTO auth_access_grants (access_grant_id,user_id,roles,permissions,grant_version,grant_status,source,source_revision,valid_from) VALUES ($1,$2,ARRAY['customer'],ARRAY[]::text[],1,'active','test','test',now())`, uuid.New(), userID); err != nil {
-		t.Fatalf("seed refresh grant: %v", err)
 	}
 }

@@ -18,6 +18,7 @@ images:
   - notification-service
   - order-service
   - payment-service
+  - user-service
 
 tests:
   - catalog-service

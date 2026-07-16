@@ -154,7 +154,7 @@ CREATE TABLE auth_action_intent_payloads (
 
 CREATE TABLE auth_authentication_intents (
     intent_id UUID PRIMARY KEY,
-    client_channel VARCHAR(16) NOT NULL CHECK (client_channel IN ('web', 'mobile')),
+    client_channel VARCHAR(16) NOT NULL CHECK (client_channel IN ('web', 'ios', 'android')),
     return_path VARCHAR(1024) NOT NULL DEFAULT '/' CHECK (return_path ~ '^/[A-Za-z0-9/_-]*$'),
     intent_type VARCHAR(64) NOT NULL DEFAULT 'authenticate',
     action_context JSONB NULL,
@@ -198,7 +198,7 @@ CREATE TABLE auth_registrations (
     profile_request_id TEXT NOT NULL,
     agreement_receipt_id TEXT NOT NULL,
     remember_me BOOLEAN NOT NULL DEFAULT FALSE,
-    client_channel VARCHAR(16) NOT NULL DEFAULT 'web' CHECK (client_channel IN ('web', 'mobile')),
+    client_channel VARCHAR(16) NOT NULL DEFAULT 'web' CHECK (client_channel IN ('web', 'ios', 'android')),
     status VARCHAR(32) NOT NULL DEFAULT 'pending_verification'
         CHECK (status IN ('pending_verification', 'awaiting_user_link', 'linked', 'issuing_session', 'completed', 'failed', 'expired')),
     verified_methods TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
@@ -411,44 +411,13 @@ CREATE INDEX idx_auth_password_resets_status_expiry
 CREATE TABLE auth_user_auth_states (
     user_id UUID PRIMARY KEY,
     status VARCHAR(24) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'restricted', 'deactivated')),
-    restriction_version BIGINT NOT NULL DEFAULT 1 CHECK (restriction_version > 0),
+    user_version BIGINT NOT NULL DEFAULT 1 CHECK (user_version > 0),
     reason_code VARCHAR(64) NULL,
     effective_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    source_event_id UUID NULL UNIQUE,
+    status_change_id VARCHAR(128) NOT NULL UNIQUE,
     row_version BIGINT NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE TABLE auth_access_grants (
-    access_grant_id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
-    roles TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-    permissions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-    grant_version BIGINT NOT NULL DEFAULT 1 CHECK (grant_version > 0),
-    grant_status VARCHAR(16) NOT NULL DEFAULT 'active' CHECK (grant_status IN ('active', 'revoked')),
-    claims_hash BYTEA NULL CHECK (claims_hash IS NULL OR octet_length(claims_hash) = 32),
-    source VARCHAR(32) NOT NULL DEFAULT 'registration',
-    source_revision VARCHAR(128) NOT NULL DEFAULT 'initial',
-    valid_from TIMESTAMPTZ NOT NULL DEFAULT now(),
-    valid_until TIMESTAMPTZ NULL,
-    changed_by_user_id UUID NULL,
-    change_reason VARCHAR(500) NULL,
-    revoked_at TIMESTAMPTZ NULL,
-    row_version BIGINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (access_grant_id, user_id, grant_version)
-);
-
-CREATE UNIQUE INDEX uq_auth_access_grants_user_active
-    ON auth_access_grants (user_id)
-    WHERE grant_status = 'active';
-
-CREATE UNIQUE INDEX uq_auth_access_grants_user_version
-    ON auth_access_grants (user_id, grant_version);
-
-CREATE INDEX idx_auth_access_grants_user_status
-    ON auth_access_grants (user_id, grant_status);
 
 CREATE TABLE auth_sessions (
     session_id UUID PRIMARY KEY,
@@ -458,13 +427,9 @@ CREATE TABLE auth_sessions (
     authentication_method VARCHAR(32) NOT NULL
         CHECK (authentication_method IN ('registration_verified', 'email_password', 'phone_otp', 'provider', 'passkey')),
     last_authenticated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    access_grant_id UUID NULL,
-    access_grant_version BIGINT NULL CHECK (access_grant_version IS NULL OR access_grant_version > 0),
-    roles TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-    grant_version BIGINT NOT NULL DEFAULT 1 CHECK (grant_version > 0),
     session_status VARCHAR(24) NOT NULL DEFAULT 'active'
         CHECK (session_status IN ('active', 'expired', 'revoked', 'reuse_detected')),
-    client_channel VARCHAR(16) NOT NULL CHECK (client_channel IN ('web', 'mobile')),
+    client_channel VARCHAR(16) NOT NULL CHECK (client_channel IN ('web', 'ios', 'android')),
     remember_me BOOLEAN NOT NULL DEFAULT FALSE,
     token_policy_version BIGINT NULL REFERENCES auth_policies (policy_version),
     issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -487,10 +452,7 @@ CREATE TABLE auth_sessions (
 ALTER TABLE auth_sessions
     ADD CONSTRAINT fk_auth_sessions_identity_link
     FOREIGN KEY (identity_link_id, identity_id, user_id)
-    REFERENCES auth_identity_links (identity_link_id, identity_id, user_id),
-    ADD CONSTRAINT fk_auth_sessions_access_grant
-    FOREIGN KEY (access_grant_id, user_id, access_grant_version)
-    REFERENCES auth_access_grants (access_grant_id, user_id, grant_version);
+    REFERENCES auth_identity_links (identity_link_id, identity_id, user_id);
 
 ALTER TABLE auth_authentication_intents
     ADD CONSTRAINT fk_auth_intents_consumed_session
@@ -590,7 +552,7 @@ CREATE INDEX idx_auth_reauth_proofs_session
 CREATE TABLE auth_idempotency_replay_payloads (
     replay_payload_id UUID PRIMARY KEY,
     payload_kind VARCHAR(48) NOT NULL
-        CHECK (payload_kind IN ('mobile_refresh_response', 'reauthentication_credential_delivery', 'phone_replacement_credential_delivery')),
+        CHECK (payload_kind IN ('registration_completion', 'mobile_refresh_response', 'reauthentication_credential_delivery', 'phone_replacement_credential_delivery')),
     payload_ciphertext BYTEA NULL,
     payload_key_id VARCHAR(128) NULL,
     binding_hash BYTEA NULL CHECK (binding_hash IS NULL OR octet_length(binding_hash) = 32),
@@ -660,37 +622,6 @@ CREATE TABLE auth_outbox_events (
 
 CREATE INDEX idx_auth_outbox_claim
     ON auth_outbox_events (publish_status, next_attempt_at, lease_until, created_at);
-
-CREATE TABLE auth_inbox_messages (
-    consumer_name VARCHAR(64) NOT NULL,
-    source_event_id UUID NOT NULL,
-    message_type VARCHAR(128) NOT NULL,
-    schema_version SMALLINT NOT NULL,
-    business_key UUID NOT NULL,
-    link_request_id UUID NULL,
-    causation_id UUID NULL,
-    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    payload_hash BYTEA NULL CHECK (payload_hash IS NULL OR octet_length(payload_hash) = 32),
-    process_status VARCHAR(16) NOT NULL DEFAULT 'received'
-        CHECK (process_status IN ('received', 'deferred', 'processed', 'rejected', 'dead_letter')),
-    process_attempts INTEGER NOT NULL DEFAULT 0 CHECK (process_attempts >= 0),
-    next_attempt_at TIMESTAMPTZ NULL,
-    last_error_code VARCHAR(64) NULL,
-    received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    processed_at TIMESTAMPTZ NULL,
-    PRIMARY KEY (consumer_name, source_event_id),
-    CHECK (
-        message_type NOT IN ('User.AuthLinkRequested', 'User.AuthLinkRejected')
-        OR (schema_version = 1 AND link_request_id IS NOT NULL AND causation_id IS NOT NULL)
-    )
-);
-
-CREATE INDEX idx_auth_inbox_ready
-    ON auth_inbox_messages (process_status, next_attempt_at, received_at)
-    WHERE process_status IN ('received', 'deferred');
-
-CREATE INDEX idx_auth_inbox_business_key
-    ON auth_inbox_messages (consumer_name, business_key, link_request_id);
 
 CREATE TABLE auth_manual_actions (
     manual_action_id UUID PRIMARY KEY,

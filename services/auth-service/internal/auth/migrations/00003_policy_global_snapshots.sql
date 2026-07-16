@@ -1,6 +1,6 @@
 -- +goose Up
 -- Policy rows are execution records and can have independent database IDs.
--- The operator contract instead requires a single immutable version for the
+-- The operator API instead requires a single immutable version for the
 -- complete policy surface, so it is modeled as its own aggregate.
 CREATE TABLE auth_policy_global_snapshots (
     policy_snapshot_version BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

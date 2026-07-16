@@ -28,39 +28,37 @@ func (r *PostgresRepository) Create(ctx context.Context, tx pgx.Tx, params Creat
 		idleExpiry = s.ExpiresAt
 	}
 	csrfKeyVersion := any(nil)
-	if c.Type == "web_session_cookie" {
+	if c.Type == "web_refresh_cookie" {
 		csrfKeyVersion = int16(1)
 	}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO auth_sessions (
 			session_id, user_id, identity_id, identity_link_id, authentication_method,
-			access_grant_id, access_grant_version, roles, grant_version, session_status,
-			client_channel, remember_me, issued_at, idle_expires_at, absolute_expires_at,
+			session_status, client_channel, remember_me, issued_at, idle_expires_at, absolute_expires_at,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, now(), $12, $13, now(), now())
-	`, s.ID, s.UserID, s.IdentityID, s.IdentityLink, s.Method, s.GrantID, s.GrantVersion, s.Roles,
-		s.GrantVersion, s.Channel, s.RememberMe, idleExpiry, s.ExpiresAt)
+		) VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, now(), $8, $9, now(), now())
+	`, s.ID, s.UserID, s.IdentityID, s.IdentityLink, s.Method, s.Channel, s.RememberMe, idleExpiry, s.ExpiresAt)
 	if err != nil {
 		return err
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO auth_session_credentials (
 			session_credential_id, session_id, credential_type, credential_status, secret_hash,
-			secret_key_version, csrf_key_version, refresh_family_id, issued_at, expires_at, created_at
-		) VALUES ($1, $2, $3, 'active', $4, 1, $5, $6, now(), $7, now())
-	`, c.ID, s.ID, c.Type, c.SecretHash, csrfKeyVersion, c.FamilyID, c.ExpiresAt)
+			secret_key_version, csrf_key_version, csrf_token_hash, refresh_family_id, issued_at, expires_at, created_at
+		) VALUES ($1, $2, $3, 'active', $4, 1, $5, $6, $7, now(), $8, now())
+	`, c.ID, s.ID, c.Type, c.SecretHash, csrfKeyVersion, nullableBytes(c.CSRFHash), c.FamilyID, c.ExpiresAt)
 	return err
 }
 
 func (r *PostgresRepository) FindByWebSecret(ctx context.Context, secretHash []byte) (Session, Credential, error) {
 	return r.find(ctx, r.pool, `
 		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
-			s.client_channel, s.remember_me, s.roles, s.access_grant_id, s.grant_version,
+			s.client_channel, s.remember_me,
 			s.last_authenticated_at, s.absolute_expires_at, s.session_status,
 			c.session_credential_id, c.session_id, c.credential_type, c.credential_status,
-			c.secret_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
+			c.secret_hash, c.csrf_token_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
 		FROM auth_session_credentials c JOIN auth_sessions s ON s.session_id = c.session_id
-		WHERE c.credential_type = 'web_session_cookie' AND c.credential_status = 'active'
+		WHERE c.credential_type = 'web_refresh_cookie' AND c.credential_status = 'active'
 			AND c.secret_hash = $1 AND s.session_status = 'active' AND s.absolute_expires_at > now()
 	`, secretHash)
 }
@@ -68,12 +66,12 @@ func (r *PostgresRepository) FindByWebSecret(ctx context.Context, secretHash []b
 func (r *PostgresRepository) FindByWebSecretForUpdate(ctx context.Context, tx pgx.Tx, secretHash []byte) (Session, Credential, error) {
 	return r.find(ctx, tx, `
 		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
-			s.client_channel, s.remember_me, s.roles, s.access_grant_id, s.grant_version,
+			s.client_channel, s.remember_me,
 			s.last_authenticated_at, s.absolute_expires_at, s.session_status,
 			c.session_credential_id, c.session_id, c.credential_type, c.credential_status,
-			c.secret_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
+			c.secret_hash, c.csrf_token_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
 		FROM auth_session_credentials c JOIN auth_sessions s ON s.session_id = c.session_id
-		WHERE c.credential_type = 'web_session_cookie' AND c.secret_hash = $1
+		WHERE c.credential_type = 'web_refresh_cookie' AND c.secret_hash = $1
 		FOR UPDATE
 	`, secretHash)
 }
@@ -81,12 +79,12 @@ func (r *PostgresRepository) FindByWebSecretForUpdate(ctx context.Context, tx pg
 func (r *PostgresRepository) FindByRefreshSecretForUpdate(ctx context.Context, tx pgx.Tx, secretHash []byte) (Session, Credential, error) {
 	return r.find(ctx, tx, `
 		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
-			s.client_channel, s.remember_me, s.roles, s.access_grant_id, s.grant_version,
+			s.client_channel, s.remember_me,
 			s.last_authenticated_at, s.absolute_expires_at, s.session_status,
 			c.session_credential_id, c.session_id, c.credential_type, c.credential_status,
-			c.secret_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
+			c.secret_hash, c.csrf_token_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
 		FROM auth_session_credentials c JOIN auth_sessions s ON s.session_id = c.session_id
-		WHERE c.credential_type = 'mobile_refresh_token' AND c.secret_hash = $1
+		WHERE c.credential_type IN ('web_refresh_cookie', 'mobile_refresh_token') AND c.secret_hash = $1
 		FOR UPDATE
 	`, secretHash)
 }
@@ -100,9 +98,9 @@ func (r *PostgresRepository) find(ctx context.Context, q rowQueryer, sql string,
 	var c Credential
 	err := q.QueryRow(ctx, sql, secretHash).Scan(
 		&s.ID, &s.UserID, &s.IdentityID, &s.IdentityLink, &s.Method,
-		&s.Channel, &s.RememberMe, &s.Roles, &s.GrantID, &s.GrantVersion,
+		&s.Channel, &s.RememberMe,
 		&s.AuthenticatedAt, &s.ExpiresAt, &s.Status,
-		&c.ID, &c.SessionID, &c.Type, &c.Status, &c.SecretHash, &c.FamilyID, &c.ExpiresAt, &c.DeliveryRecoveryExpiresAt,
+		&c.ID, &c.SessionID, &c.Type, &c.Status, &c.SecretHash, &c.CSRFHash, &c.FamilyID, &c.ExpiresAt, &c.DeliveryRecoveryExpiresAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, Credential{}, ErrNotFound
@@ -113,12 +111,12 @@ func (r *PostgresRepository) find(ctx context.Context, q rowQueryer, sql string,
 func (r *PostgresRepository) FindRecoveryWebSecretForUpdate(ctx context.Context, tx pgx.Tx, secretHash []byte) (Session, Credential, error) {
 	return r.find(ctx, tx, `
 		SELECT s.session_id, s.user_id, s.identity_id, s.identity_link_id, s.authentication_method,
-			s.client_channel, s.remember_me, s.roles, s.access_grant_id, s.grant_version,
+			s.client_channel, s.remember_me,
 			s.last_authenticated_at, s.absolute_expires_at, s.session_status,
 			c.session_credential_id, c.session_id, c.credential_type, c.credential_status,
-			c.secret_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
+			c.secret_hash, c.csrf_token_hash, c.refresh_family_id, c.expires_at, c.delivery_recovery_expires_at
 		FROM auth_session_credentials c JOIN auth_sessions s ON s.session_id = c.session_id
-		WHERE c.credential_type = 'web_session_cookie' AND c.credential_status = 'rotated_pending_delivery'
+		WHERE c.credential_type = 'web_refresh_cookie' AND c.credential_status = 'rotated_pending_delivery'
 			AND c.secret_hash = $1 AND s.session_status = 'active' AND s.absolute_expires_at > now()
 		FOR UPDATE
 	`, secretHash)
@@ -132,13 +130,13 @@ func (r *PostgresRepository) FindActiveCredentialForUpdate(ctx context.Context, 
 	var credential Credential
 	err := tx.QueryRow(ctx, `
 		SELECT session_credential_id, session_id, credential_type, credential_status,
-			secret_hash, refresh_family_id, expires_at, delivery_recovery_expires_at
+			secret_hash, csrf_token_hash, refresh_family_id, expires_at, delivery_recovery_expires_at
 		FROM auth_session_credentials
 		WHERE session_id = $1 AND credential_type = $2 AND credential_status = 'active'
 		FOR UPDATE
 	`, sessionID, credentialType).Scan(
 		&credential.ID, &credential.SessionID, &credential.Type, &credential.Status,
-		&credential.SecretHash, &credential.FamilyID, &credential.ExpiresAt, &credential.DeliveryRecoveryExpiresAt,
+		&credential.SecretHash, &credential.CSRFHash, &credential.FamilyID, &credential.ExpiresAt, &credential.DeliveryRecoveryExpiresAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Credential{}, ErrNotFound
@@ -159,9 +157,10 @@ func (r *PostgresRepository) RotateRefresh(ctx context.Context, tx pgx.Tx, previ
 	_, err = tx.Exec(ctx, `
 		INSERT INTO auth_session_credentials (
 			session_credential_id, session_id, credential_type, credential_status, secret_hash,
-			secret_key_version, refresh_family_id, rotated_from_credential_id, issued_at, expires_at, created_at
-		) VALUES ($1, $2, 'mobile_refresh_token', 'active', $3, 1, $4, $5, now(), $6, now())
-	`, next.ID, next.SessionID, next.SecretHash, next.FamilyID, previous.ID, next.ExpiresAt)
+			secret_key_version, csrf_key_version, csrf_token_hash, refresh_family_id,
+			rotated_from_credential_id, issued_at, expires_at, created_at
+		) VALUES ($1, $2, $3, 'active', $4, 1, $5, $6, $7, $8, now(), $9, now())
+	`, next.ID, next.SessionID, next.Type, next.SecretHash, csrfVersion(next), nullableBytes(next.CSRFHash), next.FamilyID, previous.ID, next.ExpiresAt)
 	return err
 }
 
@@ -183,28 +182,40 @@ func (r *PostgresRepository) RotateForDelivery(ctx context.Context, tx pgx.Tx, p
 		return ErrNotFound
 	}
 	csrfKeyVersion := any(nil)
-	if next.Type == "web_session_cookie" {
+	if next.Type == "web_refresh_cookie" {
 		csrfKeyVersion = int16(1)
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO auth_session_credentials (
 			session_credential_id, session_id, credential_type, credential_status, secret_hash,
-			secret_key_version, csrf_key_version, refresh_family_id, rotated_from_credential_id,
+			secret_key_version, csrf_key_version, csrf_token_hash, refresh_family_id, rotated_from_credential_id,
 			issued_at, expires_at, created_at
-		) VALUES ($1, $2, $3, 'active', $4, 1, $5, $6, $7, now(), $8, now())
-	`, next.ID, next.SessionID, next.Type, next.SecretHash, csrfKeyVersion, next.FamilyID, previous.ID, next.ExpiresAt)
+		) VALUES ($1, $2, $3, 'active', $4, 1, $5, $6, $7, $8, now(), $9, now())
+	`, next.ID, next.SessionID, next.Type, next.SecretHash, csrfKeyVersion, nullableBytes(next.CSRFHash), next.FamilyID, previous.ID, next.ExpiresAt)
 	return err
+}
+
+func nullableBytes(value []byte) any {
+	if len(value) == 0 {
+		return nil
+	}
+	return value
+}
+
+func csrfVersion(credential Credential) any {
+	if credential.Type == "web_refresh_cookie" {
+		return int16(1)
+	}
+	return nil
 }
 
 func (r *PostgresRepository) Rebind(ctx context.Context, tx pgx.Tx, session Session) error {
 	result, err := tx.Exec(ctx, `
 		UPDATE auth_sessions
 		SET identity_id = $2, identity_link_id = $3, authentication_method = $4,
-			last_authenticated_at = now(), access_grant_id = $5, access_grant_version = $6,
-			roles = $7, grant_version = $8, updated_at = now(), row_version = row_version + 1
+			last_authenticated_at = now(), updated_at = now(), row_version = row_version + 1
 		WHERE session_id = $1 AND session_status = 'active'
-	`, session.ID, session.IdentityID, session.IdentityLink, session.Method, session.GrantID,
-		session.GrantVersion, session.Roles, session.GrantVersion)
+	`, session.ID, session.IdentityID, session.IdentityLink, session.Method)
 	if err != nil {
 		return err
 	}
@@ -328,7 +339,7 @@ func findActiveSession(ctx context.Context, q rowQueryer, sessionID uuid.UUID, f
 	var s Session
 	query := `
 		SELECT session_id, user_id, identity_id, identity_link_id, authentication_method,
-			client_channel, remember_me, roles, access_grant_id, grant_version,
+			client_channel, remember_me,
 			last_authenticated_at, absolute_expires_at, session_status
 		FROM auth_sessions
 		WHERE session_id = $1 AND session_status = 'active' AND absolute_expires_at > now()
@@ -338,7 +349,7 @@ func findActiveSession(ctx context.Context, q rowQueryer, sessionID uuid.UUID, f
 	}
 	err := q.QueryRow(ctx, query, sessionID).Scan(
 		&s.ID, &s.UserID, &s.IdentityID, &s.IdentityLink, &s.Method,
-		&s.Channel, &s.RememberMe, &s.Roles, &s.GrantID, &s.GrantVersion,
+		&s.Channel, &s.RememberMe,
 		&s.AuthenticatedAt, &s.ExpiresAt, &s.Status,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

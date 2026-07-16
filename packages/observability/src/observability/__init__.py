@@ -38,6 +38,7 @@ from observability.observation import (
 )
 from observability.profiling import configure_process_profiling
 from observability.process import configure_process_observability
+from observability.redis import instrument_redis
 from observability.tracing import (
     CallsiteSpanProcessor,
     NoopTraceRecorder,
@@ -86,6 +87,7 @@ __all__ = [
     "get_callsite",
     "get_current_request_id",
     "instrument_motor_client",
+    "instrument_redis",
     "instrument_fastapi_app",
     "instrument_sqlalchemy_engine",
     "instrument_sqlalchemy_pool_events",

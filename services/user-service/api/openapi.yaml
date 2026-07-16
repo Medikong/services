@@ -1,0 +1,417 @@
+openapi: 3.1.0
+info:
+  title: DropMong User API
+  version: 1.0.0
+  description: 사용자 생성, 본인 프로필, 운영 계정 상태 계약입니다. 이메일, 휴대폰, credential, Session은 포함하지 않습니다.
+paths:
+  /api/v1/users:
+    post:
+      operationId: createUser
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User 생성
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResponse'
+        '200':
+          description: 같은 registrationId의 기존 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResponse'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/users/me/profile:
+    get:
+      operationId: getOwnProfile
+      parameters:
+        - $ref: '#/components/parameters/Principal'
+      responses:
+        '200':
+          description: 본인 프로필
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnProfileResponse'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    patch:
+      operationId: updateOwnProfile
+      parameters:
+        - $ref: '#/components/parameters/Principal'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 프로필 변경 또는 같은 멱등 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationResponse'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /api/v1/users/me/profile-image:
+    put:
+      operationId: updateOwnProfileImage
+      parameters:
+        - $ref: '#/components/parameters/Principal'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileImageRequest'
+      responses:
+        '200':
+          description: 프로필 이미지 자산 연결 또는 같은 멱등 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileImageResponse'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/operator/users/{userId}/status-transitions:
+    post:
+      operationId: changeUserAccountStatus
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Principal'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: X-Csrf-Verified
+          in: header
+          required: true
+          schema:
+            type: string
+            const: 'true'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeStatusRequest'
+      responses:
+        '200':
+          description: 상태 변경 또는 같은 멱등 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeStatusResponse'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/v1/operator/users/{userId}/status:
+    get:
+      operationId: getUserAccountStatus
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Principal'
+      responses:
+        '200':
+          description: 현재 계정 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStatusResponse'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    Principal:
+      name: X-Principal
+      in: header
+      required: true
+      description: Ingress가 검증 결과로 만드는 내부 principal envelope
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    AgreementAcceptance:
+      type: object
+      additionalProperties: false
+      required: [agreementCode, agreementVersion, acceptedAt]
+      properties:
+        agreementCode:
+          type: string
+        agreementVersion:
+          type: string
+        acceptedAt:
+          type: string
+          format: date-time
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, registrationCompletionProof, profile, requiredAgreements]
+      properties:
+        registrationId:
+          type: string
+          maxLength: 128
+        registrationCompletionProof:
+          type: string
+          writeOnly: true
+        profile:
+          type: object
+          additionalProperties: false
+          required: [privateName, nickname]
+          properties:
+            privateName:
+              type: string
+              maxLength: 100
+              writeOnly: true
+            nickname:
+              type: string
+              maxLength: 50
+            introduction:
+              type: [string, 'null']
+              maxLength: 500
+        requiredAgreements:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AgreementAcceptance'
+    CreateUserResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userId, userVersion, createdAt, userCreationProof]
+          properties:
+            userId:
+              type: string
+              format: uuid
+            userVersion:
+              type: integer
+              format: int64
+            createdAt:
+              type: string
+              format: date-time
+            userCreationProof:
+              type: string
+              readOnly: true
+    OwnProfileResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/OwnProfile'
+    OwnProfile:
+      type: object
+      required: [userId, accountStatus, nickname, userVersion, updatedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        accountStatus:
+          $ref: '#/components/schemas/AccountStatus'
+        nickname:
+          type: string
+        introduction:
+          type: [string, 'null']
+        profileMediaAssetId:
+          type: [string, 'null']
+        userVersion:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedUserVersion]
+      properties:
+        expectedUserVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        nickname:
+          type: string
+          maxLength: 50
+        introduction:
+          type: [string, 'null']
+          maxLength: 500
+    UpdateProfileImageRequest:
+      type: object
+      additionalProperties: false
+      required: [mediaAssetId, mediaAssetProof, expectedUserVersion]
+      properties:
+        mediaAssetId:
+          type: string
+          maxLength: 128
+        mediaAssetProof:
+          type: string
+          writeOnly: true
+        expectedUserVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    MutationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userId, userVersion, changedFields, updatedAt]
+          properties:
+            userId:
+              type: string
+              format: uuid
+            userVersion:
+              type: integer
+              format: int64
+            changedFields:
+              type: array
+              items:
+                type: string
+            updatedAt:
+              type: string
+              format: date-time
+    ProfileImageResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userId, profileMediaAssetId, userVersion, updatedAt]
+          properties:
+            userId:
+              type: string
+              format: uuid
+            profileMediaAssetId:
+              type: string
+            userVersion:
+              type: integer
+              format: int64
+            updatedAt:
+              type: string
+              format: date-time
+    ChangeStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [targetStatus, reasonCode, expectedUserVersion]
+      properties:
+        targetStatus:
+          $ref: '#/components/schemas/AccountStatus'
+        reasonCode:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{0,63}$'
+        expectedUserVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    ChangeStatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [statusChangeId, userId, accountStatus, userVersion, changedAt, userStatusChangeProof]
+          properties:
+            statusChangeId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            accountStatus:
+              $ref: '#/components/schemas/AccountStatus'
+            userVersion:
+              type: integer
+              format: int64
+            changedAt:
+              type: string
+              format: date-time
+            userStatusChangeProof:
+              type: string
+              readOnly: true
+    AccountStatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userId, accountStatus, userVersion, updatedAt]
+          properties:
+            userId:
+              type: string
+              format: uuid
+            accountStatus:
+              $ref: '#/components/schemas/AccountStatus'
+            userVersion:
+              type: integer
+              format: int64
+            updatedAt:
+              type: string
+              format: date-time
+    AccountStatus:
+      type: string
+      enum: [active, restricted, deactivated]
+    Problem:
+      type: object
+      required: [error, requestId, occurredAt]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        requestId:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+  responses:
+    Problem:
+      description: 오류 응답
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'

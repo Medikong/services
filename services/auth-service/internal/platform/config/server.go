@@ -21,7 +21,7 @@ func (c HTTPConfig) Validate() error {
 		validation.Field(&c.PublicAddr, validation.Required),
 		validation.Field(&c.AdminAddr, validation.Required),
 		validation.Field(&c.RequestTimeout, validation.Min(time.Nanosecond)),
-		validation.Field(&c.DrainDelay, validation.Min(time.Nanosecond)),
+		validation.Field(&c.DrainDelay, validation.Min(time.Duration(0))),
 	)
 }
 
@@ -62,13 +62,8 @@ func LoadServer() (ServerConfig, error) {
 		return ServerConfig{}, err
 	}
 	cfg := ServerConfig{
-		Service:     service,
-		HTTP:        httpConfig,
-		Lifecycle:   lifecycle,
-		Postgres:    postgres,
-		Auth:        authConfig,
-		Development: development,
-		Profile:     profile,
+		Service: service, HTTP: httpConfig, Lifecycle: lifecycle, Postgres: postgres,
+		Auth: authConfig, Development: development, Profile: profile,
 	}
 	if err := cfg.Validate(); err != nil {
 		return ServerConfig{}, err

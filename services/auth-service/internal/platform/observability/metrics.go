@@ -16,62 +16,40 @@ import (
 )
 
 type Metrics struct {
-	service        string
-	registry       *prometheus.Registry
-	operationTotal *prometheus.CounterVec
-	auditTotal     *prometheus.CounterVec
-	outboxTotal    *prometheus.CounterVec
-	inboxTotal     *prometheus.CounterVec
-	ready          prometheus.Gauge
-	meterProvider  *sdkmetric.MeterProvider
+	registry      *prometheus.Registry
+	service       string
+	auditTotal    *prometheus.CounterVec
+	ready         prometheus.Gauge
+	meterProvider *sdkmetric.MeterProvider
 }
 
 func NewMetrics(service string) (*Metrics, error) {
 	metrics := &Metrics{
 		service:  service,
 		registry: prometheus.NewRegistry(),
-		operationTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "auth_operations_total",
-			Help: "Authentication operation outcomes.",
-		}, []string{"service_name", "operation", "result"}),
 		auditTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "auth_audit_outbox_attempts_total",
 			Help: "Audit outbox delivery outcomes.",
 		}, []string{"service_name", "result"}),
-		outboxTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "auth_outbox_publish_total",
-			Help: "Authentication context outbox delivery outcomes.",
-		}, []string{"service_name", "event_type", "result"}),
-		inboxTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "auth_inbox_process_total",
-			Help: "Authentication inbox processing outcomes.",
-		}, []string{"service_name", "message_type", "result"}),
 		ready: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:        "service_ready",
 			Help:        "Service readiness state.",
 			ConstLabels: prometheus.Labels{"service_name": service},
 		}),
 	}
-	if err := metrics.registry.Register(collectors.NewGoCollector()); err != nil {
-		return nil, registerError("go", err)
-	}
-	if err := metrics.registry.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
-		return nil, registerError("process", err)
-	}
 	for name, collector := range map[string]prometheus.Collector{
-		"operation": metrics.operationTotal,
 		"audit":     metrics.auditTotal,
-		"outbox":    metrics.outboxTotal,
-		"inbox":     metrics.inboxTotal,
+		"go":        collectors.NewGoCollector(),
+		"process":   collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		"readiness": metrics.ready,
 	} {
 		if err := metrics.registry.Register(collector); err != nil {
-			return nil, registerError(name, err)
+			return nil, oops.In("auth_metrics").Code("metrics.register_failed").With("collector", name).Wrap(err)
 		}
 	}
 	exporter, err := otelprometheus.New(otelprometheus.WithRegisterer(metrics.registry))
 	if err != nil {
-		return nil, registerError("opentelemetry", err)
+		return nil, oops.In("auth_metrics").Code("metrics.exporter_failed").Wrap(err)
 	}
 	resource, err := platformtelemetry.Resource(service)
 	if err != nil {
@@ -86,24 +64,12 @@ func NewMetrics(service string) (*Metrics, error) {
 	return metrics, nil
 }
 
-func (m *Metrics) Handler() http.Handler {
-	return promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{EnableOpenMetrics: true})
-}
-
-func (m *Metrics) RecordOperation(operation string, result string) {
-	m.operationTotal.WithLabelValues(m.service, operation, result).Inc()
-}
-
 func (m *Metrics) RecordAuditAttempt(result string) {
 	m.auditTotal.WithLabelValues(m.service, result).Inc()
 }
 
-func (m *Metrics) RecordOutbox(eventType string, result string) {
-	m.outboxTotal.WithLabelValues(m.service, eventType, result).Inc()
-}
-
-func (m *Metrics) RecordInbox(messageType string, result string) {
-	m.inboxTotal.WithLabelValues(m.service, messageType, result).Inc()
+func (m *Metrics) Handler() http.Handler {
+	return promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{EnableOpenMetrics: true})
 }
 
 func (m *Metrics) SetReady(ready bool) {
@@ -119,8 +85,4 @@ func (m *Metrics) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return m.meterProvider.Shutdown(ctx)
-}
-
-func registerError(name string, err error) error {
-	return oops.In("auth_metrics").Code("metrics.register_failed").With("collector", name).Wrapf(err, "register metric collector %s", name)
 }

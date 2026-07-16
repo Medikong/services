@@ -10,8 +10,9 @@ import (
 type Channel string
 
 const (
-	ChannelWeb    Channel = "web"
-	ChannelMobile Channel = "mobile"
+	ChannelWeb     Channel = "web"
+	ChannelIOS     Channel = "ios"
+	ChannelAndroid Channel = "android"
 )
 
 type Status string

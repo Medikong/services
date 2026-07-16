@@ -7,8 +7,12 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/samber/oops"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -95,6 +99,60 @@ func TestRedactKeys(t *testing.T) {
 	}
 	if event["result"] != "ok" {
 		t.Fatalf("non-sensitive value = %v, want ok", event["result"])
+	}
+}
+
+func TestErrLogsOopsStructureAndRedactsNestedContext(t *testing.T) {
+	const (
+		rawToken    = "raw-token-value"
+		rawProof    = "raw-proof-value"
+		rawRequest  = "raw-request-body"
+		rawResponse = "raw-response-body"
+		rawUserData = "raw-user-data"
+	)
+	var out bytes.Buffer
+	request := httptest.NewRequest(http.MethodPost, "/private", strings.NewReader(rawRequest))
+	response := &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       io.NopCloser(strings.NewReader(rawResponse)),
+	}
+	err := oops.
+		In("repository").
+		Code("repository.query_failed").
+		With("operation", "find_user", "auth", map[string]any{
+			"token":  rawToken,
+			"nested": []any{map[string]any{"registration_proof": rawProof}},
+		}).
+		User("user-1", "profile", rawUserData).
+		Request(request, true).
+		Response(response, true).
+		New("query failed with " + rawToken + " and " + rawProof)
+
+	New(&out, "test-service").ErrorContext(context.Background(), "failed", Err(err))
+
+	event := decodeEvent(t, out.Bytes())
+	errorValue, ok := event["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error = %#v, want structured object", event["error"])
+	}
+	if errorValue["code"] != "repository.query_failed" || errorValue["domain"] != "repository" {
+		t.Fatalf("error metadata = %#v", errorValue)
+	}
+	ctx, ok := errorValue["context"].(map[string]any)
+	if !ok || ctx["operation"] != "find_user" {
+		t.Fatalf("error context = %#v", errorValue["context"])
+	}
+	auth := ctx["auth"].(map[string]any)
+	if auth["token"] != "[REDACTED]" {
+		t.Fatalf("token = %v, want redacted", auth["token"])
+	}
+	if stacktrace, _ := errorValue["stacktrace"].(string); stacktrace == "" {
+		t.Fatal("stacktrace is missing")
+	}
+	for _, forbidden := range []string{rawToken, rawProof, rawRequest, rawResponse, rawUserData} {
+		if strings.Contains(out.String(), forbidden) {
+			t.Fatalf("sensitive value %q leaked: %s", forbidden, out.String())
+		}
 	}
 }
 

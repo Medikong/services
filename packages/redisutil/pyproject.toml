@@ -1,0 +1,25 @@
+[project]
+name = "redisutil"
+version = "0.1.0"
+description = "Observable native redis-py client constructors and key utilities"
+requires-python = ">=3.12"
+dependencies = [
+    "observability",
+    "redis==7.3.1",
+]
+
+[dependency-groups]
+test = [
+    "opentelemetry-sdk==1.42.1",
+    "pytest==9.0.2",
+]
+
+[tool.uv.sources]
+observability = { path = "../observability", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "../observability/src"]

@@ -1,9 +1,9 @@
 openapi: 3.0.4
 info:
   title: DropMong Context 인증 개발 API
-  version: 0.2.0
+  version: 0.3.0
   description: |
-    개발 및 테스트 환경에만 등록하는 `SD.A.30040`의 HTTP 계약 원장이다.
+    개발 및 테스트 환경에만 등록하는 `SD.A.30040`의 HTTP 명세 원장이다.
     운영 서버와 운영 코드 생성 입력에는 이 문서를 포함하지 않는다.
 servers:
   - url: https://api.dev.dropmong.example
@@ -28,7 +28,7 @@ paths:
 
         개발 접근 token이나 소유 인증 정보가 없거나 유효하지 않거나 binding이 다르면 리소스 존재
         여부를 숨기기 위해 `404 AUTH_VIRTUAL_MESSAGE_NOT_FOUND`로 통합한다. Gateway도 같은
-        `application/problem+json` 계약을 반환한다.
+        `application/json` 형식을 반환한다.
       operationId: getVirtualVerificationMessage
       x-api-id: API.A.300-30
       x-use-case: UC.A.300
@@ -43,7 +43,7 @@ paths:
         - local
         - test
         - demo-restricted
-      x-virtual-projection-contract:
+      x-virtual-projection:
         scope: dev_test_only
         readyCodeSchema: VerificationCode
         codeAtRest: envelope_encrypted
@@ -52,11 +52,9 @@ paths:
         - DevAccessToken: []
           WebAuthFlowCookie: []
         - DevAccessToken: []
-          WebSessionCookie: []
-        - DevAccessToken: []
           MobileAuthFlowToken: []
         - DevAccessToken: []
-          MobileBearerAuth: []
+          AccessBearerAuth: []
       parameters:
         - $ref: '#/components/parameters/ChallengeId'
         - $ref: '#/components/parameters/XRequestId'
@@ -117,21 +115,16 @@ components:
       in: cookie
       name: __Host-dm_auth
       description: 웹의 사전 인증 컨텍스트와 Registration 소유권을 증명하는 단기 HttpOnly cookie다.
-    WebSessionCookie:
-      type: apiKey
-      in: cookie
-      name: __Host-dm_session
-      description: 로그인된 웹 사용자의 서버 Session을 가리키는 HttpOnly cookie다.
     MobileAuthFlowToken:
       type: apiKey
       in: header
       name: X-Auth-Flow-Token
       description: 모바일 사전 인증 단계에서 Registration 또는 Challenge 소유권을 증명하는 단기 opaque token이다.
-    MobileBearerAuth:
+    AccessBearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: 로그인된 모바일 사용자의 짧은 수명 access JWT다.
+      description: 웹과 모바일 보호 API에 공통으로 제출하는 짧은 수명 access JWT다.
   schemas:
     ChallengeId:
       type: string
@@ -227,63 +220,36 @@ components:
               pending: '#/components/schemas/PendingVirtualVerificationMessage'
         meta:
           $ref: '#/components/schemas/ResponseMeta'
-    FieldViolation:
+    ErrorResponse:
       type: object
       required:
-        - field
-        - reason
-      additionalProperties: false
-      properties:
-        field:
-          type: string
-          description: 오류가 발생한 공개 요청 필드 경로다.
-          example: body
-        reason:
-          type: string
-          description: 개인정보나 입력 원문을 포함하지 않는 안정적인 검증 실패 사유다.
-          example: additional_property
-    ProblemDetails:
-      type: object
-      required:
-        - type
-        - title
-        - status
         - code
-        - detail
-        - retryable
+        - status
+        - message
         - requestId
       additionalProperties: false
       properties:
-        type:
+        code:
           type: string
-          format: uri
-          description: 안정적인 문제 유형 URI다.
-        title:
-          type: string
-          description: 개인정보나 내부 상태를 포함하지 않는 짧은 오류 제목이다.
+          minLength: 2
+          maxLength: 100
+          pattern: ^[A-Za-z][A-Za-z0-9._-]+$
+          description: 서비스별 namespace를 사용할 수 있는 안정적인 공개 오류 코드다.
         status:
           type: integer
           minimum: 400
           maximum: 599
-        code:
+          description: HTTP 응답 상태와 같은 값이다.
+        message:
           type: string
-          pattern: ^AUTH_[A-Z0-9_]+$
-          description: 클라이언트가 분기할 수 있는 인증 도메인 오류 코드다.
-        detail:
-          type: string
-          description: 사용자에게 공개 가능한 일반화된 오류 설명이다.
-        retryable:
-          type: boolean
-          description: 같은 요청을 다시 시도할 수 있는지 나타낸다.
+          minLength: 1
+          maxLength: 500
+          description: 개인정보, credential과 내부 오류 원인을 포함하지 않는 공개 메시지다.
         requestId:
           type: string
-          format: uuid
+          minLength: 1
+          maxLength: 128
           description: 지원 및 추적에 사용하는 요청 식별자다.
-        violations:
-          type: array
-          description: 입력 검증 오류가 있을 때만 반환하는 공개 가능한 필드 오류 목록이다.
-          items:
-            $ref: '#/components/schemas/FieldViolation'
   parameters:
     ChallengeId:
       name: challengeId
@@ -346,10 +312,10 @@ components:
         Cache-Control:
           $ref: '#/components/headers/CacheControlNoStore'
       content:
-        application/problem+json:
+        application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/ProblemDetails'
+              - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties:
                   status:
@@ -361,12 +327,9 @@ components:
                     enum:
                       - AUTH_VIRTUAL_MESSAGE_NOT_FOUND
           example:
-            type: https://api.dropmong.example/problems/auth-virtual-message-not-found
-            title: 인증 메시지를 조회할 수 없습니다.
             status: 404
             code: AUTH_VIRTUAL_MESSAGE_NOT_FOUND
-            detail: 인증 요청과 현재 인증 컨텍스트를 확인해주세요.
-            retryable: false
+            message: 인증 요청과 현재 인증 컨텍스트를 확인해주세요.
             requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     VirtualMessageUnavailable:
       description: Challenge가 종료됐거나 인증번호 원문이 폐기됐다.
@@ -376,10 +339,10 @@ components:
         Cache-Control:
           $ref: '#/components/headers/CacheControlNoStore'
       content:
-        application/problem+json:
+        application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/ProblemDetails'
+              - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties:
                   status:
@@ -391,12 +354,9 @@ components:
                     enum:
                       - AUTH_VIRTUAL_MESSAGE_UNAVAILABLE
           example:
-            type: https://api.dropmong.example/problems/auth-virtual-message-unavailable
-            title: 인증 메시지를 더 이상 조회할 수 없습니다.
             status: 410
             code: AUTH_VIRTUAL_MESSAGE_UNAVAILABLE
-            detail: 새 인증번호를 요청해주세요.
-            retryable: false
+            message: 새 인증번호를 요청해주세요.
             requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     VirtualMessageRateLimited:
       description: 가상 인증 메시지 조회 제한을 초과했다.
@@ -408,10 +368,10 @@ components:
         Retry-After:
           $ref: '#/components/headers/RetryAfter'
       content:
-        application/problem+json:
+        application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/ProblemDetails'
+              - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties:
                   status:
@@ -423,12 +383,9 @@ components:
                     enum:
                       - AUTH_RATE_LIMITED
           example:
-            type: https://api.dropmong.example/problems/auth-rate-limited
-            title: 요청이 너무 많습니다.
             status: 429
             code: AUTH_RATE_LIMITED
-            detail: 잠시 뒤 다시 시도해주세요.
-            retryable: true
+            message: 잠시 뒤 다시 시도해주세요.
             requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     VirtualMessageServiceUnavailable:
       description: 가상 인증 메시지 저장소 또는 필수 내부 의존성을 일시적으로 사용할 수 없다.
@@ -440,10 +397,10 @@ components:
         Retry-After:
           $ref: '#/components/headers/RetryAfter'
       content:
-        application/problem+json:
+        application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/ProblemDetails'
+              - $ref: '#/components/schemas/ErrorResponse'
               - type: object
                 properties:
                   status:
@@ -455,10 +412,7 @@ components:
                     enum:
                       - AUTH_SERVICE_UNAVAILABLE
           example:
-            type: https://api.dropmong.example/problems/auth-service-unavailable
-            title: 인증 서비스를 일시적으로 사용할 수 없습니다.
             status: 503
             code: AUTH_SERVICE_UNAVAILABLE
-            detail: 잠시 뒤 다시 시도해주세요.
-            retryable: true
+            message: 잠시 뒤 다시 시도해주세요.
             requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8

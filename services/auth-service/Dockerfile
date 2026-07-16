@@ -3,8 +3,6 @@ FROM golang:1.26.3-bookworm AS builder
 WORKDIR /workspace
 
 COPY packages/go-audit ./packages/go-audit
-COPY packages/go-authz ./packages/go-authz
-COPY packages/go-contracts ./packages/go-contracts
 COPY packages/go-platform ./packages/go-platform
 COPY services/auth-service ./services/auth-service
 

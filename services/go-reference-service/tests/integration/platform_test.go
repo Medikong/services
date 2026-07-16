@@ -21,7 +21,7 @@ import (
 	"github.com/Medikong/services/packages/go-contracts/headers"
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	platformredis "github.com/Medikong/services/packages/go-platform/redis"
+	platformredis "github.com/Medikong/services/packages/go-platform/redisutil"
 	"github.com/Medikong/services/services/go-reference-service/internal/app"
 	"github.com/Medikong/services/services/go-reference-service/internal/domain/sample"
 	"github.com/Medikong/services/services/go-reference-service/internal/platform/config"

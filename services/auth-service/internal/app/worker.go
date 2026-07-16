@@ -16,7 +16,6 @@ import (
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	"github.com/Medikong/services/services/auth-service/internal/application/outboxrelay"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
@@ -43,7 +42,7 @@ func NewWorker(ctx context.Context, cfg config.WorkerConfig) (*Worker, error) {
 // NewWorkerWithPublisher binds the durable auth outbox only when a trusted
 // Context adapter is supplied by the deployment composition root. The normal
 // executable deliberately passes nil until a real topic/credential exists.
-func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publisher outboxrelay.Publisher) (*Worker, error) {
+func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publisher outbox.Publisher) (*Worker, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 	}
 	var runDomainOutbox func(context.Context) error
 	if publisher != nil {
-		relay, relayErr := outboxrelay.New(outbox.NewPostgresRepository(resources.DB), publisher, outboxrelay.Config{
+		relay, relayErr := outbox.New(outbox.NewPostgresRepository(resources.DB), publisher, outbox.Config{
 			WorkerID: hostname + ":auth-outbox:" + uuid.NewString(), BatchSize: cfg.Audit.BatchSize,
 			PollInterval: cfg.Audit.PollInterval, Lease: cfg.Audit.Lease, MaxAttempts: cfg.Audit.MaxAttempts,
 			BaseBackoff: cfg.Audit.BaseBackoff, MaxBackoff: cfg.Audit.MaxBackoff,

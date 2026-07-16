@@ -18,7 +18,7 @@ vars:
   PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
   PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
-  GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/..." .GO_TEST_PACKAGES}}'
+  GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/... ./services/user-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
 includes:
@@ -226,6 +226,33 @@ tasks:
     desc: Verify that the coupon OpenAPI bundle snapshot matches the sibling archive checkout.
     cmds:
       - ./services/coupon-service/scripts/check-openapi.sh
+
+  user-service-unit:
+    desc: Run user-service unit tests with the race detector.
+    cmds:
+      - go test -race ./services/user-service/...
+
+  user-service-vet:
+    desc: Run Go static checks for user-service.
+    cmds:
+      - go vet ./services/user-service/...
+
+  user-service-integration:
+    desc: Run user-service HTTP and PostgreSQL Testcontainers integration tests.
+    cmds:
+      - go test -tags=integration -count=1 ./services/user-service/tests/integration
+
+  user-service-image-build:
+    desc: Build the local user-service server and migration image.
+    cmds:
+      - docker build -f services/user-service/Dockerfile -t user-service:dev .
+
+  user-service-check:
+    desc: Run the standard user-service code and database verification suite.
+    cmds:
+      - task: user-service-unit
+      - task: user-service-vet
+      - task: user-service-integration
 
   test-all:
     desc: Run unit tests and Docker Compose E2E tests.

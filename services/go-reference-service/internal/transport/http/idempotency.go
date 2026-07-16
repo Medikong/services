@@ -12,10 +12,9 @@ func RequireIdempotencyKey(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := strings.TrimSpace(r.Header.Get(headers.IdempotencyKey))
 		if key == "" || len(key) > 128 {
-			httpapi.WriteError(w, r, httpapi.BadRequest(
-				"common.invalid_idempotency_key",
-				"Idempotency-Key 헤더가 필요하며 128자 이하여야 합니다.",
-			))
+			httpapi.WriteError(w, r, httpapi.BadRequest("common.invalid_idempotency_key").
+				Public("Idempotency-Key 헤더가 필요하며 128자 이하여야 합니다.").
+				New("Idempotency-Key is required and must not exceed 128 characters"))
 			return
 		}
 		r.Header.Set(headers.IdempotencyKey, key)

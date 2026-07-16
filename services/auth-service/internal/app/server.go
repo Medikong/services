@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"net"
 	"net/http"
@@ -12,18 +13,35 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/Medikong/services/packages/go-audit"
+	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
+	"github.com/Medikong/services/services/auth-service/internal/domain/authentication"
+	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
+	"github.com/Medikong/services/services/auth-service/internal/domain/development"
+	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
+	"github.com/Medikong/services/services/auth-service/internal/domain/identity"
+	"github.com/Medikong/services/services/auth-service/internal/domain/intent"
+	"github.com/Medikong/services/services/auth-service/internal/domain/jwks"
+	"github.com/Medikong/services/services/auth-service/internal/domain/operator"
+	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	"github.com/Medikong/services/services/auth-service/internal/domain/passwordreset"
+	"github.com/Medikong/services/services/auth-service/internal/domain/policy"
+	"github.com/Medikong/services/services/auth-service/internal/domain/reauth"
+	"github.com/Medikong/services/services/auth-service/internal/domain/registration"
+	"github.com/Medikong/services/services/auth-service/internal/domain/session"
+	"github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
+	"github.com/Medikong/services/services/auth-service/internal/platform/httpauth"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
-	authhttp "github.com/Medikong/services/services/auth-service/internal/transport/http"
+	"github.com/Medikong/services/services/auth-service/internal/security"
+	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 )
 
 type Server struct {
 	cfg        config.ServerConfig
-	resources  Resources
+	db         *pgxpool.Pool
 	metrics    *observability.Metrics
 	health     *operational.Handler
 	publicHTTP *http.Server
@@ -31,19 +49,12 @@ type Server struct {
 	profiler   *pyroscope.Profiler
 }
 
-// ServerOptions contains trusted runtime ports. The zero value keeps every
-// fail-closed production default.
 type ServerOptions struct {
-	ApprovalPort appoperator.ApprovalPort
+	ApprovalPort              operator.ApprovalPort
+	AuthorizationDecisionPort userauthstate.AuthorizationDecisionPort
 }
 
-func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
-	return NewServerWithOptions(ctx, cfg, ServerOptions{})
-}
-
-// NewServerWithOptions composes the server with explicitly supplied runtime
-// adapters. It never enables an adapter through environment configuration.
-func NewServerWithOptions(ctx context.Context, cfg config.ServerConfig, options ServerOptions) (*Server, error) {
+func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptions) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -51,51 +62,212 @@ func NewServerWithOptions(ctx context.Context, cfg config.ServerConfig, options 
 	if err != nil {
 		return nil, err
 	}
-	resources, err := openServerResources(ctx, cfg)
+	db, err := platformdb.OpenPostgres(ctx, cfg.Postgres)
 	if err != nil {
 		_ = metrics.Shutdown(context.Background())
-		return nil, err
+		return nil, oops.In("auth_server").Code("database.open_failed").Wrap(err)
 	}
-	if err := checkServerDatabase(ctx, resources.DB, cfg.Development); err != nil {
-		_ = resources.Close()
+	cleanup := func() {
+		db.Close()
 		_ = metrics.Shutdown(context.Background())
+	}
+	if err := checkServerDatabase(ctx, db, cfg.Development); err != nil {
+		cleanup()
 		return nil, err
 	}
-	healthState := operational.NewHandler(operational.Config{
+	health := operational.NewHandler(operational.Config{
 		Service:          cfg.Service.Name,
 		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
 		Checks: map[string]operational.Check{
-			"database": func(ctx context.Context) error {
-				return checkServerDatabase(ctx, resources.DB, cfg.Development)
-			},
+			"database": func(ctx context.Context) error { return checkServerDatabase(ctx, db, cfg.Development) },
 		},
 		Metrics:  metrics.Handler(),
 		SetReady: metrics.SetReady,
 	})
-	router, err := authhttp.NewRouterWithOptions(cfg, resources.DB, healthState, metrics, authhttp.RouterOptions{
-		ApprovalPort: options.ApprovalPort,
-	})
-	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+
+	retiringKeys := make(map[string]*rsa.PublicKey, len(cfg.Auth.JWTRetiringPublicKeys))
+	for keyID, encoded := range cfg.Auth.JWTRetiringPublicKeys {
+		publicKey, parseErr := security.ParseRSAPublicKeyPEM([]byte(encoded))
+		if parseErr != nil {
+			cleanup()
+			return nil, oops.In("auth_server").Code("server.jwt_retiring_key_invalid").
+				With("key_id", keyID).Wrap(parseErr)
+		}
+		retiringKeys[keyID] = publicKey
+	}
+	keys := security.Keys{
+		CredentialHMAC: []byte(cfg.Auth.CredentialHMACKey),
+		ReplayKey:      []byte(cfg.Auth.ReplayEncryptionKey),
+		JWTKey:         []byte(cfg.Auth.JWTPrivateKeyPEM),
+		JWTKeyID:       cfg.Auth.JWTKeyID,
+		JWTIssuer:      cfg.Auth.JWTIssuer,
+		JWTAudiences:   cfg.Auth.JWTAudiences,
+		JWTVerifyKeys:  retiringKeys,
+		VirtualKey:     []byte(cfg.Development.VirtualMessageKey),
+	}
+	if err := keys.Validate(cfg.Development.VirtualAdaptersEnabled); err != nil {
+		cleanup()
 		return nil, err
+	}
+
+	intentRepository := intent.NewPostgresRepository(db)
+	idempotencyRepository := idempotency.NewPostgresRepository(db)
+	identityRepository := identity.NewPostgresRepository(db)
+	userAuthStateRepository := userauthstate.NewPostgresRepository(db)
+	registrationRepository := registration.NewPostgresRepository(db)
+	challengeRepository := challenge.NewPostgresRepository(db, challenge.PostgresOptions{
+		VirtualProjectionEnabled: cfg.Development.VirtualAdaptersEnabled,
+	})
+	outboxRepository := outbox.NewPostgresRepository(db)
+	sessionRepository := session.NewPostgresRepository(db)
+	passwordResetRepository := passwordreset.NewPostgresRepository(db)
+
+	bootstrapService := intent.NewBootstrapService(
+		db,
+		keys,
+		intent.BootstrapConfig{IntentTTL: cfg.Auth.IntentTTL},
+		intentRepository,
+		idempotencyRepository,
+	)
+	sessionService := session.NewService(db, keys, session.Config{
+		AccessTTL:            cfg.Auth.AccessTTL,
+		RefreshTTL:           cfg.Auth.RefreshTTL,
+		SessionTTL:           cfg.Auth.SessionTTL,
+		RememberMeSessionTTL: cfg.Auth.RememberMeSessionTTL,
+		RecoveryTTL:          cfg.Auth.RecoveryTTL,
+	}, sessionRepository, userAuthStateRepository, idempotencyRepository, outboxRepository)
+	emailSignInService := authentication.NewEmailService(
+		db, bootstrapService, identityRepository, intentRepository, sessionService,
+	)
+	phoneSignInService := authentication.NewPhoneService(
+		db, keys, bootstrapService, intentRepository, identityRepository,
+		challengeRepository, outboxRepository, sessionService,
+		cfg.Development.VirtualAdaptersEnabled, cfg.Auth.ChallengeTTL,
+	)
+	passwordResetService := passwordreset.NewService(db, keys, passwordreset.Config{
+		ResetTTL:              cfg.Auth.ProofTTL,
+		ChallengeTTL:          cfg.Auth.ChallengeTTL,
+		VirtualAdapterEnabled: cfg.Development.VirtualAdaptersEnabled,
+	}, bootstrapService, passwordResetRepository, identityRepository, challengeRepository,
+		idempotencyRepository, sessionRepository, outboxRepository)
+	reauthService := reauth.NewReauthService(
+		db, keys, identityRepository, reauth.NewPostgresRepository(db), sessionRepository,
+		idempotencyRepository, sessionService, cfg.Auth.ProofTTL, cfg.Auth.RecoveryTTL,
+	)
+	identityLinkService := identity.NewLinkService(
+		db, keys, reauthService, identityRepository, challengeRepository, sessionRepository,
+		sessionService, idempotencyRepository, outboxRepository,
+		cfg.Development.VirtualAdaptersEnabled, cfg.Auth.ChallengeTTL, cfg.Auth.RecoveryTTL,
+	)
+	approvalPort := options.ApprovalPort
+	if approvalPort == nil {
+		approvalPort = operator.DenyApprovalPort{}
+	}
+	operatorService := operator.NewService(
+		db, keys, operator.NewPostgresRepository(db), policy.NewPostgresRepository(db),
+		idempotencyRepository, outboxRepository, operator.Config{StrongAuthTTL: cfg.Auth.ProofTTL},
+		approvalPort, options.AuthorizationDecisionPort,
+	)
+	userProofVerifier, err := security.NewUserProofVerifier(
+		cfg.Auth.UserProofIssuer,
+		cfg.Auth.UserProofKeyID,
+		cfg.Auth.UserProofPublicKey,
+		cfg.Auth.ProofClockSkew,
+		nil,
+	)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	authProofSigner, err := security.NewUserProofSigner(
+		config.ServiceName,
+		cfg.Auth.AuthProofKeyID,
+		cfg.Auth.AuthProofPrivateKey,
+		nil,
+	)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	registrationService := registration.NewService(
+		db,
+		keys,
+		registration.Config{
+			RegistrationTTL:       cfg.Auth.RegistrationTTL,
+			StatusTokenRetention:  cfg.Auth.ProofTTL,
+			ChallengeTTL:          cfg.Auth.ChallengeTTL,
+			VirtualAdapterEnabled: cfg.Development.VirtualAdaptersEnabled,
+		},
+		bootstrapService,
+		registrationRepository,
+		challengeRepository,
+		identityRepository,
+		idempotencyRepository,
+		outboxRepository,
+		userAuthStateRepository,
+		intentRepository,
+		sessionService,
+		registration.ProofConfig{Signer: authProofSigner, Verifier: userProofVerifier},
+	)
+	actionResumeService := intent.NewActionResumeService(db, keys, intentRepository, idempotencyRepository)
+	userAuthStateService := userauthstate.NewService(
+		db,
+		userAuthStateRepository,
+		sessionRepository,
+		userProofVerifier,
+		options.AuthorizationDecisionPort,
+		userauthstate.Config{StrongAuthTTL: cfg.Auth.ProofTTL},
+	)
+
+	credentials := httpauth.New(cfg.Auth, cfg.Development)
+	csrf := httputil.NewCSRF(cfg.Auth.AllowedOrigins)
+	bootstrapController := intent.NewBootstrap(credentials, bootstrapService)
+	signInController := authentication.NewSignIn(credentials, csrf, emailSignInService, phoneSignInService)
+	sessionController := session.NewSession(credentials, csrf, sessionService)
+	registrationController := registration.NewRegistration(credentials, csrf, registrationService)
+	passwordResetController := passwordreset.NewPasswordReset(credentials, csrf, passwordResetService)
+	identityController := identity.NewIdentityManagement(credentials, csrf, sessionService, reauthService, identityLinkService)
+	operatorController := operator.NewOperator(credentials, sessionService, operatorService)
+	actionResumeController := intent.NewActionResume(credentials, sessionService, actionResumeService)
+	userAuthStateController := userauthstate.NewUserAuthState(credentials, sessionService, userAuthStateService)
+	jwksController := jwks.NewController(keys)
+	var developmentController *development.DevelopmentController
+	if cfg.Development.RouteEnabled {
+		virtualMessageService := development.NewVirtualMessageService(
+			db, keys, bootstrapService, challengeRepository, registrationRepository,
+			passwordResetRepository, identityRepository,
+		)
+		developmentController = development.NewDevelopment(credentials, virtualMessageService, sessionService)
+	}
+
+	router := newRouter(cfg.Service.Name, cfg.HTTP.RequestTimeout, health)
+	jwks.RegisterRoutes(router, jwksController)
+	intent.RegisterRoutes(router, bootstrapController, actionResumeController)
+	authentication.RegisterRoutes(router, signInController)
+	registration.RegisterRoutes(router, registrationController)
+	passwordreset.RegisterRoutes(router, passwordResetController)
+	identity.RegisterRoutes(router, identityController)
+	session.RegisterRoutes(router, sessionController)
+	operator.RegisterRoutes(router, operatorController)
+	userauthstate.RegisterRoutes(router, userAuthStateController)
+	if developmentController != nil {
+		development.RegisterRoutes(router, developmentController)
 	}
 	profiler, err := observability.StartProfiler(cfg.Service, cfg.Profile)
 	if err != nil {
-		_ = resources.Close()
-		_ = metrics.Shutdown(context.Background())
+		cleanup()
 		return nil, err
 	}
 	adminMux := http.NewServeMux()
-	healthState.RegisterAll(adminMux, cfg.Profile.PprofEnabled)
+	health.RegisterAll(adminMux, cfg.Profile.PprofEnabled)
 	adminHTTP := httpserver.New(cfg.HTTP.AdminAddr, adminMux)
 	adminHTTP.WriteTimeout = 0
 	metrics.SetReady(true)
 	return &Server{
 		cfg:        cfg,
-		resources:  resources,
+		db:         db,
 		metrics:    metrics,
-		health:     healthState,
+		health:     health,
 		publicHTTP: httpserver.New(cfg.HTTP.PublicAddr, router),
 		adminHTTP:  adminHTTP,
 		profiler:   profiler,
@@ -139,11 +311,19 @@ func (s *Server) Run(ctx context.Context) error {
 	case runErr = <-results:
 		consumed = 1
 	}
-
 	s.health.BeginDrain()
 	if ctx.Err() != nil && s.cfg.HTTP.DrainDelay > 0 {
 		timer := time.NewTimer(s.cfg.HTTP.DrainDelay)
-		<-timer.C
+		select {
+		case <-timer.C:
+		case <-time.After(s.cfg.Lifecycle.ShutdownTimeout):
+		}
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
 	shutdownErr := oops.Join(
@@ -188,9 +368,12 @@ func (s *Server) closeWith(cause error) error {
 		profilerErr = s.profiler.Stop()
 		s.profiler = nil
 	}
-	resourceErr := s.resources.Close()
+	if s.db != nil {
+		s.db.Close()
+		s.db = nil
+	}
 	metricCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
 	metricErr := s.metrics.Shutdown(metricCtx)
 	cancel()
-	return oops.Join(cause, profilerErr, resourceErr, metricErr)
+	return oops.Join(cause, profilerErr, metricErr)
 }
