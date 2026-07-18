@@ -12,6 +12,7 @@ COPY services/dropmong-web ./
 RUN pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 FROM node:22.16.0-alpine AS runtime
+RUN apk upgrade --no-cache
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
