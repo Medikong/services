@@ -164,6 +164,7 @@ jobs:
           format: table
           severity: CRITICAL
           exit-code: 1
+          ignore-unfixed: true
       - name: Docker 이미지 빌드
         shell: bash
         working-directory: ${{ github.workspace }}

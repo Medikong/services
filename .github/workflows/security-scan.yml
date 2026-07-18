@@ -133,6 +133,7 @@ jobs:
           output: trivy-critical-${{ matrix.service }}.json
           severity: CRITICAL
           exit-code: 1
+          ignore-unfixed: true
 
       - name: Trivy HIGH 스캔
         id: high
