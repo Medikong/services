@@ -160,7 +160,7 @@ async def test_duplicate_failure_reuses_payment_and_outbox() -> None:
 def _order_created(suffix: str) -> OrderCreatedEvent:
     return OrderCreatedEvent(
         eventId=f"evt-{suffix}",
-        userId=f"user-{suffix}",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=f"order-{suffix}",
         occurredAt=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
         producer="order-service",

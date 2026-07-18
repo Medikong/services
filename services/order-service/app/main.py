@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, ORJSONResponse, PlainTextResponse
@@ -28,7 +29,6 @@ from app.models import (
     ReadinessResponse,
     ProductId,
     UserId,
-    UserRole,
 )
 from app.db import AppResources, lifespan_for, resources_from_env
 from app.cancellation_http import cancellation_router
@@ -212,39 +212,22 @@ def _configure_observability(app: FastAPI) -> None:
 
 
 def create_order_context(
-    x_user_id: Annotated[str, Header(alias="X-User-Id")],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    ],
 ) -> CreateOrderContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return CreateOrderContext(
-                user_id=UserId(x_user_id),
-                idempotency_key=IdempotencyKey(idempotency_key),
-            )
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return CreateOrderContext(
+        user_id=UserId(str(x_user_id)),
+        idempotency_key=IdempotencyKey(idempotency_key),
+    )
 
 
 def read_order_context(
-    x_user_id: Annotated[str, Header(alias="X-User-Id")],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
 ) -> ReadOrderContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return ReadOrderContext(user_id=UserId(x_user_id))
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return ReadOrderContext(user_id=UserId(str(x_user_id)))
 
 
 def _utc_now() -> datetime:

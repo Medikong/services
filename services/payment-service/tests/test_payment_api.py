@@ -12,7 +12,7 @@ from contracts import OrderCreatedEvent
 
 DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
     eventId="evt-order-created-default",
-    userId="user-001",
+    userId="00000000-0000-4000-8000-000000000001",
     sourceId="order-001",
     occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
     producer="order-service",
@@ -98,7 +98,7 @@ def test_approve_mock_payment_returns_approved_payment() -> None:
     response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-approve-001",
         },
@@ -109,7 +109,7 @@ def test_approve_mock_payment_returns_approved_payment() -> None:
     assert response.status_code == 201
     body = response.json()
     assert body["data"]["orderId"] == "order-001"
-    assert body["data"]["userId"] == "user-001"
+    assert body["data"]["userId"] == "00000000-0000-4000-8000-000000000001"
     assert body["data"]["amount"] == 50000
     assert body["data"]["method"] == "MOCK_CARD"
     assert body["data"]["status"] == "APPROVED"
@@ -121,7 +121,7 @@ def test_approve_mock_payment_reuses_payment_when_idempotency_key_repeats() -> N
     record_known_order(store)
     client = TestClient(create_app(store))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "payment-approve-replay-001",
     }
@@ -151,7 +151,7 @@ def test_fail_mock_payment_returns_failed_payment() -> None:
     response = client.post(
         "/payments/mock-failures",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-fail-001",
         },
@@ -162,7 +162,7 @@ def test_fail_mock_payment_returns_failed_payment() -> None:
     assert response.status_code == 201
     body = response.json()
     assert body["data"]["orderId"] == "order-001"
-    assert body["data"]["userId"] == "user-001"
+    assert body["data"]["userId"] == "00000000-0000-4000-8000-000000000001"
     assert body["data"]["amount"] == 50000
     assert body["data"]["method"] == "MOCK_CARD"
     assert body["data"]["status"] == "FAILED"
@@ -177,7 +177,7 @@ def test_fail_mock_payment_reuses_payment_when_idempotency_key_repeats() -> None
     record_known_order(store)
     client = TestClient(create_app(store))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "payment-fail-replay-001",
     }
@@ -210,7 +210,7 @@ def test_fail_mock_payment_returns_conflict_when_order_is_already_approved() -> 
     approval_response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-terminal-approval-001",
         },
@@ -222,7 +222,7 @@ def test_fail_mock_payment_returns_conflict_when_order_is_already_approved() -> 
     failure_response = client.post(
         "/payments/mock-failures",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-terminal-failure-001",
         },
@@ -241,7 +241,7 @@ def test_get_payment_returns_approved_payment_for_owner_customer() -> None:
     create_response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-get-001",
         },
@@ -252,7 +252,10 @@ def test_get_payment_returns_approved_payment_for_owner_customer() -> None:
     # When
     response = client.get(
         f"/payments/{payment_id}",
-        headers={"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"},
+        headers={
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
+            "X-User-Role": "CUSTOMER",
+        },
     )
 
     # Then
@@ -269,7 +272,7 @@ def test_get_payment_returns_403_when_customer_reads_another_customer_payment() 
     create_response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-owner-001",
         },
@@ -280,22 +283,27 @@ def test_get_payment_returns_403_when_customer_reads_another_customer_payment() 
     # When
     response = client.get(
         f"/payments/{payment_id}",
-        headers={"X-User-Id": "user-002", "X-User-Role": "CUSTOMER"},
+        headers={
+            "X-User-Id": "00000000-0000-4000-8000-000000000002",
+            "X-User-Role": "CUSTOMER",
+        },
     )
 
     # Then
     assert response.status_code == 403
 
 
-def test_approve_mock_payment_returns_403_when_owner_role_requests_approval() -> None:
+def test_approve_mock_payment_ignores_untrusted_owner_role_header() -> None:
     # Given
-    client = TestClient(create_app(PaymentStore()))
+    store = PaymentStore()
+    record_known_order(store)
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "owner-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "OWNER",
             "Idempotency-Key": "payment-owner-role-001",
         },
@@ -303,4 +311,7 @@ def test_approve_mock_payment_returns_403_when_owner_role_requests_approval() ->
     )
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 201
+    assert response.json()["data"]["userId"] == (
+        "00000000-0000-4000-8000-000000000001"
+    )

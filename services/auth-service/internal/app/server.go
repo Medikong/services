@@ -10,6 +10,7 @@ import (
 
 	"github.com/grafana/pyroscope-go"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/samber/oops"
 
 	"github.com/Medikong/services/packages/go-audit"
@@ -40,13 +41,14 @@ import (
 )
 
 type Server struct {
-	cfg        config.ServerConfig
-	db         *pgxpool.Pool
-	metrics    *observability.Metrics
-	health     *operational.Handler
-	publicHTTP *http.Server
-	adminHTTP  *http.Server
-	profiler   *pyroscope.Profiler
+	cfg         config.ServerConfig
+	db          *pgxpool.Pool
+	statusRedis *redis.Client
+	metrics     *observability.Metrics
+	health      *operational.Handler
+	publicHTTP  *http.Server
+	adminHTTP   *http.Server
+	profiler    *pyroscope.Profiler
 }
 
 type ServerOptions struct {
@@ -67,7 +69,14 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		_ = metrics.Shutdown(context.Background())
 		return nil, oops.In("auth_server").Code("database.open_failed").Wrap(err)
 	}
+	statusRedis, err := openSessionStatusRedis(cfg.Auth.SessionStatusRedisURL)
+	if err != nil {
+		db.Close()
+		_ = metrics.Shutdown(context.Background())
+		return nil, err
+	}
 	cleanup := func() {
+		_ = statusRedis.Close()
 		db.Close()
 		_ = metrics.Shutdown(context.Background())
 	}
@@ -79,7 +88,8 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		Service:          cfg.Service.Name,
 		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
 		Checks: map[string]operational.Check{
-			"database": func(ctx context.Context) error { return checkServerDatabase(ctx, db, cfg.Development) },
+			"database":             func(ctx context.Context) error { return checkServerDatabase(ctx, db, cfg.Development) },
+			"session_status_redis": func(ctx context.Context) error { return statusRedis.Ping(ctx).Err() },
 		},
 		Metrics:  metrics.Handler(),
 		SetReady: metrics.SetReady,
@@ -136,6 +146,16 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		RememberMeSessionTTL: cfg.Auth.RememberMeSessionTTL,
 		RecoveryTTL:          cfg.Auth.RecoveryTTL,
 	}, sessionRepository, userAuthStateRepository, idempotencyRepository, outboxRepository)
+	statusService := session.NewStatusService(session.StatusServiceOptions{
+		Cache:  session.NewRedisStatusCache(statusRedis),
+		Source: session.NewPostgresStatusSource(db, cfg.Auth.AccessTTL),
+		Config: session.StatusServiceConfig{
+			ActiveTTL: cfg.Auth.SessionStatusCacheTTL, AccessTTL: cfg.Auth.AccessTTL,
+			FallbackTimeout: cfg.Auth.SessionStatusDBTimeout, MaxFallbacks: cfg.Auth.SessionStatusMaxDBLookups,
+		},
+	})
+	sessionService.UseStatusProjection(statusService)
+	sessionRepository.UseStatusProjection(statusService)
 	emailSignInService := authentication.NewEmailService(
 		db, bootstrapService, identityRepository, intentRepository, sessionService,
 	)
@@ -168,6 +188,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		idempotencyRepository, outboxRepository, operator.Config{StrongAuthTTL: cfg.Auth.ProofTTL},
 		approvalPort, options.AuthorizationDecisionPort,
 	)
+	operatorService.UseSessionRevocation(sessionRepository)
 	userProofVerifier, err := security.NewUserProofVerifier(
 		cfg.Auth.UserProofIssuer,
 		cfg.Auth.UserProofKeyID,
@@ -231,6 +252,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	actionResumeController := intent.NewActionResume(credentials, sessionService, actionResumeService)
 	userAuthStateController := userauthstate.NewUserAuthState(credentials, sessionService, userAuthStateService)
 	jwksController := jwks.NewController(keys)
+	extAuthzController := session.NewExtAuthz(keys, statusService)
 	var developmentController *development.DevelopmentController
 	if cfg.Development.RouteEnabled {
 		virtualMessageService := development.NewVirtualMessageService(
@@ -241,6 +263,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	}
 
 	router := newRouter(cfg.Service.Name, cfg.HTTP.RequestTimeout, health)
+	session.RegisterExtAuthzRoutes(router, extAuthzController)
 	jwks.RegisterRoutes(router, jwksController)
 	intent.RegisterRoutes(router, bootstrapController, actionResumeController)
 	authentication.RegisterRoutes(router, signInController)
@@ -264,13 +287,14 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	adminHTTP.WriteTimeout = 0
 	metrics.SetReady(true)
 	return &Server{
-		cfg:        cfg,
-		db:         db,
-		metrics:    metrics,
-		health:     health,
-		publicHTTP: httpserver.New(cfg.HTTP.PublicAddr, router),
-		adminHTTP:  adminHTTP,
-		profiler:   profiler,
+		cfg:         cfg,
+		db:          db,
+		statusRedis: statusRedis,
+		metrics:     metrics,
+		health:      health,
+		publicHTTP:  httpserver.New(cfg.HTTP.PublicAddr, router),
+		adminHTTP:   adminHTTP,
+		profiler:    profiler,
 	}, nil
 }
 
@@ -372,8 +396,13 @@ func (s *Server) closeWith(cause error) error {
 		s.db.Close()
 		s.db = nil
 	}
+	var statusRedisErr error
+	if s.statusRedis != nil {
+		statusRedisErr = s.statusRedis.Close()
+		s.statusRedis = nil
+	}
 	metricCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Lifecycle.ShutdownTimeout)
 	metricErr := s.metrics.Shutdown(metricCtx)
 	cancel()
-	return oops.Join(cause, profilerErr, metricErr)
+	return oops.Join(cause, profilerErr, statusRedisErr, metricErr)
 }

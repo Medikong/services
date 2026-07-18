@@ -24,13 +24,6 @@ class OrderStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
-@unique
-class UserRole(StrEnum):
-    CUSTOMER = "CUSTOMER"
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
-
-
 class CreateOrderRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 

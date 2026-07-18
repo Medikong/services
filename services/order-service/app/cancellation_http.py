@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Annotated, assert_never
+from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Path, status
 from observability import HttpError
@@ -21,7 +22,6 @@ from app.models import (
     IdempotencyKey,
     OrderId,
     UserId,
-    UserRole,
 )
 from app.repository import OrderRepository
 
@@ -139,19 +139,12 @@ def cancellation_router(repository: OrderRepository) -> APIRouter:
 
 def cancellation_context(
     x_user_id: Annotated[
-        str,
+        UUID,
         Header(
             alias="X-User-Id",
             description=(
                 "Authenticated user id forwarded by the trusted gateway in local E2E."
             ),
-        ),
-    ],
-    x_user_role: Annotated[
-        UserRole,
-        Header(
-            alias="X-User-Role",
-            json_schema_extra={"enum": ["CUSTOMER"]},
         ),
     ],
     idempotency_key: Annotated[
@@ -175,18 +168,7 @@ def cancellation_context(
         ),
     ] = None,
 ) -> CancellationContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return CancellationContext(
-                user_id=UserId(x_user_id),
-                idempotency_key=IdempotencyKey(idempotency_key),
-            )
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HttpError(
-                status.HTTP_403_FORBIDDEN,
-                "cancellation.forbidden",
-                "customer role required",
-                {"requiredRole": "CUSTOMER"},
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return CancellationContext(
+        user_id=UserId(str(x_user_id)),
+        idempotency_key=IdempotencyKey(idempotency_key),
+    )

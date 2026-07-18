@@ -41,6 +41,7 @@ type httpE2EHarness struct {
 	client    *http.Client
 	baseURL   string
 	adminURL  string
+	redisURL  string
 	origin    string
 	result    <-chan error
 	closeOnce sync.Once
@@ -110,12 +111,14 @@ func newHTTPHarness(t *testing.T, development bool, options app.ServerOptions) *
 	t.Cleanup(cancel)
 
 	databaseURL := startPostgres(t, ctx)
+	redisURL := startRedis(t, ctx)
 	var cfg config.ServerConfig
 	if development {
 		cfg = loadDevelopmentHTTPServerConfig(t, databaseURL)
 	} else {
 		cfg = loadProductionHTTPServerConfig(t, databaseURL)
 	}
+	cfg.Auth.SessionStatusRedisURL = redisURL
 	var db *pgxpool.Pool
 	if development {
 		db = migrateSchemas(t, ctx, cfg.Postgres)
@@ -146,6 +149,7 @@ func newHTTPHarness(t *testing.T, development bool, options app.ServerOptions) *
 		},
 		baseURL:  "http://" + cfg.HTTP.PublicAddr,
 		adminURL: "http://" + cfg.HTTP.AdminAddr,
+		redisURL: redisURL,
 		origin:   httpE2ETestOrigin,
 		result:   result,
 	}
@@ -207,6 +211,7 @@ func configureHTTPEnvironment(t *testing.T, databaseURL string) {
 	t.Setenv("AUTH_ACCESS_TTL", "5m")
 	t.Setenv("AUTH_PROOF_TTL", "5m")
 	t.Setenv("AUTH_RECOVERY_TTL", "2m")
+	t.Setenv("AUTH_SESSION_STATUS_REDIS_URL", "redis://127.0.0.1:6379/0")
 	t.Setenv("AUTH_PASSWORD_MIN_LENGTH", "12")
 	t.Setenv("READINESS_CHECK_TIMEOUT", "1s")
 	t.Setenv("SHUTDOWN_TIMEOUT", "2s")

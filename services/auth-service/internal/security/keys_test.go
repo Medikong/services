@@ -83,7 +83,11 @@ func TestAccessTokenRejectsTamperingExpiryAudienceAndUnknownKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	parts := splitJWT(t, raw)
-	tampered := parts[0] + "." + parts[1] + "." + parts[2][:len(parts[2])-1] + "A"
+	tamperedFirst := byte('A')
+	if parts[2][0] == tamperedFirst {
+		tamperedFirst = 'B'
+	}
+	tampered := parts[0] + "." + parts[1] + "." + string(tamperedFirst) + parts[2][1:]
 	if _, err := keys.VerifyAccessToken(tampered); err == nil {
 		t.Fatal("tampered JWT was accepted")
 	}

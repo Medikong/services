@@ -145,7 +145,7 @@ def test_list_notifications_returns_current_customer_notifications() -> None:
     # When
     response = client.get(
         "/notifications",
-        headers={"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"},
+        headers={"X-User-Id": "user-001"},
     )
 
     # Then
@@ -174,12 +174,12 @@ def test_list_notifications_uses_cursor_for_next_page() -> None:
     # When
     first_response = client.get(
         "/notifications?limit=1",
-        headers={"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"},
+        headers={"X-User-Id": "user-001"},
     )
     first_body = first_response.json()
     second_response = client.get(
         f"/notifications?limit=1&cursor={first_body['pageInfo']['nextCursor']}",
-        headers={"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"},
+        headers={"X-User-Id": "user-001"},
     )
 
     # Then
@@ -200,7 +200,7 @@ def test_list_notifications_hides_other_customer_notifications() -> None:
     # When
     response = client.get(
         "/notifications",
-        headers={"X-User-Id": "user-002", "X-User-Role": "CUSTOMER"},
+        headers={"X-User-Id": "user-002"},
     )
 
     # Then
@@ -208,18 +208,42 @@ def test_list_notifications_hides_other_customer_notifications() -> None:
     assert response.json()["data"] == []
 
 
-def test_list_notifications_returns_403_when_owner_role_reads_notifications() -> None:
+def test_list_notifications_ignores_forged_role_and_email() -> None:
+    # Given
+    store = NotificationStore()
+    anyio.run(store.record_notification_requested, DEFAULT_NOTIFICATION_REQUESTED)
+    client = TestClient(create_app(store))
+
+    # When
+    response = client.get(
+        "/notifications",
+        headers={
+            "X-User-Id": "user-001",
+            "X-User-Role": "ADMIN",
+            "X-User-Email": "forged@example.com",
+        },
+    )
+
+    # Then
+    assert response.status_code == 200
+    assert response.json()["data"][0]["id"] == "notification-001"
+
+
+def test_list_notifications_returns_422_when_user_id_is_missing() -> None:
     # Given
     client = TestClient(create_app(NotificationStore()))
 
     # When
     response = client.get(
         "/notifications",
-        headers={"X-User-Id": "owner-001", "X-User-Role": "OWNER"},
+        headers={
+            "X-User-Role": "CUSTOMER",
+            "X-User-Email": "forged@example.com",
+        },
     )
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 def test_record_notification_requested_is_idempotent_by_event_id() -> None:

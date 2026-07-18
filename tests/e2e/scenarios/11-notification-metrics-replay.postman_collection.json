@@ -58,8 +58,7 @@
         "method": "GET",
         "header": [
           { "key": "X-Request-Id", "value": "e2e-notification-replay-list" },
-          { "key": "X-User-Id", "value": "user-metric-replay" },
-          { "key": "X-User-Role", "value": "CUSTOMER" }
+          { "key": "X-User-Id", "value": "user-metric-replay" }
         ],
         "url": {
           "raw": "{{notificationServiceUrl}}/notifications?limit=20",

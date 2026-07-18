@@ -18,7 +18,8 @@ func TestWorkerPublishesDomainOutboxWhenPublisherIsInjected(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	databaseURL := startPostgres(t, ctx)
-	configureDevelopmentEnvironment(t, databaseURL)
+	redisURL := startRedis(t, ctx)
+	configureDevelopmentEnvironment(t, databaseURL, redisURL)
 	workerCfg, err := config.LoadWorker()
 	if err != nil {
 		t.Fatalf("load worker config: %v", err)

@@ -13,7 +13,8 @@ import (
 var ErrNotFound = errors.New("session not found")
 
 type PostgresRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	status *StatusService
 }
 
 func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {

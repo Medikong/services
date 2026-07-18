@@ -26,7 +26,7 @@ def test_create_order_increments_orders_created_metric() -> None:
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-metric-created-001",
         },
@@ -65,7 +65,7 @@ def test_create_order_increments_sold_out_metric_when_stock_is_exhausted() -> No
     first_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-metric-sold-out-001",
         },
@@ -78,7 +78,7 @@ def test_create_order_increments_sold_out_metric_when_stock_is_exhausted() -> No
     second_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-002",
+            "X-User-Id": "00000000-0000-4000-8000-000000000002",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-metric-sold-out-002",
         },
@@ -109,7 +109,7 @@ def test_unknown_product_does_not_increment_sold_out_metric() -> None:
     response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-metric-unavailable-001",
         },

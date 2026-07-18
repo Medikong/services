@@ -7,13 +7,17 @@ from app.cancellations import RequestCancellationCommand, RequestCancellationRes
 from app.store import OrderStore
 
 
+class PrivateDatabaseFailure(RuntimeError):
+    pass
+
+
 class FailingCancellationStore(OrderStore):
     async def request_cancellation(
         self,
         command: RequestCancellationCommand,
     ) -> RequestCancellationResult:
         del command
-        raise RuntimeError("private database failure")
+        raise PrivateDatabaseFailure("private database failure")
 
 
 def test_cancellation_openapi_documents_static_operation_metadata() -> None:
@@ -86,7 +90,7 @@ def test_cancellation_openapi_documents_static_operation_metadata() -> None:
     )
 
 
-def test_admin_cancellation_error_uses_common_envelope() -> None:
+def test_forged_admin_header_does_not_change_missing_order_envelope() -> None:
     # Given
     client = TestClient(create_app(OrderStore()))
 
@@ -94,7 +98,7 @@ def test_admin_cancellation_error_uses_common_envelope() -> None:
     response = client.post(
         "/orders/order-role-forbidden/cancellations",
         headers={
-            "X-User-Id": "admin-cancel",
+            "X-User-Id": "00000000-0000-4000-8000-000000000003",
             "X-User-Role": "ADMIN",
             "Idempotency-Key": "cancel-role-forbidden",
             "X-Request-Id": "request-role-forbidden",
@@ -103,11 +107,11 @@ def test_admin_cancellation_error_uses_common_envelope() -> None:
     )
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert response.json()["error"] == {
-        "code": "cancellation.forbidden",
-        "message": "customer role required",
-        "details": {"requiredRole": "CUSTOMER"},
+        "code": "order.not_found",
+        "message": "order not found",
+        "details": {"orderId": "order-role-forbidden"},
     }
     assert response.json()["requestId"] == "request-role-forbidden"
     assert datetime.fromisoformat(
@@ -123,7 +127,7 @@ def test_invalid_cancellation_error_uses_common_envelope() -> None:
     response = client.post(
         "/orders/order-validation/cancellations",
         headers={
-            "X-User-Id": "customer-validation",
+            "X-User-Id": "00000000-0000-4000-8000-000000000004",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "",
         },
@@ -149,7 +153,7 @@ def test_unexpected_cancellation_error_uses_safe_common_envelope() -> None:
     response = client.post(
         "/orders/order-unexpected/cancellations",
         headers={
-            "X-User-Id": "customer-unexpected",
+            "X-User-Id": "00000000-0000-4000-8000-000000000005",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "cancel-unexpected",
             "X-Request-Id": "request-unexpected",

@@ -16,33 +16,37 @@ import (
 
 // AuthConfig contains authentication policy and key references, never user profile data.
 type AuthConfig struct {
-	CredentialHMACKey     string
-	ReplayEncryptionKey   string
-	JWTPrivateKeyPEM      string
-	JWTKeyID              string
-	JWTIssuer             string
-	JWTAudiences          []string
-	JWTRetiringPublicKeys map[string]string
-	AuthProofPrivateKey   string
-	AuthProofKeyID        string
-	UserProofPublicKey    string
-	UserProofKeyID        string
-	UserProofIssuer       string
-	ProofClockSkew        time.Duration
-	IntentTTL             time.Duration
-	RegistrationTTL       time.Duration
-	ChallengeTTL          time.Duration
-	SessionTTL            time.Duration
-	RememberMeSessionTTL  time.Duration
-	RefreshTTL            time.Duration
-	AccessTTL             time.Duration
-	ProofTTL              time.Duration
-	RecoveryTTL           time.Duration
-	PasswordMinLength     int
-	SessionCookieName     string
-	AuthFlowCookieName    string
-	CookieSecure          bool
-	AllowedOrigins        []string
+	CredentialHMACKey         string
+	ReplayEncryptionKey       string
+	JWTPrivateKeyPEM          string
+	JWTKeyID                  string
+	JWTIssuer                 string
+	JWTAudiences              []string
+	JWTRetiringPublicKeys     map[string]string
+	AuthProofPrivateKey       string
+	AuthProofKeyID            string
+	UserProofPublicKey        string
+	UserProofKeyID            string
+	UserProofIssuer           string
+	ProofClockSkew            time.Duration
+	IntentTTL                 time.Duration
+	RegistrationTTL           time.Duration
+	ChallengeTTL              time.Duration
+	SessionTTL                time.Duration
+	RememberMeSessionTTL      time.Duration
+	RefreshTTL                time.Duration
+	AccessTTL                 time.Duration
+	ProofTTL                  time.Duration
+	RecoveryTTL               time.Duration
+	PasswordMinLength         int
+	SessionCookieName         string
+	AuthFlowCookieName        string
+	CookieSecure              bool
+	AllowedOrigins            []string
+	SessionStatusRedisURL     string
+	SessionStatusCacheTTL     time.Duration
+	SessionStatusDBTimeout    time.Duration
+	SessionStatusMaxDBLookups int
 }
 
 func (c AuthConfig) Validate(operational bool) error {
@@ -71,6 +75,10 @@ func (c AuthConfig) Validate(operational bool) error {
 		validation.Field(&c.PasswordMinLength, validation.Min(8)),
 		validation.Field(&c.SessionCookieName, validation.Required),
 		validation.Field(&c.AuthFlowCookieName, validation.Required),
+		validation.Field(&c.SessionStatusRedisURL, validation.Required),
+		validation.Field(&c.SessionStatusCacheTTL, validation.Min(time.Nanosecond), validation.Max(5*time.Minute)),
+		validation.Field(&c.SessionStatusDBTimeout, validation.Min(time.Nanosecond), validation.Max(100*time.Millisecond)),
+		validation.Field(&c.SessionStatusMaxDBLookups, validation.Min(1), validation.Max(32)),
 	)
 	if err != nil {
 		return err
@@ -182,11 +190,12 @@ func AllowsDevelopmentFeatures(environment string) bool {
 
 func loadAuth(environment string) (AuthConfig, error) {
 	developmentAllowed := AllowsDevelopmentFeatures(environment)
-	credentialDefault, replayDefault, originDefault := "", "", ""
+	credentialDefault, replayDefault, originDefault, redisDefault := "", "", "", ""
 	if developmentAllowed {
 		credentialDefault = "local-development-credential-hmac-key-change-before-shared-use"
 		replayDefault = "local-development-replay-key-001"
 		originDefault = "http://localhost:3000"
+		redisDefault = "redis://127.0.0.1:6379/0"
 	}
 	registrationTTL, err := durationEnv("AUTH_REGISTRATION_TTL", 30*time.Minute)
 	if err != nil {
@@ -225,6 +234,18 @@ func loadAuth(environment string) (AuthConfig, error) {
 		return AuthConfig{}, err
 	}
 	accessTTL, err := durationEnv("AUTH_ACCESS_TTL", 15*time.Minute)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	statusCacheTTL, err := durationEnv("AUTH_SESSION_STATUS_CACHE_TTL", 5*time.Minute)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	statusDBTimeout, err := durationEnv("AUTH_SESSION_STATUS_DB_TIMEOUT", 100*time.Millisecond)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	statusMaxDBLookups, err := intEnv("AUTH_SESSION_STATUS_MAX_DB_LOOKUPS", 32)
 	if err != nil {
 		return AuthConfig{}, err
 	}
@@ -268,11 +289,15 @@ func loadAuth(environment string) (AuthConfig, error) {
 		IntentTTL:             intentTTL, RegistrationTTL: registrationTTL, ChallengeTTL: challengeTTL,
 		SessionTTL: sessionTTL, RememberMeSessionTTL: rememberTTL, RefreshTTL: refreshTTL,
 		AccessTTL: accessTTL, ProofTTL: proofTTL, RecoveryTTL: recoveryTTL,
-		PasswordMinLength:  passwordMinLength,
-		SessionCookieName:  stringEnv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_refresh"),
-		AuthFlowCookieName: stringEnv("AUTH_FLOW_COOKIE_NAME", "__Host-dm_auth"),
-		CookieSecure:       cookieSecure,
-		AllowedOrigins:     stringListEnv("AUTH_ALLOWED_ORIGINS", originDefault),
+		PasswordMinLength:         passwordMinLength,
+		SessionCookieName:         stringEnv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_refresh"),
+		AuthFlowCookieName:        stringEnv("AUTH_FLOW_COOKIE_NAME", "__Host-dm_auth"),
+		CookieSecure:              cookieSecure,
+		AllowedOrigins:            stringListEnv("AUTH_ALLOWED_ORIGINS", originDefault),
+		SessionStatusRedisURL:     stringEnv("AUTH_SESSION_STATUS_REDIS_URL", redisDefault),
+		SessionStatusCacheTTL:     statusCacheTTL,
+		SessionStatusDBTimeout:    statusDBTimeout,
+		SessionStatusMaxDBLookups: statusMaxDBLookups,
 	}, nil
 }
 

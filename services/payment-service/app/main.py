@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
@@ -27,7 +28,6 @@ from app.models import (
     PaymentResponse,
     ReadinessResponse,
     UserId,
-    UserRole,
 )
 from app.repository import PaymentRepository
 from app.readiness import payment_readiness
@@ -41,6 +41,7 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
+    PaymentOrderOwnerMismatch,
     PaymentTerminalConflict,
 )
 
@@ -126,6 +127,11 @@ def create_app(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="payment request does not match order",
                 )
+            case PaymentOrderOwnerMismatch():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="order owner mismatch",
+                )
             case PaymentIdempotencyConflict():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -173,6 +179,11 @@ def create_app(
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="payment request does not match order",
+                )
+            case PaymentOrderOwnerMismatch():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="order owner mismatch",
                 )
             case PaymentIdempotencyConflict():
                 raise HTTPException(
@@ -222,42 +233,22 @@ def _configure_observability(app: FastAPI) -> None:
 
 
 def approve_payment_context(
-    x_user_id: Annotated[str, Header(alias="X-User-Id", min_length=1, max_length=64)],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
     idempotency_key: Annotated[
         str,
         Header(alias="Idempotency-Key", min_length=1, max_length=128),
     ],
 ) -> ApprovePaymentContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return ApprovePaymentContext(
-                user_id=UserId(x_user_id),
-                idempotency_key=IdempotencyKey(idempotency_key),
-            )
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return ApprovePaymentContext(
+        user_id=UserId(str(x_user_id)),
+        idempotency_key=IdempotencyKey(idempotency_key),
+    )
 
 
 def read_payment_context(
-    x_user_id: Annotated[str, Header(alias="X-User-Id", min_length=1, max_length=64)],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
 ) -> ReadPaymentContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return ReadPaymentContext(user_id=UserId(x_user_id))
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return ReadPaymentContext(user_id=UserId(str(x_user_id)))
 
 
 def _utc_now() -> datetime:

@@ -31,7 +31,7 @@ def test_payment_approved_message_applies_domain_change_without_direct_publish()
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "notification-order-001",
         },
@@ -40,7 +40,7 @@ def test_payment_approved_message_applies_domain_change_without_direct_publish()
     order_id = create_response.json()["data"]["id"]
     event = PaymentApprovedEvent(
         eventId="evt-payment-approved-notification-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
         producer="payment-service",

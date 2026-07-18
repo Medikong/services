@@ -31,9 +31,9 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
+    PaymentOrderOwnerMismatch,
     PaymentTerminalConflict,
     failed_payment_matches_command,
-    known_order_matches_command,
     payment_matches_command,
 )
 
@@ -49,22 +49,19 @@ class PostgresPaymentRepository:
         async with self._session_factory() as session:
             try:
                 async with session.begin():
-                    replayed = await _replayed_payment(session, command)
-                    if replayed is not None:
-                        return _approval_replay(replayed, command)
                     known_order = await _locked_known_order(session, command.order_id)
                     if known_order is None:
                         return PaymentOrderNotFound(order_id=command.order_id)
+                    projected_order = known_order_from_record(known_order)
+                    if projected_order.user_id != command.user_id:
+                        return PaymentOrderOwnerMismatch(order_id=command.order_id)
                     replayed = await _replayed_payment(session, command)
                     if replayed is not None:
                         return _approval_replay(replayed, command)
                     terminal = await _terminal_payment(session, command.order_id)
                     if terminal is not None:
                         return PaymentTerminalConflict(payment=terminal)
-                    if not known_order_matches_command(
-                        known_order_from_record(known_order),
-                        command,
-                    ):
+                    if projected_order.amount != command.amount:
                         return PaymentOrderMismatch(order_id=command.order_id)
                     payment = new_approved_payment(command)
                     session.add(record_from_payment(payment, command.idempotency_key))
@@ -80,22 +77,19 @@ class PostgresPaymentRepository:
         async with self._session_factory() as session:
             try:
                 async with session.begin():
-                    replayed = await _replayed_payment(session, command)
-                    if replayed is not None:
-                        return _failure_replay(replayed, command)
                     known_order = await _locked_known_order(session, command.order_id)
                     if known_order is None:
                         return PaymentOrderNotFound(order_id=command.order_id)
+                    projected_order = known_order_from_record(known_order)
+                    if projected_order.user_id != command.user_id:
+                        return PaymentOrderOwnerMismatch(order_id=command.order_id)
                     replayed = await _replayed_payment(session, command)
                     if replayed is not None:
                         return _failure_replay(replayed, command)
                     terminal = await _terminal_payment(session, command.order_id)
                     if terminal is not None:
                         return PaymentTerminalConflict(payment=terminal)
-                    if not known_order_matches_command(
-                        known_order_from_record(known_order),
-                        command,
-                    ):
+                    if projected_order.amount != command.amount:
                         return PaymentOrderMismatch(order_id=command.order_id)
                     payment = new_failed_payment(command)
                     session.add(record_from_payment(payment, command.idempotency_key))

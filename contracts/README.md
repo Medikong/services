@@ -46,7 +46,8 @@ contracts/
 
 - OpenAPI 버전은 `3.1.0`을 사용한다.
 - 인증은 `Authorization: Bearer <JWT>`를 기본으로 한다.
-- JWT 발급, 검증, role, claim 규칙은 `jwt-conventions.md`를 따른다.
+- JWT/JWKS 발급·검증, Session 확인과 identity-only claim/header 규칙은 `jwt-conventions.md`를 따른다.
+- 위 JWT/JWKS 규칙은 목표 계약이다. 현재 활성 Helm stack의 effective legacy `JWT_SECRET`, Kong HS256 및 role/email plugin, Notification/Interest의 legacy role-header trust와 Auth issuer fallback은 `jwt-conventions.md`에 미해결 deployment blocker로 기록하며, 후속 migration 전에는 RS256/identity-only-ready 배포로 간주하지 않는다.
 - `/healthz`, `/readyz`, `/metrics` 운영 엔드포인트는 `operational-endpoints.md`를 따른다.
 - ID 타입은 모두 `string`으로 둔다.
 - 목록 API는 `limit`, `cursor` 기반 페이지네이션을 사용한다.

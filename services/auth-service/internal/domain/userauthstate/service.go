@@ -29,7 +29,9 @@ func (DenyAuthorizationDecisionPort) Verify(context.Context, string, string, str
 }
 
 type SessionRevoker interface {
+	FenceRevocationsForUser(context.Context, pgx.Tx, uuid.UUID) (domain.RevocationFences, error)
 	RevokeForUser(context.Context, pgx.Tx, uuid.UUID, string) error
+	ProjectRevokedForUser(context.Context, uuid.UUID) error
 }
 
 type Config struct {
@@ -116,6 +118,7 @@ func (s *Service) Apply(ctx context.Context, input ApplyInput) (ApplyOutput, err
 	if err != nil {
 		return ApplyOutput{}, domain.Problem(403, "AUTH_USER_STATUS_PROOF_INVALID", "사용자 상태 증명을 확인할 수 없습니다.")
 	}
+	var fences domain.RevocationFences
 	if apply {
 		current, err = s.states.Apply(ctx, tx, current, change)
 		if errors.Is(err, ErrVersionConflict) {
@@ -125,13 +128,29 @@ func (s *Service) Apply(ctx context.Context, input ApplyInput) (ApplyOutput, err
 			return ApplyOutput{}, domain.Unavailable()
 		}
 		if status == StatusRestricted || status == StatusDeactivated {
+			fences, err = s.sessions.FenceRevocationsForUser(ctx, tx, pathUserID)
+			if err != nil {
+				domain.ResolveRevocationRollback(ctx, tx, fences)
+				return ApplyOutput{}, domain.Unavailable()
+			}
 			if err := s.sessions.RevokeForUser(ctx, tx, pathUserID, "user_account_status_changed"); err != nil {
+				domain.ResolveRevocationRollback(ctx, tx, fences)
 				return ApplyOutput{}, domain.Unavailable()
 			}
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return ApplyOutput{}, domain.Unavailable()
+	}
+	if fences != nil {
+		if err := fences.Resolve(ctx); err != nil {
+			return ApplyOutput{}, domain.Unavailable()
+		}
+	} else if current.Status == StatusRestricted || current.Status == StatusDeactivated {
+		if err := s.sessions.ProjectRevokedForUser(ctx, pathUserID); err != nil {
+			return ApplyOutput{}, domain.Unavailable()
+		}
 	}
 	return ApplyOutput{UserID: current.UserID, AccountStatus: current.Status, UserVersion: current.UserVersion, Applied: apply || replay}, nil
 }

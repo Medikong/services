@@ -314,10 +314,6 @@
           {
             "key": "X-User-Id",
             "value": "{{userId}}"
-          },
-          {
-            "key": "X-User-Role",
-            "value": "{{userRole}}"
           }
         ],
         "url": {

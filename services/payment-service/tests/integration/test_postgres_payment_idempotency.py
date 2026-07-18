@@ -25,6 +25,7 @@ from app.store import (
     PaymentIdempotencyConflict,
     PaymentOrderMismatch,
     PaymentOrderNotFound,
+    PaymentOrderOwnerMismatch,
     PaymentTerminalConflict,
 )
 from contracts import OrderCreatedEvent
@@ -162,6 +163,7 @@ def _one_failed_and_one_replayed(
             case (
                 PaymentOrderNotFound()
                 | PaymentOrderMismatch()
+                | PaymentOrderOwnerMismatch()
                 | PaymentIdempotencyConflict()
                 | PaymentTerminalConflict()
             ):

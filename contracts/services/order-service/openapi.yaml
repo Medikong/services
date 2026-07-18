@@ -17,8 +17,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Email"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
         - $ref: "../../common/components.yaml#/components/parameters/Idempotency-Key"
       requestBody:
         required: true
@@ -53,7 +51,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
         - $ref: "../../common/components.yaml#/components/parameters/orderId"
       responses:
         "200":
@@ -78,13 +75,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - name: X-User-Role
-          in: header
-          required: true
-          schema:
-            type: string
-            enum:
-              - CUSTOMER
         - name: order_id
           in: path
           required: true
@@ -119,13 +109,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - name: X-User-Role
-          in: header
-          required: true
-          schema:
-            type: string
-            enum:
-              - CUSTOMER
         - $ref: "../../common/components.yaml#/components/parameters/Idempotency-Key"
         - name: order_id
           in: path
