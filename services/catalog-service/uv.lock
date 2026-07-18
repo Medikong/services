@@ -716,10 +716,12 @@ dependencies = [
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-instrumentation-pymongo" },
+    { name = "opentelemetry-instrumentation-redis" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
     { name = "opentelemetry-sdk" },
     { name = "pyroscope-io", marker = "sys_platform != 'win32'" },
     { name = "pyroscope-otel", marker = "sys_platform != 'win32'" },
+    { name = "redis" },
     { name = "structlog" },
 ]
 
@@ -733,10 +735,12 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-fastapi", specifier = "==0.63b1" },
     { name = "opentelemetry-instrumentation-logging", specifier = "==0.63b1" },
     { name = "opentelemetry-instrumentation-pymongo", specifier = "==0.63b1" },
+    { name = "opentelemetry-instrumentation-redis", specifier = "==0.63b1" },
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = "==0.63b1" },
     { name = "opentelemetry-sdk", specifier = "==1.42.1" },
     { name = "pyroscope-io", marker = "sys_platform != 'win32'", specifier = "==0.8.14" },
     { name = "pyroscope-otel", marker = "sys_platform != 'win32'", specifier = "==0.4.1" },
+    { name = "redis", specifier = "==7.3.1" },
     { name = "structlog", specifier = "==25.5.0" },
 ]
 
@@ -892,6 +896,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/06/b2/94c180359165abe62e829250bc6ac6b7daa2334b3c505bad64f1c64f18ab/opentelemetry_instrumentation_pymongo-0.63b1.tar.gz", hash = "sha256:8c0ae185b59dcb45c80bf90d4ffda5fcc6337dbba11de40306ffd69459e476fa", size = 10208, upload-time = "2026-05-21T16:36:41.961Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/b9/47b8d0f52d81d7661debebb11f4fdd1ab869d694089711c1ac8988456364/opentelemetry_instrumentation_pymongo-0.63b1-py3-none-any.whl", hash = "sha256:0d8dd55b2522eda4a7093da8b5f47fae9a3235fb2786bc14c161d5999a66320d", size = 10290, upload-time = "2026-05-21T16:35:44.634Z" },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-redis"
+version = "0.63b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/58/2a91453c70943d6af4b5f9f1c232d69e6093800f95349ff5f1f8a89cf6ba/opentelemetry_instrumentation_redis-0.63b1.tar.gz", hash = "sha256:28d235159df43cc2bc8779af5c602afad1e08603fff75ac8ca34dd1bf30a9cb9", size = 16711, upload-time = "2026-05-21T16:36:44.662Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/17/33c21901325f6bf96939f355db174627c148c83211d0412622d4066f560d/opentelemetry_instrumentation_redis-0.63b1-py3-none-any.whl", hash = "sha256:f0e51c4006f68e340abbf28a7995feff004de78649697cbdf3bac0072cacd082", size = 14539, upload-time = "2026-05-21T16:35:49.995Z" },
 ]
 
 [[package]]
@@ -1249,6 +1268,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/da/92/1446574745d74df0c92e6aa4a7b0b3130706a4142b2d1a5869f2eaa423c6/pyyaml-6.0.3-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:16249ee61e95f858e83976573de0f5b2893b3677ba71c9dd36b9cf8be9ac6d65", size = 829923, upload-time = "2025-09-25T21:32:54.537Z" },
     { url = "https://files.pythonhosted.org/packages/f0/7a/1c7270340330e575b92f397352af856a8c06f230aa3e76f86b39d01b416a/pyyaml-6.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4ad1906908f2f5ae4e5a8ddfce73c320c2a1429ec52eafd27138b7f1cbe341c9", size = 174062, upload-time = "2025-09-25T21:32:55.767Z" },
     { url = "https://files.pythonhosted.org/packages/f1/12/de94a39c2ef588c7e6455cfbe7343d3b2dc9d6b6b2f40c4c6565744c873d/pyyaml-6.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:ebc55a14a21cb14062aa4162f906cd962b28e2e9ea38f9b4391244cd8de4ae0b", size = 149341, upload-time = "2025-09-25T21:32:56.828Z" },
+]
+
+[[package]]
+name = "redis"
+version = "7.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d0/dd/18929ca8060427f9351b17599e48929e11e93bfe72e063d86d73c79d7efa/redis-7.3.1.tar.gz", hash = "sha256:c19dc44d1aa6d56d882fb17fc2e93183e5371be0ae0049b7400786658e09a561", size = 4930156, upload-time = "2026-06-05T08:46:42.675Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/67/9457566995aee96aff727f18f57e8b246c26327a174b1e4598a9d9938f29/redis-7.3.1-py3-none-any.whl", hash = "sha256:9eae87cbbf6490d32eef5d2f9e05718656ccdcb877dcd78e14ce90393f7bb914", size = 404779, upload-time = "2026-06-05T08:46:41.2Z" },
 ]
 
 [[package]]
