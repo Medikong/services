@@ -10,7 +10,7 @@ from contracts import OrderCreatedEvent
 
 DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
     eventId="evt-order-created-security",
-    userId="user-001",
+    userId="00000000-0000-4000-8000-000000000001",
     sourceId="order-001",
     occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
     producer="order-service",
@@ -36,7 +36,7 @@ def test_approve_mock_payment_returns_409_when_order_is_unknown() -> None:
     response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-unknown-order-001",
         },
@@ -58,7 +58,7 @@ def test_fail_mock_payment_returns_409_when_order_is_unknown() -> None:
     response = client.post(
         "/payments/mock-failures",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-fail-unknown-order-001",
         },
@@ -86,7 +86,7 @@ def test_approve_mock_payment_returns_409_when_amount_mismatches_order() -> None
     response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-amount-mismatch-001",
         },
@@ -109,7 +109,7 @@ def test_fail_mock_payment_returns_409_when_amount_mismatches_order() -> None:
     response = client.post(
         "/payments/mock-failures",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-fail-amount-mismatch-001",
         },
@@ -133,7 +133,7 @@ def test_approve_mock_payment_returns_409_when_idempotency_payload_changes() -> 
     record_known_order(store)
     client = TestClient(create_app(store))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "payment-idempotency-conflict-001",
     }
@@ -166,7 +166,7 @@ def test_fail_mock_payment_returns_409_when_idempotency_payload_changes() -> Non
     record_known_order(store)
     client = TestClient(create_app(store))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "payment-fail-idempotency-conflict-001",
     }
@@ -211,7 +211,7 @@ def test_approve_mock_payment_returns_422_when_order_id_is_empty() -> None:
     response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-empty-order-001",
         },

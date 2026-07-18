@@ -46,8 +46,9 @@ func (r *PostgresRepository) ClaimPublishBatch(ctx context.Context, workerID str
 		WITH candidates AS (
 			SELECT event_id
 			FROM auth_outbox_events
-			WHERE (publish_status = 'pending' AND next_attempt_at <= now())
+			WHERE event_type <> $4 AND ((publish_status = 'pending' AND next_attempt_at <= now())
 				OR (publish_status = 'publishing' AND lease_until <= now())
+			)
 			ORDER BY occurred_at, event_id
 			FOR UPDATE SKIP LOCKED
 			LIMIT $1
@@ -61,7 +62,7 @@ func (r *PostgresRepository) ClaimPublishBatch(ctx context.Context, workerID str
 		RETURNING event.event_id, event.aggregate_type, event.aggregate_id,
 			event.aggregate_version, event.event_type, event.payload,
 			event.correlation_id, event.occurred_at, event.publish_attempts
-	`, batchSize, workerID, lease.String())
+	`, batchSize, workerID, lease.String(), InternalSessionStatusProjectionEventType)
 	if err != nil {
 		return nil, err
 	}

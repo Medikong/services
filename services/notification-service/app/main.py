@@ -1,9 +1,9 @@
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Final, assert_never
+from typing import Annotated, Final
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, Header, Query, Response, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from observability import (
     RequestIdMiddleware,
@@ -22,7 +22,6 @@ from app.models import (
     NotificationListResponse,
     ReadinessResponse,
     UserId,
-    UserRole,
 )
 from app.repository import NotificationRepository
 
@@ -112,18 +111,8 @@ def _configure_observability(app: FastAPI) -> None:
 
 def read_notifications_context(
     x_user_id: Annotated[str, Header(alias="X-User-Id", min_length=1, max_length=64)],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
 ) -> ReadNotificationsContext:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return ReadNotificationsContext(user_id=UserId(x_user_id))
-        case UserRole.OWNER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return ReadNotificationsContext(user_id=UserId(x_user_id))
 
 
 def _utc_now() -> datetime:

@@ -18,21 +18,23 @@ import (
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	"github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
 )
 
 type Worker struct {
-	cfg             config.WorkerConfig
-	resources       Resources
-	metrics         *observability.Metrics
-	health          *operational.Handler
-	adminHTTP       *http.Server
-	runAudit        func(context.Context) error
-	runDomainOutbox func(context.Context) error
-	cleanup         func(context.Context) (int64, error)
-	cleanupInterval time.Duration
-	profiler        *pyroscope.Profiler
+	cfg                 config.WorkerConfig
+	resources           Resources
+	metrics             *observability.Metrics
+	health              *operational.Handler
+	adminHTTP           *http.Server
+	runAudit            func(context.Context) error
+	runDomainOutbox     func(context.Context) error
+	runStatusProjection func(context.Context) error
+	cleanup             func(context.Context) (int64, error)
+	cleanupInterval     time.Duration
+	profiler            *pyroscope.Profiler
 }
 
 func NewWorker(ctx context.Context, cfg config.WorkerConfig) (*Worker, error) {
@@ -131,9 +133,33 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		}
 		runDomainOutbox = relay.Run
 	}
+	statusService := session.NewStatusService(session.StatusServiceOptions{
+		Cache:  session.NewRedisStatusCache(resources.SessionStatusRedis),
+		Source: session.NewPostgresStatusSource(resources.DB, cfg.Auth.AccessTTL),
+		Config: session.StatusServiceConfig{
+			ActiveTTL: cfg.Auth.SessionStatusCacheTTL, AccessTTL: cfg.Auth.AccessTTL,
+			FallbackTimeout: cfg.Auth.SessionStatusDBTimeout, MaxFallbacks: cfg.Auth.SessionStatusMaxDBLookups,
+		},
+	})
+	statusRelay, err := session.NewStatusProjectionRelay(outbox.NewPostgresRepository(resources.DB), statusService, outbox.Config{
+		WorkerID: hostname + ":session-status:" + uuid.NewString(), BatchSize: cfg.Audit.BatchSize,
+		PollInterval: time.Second, Lease: cfg.Audit.Lease, MaxAttempts: cfg.Audit.MaxAttempts,
+		BaseBackoff: time.Second, MaxBackoff: 30 * time.Second,
+	})
+	if err != nil {
+		if profiler != nil {
+			_ = profiler.Stop()
+		}
+		_ = resources.Close()
+		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
+		return nil, err
+	}
 	checks := map[string]operational.Check{
 		"source_database": func(ctx context.Context) error {
 			return checkWorkerSourceDatabase(ctx, resources.DB, cfg.Development)
+		},
+		"session_status_redis": func(ctx context.Context) error {
+			return resources.SessionStatusRedis.Ping(ctx).Err()
 		},
 	}
 	if resources.AuditSink != resources.DB {
@@ -154,13 +180,14 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 	adminHTTP.WriteTimeout = 0
 	metrics.SetReady(true)
 	return &Worker{
-		cfg:             cfg,
-		resources:       resources,
-		metrics:         metrics,
-		health:          healthState,
-		adminHTTP:       adminHTTP,
-		runAudit:        auditWorker.Run,
-		runDomainOutbox: runDomainOutbox,
+		cfg:                 cfg,
+		resources:           resources,
+		metrics:             metrics,
+		health:              healthState,
+		adminHTTP:           adminHTTP,
+		runAudit:            auditWorker.Run,
+		runDomainOutbox:     runDomainOutbox,
+		runStatusProjection: statusRelay.Run,
 		cleanup: func(ctx context.Context) (int64, error) {
 			return audit.DeleteDeliveredBefore(ctx, resources.DB, time.Now().UTC().Add(-cfg.Audit.Retention), cfg.Audit.CleanupLimit)
 		},
@@ -213,9 +240,10 @@ func (w *Worker) Run(ctx context.Context) error {
 		adminResult = results
 		go func() { results <- serveHTTP(w.adminHTTP, listener, "worker-admin") }()
 	}
-	backgroundCount := 1
-	backgroundResult := make(chan error, 2)
+	backgroundCount := 2
+	backgroundResult := make(chan error, 3)
 	go func() { backgroundResult <- w.runAudit(runCtx) }()
+	go func() { backgroundResult <- w.runStatusProjection(runCtx) }()
 	if w.runDomainOutbox != nil {
 		backgroundCount++
 		go func() { backgroundResult <- w.runDomainOutbox(runCtx) }()

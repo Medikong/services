@@ -10,7 +10,7 @@ from contracts import OrderCreatedEvent
 
 DEFAULT_ORDER_CREATED: Final = OrderCreatedEvent(
     eventId="evt-order-created-metric",
-    userId="user-001",
+    userId="00000000-0000-4000-8000-000000000001",
     sourceId="order-001",
     occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
     producer="order-service",
@@ -45,7 +45,7 @@ def test_approve_mock_payment_increments_approved_metric() -> None:
     payment_response = client.post(
         "/payments/mock-approvals",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-metric-approved-001",
         },
@@ -72,7 +72,7 @@ def test_fail_mock_payment_increments_failed_metric() -> None:
     payment_response = client.post(
         "/payments/mock-failures",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-metric-failed-001",
         },

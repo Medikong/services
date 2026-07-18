@@ -363,9 +363,6 @@ func (s *Service) Complete(ctx context.Context, input CompleteInput) error {
 	if err != nil {
 		return domain.Unavailable()
 	}
-	if err := s.sessions.RevokeForUser(ctx, tx, link.UserID, "password_reset"); err != nil {
-		return domain.Unavailable()
-	}
 	if err := reset.Complete(time.Now().UTC()); err != nil {
 		return domain.Problem(410, "AUTH_PASSWORD_RESET_GRANT_EXPIRED", "비밀번호 재설정 권한이 만료되었습니다.")
 	}
@@ -378,7 +375,23 @@ func (s *Service) Complete(ctx context.Context, input CompleteInput) error {
 	if err := domain.AppendAudit(ctx, tx, "auth.password_reset.completed", "authentication_intent", *reset.IntentID, resetID, map[string]string{"status": "completed"}, input.IdempotencyKey); err != nil {
 		return domain.Unavailable()
 	}
-	return tx.Commit(ctx)
+	fences, err := s.sessions.FenceRevocationsForUser(ctx, tx, link.UserID)
+	if err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := s.sessions.RevokeForUser(ctx, tx, link.UserID, "password_reset"); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := fences.Resolve(ctx); err != nil {
+		return domain.Unavailable()
+	}
+	return nil
 }
 
 func (s *Service) resetTTL() time.Duration {

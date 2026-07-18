@@ -25,7 +25,8 @@ func TestRuntimeReadinessAndOutdatedSchemaRefusal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	databaseURL := startPostgres(t, ctx)
-	configureDevelopmentEnvironment(t, databaseURL)
+	redisURL := startRedis(t, ctx)
+	configureDevelopmentEnvironment(t, databaseURL, redisURL)
 
 	serverCfg, err := config.LoadServer()
 	if err != nil {
@@ -84,10 +85,35 @@ func startPostgres(t *testing.T, ctx context.Context) string {
 	return databaseURL
 }
 
-func configureDevelopmentEnvironment(t *testing.T, databaseURL string) {
+func startRedis(t *testing.T, ctx context.Context) string {
+	t.Helper()
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image: "redis:7.4-alpine", ExposedPorts: []string{"6379/tcp"},
+			WaitingFor: wait.ForLog("Ready to accept connections"),
+		},
+		Started: true,
+	})
+	if err != nil {
+		t.Fatalf("start redis container: %v", err)
+	}
+	t.Cleanup(func() { _ = container.Terminate(context.Background()) })
+	host, err := container.Host(ctx)
+	if err != nil {
+		t.Fatalf("redis host: %v", err)
+	}
+	port, err := container.MappedPort(ctx, "6379/tcp")
+	if err != nil {
+		t.Fatalf("redis port: %v", err)
+	}
+	return "redis://" + host + ":" + port.Port() + "/0"
+}
+
+func configureDevelopmentEnvironment(t *testing.T, databaseURL, redisURL string) {
 	t.Helper()
 	t.Setenv("SERVICE_ENVIRONMENT", "test")
 	t.Setenv("DATABASE_URL", databaseURL)
+	t.Setenv("AUTH_SESSION_STATUS_REDIS_URL", redisURL)
 	t.Setenv("AUTH_DEVELOPMENT_ENABLED", "true")
 	t.Setenv("AUTH_DEV_ROUTE_ENABLED", "true")
 	t.Setenv("AUTH_VIRTUAL_ADAPTERS_ENABLED", "true")

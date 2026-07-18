@@ -26,6 +26,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var strictRawURLEncoding = base64.RawURLEncoding.Strict()
+
 type Keys struct {
 	CredentialHMAC []byte
 	ReplayKey      []byte
@@ -220,7 +222,7 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 	if len(parts) != 3 {
 		return Claims{}, errors.New("malformed JWT")
 	}
-	headerPayload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	headerPayload, err := strictRawURLEncoding.DecodeString(parts[0])
 	if err != nil {
 		return Claims{}, errors.New("malformed JWT header")
 	}
@@ -236,7 +238,7 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 	if err != nil {
 		return Claims{}, err
 	}
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	signature, err := strictRawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return Claims{}, errors.New("malformed JWT signature")
 	}
@@ -244,7 +246,7 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 	if err := rsa.VerifyPKCS1v15(publicKey, cryptoHashSHA256, digest[:], signature); err != nil {
 		return Claims{}, errors.New("invalid JWT signature")
 	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	payload, err := strictRawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return Claims{}, errors.New("malformed JWT payload")
 	}

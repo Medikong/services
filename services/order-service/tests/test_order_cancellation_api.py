@@ -15,7 +15,7 @@ def test_customer_cancellation_is_accepted_and_idempotently_replayed() -> None:
     created = anyio.run(
         store.create_order,
         CreateOrderCommand(
-            user_id=UserId("user-cancel-001"),
+            user_id=UserId("00000000-0000-4000-8000-000000000001"),
             drop_id=DropId("drop-001"),
             product_id=ProductId("product-001"),
             quantity=1,
@@ -87,7 +87,7 @@ def test_pending_payment_order_cancellation_is_rejected() -> None:
     created = anyio.run(
         store.create_order,
         CreateOrderCommand(
-            user_id=UserId("user-cancel-pending"),
+            user_id=UserId("00000000-0000-4000-8000-000000000002"),
             drop_id=DropId("drop-001"),
             product_id=ProductId("product-001"),
             quantity=1,
@@ -221,15 +221,17 @@ def test_cancellation_rejects_empty_idempotency_key() -> None:
     assert response.status_code == 422
 
 
-def test_cancellation_returns_403_for_non_customer_role() -> None:
+def test_cancellation_forged_admin_role_does_not_bypass_ownership() -> None:
     # Given
-    client = TestClient(create_app(OrderStore()))
+    store = OrderStore()
+    created = _confirmed_order(store, "forged-admin-owner")
+    client = TestClient(create_app(store))
 
     # When
     response = client.post(
-        "/orders/order-role-forbidden/cancellations",
+        f"/orders/{created.order.id}/cancellations",
         headers={
-            "X-User-Id": "admin-cancel",
+            "X-User-Id": "00000000-0000-4000-8000-000000000003",
             "X-User-Role": "ADMIN",
             "Idempotency-Key": "cancel-role-forbidden",
         },
@@ -238,6 +240,7 @@ def test_cancellation_returns_403_for_non_customer_role() -> None:
 
     # Then
     assert response.status_code == 403
+    assert response.json()["error"]["message"] == "order owner mismatch"
 
 
 def test_cancellation_runtime_openapi_matches_static_operation() -> None:
@@ -249,11 +252,9 @@ def test_cancellation_runtime_openapi_matches_static_operation() -> None:
     )
 
     # When
-    role_parameter = next(
-        parameter
-        for parameter in operation["parameters"]
-        if parameter["name"] == "X-User-Role"
-    )
+    parameter_names = {
+        parameter["name"] for parameter in operation["parameters"]
+    }
 
     # Then
     assert operation["operationId"] == "cancelOrder"
@@ -266,14 +267,14 @@ def test_cancellation_runtime_openapi_matches_static_operation() -> None:
         "422",
         "500",
     }
-    assert role_parameter["schema"]["enum"] == ["CUSTOMER"]
+    assert "X-User-Role" not in parameter_names
 
 
 def _confirmed_order(store: OrderStore, suffix: str) -> OrderCreated:
     created = anyio.run(
         store.create_order,
         CreateOrderCommand(
-            user_id=UserId("user-cancel-shared"),
+            user_id=UserId("00000000-0000-4000-8000-000000000004"),
             drop_id=DropId("drop-001"),
             product_id=ProductId("product-001"),
             quantity=1,

@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const InternalSessionStatusProjectionEventType = "Auth.SessionStatusCacheUpdated"
+
 type Event struct {
 	ID            uuid.UUID
 	Type          string

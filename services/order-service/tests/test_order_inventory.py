@@ -32,7 +32,7 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
     first_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-limited-release-001",
         },
@@ -41,7 +41,7 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
     order_id = first_response.json()["data"]["id"]
     payment_failed = PaymentFailedEvent(
         eventId="evt-payment-failed-release-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 7, 12, 0, tzinfo=UTC),
         producer="payment-service",
@@ -56,7 +56,7 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
     second_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-002",
+            "X-User-Id": "00000000-0000-4000-8000-000000000002",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-limited-release-002",
         },
@@ -71,7 +71,7 @@ def test_payment_failed_releases_reserved_stock_for_next_order() -> None:
         store.get_order, OrderId(second_response.json()["data"]["id"])
     )
     assert second_order is not None
-    assert second_order.userId == "user-002"
+    assert second_order.userId == "00000000-0000-4000-8000-000000000002"
 
 
 def test_refund_completed_releases_stock_for_next_in_memory_order() -> None:
@@ -95,7 +95,7 @@ def test_refund_completed_releases_stock_for_next_in_memory_order() -> None:
     first = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-refund-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000003",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-refund-limited-001",
         },
@@ -173,7 +173,7 @@ def test_refund_completed_releases_stock_for_next_in_memory_order() -> None:
     second = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-refund-002",
+            "X-User-Id": "00000000-0000-4000-8000-000000000004",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-refund-limited-002",
         },

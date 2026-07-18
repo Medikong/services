@@ -28,8 +28,12 @@ def test_order_contract_defines_idempotent_customer_cancellation() -> None:
         for parameter in parameters
     )
     assert any(
-        parameter.get("name") == "X-User-Role"
-        and parameter["schema"]["enum"] == ["CUSTOMER"]
+        parameter.get("$ref", "").endswith("/X-User-Id")
+        for parameter in parameters
+    )
+    assert all(
+        not parameter.get("$ref", "").endswith(("/X-User-Role", "/X-User-Email"))
+        and parameter.get("name") not in {"X-User-Role", "X-User-Email"}
         for parameter in parameters
     )
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
@@ -89,3 +93,22 @@ def test_notification_contract_defines_all_purchase_outcomes() -> None:
         "PAYMENT_REFUNDED",
         "REFUND_FAILED",
     ]
+
+
+def test_notification_contract_requires_only_canonical_user_identity() -> None:
+    operation = load_openapi("notification-service")["paths"]["/notifications"][
+        "get"
+    ]
+    parameters = operation["parameters"]
+
+    assert any(
+        parameter.get("$ref", "").endswith("/X-User-Id")
+        for parameter in parameters
+    )
+    assert all(
+        not parameter.get("$ref", "").endswith(("/X-User-Role", "/X-User-Email"))
+        and parameter.get("name") not in {"X-User-Role", "X-User-Email"}
+        for parameter in parameters
+    )
+    assert "401" in operation["responses"]
+    assert "403" not in operation["responses"]

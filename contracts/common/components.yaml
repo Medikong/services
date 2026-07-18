@@ -31,22 +31,41 @@ components:
       required: true
       schema:
         type: string
-      description: Authenticated user id forwarded by the trusted gateway in local E2E.
+        format: uuid
+      description: Authenticated user id created by the trusted gateway after JWT and Session validation.
+    X-Session-Id:
+      name: X-Session-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Authenticated Session id created by the trusted gateway after JWT and Session validation.
+    X-Token-Id:
+      name: X-Token-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Access JWT id created by the trusted gateway after JWT and Session validation.
     X-User-Email:
       name: X-User-Email
       in: header
       required: false
+      deprecated: true
       schema:
         type: string
         format: email
-      description: Authenticated user email forwarded by the trusted gateway in local E2E.
+      description: Legacy compatibility parameter. The identity-only gateway does not create or trust this header.
     X-User-Role:
       name: X-User-Role
       in: header
-      required: true
+      required: false
+      deprecated: true
       schema:
         $ref: "#/components/schemas/UserRole"
-      description: Authenticated role forwarded by the trusted gateway in local E2E.
+      description: Legacy compatibility parameter. The identity-only gateway does not create or trust this header.
     Idempotency-Key:
       name: Idempotency-Key
       in: header
@@ -137,29 +156,47 @@ components:
         - CUSTOMER
         - OPERATOR
         - ADMIN
-      description: Authenticated DropMong role used by auth-service JWT payloads.
+      description: Legacy business role enum. It is not an Auth JWT claim or trusted gateway header.
     JwtAccessTokenClaims:
       type: object
+      additionalProperties: false
       required:
         - iss
         - sub
-        - role
+        - sid
+        - aud
         - iat
         - exp
         - jti
       properties:
         iss:
           type: string
-          description: Token issuer. Defaults to auth-service.
+          minLength: 1
+          description: Environment-specific Auth issuer. The current runtime falls back to ServiceName when unset; the target production policy requires an explicit value and rejects that fallback.
           examples:
-            - auth-service
+            - https://auth.example.internal
         sub:
           type: string
-          description: Auth user id encoded as a string.
+          format: uuid
+          description: Canonical user id.
           examples:
-            - "1"
-        role:
-          $ref: "#/components/schemas/UserRole"
+            - 018fdc02-f2d2-7b3a-9d11-2e9f22fef001
+        sid:
+          type: string
+          format: uuid
+          description: Auth Session id.
+        aud:
+          description: Protected API audience. The initial audience is dropmong-api.
+          oneOf:
+            - type: string
+              const: dropmong-api
+            - type: array
+              minItems: 1
+              uniqueItems: true
+              contains:
+                const: dropmong-api
+              items:
+                type: string
         iat:
           type: integer
           description: Issued-at time as Unix epoch seconds.
@@ -173,7 +210,7 @@ components:
         jti:
           type: string
           format: uuid
-          description: Token id used for access-token revocation.
+          description: Access JWT id used for request correlation and audit.
     ErrorResponse:
       type: object
       required:

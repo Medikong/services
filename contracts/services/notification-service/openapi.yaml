@@ -17,7 +17,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
         - $ref: "../../common/components.yaml#/components/parameters/limit"
         - $ref: "../../common/components.yaml#/components/parameters/cursor"
       responses:
@@ -29,8 +28,6 @@ paths:
                 $ref: "#/components/schemas/NotificationListResponse"
         "401":
           $ref: "../../common/components.yaml#/components/responses/Unauthorized"
-        "403":
-          $ref: "../../common/components.yaml#/components/responses/Forbidden"
         "500":
           $ref: "../../common/components.yaml#/components/responses/InternalServerError"
 components:

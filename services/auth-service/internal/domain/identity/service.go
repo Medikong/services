@@ -274,9 +274,6 @@ func (s *LinkService) completeLink(ctx context.Context, input CompleteLinkInput,
 		if err := s.identities.ReplacePhoneLink(ctx, tx, *link.PreviousID, link.ID); err != nil {
 			return CompleteLinkOutput{}, domain.Unavailable()
 		}
-		if err := s.sessions.RevokeForIdentityLinkExcept(ctx, tx, *link.PreviousID, input.Principal.SessionID, "phone_replaced"); err != nil {
-			return CompleteLinkOutput{}, domain.Unavailable()
-		}
 	} else if err := s.identities.ActivateLink(ctx, tx, link.ID); err != nil {
 		return CompleteLinkOutput{}, domain.Unavailable()
 	}
@@ -294,8 +291,29 @@ func (s *LinkService) completeLink(ctx context.Context, input CompleteLinkInput,
 	if err := domain.AppendAudit(ctx, tx, "auth.identity_link.completed", "user", input.Principal.UserID, linkID, map[string]string{"purpose": string(purpose)}, stableKey(input.IdempotencyKey, "identity-link", challengeID)); err != nil {
 		return CompleteLinkOutput{}, domain.Unavailable()
 	}
+	var fences domain.RevocationFences
+	if replace {
+		fences, err = s.sessions.FenceRevocationsForIdentityLinkExcept(ctx, tx, session.IdentityLinkRevocationScope{
+			IdentityLinkID: *link.PreviousID,
+			KeepSessionID:  input.Principal.SessionID,
+		})
+		if err != nil {
+			domain.ResolveRevocationRollback(ctx, tx, fences)
+			return CompleteLinkOutput{}, domain.Unavailable()
+		}
+		if err := s.sessions.RevokeForIdentityLinkExcept(ctx, tx, *link.PreviousID, input.Principal.SessionID, "phone_replaced"); err != nil {
+			domain.ResolveRevocationRollback(ctx, tx, fences)
+			return CompleteLinkOutput{}, domain.Unavailable()
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return CompleteLinkOutput{}, domain.Unavailable()
+	}
+	if fences != nil {
+		if err := fences.Resolve(ctx); err != nil {
+			return CompleteLinkOutput{}, domain.Unavailable()
+		}
 	}
 	return output, nil
 }

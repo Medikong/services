@@ -76,7 +76,7 @@ def test_create_order_returns_pending_order_when_customer_requests_known_product
     response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-create-001",
         },
@@ -86,7 +86,7 @@ def test_create_order_returns_pending_order_when_customer_requests_known_product
     # Then
     assert response.status_code == 201
     body = response.json()
-    assert body["data"]["userId"] == "user-001"
+    assert body["data"]["userId"] == "00000000-0000-4000-8000-000000000001"
     assert body["data"]["dropId"] == "drop-001"
     assert body["data"]["productId"] == "product-001"
     assert body["data"]["quantity"] == 1
@@ -98,7 +98,7 @@ def test_create_order_reuses_order_when_idempotency_key_repeats() -> None:
     # Given
     client = TestClient(create_app(OrderStore()))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "order-create-replay-001",
     }
@@ -118,7 +118,7 @@ def test_create_order_returns_409_when_idempotency_key_payload_changes() -> None
     # Given
     client = TestClient(create_app(OrderStore()))
     headers = {
-        "X-User-Id": "user-001",
+        "X-User-Id": "00000000-0000-4000-8000-000000000001",
         "X-User-Role": "CUSTOMER",
         "Idempotency-Key": "order-create-conflict-001",
     }
@@ -149,7 +149,7 @@ def test_get_order_returns_403_when_customer_reads_another_customer_order() -> N
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-owner-001",
         },
@@ -160,7 +160,10 @@ def test_get_order_returns_403_when_customer_reads_another_customer_order() -> N
     # When
     response = client.get(
         f"/orders/{order_id}",
-        headers={"X-User-Id": "user-002", "X-User-Role": "CUSTOMER"},
+        headers={
+            "X-User-Id": "00000000-0000-4000-8000-000000000002",
+            "X-User-Role": "CUSTOMER",
+        },
     )
 
     # Then
@@ -175,7 +178,7 @@ def test_create_order_returns_409_when_product_is_unavailable() -> None:
     response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-unavailable-001",
         },
@@ -204,7 +207,7 @@ def test_create_order_returns_409_when_reserved_stock_is_sold_out() -> None:
     first_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-limited-001",
         },
@@ -213,7 +216,7 @@ def test_create_order_returns_409_when_reserved_stock_is_sold_out() -> None:
     second_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-002",
+            "X-User-Id": "00000000-0000-4000-8000-000000000002",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "order-limited-002",
         },
@@ -225,7 +228,7 @@ def test_create_order_returns_409_when_reserved_stock_is_sold_out() -> None:
     assert second_response.status_code == 409
 
 
-def test_create_order_returns_403_when_owner_role_requests_order_creation() -> None:
+def test_create_order_ignores_untrusted_owner_role_header() -> None:
     # Given
     client = TestClient(create_app(OrderStore()))
 
@@ -233,7 +236,7 @@ def test_create_order_returns_403_when_owner_role_requests_order_creation() -> N
     response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "owner-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000003",
             "X-User-Role": "OWNER",
             "Idempotency-Key": "owner-order-001",
         },
@@ -241,4 +244,7 @@ def test_create_order_returns_403_when_owner_role_requests_order_creation() -> N
     )
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 201
+    assert response.json()["data"]["userId"] == (
+        "00000000-0000-4000-8000-000000000003"
+    )

@@ -17,7 +17,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
         - $ref: "../../common/components.yaml#/components/parameters/Idempotency-Key"
       requestBody:
         required: true
@@ -52,7 +51,6 @@ paths:
         - $ref: "../../common/components.yaml#/components/parameters/X-Request-Id"
         - $ref: "../../common/components.yaml#/components/parameters/traceparent"
         - $ref: "../../common/components.yaml#/components/parameters/X-User-Id"
-        - $ref: "../../common/components.yaml#/components/parameters/X-User-Role"
         - $ref: "../../common/components.yaml#/components/parameters/paymentId"
       responses:
         "200":

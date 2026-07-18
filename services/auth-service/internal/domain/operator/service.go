@@ -31,7 +31,12 @@ type Service struct {
 	outbox      outbox.Repository
 	approvals   ApprovalPort
 	decisions   appstate.AuthorizationDecisionPort
+	sessions    SessionRevocationPort
 	strongTTL   time.Duration
+}
+
+type SessionRevocationPort interface {
+	FenceRevocation(context.Context, pgx.Tx, uuid.UUID) (domain.RevocationFences, error)
 }
 
 type Config struct {
@@ -50,6 +55,11 @@ func NewService(pool *pgxpool.Pool, keys security.Keys, users Repository, polici
 	}
 	return &Service{pool: pool, keys: keys, users: users, policies: policies, idempotency: idempotency, outbox: outbox, approvals: approvals, decisions: decisions, strongTTL: config.StrongAuthTTL}
 }
+
+func (s *Service) UseSessionRevocation(sessions SessionRevocationPort) {
+	s.sessions = sessions
+}
+
 func (s *Service) User(ctx context.Context, principal appsession.Principal, decision, userID, reasonCode, auditKey string) (UserView, error) {
 	if err := s.authorize(ctx, principal, decision, false, "auth.case.read", userID); err != nil {
 		return UserView{}, err
@@ -301,24 +311,50 @@ func (s *Service) Manual(ctx context.Context, input ManualInput) (uuid.UUID, int
 	if err := s.idempotency.CreateProcessing(ctx, tx, record, "ManualAction"); err != nil {
 		return uuid.Nil, 0, domain.Unavailable()
 	}
+	var fences domain.RevocationFences
+	if input.Action == "revoke_sessions" {
+		targetID, parseErr := uuid.Parse(input.TargetID)
+		if parseErr != nil {
+			return uuid.Nil, 0, domain.Problem(400, "AUTH_INPUT_INVALID", "운영 작업 요청이 올바르지 않습니다.")
+		}
+		if s.sessions == nil {
+			return uuid.Nil, 0, domain.Unavailable()
+		}
+		fences, err = s.sessions.FenceRevocation(ctx, tx, targetID)
+		if err != nil {
+			domain.ResolveRevocationRollback(ctx, tx, fences)
+			return uuid.Nil, 0, domain.Unavailable()
+		}
+	}
 	version, err := s.users.ApplyManual(ctx, tx, ManualAction{ID: actionID, OperatorID: input.Principal.UserID, CaseID: input.CaseID, TargetType: input.TargetType, TargetID: input.TargetID, Action: input.Action, ReasonCode: input.ReasonCode, ApprovalID: input.ApprovalID, EvidenceRef: input.EvidenceRef, ExpectedVersion: input.ExpectedVersion, IdempotencyID: &record.ID})
 	if errors.Is(err, ErrNotFound) {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Problem(412, "AUTH_RESOURCE_PRECONDITION_FAILED", "대상 version이 현재 상태와 다릅니다.")
 	}
 	if err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Unavailable()
 	}
 	if err := s.idempotency.Complete(ctx, tx, record.ID, "completed"); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Unavailable()
 	}
 	if err := s.outbox.Append(ctx, tx, outbox.Event{ID: uuid.New(), Type: "Auth.ManualActionCompleted", AggregateType: "ManualAction", AggregateID: actionID, Version: version, Payload: json.RawMessage(`{"status":"completed"}`), CorrelationID: input.Principal.SessionID}); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Unavailable()
 	}
 	if err := domain.AppendAudit(ctx, tx, "auth.manual_action.completed", "operator", input.Principal.UserID, actionID, map[string]string{"action": input.Action}, input.IdempotencyKey); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Unavailable()
 	}
 	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
 		return uuid.Nil, 0, domain.Unavailable()
+	}
+	if fences != nil {
+		if err := fences.Resolve(ctx); err != nil {
+			return uuid.Nil, 0, domain.Unavailable()
+		}
 	}
 	return actionID, version, nil
 }

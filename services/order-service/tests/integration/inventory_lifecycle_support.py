@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Final
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from contracts import PaymentApprovedEvent, PaymentFailedEvent, RefundCompletedEvent
 from sqlalchemy import text
@@ -158,7 +158,7 @@ def product(suffix: str) -> ProductForSale:
 
 def command(product_for_sale: ProductForSale, suffix: str) -> CreateOrderCommand:
     return CreateOrderCommand(
-        user_id=UserId(f"user-{suffix}"),
+        user_id=UserId(str(uuid5(NAMESPACE_URL, f"order-test:{suffix}"))),
         drop_id=product_for_sale.drop_id,
         product_id=product_for_sale.product_id,
         quantity=10,

@@ -35,10 +35,15 @@ type Service struct {
 	states      statedomain.Repository
 	idempotency idempotency.Repository
 	outbox      outbox.Repository
+	status      *StatusService
 }
 
 func NewService(pool *pgxpool.Pool, keys security.Keys, config Config, sessions Repository, states statedomain.Repository, idempotency idempotency.Repository, outbox outbox.Repository) *Service {
 	return &Service{pool: pool, keys: keys, config: config, sessions: sessions, states: states, idempotency: idempotency, outbox: outbox}
+}
+
+func (s *Service) UseStatusProjection(status *StatusService) {
+	s.status = status
 }
 
 type Principal = domain.Principal
@@ -367,13 +372,29 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, csrfToken, idempote
 		return TokenSet{}, domain.Problem(401, "AUTH_SESSION_REVOKED", "Session을 갱신할 수 없습니다.")
 	}
 	if credential.Status != "active" || current.Status != "active" || !credential.ExpiresAt.After(time.Now()) {
+		var fences domain.RevocationFences
 		if credential.FamilyID != nil {
+			fences, err = s.sessions.FenceRevocation(ctx, tx, current.ID)
+			if err != nil {
+				domain.ResolveRevocationRollback(ctx, tx, fences)
+				return TokenSet{}, domain.Unavailable()
+			}
 			if err := s.sessions.MarkReuseDetected(ctx, tx, current.ID, *credential.FamilyID); err != nil {
+				domain.ResolveRevocationRollback(ctx, tx, fences)
 				return TokenSet{}, domain.Unavailable()
 			}
 		}
 		if err := tx.Commit(ctx); err != nil {
+			domain.ResolveRevocationRollback(ctx, tx, fences)
 			return TokenSet{}, domain.Unavailable()
+		}
+		if fences != nil {
+			if err := fences.Resolve(ctx); err != nil {
+				return TokenSet{}, domain.Unavailable()
+			}
+		}
+		if err := s.projectStatus(ctx, current.ID); err != nil {
+			return TokenSet{}, err
 		}
 		return TokenSet{}, domain.Problem(401, "AUTH_SESSION_REVOKED", "Session을 갱신할 수 없습니다.")
 	}
@@ -512,15 +533,25 @@ func (s *Service) LogoutByWeb(ctx context.Context, webToken, csrfToken, idempote
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Unavailable()
 		}
-		return nil
-	}
-	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
-		return domain.Unavailable()
+		return s.projectStatus(ctx, current.ID)
 	}
 	if err := s.idempotency.Complete(ctx, tx, record.ID, "logged_out"); err != nil {
 		return domain.Unavailable()
 	}
+	fences, err := s.sessions.FenceRevocation(ctx, tx, current.ID)
+	if err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
 	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := fences.Resolve(ctx); err != nil {
 		return domain.Unavailable()
 	}
 	return nil
@@ -555,15 +586,35 @@ func (s *Service) LogoutByRefresh(ctx context.Context, refreshToken, idempotency
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Unavailable()
 		}
-		return nil
-	}
-	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
-		return domain.Unavailable()
+		return s.projectStatus(ctx, current.ID)
 	}
 	if err := s.idempotency.Complete(ctx, tx, record.ID, "logged_out"); err != nil {
 		return domain.Unavailable()
 	}
+	fences, err := s.sessions.FenceRevocation(ctx, tx, current.ID)
+	if err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := s.sessions.Revoke(ctx, tx, current.ID, "logout"); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
 	if err := tx.Commit(ctx); err != nil {
+		domain.ResolveRevocationRollback(ctx, tx, fences)
+		return domain.Unavailable()
+	}
+	if err := fences.Resolve(ctx); err != nil {
+		return domain.Unavailable()
+	}
+	return nil
+}
+
+func (s *Service) projectStatus(ctx context.Context, sessionID uuid.UUID) error {
+	if s.status == nil {
+		return nil
+	}
+	if err := s.status.Project(ctx, sessionID); err != nil {
 		return domain.Unavailable()
 	}
 	return nil

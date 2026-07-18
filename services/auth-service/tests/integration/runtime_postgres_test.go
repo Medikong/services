@@ -35,7 +35,9 @@ func TestServerRuntimeWithPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("postgres connection string: %v", err)
 	}
+	redisURL := startRedis(t, ctx)
 	cfg := loadProductionHTTPServerConfig(t, databaseURL)
+	cfg.Auth.SessionStatusRedisURL = redisURL
 	db := migrateProductionSchemas(t, ctx, cfg.Postgres)
 	t.Cleanup(db.Close)
 	server, err := app.NewServer(ctx, cfg, app.ServerOptions{})

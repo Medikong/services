@@ -28,7 +28,7 @@ def test_apply_payment_approved_confirms_order_when_payment_event_matches() -> N
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-approved-001",
         },
@@ -37,7 +37,7 @@ def test_apply_payment_approved_confirms_order_when_payment_event_matches() -> N
     order_id = create_response.json()["data"]["id"]
     event = PaymentApprovedEvent(
         eventId="evt-payment-approved-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
         producer="payment-service",
@@ -63,7 +63,7 @@ def test_payment_approved_kafka_message_confirms_order_when_payload_is_valid() -
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-approved-kafka-001",
         },
@@ -72,7 +72,7 @@ def test_payment_approved_kafka_message_confirms_order_when_payload_is_valid() -
     order_id = create_response.json()["data"]["id"]
     event = PaymentApprovedEvent(
         eventId="evt-payment-approved-kafka-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
         producer="payment-service",
@@ -105,7 +105,7 @@ def test_apply_payment_failed_marks_order_failed_when_payment_event_matches() ->
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-failed-001",
         },
@@ -114,7 +114,7 @@ def test_apply_payment_failed_marks_order_failed_when_payment_event_matches() ->
     order_id = create_response.json()["data"]["id"]
     event = PaymentFailedEvent(
         eventId="evt-payment-failed-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
         producer="payment-service",
@@ -143,7 +143,7 @@ def test_payment_failed_kafka_message_marks_order_failed_when_payload_is_valid()
     create_response = client.post(
         "/orders",
         headers={
-            "X-User-Id": "user-001",
+            "X-User-Id": "00000000-0000-4000-8000-000000000001",
             "X-User-Role": "CUSTOMER",
             "Idempotency-Key": "payment-failed-kafka-001",
         },
@@ -152,7 +152,7 @@ def test_payment_failed_kafka_message_marks_order_failed_when_payload_is_valid()
     order_id = create_response.json()["data"]["id"]
     event = PaymentFailedEvent(
         eventId="evt-payment-failed-kafka-001",
-        userId="user-001",
+        userId="00000000-0000-4000-8000-000000000001",
         sourceId=order_id,
         occurredAt=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
         producer="payment-service",

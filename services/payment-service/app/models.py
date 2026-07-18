@@ -21,13 +21,6 @@ class PaymentStatus(StrEnum):
     FAILED = "FAILED"
 
 
-@unique
-class UserRole(StrEnum):
-    CUSTOMER = "CUSTOMER"
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
-
-
 class ApprovePaymentRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 

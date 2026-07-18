@@ -17,16 +17,21 @@
 
 ## JWT 규칙
 
-JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions.md)를 기준으로 한다.
+JWT/JWKS 발급·검증, Session 확인과 identity-only claim/header 규칙은 [jwt-conventions.md](./jwt-conventions.md)를 기준으로 한다.
 
 요약:
 
-- Access token은 `HS256` JWT로 발급한다.
-- MVP에서는 모든 서비스가 같은 `JWT_SECRET`으로 access token을 검증한다.
+- 아래 항목은 승인된 목표 계약이다. 현재 stage worktree의 Auth 소스는 RS256/JWKS와 내부 `/internal/ext-authz` Handler/router 등록을 구현했지만, issuer 미설정 시 `ServiceName`으로 fallback한다. 활성 private-dev/aws-dev Helm stack은 목록 대체 후 각각 legacy `JWT_SECRET` 하나만 유효하고 RS256 key material을 공급하지 않는다. 공통 `AUTH_JWT_SECRET`은 base 파일 선언이지만 두 active effective stack 입력은 아니며 repository dev overlay도 두 Application에서 참조하지 않는다. Kong의 HS256 credential과 role/email identity/role-guard plugin, Notification/Interest의 `X-User-Role` trust도 남아 있고 Handler는 배포되거나 Istio에 연결되지 않았다. 후속 Auth/GitOps/서비스 migration 전에는 현재 배포를 RS256/ext_authz-ready나 identity-only-ready로 보지 않는다.
+- Access token protected header는 `alg=RS256`, JWKS와 일치하는 `kid`, `typ=JWT`를 사용한다.
+- Istio와 Auth의 내부 adapter가 `GET /.well-known/jwks.json`의 공개키로 access token을 검증한다.
 - `Authorization` 헤더는 `Bearer <accessToken>` 형식만 허용한다.
-- `role`은 `CUSTOMER`, `PROVIDER`, `ADMIN` 중 하나이다.
-- 필수 claim은 `iss`, `sub`, `role`, `iat`, `exp`, `jti`이다. 이메일 같은 개인정보는 access token claim에 넣지 않는다.
+- 필수 claim allowlist는 `iss`, `sub`, `sid`, `aud`, `iat`, `exp`, `jti`이다.
+- role, permission, email과 업무 ACL은 access token claim이나 내부 인증 헤더에 넣지 않는다.
+- stage worktree에 구현된 내부 경로 `/internal/ext-authz`는 Session 상태를 확인하며 공개 OpenAPI나 Gateway Route에 등록하지 않는다. 보호 Route와의 Istio 연결은 후속 GitOps 작업이다.
+- 인증 성공 시 `X-User-Id`, `X-Session-Id`, `X-Token-Id`만 업무 서비스에 전달한다.
 - refresh token은 JWT가 아니라 opaque string이며, `auth-service`만 검증한다.
+
+현재 배포 blocker의 원장과 해소 owner는 [jwt-conventions.md](./jwt-conventions.md)의 `현재 구현·배포와 목표의 차이` 표를 따른다. 이 문서는 active values나 Gateway manifest가 이미 전환됐다고 주장하지 않는다.
 
 ## Status Code 규칙
 
@@ -36,11 +41,12 @@ JWT 발급, 검증, role, claim 규칙은 [jwt-conventions.md](./jwt-conventions
 - `204 No Content`: 성공했지만 반환할 본문이 없을 때 사용한다.
 - `400 Bad Request`: 요청 JSON, 쿼리, path parameter 형식이 잘못됐을 때 사용한다.
 - `401 Unauthorized`: JWT가 없거나 유효하지 않을 때 사용한다.
-- `403 Forbidden`: 인증은 됐지만 해당 리소스나 명령 권한이 없을 때 사용한다.
+- `403 Forbidden`: 인증은 됐지만 업무 서비스의 리소스 소유권 검사가 실패할 때 사용한다.
 - `404 Not Found`: 리소스를 찾을 수 없을 때 사용한다.
 - `409 Conflict`: 품절, 중복 주문, 이미 처리된 상태 변경처럼 현재 상태와 충돌할 때 사용한다.
 - `422 Unprocessable Entity`: 형식은 맞지만 도메인 규칙상 처리할 수 없을 때 사용한다.
 - `500 Internal Server Error`: 예측하지 못한 서버 오류에 사용한다.
+- `503 Service Unavailable`: Auth/JWKS/Redis/PostgreSQL 상태를 확정할 수 없어 인증을 fail closed할 때 사용한다.
 
 ## ErrorResponse 예시
 

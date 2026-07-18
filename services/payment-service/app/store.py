@@ -63,6 +63,11 @@ class PaymentOrderMismatch:
 
 
 @dataclass(frozen=True, slots=True)
+class PaymentOrderOwnerMismatch:
+    order_id: OrderId
+
+
+@dataclass(frozen=True, slots=True)
 class PaymentIdempotencyConflict:
     payment: Payment
 
@@ -77,6 +82,7 @@ type ApprovePaymentResult = (
     | PaymentAlreadyApproved
     | PaymentOrderNotFound
     | PaymentOrderMismatch
+    | PaymentOrderOwnerMismatch
     | PaymentIdempotencyConflict
     | PaymentTerminalConflict
 )
@@ -87,6 +93,7 @@ type FailPaymentResult = (
     | PaymentAlreadyFailed
     | PaymentOrderNotFound
     | PaymentOrderMismatch
+    | PaymentOrderOwnerMismatch
     | PaymentIdempotencyConflict
     | PaymentTerminalConflict
 )
@@ -111,6 +118,12 @@ class PaymentStore:
     async def approve_mock_payment(
         self, command: ApprovePaymentCommand
     ) -> ApprovePaymentResult:
+        known_order = self._known_orders.get(command.order_id)
+        if known_order is None:
+            return PaymentOrderNotFound(order_id=command.order_id)
+        if known_order.user_id != command.user_id:
+            return PaymentOrderOwnerMismatch(order_id=command.order_id)
+
         replayed_payment = self._replayed_payment(
             command.user_id, command.idempotency_key
         )
@@ -123,10 +136,7 @@ class PaymentStore:
         if terminal_payment is not None:
             return PaymentTerminalConflict(payment=terminal_payment)
 
-        known_order = self._known_orders.get(command.order_id)
-        if known_order is None:
-            return PaymentOrderNotFound(order_id=command.order_id)
-        if not known_order_matches_command(known_order, command):
+        if known_order.amount != command.amount:
             return PaymentOrderMismatch(order_id=command.order_id)
 
         approved_at = datetime.now(UTC)
@@ -147,6 +157,12 @@ class PaymentStore:
         return PaymentApproved(payment=payment)
 
     async def fail_mock_payment(self, command: FailPaymentCommand) -> FailPaymentResult:
+        known_order = self._known_orders.get(command.order_id)
+        if known_order is None:
+            return PaymentOrderNotFound(order_id=command.order_id)
+        if known_order.user_id != command.user_id:
+            return PaymentOrderOwnerMismatch(order_id=command.order_id)
+
         replayed_payment = self._replayed_payment(
             command.user_id, command.idempotency_key
         )
@@ -159,10 +175,7 @@ class PaymentStore:
         if terminal_payment is not None:
             return PaymentTerminalConflict(payment=terminal_payment)
 
-        known_order = self._known_orders.get(command.order_id)
-        if known_order is None:
-            return PaymentOrderNotFound(order_id=command.order_id)
-        if not known_order_matches_command(known_order, command):
+        if known_order.amount != command.amount:
             return PaymentOrderMismatch(order_id=command.order_id)
 
         failed_at = datetime.now(UTC)
@@ -245,13 +258,4 @@ def failed_payment_matches_command(
         and payment.amount == command.amount
         and payment.method == command.method
         and payment.failureReason == command.reason
-    )
-
-
-def known_order_matches_command(
-    known_order: KnownOrder,
-    command: ApprovePaymentCommand | FailPaymentCommand,
-) -> bool:
-    return (
-        known_order.user_id == command.user_id and known_order.amount == command.amount
     )

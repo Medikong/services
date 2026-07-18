@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import StrEnum, unique
 from typing import NewType
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,13 +8,6 @@ from contracts import NotificationType
 NotificationId = NewType("NotificationId", str)
 OrderId = NewType("OrderId", str)
 UserId = NewType("UserId", str)
-
-
-@unique
-class UserRole(StrEnum):
-    CUSTOMER = "CUSTOMER"
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
 
 
 class Notification(BaseModel):
