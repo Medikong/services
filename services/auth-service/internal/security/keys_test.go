@@ -1,8 +1,10 @@
 package security
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -78,12 +80,12 @@ func TestAccessTokenRejectsTamperingExpiryAudienceAndUnknownKey(t *testing.T) {
 		JWTAudiences:   []string{"dropmong-api"},
 		Now:            func() time.Time { return now },
 	}
-	raw, _, err := keys.SignAccessToken("user-id", "session-id", time.Minute)
+	raw, _, err := keys.SignAccessToken("7df1ef50-f05b-4d58-8934-c52a7510af35", "cc61de80-da8e-4149-8b7a-c166237d552c", time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	parts := splitJWT(t, raw)
-	tampered := parts[0] + "." + parts[1] + "." + parts[2][:len(parts[2])-1] + "A"
+	tampered := tamperJWTSignature(t, parts)
 	if _, err := keys.VerifyAccessToken(tampered); err == nil {
 		t.Fatal("tampered JWT was accepted")
 	}
@@ -107,6 +109,40 @@ func TestAccessTokenRejectsTamperingExpiryAudienceAndUnknownKey(t *testing.T) {
 	unknownKey := base64.RawURLEncoding.EncodeToString(headerJSON) + "." + parts[1] + "." + parts[2]
 	if _, err := keys.VerifyAccessToken(unknownKey); err == nil {
 		t.Fatal("JWT with an unknown kid was accepted")
+	}
+	for _, value := range []string{"not-a-uuid", "00000000-0000-0000-0000-000000000000"} {
+		for _, claim := range []string{"sub", "sid", "jti"} {
+			invalidIdentifier := resignJWTClaim(t, parts, privateKey, claim, value)
+			if _, err := keys.VerifyAccessToken(invalidIdentifier); err == nil {
+				t.Fatalf("JWT with invalid %s=%q was accepted", claim, value)
+			}
+		}
+	}
+}
+
+func TestAccessTokenSignerRejectsNonUUIDIdentifiers(t *testing.T) {
+	keys := Keys{
+		JWTKey:       privateKeyPEM(t, testPrivateKey(t)),
+		JWTKeyID:     "active-key",
+		JWTIssuer:    "auth-service",
+		JWTAudiences: []string{"dropmong-api"},
+	}
+	tests := []struct {
+		name      string
+		userID    string
+		sessionID string
+	}{
+		{name: "subject", userID: "user-id", sessionID: "cc61de80-da8e-4149-8b7a-c166237d552c"},
+		{name: "session", userID: "7df1ef50-f05b-4d58-8934-c52a7510af35", sessionID: "session-id"},
+		{name: "zero subject", userID: "00000000-0000-0000-0000-000000000000", sessionID: "cc61de80-da8e-4149-8b7a-c166237d552c"},
+		{name: "zero session", userID: "7df1ef50-f05b-4d58-8934-c52a7510af35", sessionID: "00000000-0000-0000-0000-000000000000"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, _, err := keys.SignAccessToken(test.userID, test.sessionID, time.Minute); err == nil {
+				t.Fatal("access token signer accepted a non-UUID identifier")
+			}
+		})
 	}
 }
 
@@ -146,4 +182,32 @@ func decodeJWTPart(t *testing.T, raw string, target any) {
 	if err := json.Unmarshal(decoded, target); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func resignJWTClaim(t *testing.T, parts []string, privateKey *rsa.PrivateKey, claim, value string) string {
+	t.Helper()
+	var payload map[string]any
+	decodeJWTPart(t, parts[1], &payload)
+	payload[claim] = value
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unsigned := parts[0] + "." + base64.RawURLEncoding.EncodeToString(payloadJSON)
+	digest := sha256.Sum256([]byte(unsigned))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return unsigned + "." + base64.RawURLEncoding.EncodeToString(signature)
+}
+
+func tamperJWTSignature(t *testing.T, parts []string) string {
+	t.Helper()
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature[0] ^= 0xff
+	return parts[0] + "." + parts[1] + "." + base64.RawURLEncoding.EncodeToString(signature)
 }

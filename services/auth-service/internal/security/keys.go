@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samber/oops"
 )
 
 type Keys struct {
@@ -185,6 +186,10 @@ type Claims struct {
 }
 
 func (k Keys) SignAccessToken(userID, sessionID string, ttl time.Duration) (string, time.Time, error) {
+	if !isNonZeroUUID(userID) || !isNonZeroUUID(sessionID) {
+		return "", time.Time{}, oops.In("auth_security").Code("jwt.identifier_invalid").
+			New("access token subject and session ID must be non-zero UUIDs")
+	}
 	privateKey, err := parseRSAPrivateKey(k.JWTKey)
 	if err != nil {
 		return "", time.Time{}, err
@@ -253,10 +258,15 @@ func (k Keys) VerifyAccessToken(raw string) (Claims, error) {
 		return Claims{}, err
 	}
 	now := k.now().Unix()
-	if claims.Issuer != k.JWTIssuer || claims.Subject == "" || claims.SessionID == "" || claims.TokenID == "" || claims.IssuedAt > now+30 || claims.ExpiresAt <= now || claims.ExpiresAt <= claims.IssuedAt || !containsAudience(claims.Audience, k.JWTAudiences) {
+	if claims.Issuer != k.JWTIssuer || !isNonZeroUUID(claims.Subject) || !isNonZeroUUID(claims.SessionID) || !isNonZeroUUID(claims.TokenID) || claims.IssuedAt > now+30 || claims.ExpiresAt <= now || claims.ExpiresAt <= claims.IssuedAt || !containsAudience(claims.Audience, k.JWTAudiences) {
 		return Claims{}, errors.New("expired or invalid JWT")
 	}
 	return claims, nil
+}
+
+func isNonZeroUUID(value string) bool {
+	id, err := uuid.Parse(value)
+	return err == nil && id != uuid.Nil
 }
 
 const cryptoHashSHA256 = crypto.SHA256
