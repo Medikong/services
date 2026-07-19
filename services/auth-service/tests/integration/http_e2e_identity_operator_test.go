@@ -157,6 +157,39 @@ func TestHTTPIdentityOperatorAndActionE2E(t *testing.T) {
 		assertResponseOmits(t, response, email, wrongPassword, session.Cookie.Value, session.CSRFToken)
 	})
 
+	t.Run("API.A.300-17 password reset state stays generic", func(t *testing.T) {
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_identities
+			SET credential_status = 'password_reset_required',
+				password_reset_required_at = now(), password_reset_reason = 'integration_test'
+			WHERE identity_id = $1
+		`, emailIdentityID); err != nil {
+			t.Fatalf("require password reset: %v", err)
+		}
+		defer func() {
+			if _, err := harness.db.Exec(harness.ctx, `
+				UPDATE auth_identities
+				SET credential_status = 'active',
+					password_reset_required_at = NULL, password_reset_reason = NULL
+				WHERE identity_id = $1
+			`, emailIdentityID); err != nil {
+				t.Errorf("restore active identity: %v", err)
+			}
+		}()
+
+		response := harness.do(httpE2ERequest{
+			Method: http.MethodPost,
+			Path:   "/api/v1/auth/reauthentications/email",
+			JSON:   map[string]any{"purpose": "link_identity", "password": password},
+			Headers: http.Header{
+				"Idempotency-Key": {uuid.NewString()},
+			},
+			Credentials: identitySessionCredentials(session),
+		})
+		decodeHTTPError(t, response, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		assertResponseOmits(t, response, email, password, session.Cookie.Value, session.CSRFToken)
+	})
+
 	var linkReauthentication identityE2EReauthentication
 	t.Run("API.A.300-17 success and exact delivery recovery", func(t *testing.T) {
 		linkReauthentication = reauthenticateIdentityE2E(t, harness, session, password, "link_identity")

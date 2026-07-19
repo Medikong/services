@@ -6,7 +6,6 @@ import binascii
 import json
 import os
 import re
-import secrets
 import shlex
 import subprocess
 import sys
@@ -383,10 +382,10 @@ def _seed_fixture(settings: Settings) -> Fixture:
     user_id, identity_id, link_id = uuid4(), uuid4(), uuid4()
     credential_id, status_change_id = uuid4(), uuid4()
     email = f"auth-observability-{identity_id.hex}@example.test"
-    password = f"Obs-{secrets.token_urlsafe(24)}!42"
+    password = "Obs-Argon2id-e2e-credential-2026!42"
+    password_hash = "$argon2id$v=19$m=32768,t=3,p=1$Wfxb+c3EhOAO84Rg+Kf+Lg$GiwkWwtGOdbsF5tgANL06Gl6KW48pMmKw7Nfjm2/7LE"
     sql = f"""
 BEGIN;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 INSERT INTO auth_identities (
     identity_id, identity_type, identity_namespace, normalized_value, masked_value,
     status, verification_status, credential_status, verified_at
@@ -402,8 +401,8 @@ INSERT INTO auth_password_credentials (
     password_credential_id, identity_id, password_hash, password_status, hash_algorithm,
     created_at, updated_at
 ) VALUES (
-    '{credential_id}', '{identity_id}', crypt('{password}', gen_salt('bf', 10)),
-    'active', 'bcrypt', now(), now()
+    '{credential_id}', '{identity_id}', '{password_hash}',
+    'active', 'argon2id', now(), now()
 );
 INSERT INTO auth_user_auth_states (
     user_id, status, user_version, status_change_id, effective_at

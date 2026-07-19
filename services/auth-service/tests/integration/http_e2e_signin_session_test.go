@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -181,6 +182,92 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 		mobileResponse, mobileData := signInEmailHTTP(t, harness, mobileFlow, email, httpE2EInitialPassword, true)
 		assertMobileAuthenticationDelivery(t, mobileResponse, mobileData)
 		assertResponseOmits(t, mobileResponse, email, httpE2EInitialPassword)
+
+		var argon2idHash string
+		if err := harness.db.QueryRow(harness.ctx, `
+			SELECT password_hash FROM auth_password_credentials
+			WHERE identity_id = $1 AND password_status = 'active'
+		`, emailID).Scan(&argon2idHash); err != nil {
+			t.Fatal("read active Argon2id credential")
+		}
+		const legacyBcryptHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_password_credentials
+			SET password_hash = $2, hash_algorithm = 'bcrypt'
+			WHERE identity_id = $1 AND password_status = 'active'
+		`, emailID, legacyBcryptHash); err != nil {
+			t.Fatal("set legacy bcrypt credential")
+		}
+		legacyFlow := createHTTPPreAuth(t, harness, "ios")
+		legacy := harness.do(httpE2ERequest{
+			Method: http.MethodPost,
+			Path:   "/api/v1/auth/signins/email",
+			JSON: map[string]any{
+				"authIntentId": legacyFlow.intentID,
+				"email":        email,
+				"password":     "password",
+				"rememberMe":   false,
+			},
+			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
+			Credentials: legacyFlow.credentials(harness.origin),
+		})
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_password_credentials
+			SET password_hash = $2, hash_algorithm = 'argon2id'
+			WHERE identity_id = $1 AND password_status = 'active'
+		`, emailID, argon2idHash); err != nil {
+			t.Fatal("restore active Argon2id credential")
+		}
+		decodeHTTPError(t, legacy, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		assertResponseOmits(t, legacy, email, "password", legacyFlow.authFlowToken)
+
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_identities
+			SET credential_status = 'password_reset_required',
+				password_reset_required_at = now(), password_reset_reason = 'integration_test'
+			WHERE identity_id = $1
+		`, emailID); err != nil {
+			t.Fatal("set password reset required state")
+		}
+		wrongStateFlow := createHTTPPreAuth(t, harness, "ios")
+		wrongState := harness.do(httpE2ERequest{
+			Method: http.MethodPost,
+			Path:   "/api/v1/auth/signins/email",
+			JSON: map[string]any{
+				"authIntentId": wrongStateFlow.intentID,
+				"email":        email,
+				"password":     httpE2EWrongPassword,
+				"rememberMe":   false,
+			},
+			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
+			Credentials: wrongStateFlow.credentials(harness.origin),
+		})
+		decodeHTTPError(t, wrongState, http.StatusUnauthorized, "AUTH_SIGNIN_FAILED")
+		assertResponseOmits(t, wrongState, email, httpE2EWrongPassword, wrongStateFlow.authFlowToken)
+
+		correctStateFlow := createHTTPPreAuth(t, harness, "ios")
+		correctState := harness.do(httpE2ERequest{
+			Method: http.MethodPost,
+			Path:   "/api/v1/auth/signins/email",
+			JSON: map[string]any{
+				"authIntentId": correctStateFlow.intentID,
+				"email":        email,
+				"password":     httpE2EInitialPassword,
+				"rememberMe":   false,
+			},
+			Headers:     idempotencyHTTPHeaders(uuid.NewString()),
+			Credentials: correctStateFlow.credentials(harness.origin),
+		})
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_identities
+			SET credential_status = 'active',
+				password_reset_required_at = NULL, password_reset_reason = NULL
+			WHERE identity_id = $1
+		`, emailID); err != nil {
+			t.Fatal("restore active credential state")
+		}
+		decodeHTTPError(t, correctState, http.StatusForbidden, "AUTH_PASSWORD_RESET_REQUIRED")
+		assertResponseOmits(t, correctState, email, httpE2EInitialPassword, correctStateFlow.authFlowToken)
 	}) {
 		t.FailNow()
 	}
@@ -370,6 +457,14 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 		})
 		decodeHTTPError(t, weak, http.StatusUnprocessableEntity, "AUTH_PASSWORD_POLICY_NOT_MET")
 		assertResponseOmits(t, weak, email, resetCode, resetGrant, weakPassword, resetFlow.authFlowToken)
+		if _, err := harness.db.Exec(harness.ctx, `
+			UPDATE auth_identities
+			SET credential_status = 'password_reset_required',
+				password_reset_required_at = now(), password_reset_reason = 'integration_test'
+			WHERE identity_id = $1
+		`, emailID); err != nil {
+			t.Fatalf("require password reset before completion: %v", err)
+		}
 
 		response := harness.do(httpE2ERequest{
 			Method: http.MethodPut,
@@ -385,6 +480,42 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 		})
 		assertHTTPNoContent(t, response, http.StatusNoContent)
 		assertResponseOmits(t, response, email, resetCode, resetGrant, httpE2ENewPassword, resetFlow.authFlowToken)
+
+		var activeHash, activeAlgorithm string
+		if err := harness.db.QueryRow(harness.ctx, `
+			SELECT p.password_hash, p.hash_algorithm
+			FROM auth_password_credentials p
+			JOIN auth_identities i ON i.identity_id = p.identity_id
+			WHERE i.normalized_value = $1 AND p.password_status = 'active'
+		`, email).Scan(&activeHash, &activeAlgorithm); err != nil {
+			t.Fatal("read active password credential after reset")
+		}
+		if activeAlgorithm != "argon2id" || !strings.HasPrefix(activeHash, "$argon2id$v=19$") {
+			t.Fatal("reset password credential is not an Argon2id PHC hash")
+		}
+		var credentialState string
+		if err := harness.db.QueryRow(harness.ctx, `
+			SELECT credential_status FROM auth_identities WHERE identity_id = $1
+		`, emailID).Scan(&credentialState); err != nil {
+			t.Fatal("read identity credential state after reset")
+		}
+		if credentialState != "active" {
+			t.Fatalf("identity credential state after reset = %q, want active", credentialState)
+		}
+		var replacedHash sql.NullString
+		if err := harness.db.QueryRow(harness.ctx, `
+			SELECT p.password_hash
+			FROM auth_password_credentials p
+			JOIN auth_identities i ON i.identity_id = p.identity_id
+			WHERE i.normalized_value = $1 AND p.password_status = 'replaced'
+			ORDER BY p.replaced_at DESC
+			LIMIT 1
+		`, email).Scan(&replacedHash); err != nil {
+			t.Fatal("read replaced password credential after reset")
+		}
+		if replacedHash.Valid {
+			t.Fatal("replaced password credential retained its verifier")
+		}
 
 		verificationFlow := createHTTPPreAuth(t, harness, "ios")
 		oldPassword := harness.do(httpE2ERequest{

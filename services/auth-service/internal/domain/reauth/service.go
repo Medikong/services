@@ -35,7 +35,7 @@ func NewReauthService(pool *pgxpool.Pool, keys security.Keys, identities identit
 }
 
 func (s *ReauthService) Reauthenticate(ctx context.Context, input identity.ReauthInput) (identity.ReauthOutput, error) {
-	if !input.Principal.Authenticated || !validPurpose(input.Purpose) || strings.TrimSpace(input.Password) == "" || !validIdempotencyKey(input.IdempotencyKey) {
+	if !input.Principal.Authenticated || !validPurpose(input.Purpose) || input.Password == "" || !validIdempotencyKey(input.IdempotencyKey) {
 		return identity.ReauthOutput{}, domain.Problem(400, "AUTH_INPUT_INVALID", "재인증 요청이 올바르지 않습니다.")
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -52,11 +52,18 @@ func (s *ReauthService) Reauthenticate(ctx context.Context, input identity.Reaut
 		return output, nil
 	}
 	identityValue, credential, err := s.identities.FindActiveEmailCredentialForUser(ctx, tx, input.Principal.UserID)
-	if errors.Is(err, identity.ErrNotFound) || !security.VerifyPassword(credential.Hash, input.Password) {
+	if errors.Is(err, identity.ErrNotFound) {
+		_ = security.VerifyPassword("", input.Password)
 		return identity.ReauthOutput{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
 	}
 	if err != nil {
 		return identity.ReauthOutput{}, domain.Unavailable()
+	}
+	if !security.VerifyPassword(credential.Hash, input.Password) {
+		return identity.ReauthOutput{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
+	}
+	if identityValue.Status != "verified" || identityValue.CredentialState != "active" {
+		return identity.ReauthOutput{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
 	}
 	link, err := s.identities.FindActiveLinkForIdentity(ctx, tx, identityValue.ID)
 	if err != nil {
@@ -97,7 +104,7 @@ func (s *ReauthService) Reauthenticate(ctx context.Context, input identity.Reaut
 // rotated_pending_delivery, and only for the exact reauthentication replay
 // that created its successor. It is never a general authentication path.
 func (s *ReauthService) RecoverWebDelivery(ctx context.Context, webCookie, csrfToken, purpose, password, idempotencyKey string) (identity.ReauthOutput, error) {
-	if strings.TrimSpace(webCookie) == "" || strings.TrimSpace(csrfToken) == "" || !validPurpose(purpose) || strings.TrimSpace(password) == "" || !validIdempotencyKey(idempotencyKey) {
+	if strings.TrimSpace(webCookie) == "" || strings.TrimSpace(csrfToken) == "" || !validPurpose(purpose) || password == "" || !validIdempotencyKey(idempotencyKey) {
 		return identity.ReauthOutput{}, domain.Problem(401, "AUTH_SESSION_REQUIRED", "유효한 인증 정보가 필요합니다.")
 	}
 	tx, err := s.pool.Begin(ctx)

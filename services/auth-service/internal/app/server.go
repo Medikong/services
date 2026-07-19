@@ -156,6 +156,11 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	})
 	sessionService.UseStatusProjection(statusService)
 	sessionRepository.UseStatusProjection(statusService)
+	passwordPolicy := security.PasswordPolicy{
+		MinimumLength: cfg.Auth.PasswordMinLength,
+		MaximumLength: security.DefaultPasswordMaximumLength,
+		MaximumBytes:  security.DefaultPasswordMaximumBytes,
+	}
 	emailSignInService := authentication.NewEmailService(
 		db, bootstrapService, identityRepository, intentRepository, sessionService,
 	)
@@ -168,6 +173,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		ResetTTL:              cfg.Auth.ProofTTL,
 		ChallengeTTL:          cfg.Auth.ChallengeTTL,
 		VirtualAdapterEnabled: cfg.Development.VirtualAdaptersEnabled,
+		PasswordPolicy:        passwordPolicy,
 	}, bootstrapService, passwordResetRepository, identityRepository, challengeRepository,
 		idempotencyRepository, sessionRepository, outboxRepository)
 	reauthService := reauth.NewReauthService(
@@ -218,6 +224,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 			StatusTokenRetention:  cfg.Auth.ProofTTL,
 			ChallengeTTL:          cfg.Auth.ChallengeTTL,
 			VirtualAdapterEnabled: cfg.Development.VirtualAdaptersEnabled,
+			PasswordPolicy:        passwordPolicy,
 		},
 		bootstrapService,
 		registrationRepository,

@@ -365,6 +365,7 @@ paths:
         AUTH_IDENTIFIER_UNAVAILABLE: 409
         AUTH_IDEMPOTENCY_CONFLICT: 409
         AUTH_INTENT_EXPIRED: 410
+        AUTH_PASSWORD_POLICY_NOT_MET: 422
         AUTH_RATE_LIMITED: 429
         AUTH_SERVICE_UNAVAILABLE: 503
       security:
@@ -401,11 +402,11 @@ paths:
                 password:
                   type: string
                   format: password
-                  minLength: 1
-                  maxLength: 1024
+                  minLength: 12
+                  maxLength: 256
                   writeOnly: true
                   x-sensitive: true
-                  description: 세부 강도는 현재 PasswordPolicy로 검증한다.
+                  description: OpenAPI 최소값은 12자이고 배포 설정 AUTH_PASSWORD_MIN_LENGTH가 12~256자 범위에서 강화할 수 있다. maxLength는 Unicode code point 기준 256자다. UTF-8은 1024바이트 이하로 제한하며 trim 또는 Unicode 정규화를 적용하지 않는다.
                 phone:
                   $ref: '#/components/schemas/PhoneNumber'
                 rememberMe:
@@ -508,6 +509,8 @@ paths:
           $ref: '#/components/responses/AuthProblem409IdempotencyConflictOrIdentifierUnavailable'
         '410':
           $ref: '#/components/responses/Gone'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
@@ -965,9 +968,10 @@ paths:
                   type: string
                   format: password
                   minLength: 1
-                  maxLength: 1024
+                  maxLength: 256
                   writeOnly: true
                   x-sensitive: true
+                  description: 현재 비밀번호 원문이다. maxLength는 Unicode code point 기준 256자이고 UTF-8은 1024바이트 이하로 제한한다. trim 또는 Unicode 정규화를 적용하지 않는다.
                 rememberMe:
                   type: boolean
             example:
@@ -1781,18 +1785,19 @@ paths:
                     newPassword:
                       type: string
                       format: password
-                      minLength: 1
-                      maxLength: 1024
+                      minLength: 12
+                      maxLength: 256
                       writeOnly: true
                       x-sensitive: true
+                      description: OpenAPI 최소값은 12자이고 배포 설정 AUTH_PASSWORD_MIN_LENGTH가 12~256자 범위에서 강화할 수 있다. maxLength는 Unicode code point 기준 256자다. UTF-8은 1024바이트 이하로 제한하며 trim 또는 Unicode 정규화를 적용하지 않는다.
                     confirmPassword:
                       type: string
                       format: password
-                      minLength: 1
-                      maxLength: 1024
+                      minLength: 12
+                      maxLength: 256
                       writeOnly: true
                       x-sensitive: true
-                      description: newPassword와 같아야 한다.
+                      description: newPassword와 원문 그대로 같아야 한다. 최소 12자이며 maxLength는 Unicode code point 기준 256자다. UTF-8은 1024바이트 이하로 제한하며 trim 또는 Unicode 정규화를 적용하지 않는다.
                 - type: object
                   additionalProperties: false
                   required:
@@ -1814,18 +1819,19 @@ paths:
                     newPassword:
                       type: string
                       format: password
-                      minLength: 1
-                      maxLength: 1024
+                      minLength: 12
+                      maxLength: 256
                       writeOnly: true
                       x-sensitive: true
+                      description: OpenAPI 최소값은 12자이고 배포 설정 AUTH_PASSWORD_MIN_LENGTH가 12~256자 범위에서 강화할 수 있다. maxLength는 Unicode code point 기준 256자다. UTF-8은 1024바이트 이하로 제한하며 trim 또는 Unicode 정규화를 적용하지 않는다.
                     confirmPassword:
                       type: string
                       format: password
-                      minLength: 1
-                      maxLength: 1024
+                      minLength: 12
+                      maxLength: 256
                       writeOnly: true
                       x-sensitive: true
-                      description: newPassword와 같아야 한다.
+                      description: newPassword와 원문 그대로 같아야 한다. 최소 12자이며 maxLength는 Unicode code point 기준 256자다. UTF-8은 1024바이트 이하로 제한하며 trim 또는 Unicode 정규화를 적용하지 않는다.
               discriminator:
                 propertyName: credentialDelivery
             examples:
@@ -2230,9 +2236,10 @@ paths:
                   type: string
                   format: password
                   minLength: 1
-                  maxLength: 1024
+                  maxLength: 256
                   writeOnly: true
                   x-sensitive: true
+                  description: 현재 비밀번호 원문이다. maxLength는 Unicode code point 기준 256자이고 UTF-8은 1024바이트 이하로 제한한다. trim 또는 Unicode 정규화를 적용하지 않는다.
             example:
               purpose: replace_phone
               password: <current-password>
@@ -5525,6 +5532,33 @@ components:
                 code: AUTH_IDENTIFIER_UNAVAILABLE
                 message: 요청 조건과 현재 인증 상태를 확인해주세요.
                 requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    UnprocessableEntity:
+      description: 요청 형식은 유효하지만 인증 도메인 정책을 만족하지 못했다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 422
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_PASSWORD_POLICY_NOT_MET
+          example:
+            status: 422
+            code: AUTH_PASSWORD_POLICY_NOT_MET
+            message: 안내된 비밀번호 조건을 확인해주세요.
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     NotFound:
       description: 현재 credential과 binding으로 조회할 수 있는 인증 리소스를 찾을 수 없다.
       headers:
@@ -6172,33 +6206,6 @@ components:
                 code: AUTH_PASSWORD_RESET_GRANT_EXPIRED
                 message: 요청 조건과 현재 인증 상태를 확인해주세요.
                 requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
-    UnprocessableEntity:
-      description: 요청 형식은 유효하지만 인증 도메인 정책을 만족하지 못했다.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/XRequestId'
-        Cache-Control:
-          $ref: '#/components/headers/CacheControlNoStore'
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ErrorResponse'
-              - type: object
-                properties:
-                  status:
-                    type: integer
-                    enum:
-                      - 422
-                  code:
-                    type: string
-                    enum:
-                      - AUTH_PASSWORD_POLICY_NOT_MET
-          example:
-            status: 422
-            code: AUTH_PASSWORD_POLICY_NOT_MET
-            message: 안내된 비밀번호 조건을 확인해주세요.
-            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     AuthProblem401SessionRevoked:
       description: 이 operation에서 HTTP 401로 반환할 수 있는 인증 도메인 오류다.
       headers:

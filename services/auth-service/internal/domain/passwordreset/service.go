@@ -24,6 +24,7 @@ type Config struct {
 	ResetTTL              time.Duration
 	ChallengeTTL          time.Duration
 	VirtualAdapterEnabled bool
+	PasswordPolicy        security.PasswordPolicy
 }
 
 type Service struct {
@@ -328,8 +329,8 @@ func (s *Service) Complete(ctx context.Context, input CompleteInput) error {
 	if err != nil || input.NewPassword != input.ConfirmPassword || strings.TrimSpace(input.IdempotencyKey) == "" {
 		return domain.Problem(400, "AUTH_INPUT_INVALID", "비밀번호 재설정 요청이 올바르지 않습니다.")
 	}
-	if err := (security.PasswordPolicy{}).Validate(input.NewPassword); err != nil {
-		return domain.Problem(422, "AUTH_PASSWORD_POLICY_NOT_MET", "비밀번호 정책을 만족하지 않습니다.")
+	if err := s.config.PasswordPolicy.Validate(input.NewPassword); err != nil {
+		return domain.Problem(422, "AUTH_PASSWORD_POLICY_NOT_MET", err.Error())
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

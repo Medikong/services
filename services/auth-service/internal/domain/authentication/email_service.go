@@ -38,7 +38,7 @@ type EmailInput struct {
 
 func (s *EmailService) SignIn(ctx context.Context, input EmailInput) (Completed, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
-	if !strings.Contains(email, "@") || strings.TrimSpace(input.Password) == "" {
+	if !strings.Contains(email, "@") || input.Password == "" {
 		return Completed{}, domain.Problem(400, "AUTH_INPUT_INVALID", "이메일과 비밀번호가 필요합니다.")
 	}
 	intentID, err := uuid.Parse(input.IntentID)
@@ -56,19 +56,20 @@ func (s *EmailService) SignIn(ctx context.Context, input EmailInput) (Completed,
 	}
 	currentIdentity, link, credential, err := s.identities.FindEmailCredentialForUpdate(ctx, tx, email)
 	if errors.Is(err, identity.ErrNotFound) {
+		_ = security.VerifyPassword("", input.Password)
 		return Completed{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
 	}
 	if err != nil {
 		return Completed{}, domain.Unavailable()
+	}
+	if !security.VerifyPassword(credential.Hash, input.Password) {
+		return Completed{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
 	}
 	if currentIdentity.CredentialState == "locked" {
 		return Completed{}, domain.Problem(423, "AUTH_ACCOUNT_LOCKED", "인증 식별자가 잠겨 있습니다.")
 	}
 	if currentIdentity.CredentialState == "password_reset_required" {
 		return Completed{}, domain.Problem(403, "AUTH_PASSWORD_RESET_REQUIRED", "비밀번호 재설정이 필요합니다.")
-	}
-	if !security.VerifyPassword(credential.Hash, input.Password) {
-		return Completed{}, domain.Problem(401, "AUTH_SIGNIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.")
 	}
 	issued, err := s.sessions.IssueTx(ctx, tx, appsession.IssueInput{
 		UserID: link.UserID, IdentityID: currentIdentity.ID, IdentityLink: link.ID,

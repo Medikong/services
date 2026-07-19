@@ -36,6 +36,7 @@ type Config struct {
 	LinkAcceptanceWindow  time.Duration
 	SessionDeliveryWindow time.Duration
 	VirtualAdapterEnabled bool
+	PasswordPolicy        security.PasswordPolicy
 }
 
 type Service struct {
@@ -122,8 +123,8 @@ func (s *Service) Start(ctx context.Context, input StartInput) (StartOutput, err
 	if err != nil {
 		return StartOutput{}, domain.Problem(400, "AUTH_INPUT_INVALID", "휴대폰 번호 형식이 올바르지 않습니다.")
 	}
-	if err := (security.PasswordPolicy{}).Validate(input.Password); err != nil {
-		return StartOutput{}, domain.Problem(400, "AUTH_INPUT_INVALID", "비밀번호 정책을 만족하지 않습니다.")
+	if err := s.config.PasswordPolicy.Validate(input.Password); err != nil {
+		return StartOutput{}, domain.Problem(422, "AUTH_PASSWORD_POLICY_NOT_MET", err.Error())
 	}
 	intentID, err := uuid.Parse(input.IntentID)
 	if err != nil {

@@ -73,7 +73,7 @@ func (r *PostgresRepository) CreatePasswordCredential(ctx context.Context, tx pg
 	_, err := tx.Exec(ctx, `
 		INSERT INTO auth_password_credentials (
 			password_credential_id, identity_id, password_hash, password_status, hash_algorithm, created_at, updated_at
-		) VALUES ($1, $2, $3, 'active', 'bcrypt', now(), now())
+		) VALUES ($1, $2, $3, 'active', 'argon2id', now(), now())
 	`, uuid.New(), identityID, hash)
 	return err
 }
@@ -81,8 +81,17 @@ func (r *PostgresRepository) CreatePasswordCredential(ctx context.Context, tx pg
 func (r *PostgresRepository) ReplacePasswordCredential(ctx context.Context, tx pgx.Tx, identityID uuid.UUID, hash string) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE auth_password_credentials
-		SET password_status = 'replaced', replaced_at = now(), updated_at = now()
+		SET password_hash = NULL, password_status = 'replaced', replaced_at = now(), updated_at = now()
 		WHERE identity_id = $1 AND password_status = 'active'
+	`, identityID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE auth_identities
+		SET credential_status = 'active', password_reset_required_at = NULL,
+			password_reset_reason = NULL, row_version = row_version + 1, updated_at = now()
+		WHERE identity_id = $1 AND credential_status = 'password_reset_required'
 	`, identityID)
 	if err != nil {
 		return err
@@ -90,7 +99,7 @@ func (r *PostgresRepository) ReplacePasswordCredential(ctx context.Context, tx p
 	_, err = tx.Exec(ctx, `
 		INSERT INTO auth_password_credentials (
 			password_credential_id, identity_id, password_hash, password_status, hash_algorithm, created_at, updated_at
-		) VALUES ($1, $2, $3, 'active', 'bcrypt', now(), now())
+		) VALUES ($1, $2, $3, 'active', 'argon2id', now(), now())
 	`, uuid.New(), identityID, hash)
 	return err
 }

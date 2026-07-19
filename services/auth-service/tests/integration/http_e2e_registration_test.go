@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -158,6 +159,21 @@ func TestProductionHTTPRegistrationAPI(t *testing.T) {
 	decodeHTTPError(t, invalidOrigin, http.StatusForbidden, "AUTH_CSRF_INVALID")
 	assertResponseOmits(t, invalidOrigin, email, phone, password)
 
+	shortPassword := strings.Repeat("a", 11)
+	policyFailure := harness.do(httpE2ERequest{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/auth/registrations",
+		JSON:    registrationHTTPBody(intentData.AuthIntentID, email, shortPassword, phoneCountryCode, phoneNationalNumber, profileRequestID, agreementReceiptID),
+		Headers: registrationHTTPHeaders(uuid.NewString(), nil),
+		Credentials: httpE2ECredentials{
+			AuthFlowCookie: authFlowCookie,
+			CSRFToken:      intentData.CSRFToken,
+			Origin:         harness.origin,
+		},
+	})
+	decodeHTTPError(t, policyFailure, http.StatusUnprocessableEntity, "AUTH_PASSWORD_POLICY_NOT_MET")
+	assertResponseOmits(t, policyFailure, email, phone, shortPassword)
+
 	startKey := uuid.NewString()
 	startResponse := harness.do(httpE2ERequest{
 		Method:  http.MethodPost,
@@ -176,6 +192,18 @@ func TestProductionHTTPRegistrationAPI(t *testing.T) {
 		t.Fatal("API.A.300-03 success data does not match the expected result")
 	}
 	assertResponseOmits(t, startResponse, email, phone, password)
+	var storedPasswordHash, storedHashAlgorithm string
+	if err := harness.db.QueryRow(harness.ctx, `
+		SELECT p.password_hash, p.hash_algorithm
+		FROM auth_password_credentials p
+		JOIN auth_identities i ON i.identity_id = p.identity_id
+		WHERE i.normalized_value = $1 AND p.password_status = 'active'
+	`, email).Scan(&storedPasswordHash, &storedHashAlgorithm); err != nil {
+		t.Fatal("read registration password credential")
+	}
+	if storedHashAlgorithm != "argon2id" || !strings.HasPrefix(storedPasswordHash, "$argon2id$v=19$") {
+		t.Fatal("registration password credential is not an Argon2id PHC hash")
+	}
 
 	secondIntent, secondAuthFlowCookie := registrationHTTPCreateWebIntent(t, harness, "/drops/registration-conflict")
 	identifierConflict := harness.do(httpE2ERequest{

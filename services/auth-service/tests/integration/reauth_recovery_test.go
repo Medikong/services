@@ -83,6 +83,20 @@ func TestReauthenticationKeepsSessionAndRecoversOnlyExactWebDelivery(t *testing.
 	if _, err := service.RecoverWebDelivery(ctx, initial.WebCookie, initial.CSRFToken, "replace_phone", password, key); errorCode(err) != "AUTH_SESSION_DELIVERY_EXPIRED" {
 		t.Fatalf("expired recovery error=%v", err)
 	}
+	if _, err := db.Exec(ctx, `
+		UPDATE auth_identities
+		SET credential_status = 'password_reset_required',
+			password_reset_required_at = now(), password_reset_reason = 'integration_test'
+		WHERE identity_id = $1
+	`, emailID); err != nil {
+		t.Fatalf("require password reset: %v", err)
+	}
+	if _, err := service.Reauthenticate(ctx, identity.ReauthInput{
+		Principal: principal, Purpose: "replace_phone", Password: password,
+		IdempotencyKey: uuid.NewString(), PreviousWebCookie: result.Issued.WebCookie,
+	}); errorCode(err) != "AUTH_SIGNIN_FAILED" {
+		t.Fatalf("password-reset-required reauthentication error=%v", err)
+	}
 }
 
 func TestMethodLinkStartReplaysBeforeConsumingProofAgain(t *testing.T) {
@@ -285,7 +299,7 @@ func seedEmailPrincipal(t *testing.T, ctx context.Context, db *pgxpool.Pool, use
 	}
 	if _, err := db.Exec(ctx, `
 		INSERT INTO auth_password_credentials (password_credential_id, identity_id, password_hash, password_status, hash_algorithm, created_at, updated_at)
-		VALUES ($1, $2, $3, 'active', 'bcrypt', now(), now())
+		VALUES ($1, $2, $3, 'active', 'argon2id', now(), now())
 	`, uuid.New(), identityID, hash); err != nil {
 		t.Fatalf("seed password credential: %v", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Medikong/services/services/auth-service/internal/security"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
@@ -72,7 +73,7 @@ func (c AuthConfig) Validate(operational bool) error {
 		validation.Field(&c.IntentTTL, validation.Min(time.Nanosecond)),
 		validation.Field(&c.ProofTTL, validation.Min(time.Nanosecond)),
 		validation.Field(&c.RecoveryTTL, validation.Min(time.Nanosecond)),
-		validation.Field(&c.PasswordMinLength, validation.Min(8)),
+		validation.Field(&c.PasswordMinLength, validation.Min(security.DefaultPasswordMinimumLength), validation.Max(security.DefaultPasswordMaximumLength)),
 		validation.Field(&c.SessionCookieName, validation.Required),
 		validation.Field(&c.AuthFlowCookieName, validation.Required),
 		validation.Field(&c.SessionStatusRedisURL, validation.Required),
