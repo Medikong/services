@@ -17,6 +17,7 @@ from auth_e2e_common import generate_rsa_private_key
 
 AUTH_ADMIN_TOKEN = "auth-e2e-admin-control-secret-001"
 AUTH_COLLECTION = "auth/auth.postman_collection.json"
+READINESS_ENDPOINTS = ("/healthz", "/e2e/auth-readyz", "/e2e/worker-readyz")
 
 
 class E2EError(RuntimeError):
@@ -27,6 +28,32 @@ def failure_message(exc):
     if isinstance(exc, subprocess.CalledProcessError):
         return f"subprocess exited with status {exc.returncode}"
     return str(exc)
+
+
+def readiness_description(status_code, body=b""):
+    description = f"http {status_code}"
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+        return description
+    if not isinstance(payload, dict):
+        return description
+    status = payload.get("status")
+    if status in {"ok", "ready", "not_ready"}:
+        description += f" status={status}"
+    checks = payload.get("checks")
+    if not isinstance(checks, dict):
+        return description
+    safe_checks = []
+    for name, result in sorted(checks.items()):
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9_]+", name):
+            continue
+        if result not in {"ok", "error", "draining"}:
+            continue
+        safe_checks.append(f"{name}:{result}")
+    if safe_checks:
+        description += " checks=" + ",".join(safe_checks)
+    return description
 
 
 def env(name, default=""):
@@ -173,20 +200,26 @@ def run_purchase(selected=None):
 
 
 def wait_for_auth():
-    endpoints = ["/healthz", "/e2e/auth-readyz", "/e2e/worker-readyz"]
     deadline = time.monotonic() + WAIT_SECONDS
+    last_state = {path: "not checked" for path in READINESS_ENDPOINTS}
     while time.monotonic() < deadline:
         ready = True
-        for path in endpoints:
+        for path in READINESS_ENDPOINTS:
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:18088{path}", timeout=2) as response:
+                    last_state[path] = readiness_description(response.status)
                     ready = ready and response.status == 200
-            except (OSError, urllib.error.URLError):
+            except urllib.error.HTTPError as exc:
+                last_state[path] = readiness_description(exc.code, exc.read(4096))
+                ready = False
+            except (OSError, urllib.error.URLError) as exc:
+                last_state[path] = f"unreachable ({type(exc).__name__})"
                 ready = False
         if ready:
             return
         time.sleep(0.5)
-    raise E2EError("auth E2E stack did not become ready")
+    summary = "; ".join(f"{path}={last_state[path]}" for path in READINESS_ENDPOINTS)
+    raise E2EError(f"auth E2E stack did not become ready: {summary}")
 
 
 def auth_folders():
