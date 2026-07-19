@@ -258,12 +258,12 @@ tasks:
     desc: Run unit tests and Docker Compose E2E tests.
     cmds:
       - task: tests:test-unit
-      - task: tests:purchase-e2e
+      - task: test-e2e
 
   test-e2e:
     desc: Run Docker Compose E2E tests. Optionally set SCENARIO=<scenario-name>.
     cmds:
-      - task: tests:purchase-e2e
+      - task: tests:e2e
         vars:
           SCENARIO: '{{default "" .SCENARIO}}'
 

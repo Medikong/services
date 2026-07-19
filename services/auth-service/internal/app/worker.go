@@ -17,10 +17,12 @@ import (
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/auth-service/internal/auth"
+	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
 	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/domain/session"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
+	"github.com/Medikong/services/services/auth-service/internal/security"
 )
 
 type Worker struct {
@@ -32,6 +34,8 @@ type Worker struct {
 	runAudit            func(context.Context) error
 	runDomainOutbox     func(context.Context) error
 	runStatusProjection func(context.Context) error
+	runDelivery         func(context.Context) error
+	kafkaPublisher      *outbox.KafkaPublisher
 	cleanup             func(context.Context) (int64, error)
 	cleanupInterval     time.Duration
 	profiler            *pyroscope.Profiler
@@ -41,9 +45,8 @@ func NewWorker(ctx context.Context, cfg config.WorkerConfig) (*Worker, error) {
 	return NewWorkerWithPublisher(ctx, cfg, nil)
 }
 
-// NewWorkerWithPublisher binds the durable auth outbox only when a trusted
-// Context adapter is supplied by the deployment composition root. The normal
-// executable deliberately passes nil until a real topic/credential exists.
+// NewWorkerWithPublisher keeps a narrow injection point for integration tests.
+// The normal executable creates the configured Kafka publisher itself.
 func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publisher outbox.Publisher) (*Worker, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -116,6 +119,19 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
 		return nil, err
 	}
+	var kafkaPublisher *outbox.KafkaPublisher
+	if publisher == nil && cfg.Broker.Enabled {
+		kafkaPublisher, err = outbox.NewKafkaPublisher(ctx, cfg.Broker.Brokers, cfg.Broker.Topic, cfg.Broker.PublishTimeout)
+		if err != nil {
+			if profiler != nil {
+				_ = profiler.Stop()
+			}
+			_ = resources.Close()
+			_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
+			return nil, err
+		}
+		publisher = kafkaPublisher
+	}
 	var runDomainOutbox func(context.Context) error
 	if publisher != nil {
 		relay, relayErr := outbox.New(outbox.NewPostgresRepository(resources.DB), publisher, outbox.Config{
@@ -124,6 +140,9 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 			BaseBackoff: cfg.Audit.BaseBackoff, MaxBackoff: cfg.Audit.MaxBackoff,
 		})
 		if relayErr != nil {
+			if kafkaPublisher != nil {
+				kafkaPublisher.Close()
+			}
 			if profiler != nil {
 				_ = profiler.Stop()
 			}
@@ -147,12 +166,46 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		BaseBackoff: time.Second, MaxBackoff: 30 * time.Second,
 	})
 	if err != nil {
+		if kafkaPublisher != nil {
+			kafkaPublisher.Close()
+		}
 		if profiler != nil {
 			_ = profiler.Stop()
 		}
 		_ = resources.Close()
 		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
 		return nil, err
+	}
+	var runDelivery func(context.Context) error
+	if cfg.Delivery.Enabled {
+		keys := security.Keys{
+			CredentialHMAC: []byte(cfg.Auth.CredentialHMACKey),
+			ReplayKey:      []byte(cfg.Auth.ReplayEncryptionKey),
+		}
+		delivery, deliveryErr := challenge.NewDeliveryService(
+			challenge.NewPostgresRepository(resources.DB),
+			keys,
+			challenge.DeliveryConfig{
+				WorkerID: hostname + ":auth-delivery:" + uuid.NewString(),
+				EmailURL: cfg.Delivery.EmailURL, SMSURL: cfg.Delivery.SMSURL,
+				EmailToken: cfg.Delivery.EmailBearerToken, SMSToken: cfg.Delivery.SMSBearerToken,
+				RequestTimeout: cfg.Delivery.RequestTimeout, PollInterval: cfg.Delivery.PollInterval,
+				Lease: cfg.Delivery.Lease, BatchSize: cfg.Delivery.BatchSize, MaxAttempts: cfg.Delivery.MaxAttempts,
+				BaseBackoff: cfg.Delivery.BaseBackoff, MaxBackoff: cfg.Delivery.MaxBackoff,
+			},
+		)
+		if deliveryErr != nil {
+			if kafkaPublisher != nil {
+				kafkaPublisher.Close()
+			}
+			if profiler != nil {
+				_ = profiler.Stop()
+			}
+			_ = resources.Close()
+			_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
+			return nil, deliveryErr
+		}
+		runDelivery = delivery.Run
 	}
 	checks := map[string]operational.Check{
 		"source_database": func(ctx context.Context) error {
@@ -166,6 +219,9 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		checks["sink_database"] = func(ctx context.Context) error {
 			return checkAuditDatabase(ctx, resources.AuditSink)
 		}
+	}
+	if kafkaPublisher != nil {
+		checks["broker"] = kafkaPublisher.Ping
 	}
 	healthState := operational.NewHandler(operational.Config{
 		Service:          cfg.Service.Name + "-worker",
@@ -188,6 +244,8 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		runAudit:            auditWorker.Run,
 		runDomainOutbox:     runDomainOutbox,
 		runStatusProjection: statusRelay.Run,
+		runDelivery:         runDelivery,
+		kafkaPublisher:      kafkaPublisher,
 		cleanup: func(ctx context.Context) (int64, error) {
 			return audit.DeleteDeliveredBefore(ctx, resources.DB, time.Now().UTC().Add(-cfg.Audit.Retention), cfg.Audit.CleanupLimit)
 		},
@@ -241,12 +299,22 @@ func (w *Worker) Run(ctx context.Context) error {
 		go func() { results <- serveHTTP(w.adminHTTP, listener, "worker-admin") }()
 	}
 	backgroundCount := 2
-	backgroundResult := make(chan error, 3)
-	go func() { backgroundResult <- w.runAudit(runCtx) }()
-	go func() { backgroundResult <- w.runStatusProjection(runCtx) }()
+	backgroundResult := make(chan error, 4)
+	go func() { backgroundResult <- runResilient(runCtx, "audit", w.cfg.Audit.PollInterval, w.runAudit) }()
+	go func() {
+		backgroundResult <- runResilient(runCtx, "session_status_projection", time.Second, w.runStatusProjection)
+	}()
 	if w.runDomainOutbox != nil {
 		backgroundCount++
-		go func() { backgroundResult <- w.runDomainOutbox(runCtx) }()
+		go func() {
+			backgroundResult <- runResilient(runCtx, "domain_outbox", w.cfg.Audit.PollInterval, w.runDomainOutbox)
+		}()
+	}
+	if w.runDelivery != nil {
+		backgroundCount++
+		go func() {
+			backgroundResult <- runResilient(runCtx, "verification_delivery", w.cfg.Delivery.PollInterval, w.runDelivery)
+		}()
 	}
 
 	cleanupInterval := w.cleanupInterval
@@ -292,6 +360,26 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
+func runResilient(ctx context.Context, name string, retryDelay time.Duration, run func(context.Context) error) error {
+	if retryDelay <= 0 {
+		retryDelay = time.Second
+	}
+	for {
+		err := run(ctx)
+		if ctx.Err() != nil {
+			return nil
+		}
+		logger.Warn(ctx, "worker.background_retrying", "component", name, logger.Err(err))
+		timer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil
+		case <-timer.C:
+		}
+	}
+}
+
 func (w *Worker) shutdownAdmin() error {
 	if w.adminHTTP == nil {
 		return nil
@@ -322,6 +410,10 @@ func (w *Worker) waitForBackground(result <-chan error, count int) error {
 
 func (w *Worker) closeWith(cause error) error {
 	profilerErr := w.stopProfilerWith(cause)
+	if w.kafkaPublisher != nil {
+		w.kafkaPublisher.Close()
+		w.kafkaPublisher = nil
+	}
 	resourceErr := w.resources.Close()
 	metricErr := shutdownMetrics(w.metrics, w.cfg.Lifecycle.ShutdownTimeout)
 	return oops.Join(profilerErr, resourceErr, metricErr)

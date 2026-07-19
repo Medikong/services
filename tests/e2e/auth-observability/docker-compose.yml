@@ -1,0 +1,195 @@
+name: ${AUTH_OBS_E2E_PROJECT:-dropmong-auth-observability-e2e}
+
+x-auth-environment: &auth-environment
+  SERVICE_NAME: auth-service
+  SERVICE_VERSION: e2e
+  SERVICE_ENVIRONMENT: e2e
+  DATABASE_URL: postgres://app:app@postgres:5432/auth_service?sslmode=disable
+  AUTH_CREDENTIAL_HMAC_KEY: auth-e2e-credential-hmac-key-0001
+  AUTH_REPLAY_ENCRYPTION_KEY: auth-e2e-replay-key-32-bytes-000
+  AUTH_JWT_PRIVATE_KEY_FILE: /run/secrets/auth_obs_jwt
+  AUTH_JWT_KEY_ID: auth-e2e-rsa-1
+  AUTH_JWT_ISSUER: auth-service
+  AUTH_JWT_AUDIENCES: dropmong-api
+  AUTH_PROOF_PRIVATE_KEY: nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2DXWpgBgrEKt9VL/tPJZAc6DuFy89qmIyWvAhpo9wdRGg
+  AUTH_PROOF_KEY_ID: auth-e2e-1
+  AUTH_USER_PROOF_PUBLIC_KEY: 11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo
+  AUTH_USER_PROOF_KEY_ID: user-e2e-1
+  AUTH_USER_PROOF_ISSUER: user-service
+  AUTH_COOKIE_SECURE: "true"
+  AUTH_ALLOWED_ORIGINS: https://app.e2e.test
+  AUTH_SESSION_STATUS_REDIS_URL: redis://redis:6379/0
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: auth_service
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: valkey/valkey:8-alpine
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - redis-data:/data
+
+  auth-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      <<: *auth-environment
+      MIGRATION_TIMEOUT: 2m
+      OTEL_TRACES_EXPORTER: none
+    secrets:
+      - auth_obs_jwt
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth-service:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      <<: *auth-environment
+      HTTP_ADDR: :8080
+      ADMIN_ADDR: :9090
+      REDIS_DIAL_TIMEOUT: 200ms
+      REDIS_READ_TIMEOUT: 200ms
+      REDIS_WRITE_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_DB_TIMEOUT: 100ms
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+    secrets:
+      - auth_obs_jwt
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_OBS_AUTH_PORT:-18089}:8080"
+      - "127.0.0.1:${AUTH_OBS_ADMIN_PORT:-19090}:9090"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.123.0
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./otel-collector.yml:/etc/otelcol/config.yml:ro
+    depends_on:
+      tempo:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_OBS_COLLECTOR_GRPC_PORT:-14317}:4317"
+      - "127.0.0.1:${AUTH_OBS_COLLECTOR_HTTP_PORT:-14318}:4318"
+      - "127.0.0.1:${AUTH_OBS_COLLECTOR_HEALTH_PORT:-13134}:13133"
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    user: "0:0"
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:${AUTH_OBS_TEMPO_PORT:-13200}:3200"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=1h
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      auth-service:
+        condition: service_started
+      redis-exporter:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_OBS_PROMETHEUS_PORT:-19091}:9090"
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.84.0
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_EXPORTER_DISABLE_EXPORTING_KEY_VALUES: "true"
+      REDIS_EXPORTER_LOG_FORMAT: json
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  loki:
+    image: grafana/loki:3.7.0
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./loki.yml:/etc/loki/loki.yml:ro
+    ports:
+      - "127.0.0.1:${AUTH_OBS_LOKI_PORT:-13100}:3100"
+
+  alloy:
+    image: grafana/alloy:v1.17.0
+    user: "0:0"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      AUTH_OBS_E2E_PROJECT: ${AUTH_OBS_E2E_PROJECT:-dropmong-auth-observability-e2e}
+    volumes:
+      - ./alloy.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_OBS_ALLOY_PORT:-12346}:12345"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AUTH_OBS_GRAFANA_PORT:-13001}:3000"
+
+secrets:
+  auth_obs_jwt:
+    file: ${AUTH_OBS_JWT_PRIVATE_KEY_FILE:?set AUTH_OBS_JWT_PRIVATE_KEY_FILE to a test RSA private key}
+
+volumes:
+  postgres-data:
+  redis-data:
+  tempo-data:
+  prometheus-data:

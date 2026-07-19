@@ -1,6 +1,6 @@
 # 테스트 실행 가이드
 
-이 프로젝트의 테스트 진입점은 루트 `Taskfile.yml`이다. Go 공용 기반 구조와 reference service, Python 기반 catalog/order/payment/notification 구매 흐름을 함께 검증한다.
+이 프로젝트의 테스트 진입점은 루트 `Taskfile.yml`이다. Go 공용 기반 구조와 auth/reference service, Python 기반 catalog/order/payment/notification 구매 기능을 함께 검증한다.
 
 업무 흐름을 사람이 직접 검증하거나 장애를 주입해 확인하는 절차는 배포/인프라 repo에서 별도 문서로 관리한다.
 
@@ -13,8 +13,9 @@
 | Go 벤치마크 | Go test + `benchmark` build tag | Go handler, 공용 패키지, 핵심 경로 성능 |
 | Python 단위 테스트 | Docker Python pytest 러너 | `catalog-service`, `order-service`, `payment-service`, `notification-service`, `interest-service` |
 | Purchase E2E | Docker Compose, PostgreSQL, Kafka, Docker Newman 컨테이너 | catalog/order/payment/notification 구매, 결제 실패, 품절/동시성 검증 |
+| Auth E2E | Docker Compose, Envoy, auth-service/worker, PostgreSQL, Redis, Kafka, mock Provider, Newman | 인증 사용자 여정, Gateway JWT/JWKS, Session, Provider/Outbox 장애와 복구 |
 | Observability E2E | Docker Compose, OpenTelemetry Collector, Tempo, Grafana, Python smoke 컨테이너 | Go inbound request span이 OTLP -> Collector -> Tempo 경로로 적재되는지 검증 |
-| Gateway E2E | 별도 future/Kubernetes scope | Istio Gateway/JWT/Ingress 라우팅, gateway trace boundary 검증 |
+| Kubernetes 정책 E2E | 별도 Kubernetes scope | NetworkPolicy, AuthorizationPolicy, Istio Ingress 객체 자체 검증 |
 
 ## 폴더 구조
 
@@ -37,6 +38,8 @@ tests/
     postgres-init/
       01-create-databases.sql
     scenarios/
+      auth/
+        auth.postman_collection.json
       01-drop-catalog-smoke.postman_collection.json
       02-order-create.postman_collection.json
       03-payment-approve.postman_collection.json
@@ -86,21 +89,29 @@ task test-service SERVICE=order-service
 task test-service SERVICE=order
 ```
 
+## 공통 E2E 진입점
+
+구매와 인증 E2E의 사용자 진입점은 하나다. `SCENARIO`를 생략하면 구매 컬렉션과 인증 컬렉션 전체를 차례로 실행한다.
+
+```bash
+task test-e2e
+```
+
+구매 시나리오는 기존 파일 이름, 인증 시나리오는 `auth/<folder>` 형식으로 선택한다. 인증 단일 실행은 등록 시나리오가 필요한 경우 등록을 준비 단계로 함께 실행한다.
+
+```bash
+task test-e2e SCENARIO=04-customer-drop-purchase-happy-path
+task test-e2e SCENARIO=auth/jwks-jwt-gateway
+task test-e2e SCENARIO=auth/outbox-broker-recovery
+```
+
+모든 실행은 같은 공통 Compose와 `scripts`, `newman`, `postgres-init` 구성을 사용한다. 종료 성공 여부와 관계없이 해당 Compose project의 container, volume, network를 제거하고 잔존 리소스가 있으면 실패로 판정한다. JUnit 결과는 `tests/e2e/newman/reports/`에 저장한다.
+
+기본 Email/SMS는 비밀값 없이 실행할 수 있는 mock Provider를 사용한다. 실제 Provider sandbox와 Kubernetes NetworkPolicy/AuthorizationPolicy 객체는 이 Docker Compose 결과에 포함하지 않으며, 별도 secret과 Kubernetes 환경이 있는 명시적 검증 범위로 남긴다.
+
 ## Purchase E2E
 
-구매 흐름은 Newman 컬렉션으로 검증한다.
-
-```bash
-task tests:purchase-e2e
-```
-
-특정 시나리오만 실행할 때는 다음처럼 지정한다.
-
-```bash
-task tests:purchase-e2e SCENARIO=04-customer-drop-purchase-happy-path
-task tests:purchase-e2e SCENARIO=05-payment-failure-flow
-task tests:purchase-e2e SCENARIO=06-sold-out-concurrency-flow
-```
+구매 흐름은 위 공통 진입점에서 기존 Newman 컬렉션을 이동하지 않고 실행한다.
 
 정상 구매의 Kafka producer/consumer span graph까지 확인할 때는 다음 명령을 사용한다.
 
@@ -194,7 +205,7 @@ Purchase E2E는 Compose 네트워크 DNS로 `catalog-service`, `order-service`, 
 | `payment-service` | `http://payment-service:8083` |
 | `notification-service` | `http://notification-service:8084` |
 
-Python 구매 서비스는 내부 테스트 context에서 `X-User-Id`, `X-User-Role` header를 신뢰하는 구조로 테스트한다. 기존 JWT convention과 order OpenAPI의 선택적 `X-User-Email`은 현재 구매 서비스가 소비하지 않는다. 역할값도 JWT/OpenAPI의 `OPERATOR`와 구매 런타임의 `OWNER`가 다르므로 auth-service owner와 계약을 확정해야 한다. 외부 클라이언트가 이 header를 직접 보내는 상황은 후속 Gateway E2E에서 차단 여부를 확인한다.
+Python 구매 서비스는 내부 테스트 context에서 신뢰된 `X-User-Id`와 저장된 주문·결제 소유자를 비교한다. `X-User-Role`이나 `X-User-Email`은 권한 근거로 사용하지 않는다. Auth E2E의 보호 echo는 외부에서 보낸 identity header가 제거되는지 확인하지만, 실제 Istio/Kubernetes 정책 객체까지 검증한 결과는 아니다.
 
 ## 로컬 Observability E2E
 
@@ -219,7 +230,7 @@ Go OpenTelemetry instrumentation
 
 `.github/workflows/service-tests.yml`은 PR 변경 경로를 기준으로 테스트 대상만 만든다. `services/<service>/**` 변경은 해당 서비스 테스트와 이미지를 선택하고, `tests/**`, `packages/**`, `Taskfile.yml` 변경은 넓은 범위의 검증을 실행한다.
 
-`.github/workflows/e2e.yml`은 Docker Compose 기반 E2E stack을 실행한다. Gateway/JWT/Ingress 검증은 기본 E2E와 분리하고, 이후 필요하면 `task test-gateway-e2e` 같은 별도 타깃에서 Ingress 주소, JWT 생성, Gateway 라우팅 검증을 다룬다.
+`.github/workflows/e2e.yml`은 Docker Compose 기반 E2E stack을 실행한다. 공통 Auth E2E는 Envoy로 JWT/JWKS와 Session 앞단을 검증한다. 실제 Istio Ingress와 Kubernetes 정책 객체는 별도 환경에서 검증해야 한다.
 
 ## 실패 시 점검 포인트
 
@@ -231,7 +242,7 @@ Go OpenTelemetry instrumentation
 | DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
 | Kafka 이벤트 검증 실패 | Compose `kafka:29092`, topic 생성, consumer 로그 확인 |
 | Observability smoke 실패 | `docker compose -p dropmong-observability-e2e -f tests/e2e/observability/docker-compose.yml logs otel-collector tempo go-reference-service` 확인 |
-| Newman 401 | Gateway E2E가 아닌지, 서비스가 요구하는 인증 헤더가 누락됐는지 확인 |
+| Newman 401 | access token의 서명·만료와 Session 폐기 여부 확인 |
 | Newman 403 | customer/operator/admin 권한 헤더와 요청 데이터의 권한 관계 확인 |
 | Newman 404 | 서비스 URL과 API path 확인 |
 | Compose healthcheck timeout | `docker compose -p dropmong-e2e -f tests/e2e/docker-compose.yml ps`와 각 서비스 로그 확인 |

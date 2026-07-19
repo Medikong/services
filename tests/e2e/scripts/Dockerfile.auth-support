@@ -1,0 +1,9 @@
+FROM golang:1.26.3-bookworm AS builder
+
+WORKDIR /src
+COPY tests/e2e/scripts/auth_e2e_support.go ./auth_e2e_support.go
+RUN CGO_ENABLED=0 go build -trimpath -o /out/auth-e2e-support ./auth_e2e_support.go
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/auth-e2e-support /app/auth-e2e-support
+ENTRYPOINT ["/app/auth-e2e-support"]

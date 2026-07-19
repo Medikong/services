@@ -69,7 +69,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		_ = metrics.Shutdown(context.Background())
 		return nil, oops.In("auth_server").Code("database.open_failed").Wrap(err)
 	}
-	statusRedis, err := openSessionStatusRedis(cfg.Auth.SessionStatusRedisURL)
+	statusRedis, err := openSessionStatusRedis(ctx, cfg.Auth.SessionStatusRedisURL)
 	if err != nil {
 		db.Close()
 		_ = metrics.Shutdown(context.Background())

@@ -101,6 +101,22 @@ func stringEnv(name string, fallback string) string {
 	return fallback
 }
 
+func secretStringEnv(valueName, fileName string) (string, error) {
+	value := strings.TrimSpace(os.Getenv(valueName))
+	path := strings.TrimSpace(os.Getenv(fileName))
+	if value != "" && path != "" {
+		return "", configErr.With("setting", valueName).New("secret value and secret file cannot both be set")
+	}
+	if path == "" {
+		return value, nil
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return "", configErr.With("setting", fileName).Wrap(err)
+	}
+	return strings.TrimSpace(string(contents)), nil
+}
+
 func durationEnv(name string, fallback time.Duration) (time.Duration, error) {
 	raw := strings.TrimSpace(os.Getenv(name))
 	if raw == "" {

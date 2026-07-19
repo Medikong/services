@@ -18,7 +18,11 @@ func TestAccessTokenRejectsNonCanonicalBase64URLSignature(t *testing.T) {
 		JWTAudiences:   []string{"dropmong-api"},
 		Now:            func() time.Time { return now },
 	}
-	token, _, err := keys.SignAccessToken("user-id", "session-id", time.Minute)
+	token, _, err := keys.SignAccessToken(
+		"7df1ef50-f05b-4d58-8934-c52a7510af35",
+		"cc61de80-da8e-4149-8b7a-c166237d552c",
+		time.Minute,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

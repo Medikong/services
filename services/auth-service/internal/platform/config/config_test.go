@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"os"
 	"testing"
 )
 
@@ -42,5 +43,28 @@ func TestLoadServerRequiresDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	if _, err := LoadServer(); err == nil {
 		t.Fatal("LoadServer() error = nil, want database URL validation error")
+	}
+}
+
+func TestLoadServerReadsJWTPrivateKeyFromFile(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/auth?sslmode=disable")
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", "")
+	t.Setenv("AUTH_JWT_KEY_ID", "test-key")
+	path := t.TempDir() + "/jwt.pem"
+	if err := os.WriteFile(path, []byte(testPrivateKeyPEM(t)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_FILE", path)
+	if _, err := LoadServer(); err != nil {
+		t.Fatalf("LoadServer() error = %v", err)
+	}
+}
+
+func TestLoadServerRejectsAmbiguousJWTPrivateKeySources(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/auth?sslmode=disable")
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", testPrivateKeyPEM(t))
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_FILE", "/run/secrets/auth-jwt")
+	if _, err := LoadServer(); err == nil {
+		t.Fatal("LoadServer() error = nil")
 	}
 }

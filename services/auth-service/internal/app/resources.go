@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
+	"github.com/Medikong/services/packages/go-platform/redisutil"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -22,7 +23,7 @@ func openServerResources(ctx context.Context, cfg config.ServerConfig) (Resource
 	if err != nil {
 		return Resources{}, err
 	}
-	cache, err := openSessionStatusRedis(cfg.Auth.SessionStatusRedisURL)
+	cache, err := openSessionStatusRedis(ctx, cfg.Auth.SessionStatusRedisURL)
 	if err != nil {
 		db.Close()
 		return Resources{}, err
@@ -35,7 +36,7 @@ func openWorkerResources(ctx context.Context, cfg config.WorkerConfig) (Resource
 	if err != nil {
 		return Resources{}, err
 	}
-	cache, err := openSessionStatusRedis(cfg.Auth.SessionStatusRedisURL)
+	cache, err := openSessionStatusRedis(ctx, cfg.Auth.SessionStatusRedisURL)
 	if err != nil {
 		db.Close()
 		return Resources{}, err
@@ -55,12 +56,16 @@ func openWorkerResources(ctx context.Context, cfg config.WorkerConfig) (Resource
 	return Resources{DB: db, AuditSink: sink, SessionStatusRedis: cache}, nil
 }
 
-func openSessionStatusRedis(rawURL string) (*redis.Client, error) {
-	options, err := redis.ParseURL(strings.TrimSpace(rawURL))
+func openSessionStatusRedis(ctx context.Context, rawURL string) (*redis.Client, error) {
+	redisConfig, err := redisutil.LoadConfigFromEnv(strings.TrimSpace(rawURL))
 	if err != nil {
-		return nil, oops.In("auth_resources").Code("session_status_redis.invalid_url").Wrap(err)
+		return nil, oops.In("auth_resources").Code("session_status_redis.invalid_config").Wrap(err)
 	}
-	return redis.NewClient(options), nil
+	client, err := redisutil.Open(ctx, redisConfig)
+	if err != nil {
+		return nil, oops.In("auth_resources").Code("session_status_redis.open_failed").Wrap(err)
+	}
+	return client, nil
 }
 
 func openDatabase(ctx context.Context, cfg platformdb.PostgresConfig) (*pgxpool.Pool, error) {

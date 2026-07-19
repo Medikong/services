@@ -305,7 +305,7 @@
           },
           {
             "key": "X-User-Id",
-            "value": "user-002"
+            "value": "22222222-2222-4222-8222-222222222222"
           },
           {
             "key": "X-User-Role",
@@ -417,7 +417,7 @@
               "} else {",
               "  const body = pm.response.json();",
               "  pm.test('new order is pending payment', function () { pm.expect(body.data.status).to.eql('PENDING_PAYMENT'); });",
-              "  pm.test('new order belongs to second user', function () { pm.expect(body.data.userId).to.eql('user-002'); });",
+              "  pm.test('new order belongs to second user', function () { pm.expect(body.data.userId).to.eql('22222222-2222-4222-8222-222222222222'); });",
               "  pm.collectionVariables.unset('releasedStockRetries');",
               "}"
             ]
@@ -437,7 +437,7 @@
           },
           {
             "key": "X-User-Id",
-            "value": "user-002"
+            "value": "22222222-2222-4222-8222-222222222222"
           },
           {
             "key": "X-User-Role",

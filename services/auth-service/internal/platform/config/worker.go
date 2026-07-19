@@ -16,6 +16,8 @@ type WorkerConfig struct {
 	Postgres    platformdb.PostgresConfig
 	Auth        AuthConfig
 	Audit       AuditConfig
+	Broker      BrokerConfig
+	Delivery    DeliveryConfig
 	Development DevelopmentConfig
 	Profile     ProfileConfig
 }
@@ -42,6 +44,14 @@ func LoadWorker() (WorkerConfig, error) {
 	if err != nil {
 		return WorkerConfig{}, err
 	}
+	broker, err := loadBroker()
+	if err != nil {
+		return WorkerConfig{}, err
+	}
+	delivery, err := loadDelivery()
+	if err != nil {
+		return WorkerConfig{}, err
+	}
 	development, err := loadDevelopment()
 	if err != nil {
 		return WorkerConfig{}, err
@@ -53,6 +63,8 @@ func LoadWorker() (WorkerConfig, error) {
 		Postgres:    postgres,
 		Auth:        authConfig,
 		Audit:       auditConfig,
+		Broker:      broker,
+		Delivery:    delivery,
 		Development: development,
 		Profile:     profile,
 	}
@@ -72,6 +84,8 @@ func (c WorkerConfig) Validate() error {
 			return validation.Validate(c.Postgres.DatabaseURL, validation.Required)
 		})),
 		validation.Field(&c.Audit),
+		validation.Field(&c.Broker),
+		validation.Field(&c.Delivery),
 		validation.Field(&c.Profile),
 	)
 	if err != nil {
