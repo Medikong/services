@@ -1,0 +1,55 @@
+discovery.docker "auth_service" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "2s"
+}
+
+discovery.relabel "auth_service" {
+	targets = discovery.docker.auth_service.targets
+
+	rule {
+		action        = "keep"
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		regex         = sys.env("AUTH_OBS_E2E_PROJECT")
+	}
+
+	rule {
+		action        = "keep"
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "auth-service"
+	}
+
+	rule {
+		action        = "keep"
+		source_labels = ["__meta_docker_container_log_stream"]
+		regex         = "stdout"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		target_label  = "compose_project"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_log_stream"]
+		target_label  = "stream"
+	}
+}
+
+loki.source.docker "auth_service" {
+	host             = "unix:///var/run/docker.sock"
+	targets          = discovery.docker.auth_service.targets
+	relabel_rules    = discovery.relabel.auth_service.rules
+	refresh_interval = "2s"
+	forward_to       = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

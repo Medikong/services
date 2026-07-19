@@ -12,6 +12,8 @@ import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
+from auth_e2e_common import generate_rsa_private_key
+
 
 AUTH_ADMIN_TOKEN = "auth-e2e-admin-control-secret-001"
 AUTH_COLLECTION = "auth/auth.postman_collection.json"
@@ -66,17 +68,7 @@ def auth_jwt_private_key():
     os.close(descriptor)
     path = Path(raw_path)
     try:
-        subprocess.run(
-            [
-                "openssl", "genpkey", "-algorithm", "RSA",
-                "-pkeyopt", "rsa_keygen_bits:2048", "-out", str(path),
-            ],
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
-        path.chmod(0o600)
+        generate_rsa_private_key(path)
         yield path
     finally:
         path.unlink(missing_ok=True)

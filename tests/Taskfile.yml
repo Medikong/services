@@ -46,6 +46,7 @@ vars:
   OBS_E2E_TRACE_PATH: '{{default "/v1/reference/resources/obs-resource/audit" .OBS_E2E_TRACE_PATH}}'
   OBS_E2E_TEMPO_URL: '{{default "http://tempo:3200" .OBS_E2E_TEMPO_URL}}'
   OBS_E2E_EXCLUSION_CHECK_SECONDS: '{{default "8" .OBS_E2E_EXCLUSION_CHECK_SECONDS}}'
+  AUTH_OBS_E2E_PROJECT: '{{default "dropmong-auth-observability-e2e" .AUTH_OBS_E2E_PROJECT}}'
 
 tasks:
   e2e:
@@ -1040,3 +1041,23 @@ tasks:
     desc: Stop the observability E2E Docker Compose stack.
     cmds:
       - '{{.DOCKER_COMPOSE}} -p {{.OBS_E2E_COMPOSE_PROJECT}} -f "{{.ROOT_DIR}}/{{.OBS_E2E_COMPOSE_FILE}}" down -v --remove-orphans'
+
+  test-auth-observability-e2e:
+    desc: Run the dedicated Auth Redis observability Docker E2E and clean all resources.
+    cmds:
+      - 'env AUTH_OBS_E2E_PROJECT="{{.AUTH_OBS_E2E_PROJECT}}" DOCKER_COMPOSE="{{.DOCKER_COMPOSE}}" "{{.E2E_PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/auth-observability/scripts/run.py" run'
+
+  auth-observability-e2e-up:
+    desc: Start and keep the dedicated Auth Redis observability stack.
+    cmds:
+      - 'env AUTH_OBS_E2E_PROJECT="{{.AUTH_OBS_E2E_PROJECT}}" DOCKER_COMPOSE="{{.DOCKER_COMPOSE}}" "{{.E2E_PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/auth-observability/scripts/run.py" up'
+
+  auth-observability-e2e-smoke:
+    desc: Verify an already running Auth Redis observability stack.
+    cmds:
+      - 'env AUTH_OBS_E2E_PROJECT="{{.AUTH_OBS_E2E_PROJECT}}" DOCKER_COMPOSE="{{.DOCKER_COMPOSE}}" "{{.E2E_PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/auth-observability/scripts/run.py" smoke'
+
+  auth-observability-e2e-down:
+    desc: Remove the dedicated Auth Redis observability stack, volumes, and runtime key.
+    cmds:
+      - 'env AUTH_OBS_E2E_PROJECT="{{.AUTH_OBS_E2E_PROJECT}}" DOCKER_COMPOSE="{{.DOCKER_COMPOSE}}" "{{.E2E_PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/e2e/auth-observability/scripts/run.py" down'
