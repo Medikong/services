@@ -199,11 +199,13 @@ def _ensure_key(settings: Settings) -> Path:
         if not path.is_file():
             raise CheckFailure("fixture", "지정한 RSA 개인 키 파일을 찾을 수 없습니다")
         return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
     if path.is_file():
-        path.chmod(0o600)
+        path.chmod(0o444)
         return path
     try:
-        generate_rsa_private_key(path)
+        generate_rsa_private_key(path, mode=0o444)
     except (OSError, subprocess.SubprocessError) as error:
         raise CheckFailure("fixture", "RSA 테스트 키를 생성하지 못했습니다") from error
     return path

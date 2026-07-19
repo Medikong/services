@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 
-def generate_rsa_private_key(path: Path) -> None:
+def generate_rsa_private_key(path: Path, *, mode: int = 0o600) -> None:
     """Generate the runtime-only RSA key shared by Auth Docker E2E lanes."""
     path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -22,4 +22,4 @@ def generate_rsa_private_key(path: Path) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
-    path.chmod(0o600)
+    path.chmod(mode)

@@ -18,6 +18,24 @@ from auth_e2e_common import generate_rsa_private_key
 AUTH_ADMIN_TOKEN = "auth-e2e-admin-control-secret-001"
 AUTH_COLLECTION = "auth/auth.postman_collection.json"
 READINESS_ENDPOINTS = ("/healthz", "/e2e/auth-readyz", "/e2e/worker-readyz")
+AUTH_DIAGNOSTIC_TIMEOUT_SECONDS = 5
+AUTH_DIAGNOSTIC_SERVICES = frozenset({"auth-gateway", "auth-service", "auth-worker"})
+AUTH_DIAGNOSTIC_STATES = frozenset({"created", "dead", "exited", "paused", "restarting", "running"})
+AUTH_DIAGNOSTIC_HEALTH = frozenset({"", "healthy", "starting", "unhealthy"})
+AUTH_DIAGNOSTIC_LOG_SERVICES = {
+    "auth-service": "auth-service",
+    "auth-service-worker": "auth-worker",
+}
+AUTH_DIAGNOSTIC_MESSAGES = {
+    "config load failed": "config_load_failed",
+    "telemetry init failed": "telemetry_init_failed",
+    "server init failed": "server_init_failed",
+    "worker init failed": "worker_init_failed",
+    "server starting": "server_starting",
+    "worker starting": "worker_starting",
+    "server stopped with error": "server_stopped",
+    "worker stopped with error": "worker_stopped",
+}
 
 
 class E2EError(RuntimeError):
@@ -39,7 +57,7 @@ def readiness_description(status_code, body=b""):
     if not isinstance(payload, dict):
         return description
     status = payload.get("status")
-    if status in {"ok", "ready", "not_ready"}:
+    if isinstance(status, str) and status in {"ok", "ready", "not_ready"}:
         description += f" status={status}"
     checks = payload.get("checks")
     if not isinstance(checks, dict):
@@ -48,12 +66,86 @@ def readiness_description(status_code, body=b""):
     for name, result in sorted(checks.items()):
         if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9_]+", name):
             continue
-        if result not in {"ok", "error", "draining"}:
+        if not isinstance(result, str) or result not in {"ok", "error", "draining"}:
             continue
         safe_checks.append(f"{name}:{result}")
     if safe_checks:
         description += " checks=" + ",".join(safe_checks)
     return description
+
+
+def _json_records(raw):
+    if not isinstance(raw, str) or not raw.strip():
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return [parsed]
+    if isinstance(parsed, list):
+        return [record for record in parsed if isinstance(record, dict)]
+
+    records = []
+    for line in raw.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def compose_state_descriptions(raw):
+    descriptions = []
+    for record in _json_records(raw):
+        service = record.get("Service")
+        state = str(record.get("State", "")).lower()
+        health = str(record.get("Health", "")).lower()
+        exit_code = record.get("ExitCode")
+        if (
+            not isinstance(service, str)
+            or service not in AUTH_DIAGNOSTIC_SERVICES
+            or state not in AUTH_DIAGNOSTIC_STATES
+        ):
+            continue
+        if health not in AUTH_DIAGNOSTIC_HEALTH:
+            health = "unknown"
+        if not isinstance(exit_code, int) or not 0 <= exit_code <= 255:
+            exit_code = "unknown"
+        descriptions.append(f"{service} state={state} health={health or 'none'} exit={exit_code}")
+    return sorted(set(descriptions))
+
+
+def startup_log_descriptions(raw):
+    descriptions = []
+    for line in raw.splitlines() if isinstance(raw, str) else ():
+        json_start = line.find("{")
+        if json_start < 0:
+            continue
+        try:
+            record = json.loads(line[json_start:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        raw_service = record.get("service")
+        raw_message = record.get("msg")
+        if not isinstance(raw_service, str) or not isinstance(raw_message, str):
+            continue
+        service = AUTH_DIAGNOSTIC_LOG_SERVICES.get(raw_service)
+        event = AUTH_DIAGNOSTIC_MESSAGES.get(raw_message)
+        if service is None or event is None:
+            continue
+        serialized_error = json.dumps(record.get("error"), ensure_ascii=True).lower()
+        reason = ""
+        if "permission denied" in serialized_error:
+            reason = " reason=permission_denied"
+        elif "no such file or directory" in serialized_error:
+            reason = " reason=file_not_found"
+        descriptions.append(f"{service} event={event}{reason}")
+    return sorted(set(descriptions))
 
 
 def env(name, default=""):
@@ -97,20 +189,49 @@ def auth_jwt_private_key():
         yield path
         return
 
-    descriptor, raw_path = tempfile.mkstemp(prefix=f"{PROJECT}-jwt-", suffix=".pem")
-    os.close(descriptor)
-    path = Path(raw_path)
-    try:
-        generate_rsa_private_key(path)
+    with tempfile.TemporaryDirectory(prefix=f"{PROJECT}-jwt-") as raw_directory:
+        path = Path(raw_directory) / "jwt.pem"
+        generate_rsa_private_key(path, mode=0o444)
         yield path
-    finally:
-        path.unlink(missing_ok=True)
 
 
 def compose(*arguments, environment=None, check=True):
     command = COMPOSE + ["-p", PROJECT, "-f", str(COMPOSE_FILE), "--profile", "auth"]
     command.extend(arguments)
     return run(command, environment=environment, check=check)
+
+
+def auth_runtime_diagnostics():
+    command = COMPOSE + ["-p", PROJECT, "-f", str(COMPOSE_FILE), "--profile", "auth"]
+    try:
+        state_result = subprocess.run(
+            [*command, "ps", "--all", "--format", "json"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=AUTH_DIAGNOSTIC_TIMEOUT_SECONDS,
+        )
+        log_result = subprocess.run(
+            [*command, "logs", "--no-color", "--tail", "100", "auth-service", "auth-worker"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=AUTH_DIAGNOSTIC_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        print("[E2E] auth runtime diagnostics unavailable", file=sys.stderr)
+        return
+
+    descriptions = [
+        *compose_state_descriptions(state_result.stdout),
+        *startup_log_descriptions(log_result.stdout),
+    ]
+    if descriptions:
+        print("[E2E] auth runtime: " + "; ".join(descriptions), file=sys.stderr)
+    else:
+        print("[E2E] auth runtime diagnostics returned no safe records", file=sys.stderr)
 
 
 def labeled_ids(resource):
@@ -219,6 +340,7 @@ def wait_for_auth():
             return
         time.sleep(0.5)
     summary = "; ".join(f"{path}={last_state[path]}" for path in READINESS_ENDPOINTS)
+    auth_runtime_diagnostics()
     raise E2EError(f"auth E2E stack did not become ready: {summary}")
 
 
