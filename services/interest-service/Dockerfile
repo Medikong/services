@@ -19,7 +19,12 @@ COPY services/interest-service services/interest-service
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --project services/interest-service --no-install-project --no-dev
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /workspace/services/interest-service
+
 WORKDIR /workspace/services/interest-service
+
+USER 10001
 
 EXPOSE 8085
 

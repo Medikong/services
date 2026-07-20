@@ -26,7 +26,7 @@ RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
 
 WORKDIR /workspace/services/notification-service
 
-USER appuser
+USER 10001
 
 EXPOSE 8084
 
