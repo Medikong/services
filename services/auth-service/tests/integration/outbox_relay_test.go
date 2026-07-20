@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	domainoutbox "github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	outboxinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/messaging/outbox"
 	"github.com/google/uuid"
 )
 
@@ -16,8 +17,8 @@ func TestDomainOutboxRelayPublishesOnlyAfterAcknowledgement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	db := migratedDomainPool(t, ctx)
-	repository := outbox.NewPostgresRepository(db)
-	event := outbox.Event{
+	repository := outboxinfra.NewPostgresRepository(db)
+	event := domainoutbox.Event{
 		ID: uuid.New(), Type: "Auth.RegistrationLinked", AggregateType: "Registration",
 		AggregateID: uuid.New(), Version: 1, Payload: json.RawMessage(`{"status":"linked"}`),
 		CorrelationID: uuid.New(), OccurredAt: time.Now().UTC(),
@@ -33,8 +34,8 @@ func TestDomainOutboxRelayPublishesOnlyAfterAcknowledgement(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit event: %v", err)
 	}
-	publisher := &outbox.RecordingPublisher{}
-	relay, err := outbox.New(repository, publisher, outbox.Config{WorkerID: "integration-worker", BatchSize: 10, PollInterval: time.Second, Lease: time.Minute, MaxAttempts: 3, BaseBackoff: time.Second, MaxBackoff: time.Minute})
+	publisher := &outboxinfra.RecordingPublisher{}
+	relay, err := outboxinfra.New(repository, publisher, outboxinfra.Config{WorkerID: "integration-worker", BatchSize: 10, PollInterval: time.Second, Lease: time.Minute, MaxAttempts: 3, BaseBackoff: time.Second, MaxBackoff: time.Minute})
 	if err != nil {
 		t.Fatalf("create relay: %v", err)
 	}

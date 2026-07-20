@@ -476,7 +476,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 
 		webFlow := createHTTPPreAuth(t, harness, "web")
 		webSignInResponse, webSession := signInEmailHTTP(t, harness, webFlow, email, httpE2ENewPassword, true)
-		oldCookie := responseCookie(t, webSignInResponse, "__Host-dm_refresh")
+		oldCookie := responseCookie(t, webSignInResponse, "__Secure-dm_refresh")
 		webKey := uuid.NewString()
 		webRequest := httpE2ERequest{
 			Method:  http.MethodPost,
@@ -493,13 +493,13 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 		if webFirst.CredentialDelivery != "web_jwt_refresh_cookie" || webFirst.SessionID == "" || webFirst.AccessToken == "" || !webFirst.RefreshTokenExpiresAt.IsZero() {
 			t.Fatal("web refresh response is incomplete")
 		}
-		newCookie := responseCookie(t, webFirstResponse, "__Host-dm_refresh")
-		assertCredentialCookie(t, newCookie, "__Host-dm_refresh")
+		newCookie := responseCookie(t, webFirstResponse, "__Secure-dm_refresh")
+		assertCredentialCookie(t, newCookie, "__Secure-dm_refresh")
 		webReplayResponse := harness.do(webRequest)
 		var webReplay httpE2ERefreshData
 		decodeHTTPEnvelope(t, webReplayResponse, http.StatusOK, &webReplay)
 		normalizeHTTPRefresh(&webReplay)
-		replayedCookie := responseCookie(t, webReplayResponse, "__Host-dm_refresh")
+		replayedCookie := responseCookie(t, webReplayResponse, "__Secure-dm_refresh")
 		if !sameHTTPRefresh(webFirst, webReplay) || replayedCookie.Value != newCookie.Value {
 			t.Fatal("web refresh replay changed the original credential delivery")
 		}
@@ -595,7 +595,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 
 		webResponse, web := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "web"), email, httpE2ENewPassword, true)
 		assertWebAuthenticationDelivery(t, webResponse, web, true)
-		webCookie := responseCookie(t, webResponse, "__Host-dm_refresh")
+		webCookie := responseCookie(t, webResponse, "__Secure-dm_refresh")
 		missingCSRF := harness.do(httpE2ERequest{
 			Method:  http.MethodPost,
 			Path:    "/api/v1/auth/sessions/logout",
@@ -620,11 +620,11 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 		}
 		webLogout := harness.do(webLogoutRequest)
 		assertHTTPNoContent(t, webLogout, http.StatusNoContent)
-		clearedResponseCookie(t, webLogout, "__Host-dm_refresh")
+		clearedResponseCookie(t, webLogout, "__Secure-dm_refresh")
 		assertResponseOmits(t, webLogout, webCookie.Value, web.CSRFToken)
 		webLogoutReplay := harness.do(webLogoutRequest)
 		assertHTTPNoContent(t, webLogoutReplay, http.StatusNoContent)
-		clearedResponseCookie(t, webLogoutReplay, "__Host-dm_refresh")
+		clearedResponseCookie(t, webLogoutReplay, "__Secure-dm_refresh")
 	}) {
 		t.FailNow()
 	}
@@ -657,7 +657,7 @@ func TestProductionHTTPSignInPasswordResetAndSessionAPIs(t *testing.T) {
 
 		webResponse, web := signInEmailHTTP(t, harness, createHTTPPreAuth(t, harness, "web"), email, httpE2ENewPassword, false)
 		assertWebAuthenticationDelivery(t, webResponse, web, false)
-		webCookie := responseCookie(t, webResponse, "__Host-dm_refresh")
+		webCookie := responseCookie(t, webResponse, "__Secure-dm_refresh")
 		webContext := harness.do(httpE2ERequest{
 			Method:      http.MethodGet,
 			Path:        "/api/v1/auth/context",
@@ -757,8 +757,8 @@ func assertWebAuthenticationDelivery(t *testing.T, response *httpE2EResponse, da
 	if data.CredentialDelivery != "web_jwt_refresh_cookie" || data.UserID == "" || data.Session.SessionID == "" || data.Session.ExpiresAt.IsZero() || data.Access.AccessToken == "" || data.Access.AccessTokenExpiresAt.IsZero() || data.CSRFToken == "" || data.Next.Path == "" {
 		t.Fatal("web authentication response is incomplete")
 	}
-	sessionCookie := responseCookie(t, response, "__Host-dm_refresh")
-	assertCredentialCookie(t, sessionCookie, "__Host-dm_refresh")
+	sessionCookie := responseCookie(t, response, "__Secure-dm_refresh")
+	assertCredentialCookie(t, sessionCookie, "__Secure-dm_refresh")
 	clearedResponseCookie(t, response, "__Host-dm_auth")
 	if (!rememberMe && sessionCookie.MaxAge != 0) || (rememberMe && sessionCookie.MaxAge <= 0) {
 		t.Fatal("web session cookie persistence does not match rememberMe")

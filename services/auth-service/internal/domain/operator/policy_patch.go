@@ -9,7 +9,7 @@ import (
 
 var policyTrigger = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-func patchPolicyRules(name string, previous json.RawMessage, patch map[string]any) (json.RawMessage, error) {
+func PatchPolicyRules(name string, previous json.RawMessage, patch map[string]any) (json.RawMessage, error) {
 	if err := validatePatchEnvelope(name, patch); err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func validatePatchEnvelope(name string, patch map[string]any) error {
 		}
 	}
 	name, ok := patch["policyName"].(string)
-	if !ok || dbPolicyName(name) == "" {
+	if !ok || NormalizePolicyName(name) == "" {
 		return fmt.Errorf("policyName is invalid")
 	}
 	reason, ok := patch["changeReason"].(string)
@@ -78,6 +78,23 @@ func validatePatchEnvelope(name string, patch map[string]any) error {
 		return fmt.Errorf("changeReason is invalid")
 	}
 	return nil
+}
+
+func NormalizePolicyName(value string) string {
+	switch value {
+	case "login-lock", "login_lock":
+		return "login_lock"
+	case "session-ttl", "session_ttl":
+		return "session_ttl"
+	case "refresh-rotation", "refresh_rotation":
+		return "refresh_rotation"
+	case "verification", "verification_rules":
+		return "verification_rules"
+	case "session-revocation", "session_revocation_rules":
+		return "session_revocation_rules"
+	default:
+		return ""
+	}
 }
 
 func validatePolicyValues(name string, rules map[string]any) error {

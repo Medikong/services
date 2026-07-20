@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Medikong/services/services/auth-service/internal/security"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/cryptography"
 )
 
 var (
@@ -43,9 +43,9 @@ func integrationJWTPrivateKeyPEM(t *testing.T) string {
 	return string(integrationJWTPem)
 }
 
-func integrationSecurityKeys(t *testing.T) security.Keys {
+func integrationSecurityKeys(t *testing.T) cryptography.Keys {
 	t.Helper()
-	return security.Keys{
+	return cryptography.Keys{
 		CredentialHMAC: []byte("01234567890123456789012345678901"),
 		ReplayKey:      []byte("01234567890123456789012345678901"),
 		JWTKey:         []byte(integrationJWTPrivateKeyPEM(t)),

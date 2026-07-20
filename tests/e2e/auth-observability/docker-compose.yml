@@ -18,7 +18,6 @@ x-auth-environment: &auth-environment
   AUTH_USER_PROOF_ISSUER: user-service
   AUTH_COOKIE_SECURE: "true"
   AUTH_ALLOWED_ORIGINS: https://app.e2e.test
-  AUTH_SESSION_STATUS_REDIS_URL: redis://redis:6379/0
 
 services:
   postgres:
@@ -68,10 +67,16 @@ services:
       <<: *auth-environment
       HTTP_ADDR: :8080
       ADMIN_ADDR: :9090
+      AUTH_SESSION_STATUS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
       REDIS_DIAL_TIMEOUT: 200ms
       REDIS_READ_TIMEOUT: 200ms
       REDIS_WRITE_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_TIMEOUT: 200ms
       AUTH_SESSION_STATUS_DB_TIMEOUT: 100ms
+      AUTH_SESSION_STATUS_CACHE_TTL: 5m
+      AUTH_SESSION_STATUS_TOMBSTONE_TTL: 20m
+      AUTH_SESSION_STATUS_MAX_DB_LOOKUPS: "32"
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
@@ -88,6 +93,38 @@ services:
     ports:
       - "127.0.0.1:${AUTH_OBS_AUTH_PORT:-18089}:8080"
       - "127.0.0.1:${AUTH_OBS_ADMIN_PORT:-19090}:9090"
+
+  auth-worker:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/worker"]
+    environment:
+      <<: *auth-environment
+      WORKER_ADMIN_ADDR: :9092
+      AUTH_SESSION_STATUS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_DIAL_TIMEOUT: 200ms
+      REDIS_READ_TIMEOUT: 200ms
+      REDIS_WRITE_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_TIMEOUT: 200ms
+      AUTH_SESSION_STATUS_DB_TIMEOUT: 100ms
+      AUTH_SESSION_STATUS_CACHE_TTL: 5m
+      AUTH_SESSION_STATUS_TOMBSTONE_TTL: 20m
+      AUTH_SESSION_STATUS_MAX_DB_LOOKUPS: "32"
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+    secrets:
+      - auth_obs_jwt
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
 
   otel-collector:
     image: otel/opentelemetry-collector:0.123.0
@@ -123,6 +160,8 @@ services:
       - prometheus-data:/prometheus
     depends_on:
       auth-service:
+        condition: service_started
+      auth-worker:
         condition: service_started
       redis-exporter:
         condition: service_started

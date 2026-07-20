@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime"
 	"net/http"
@@ -15,9 +16,10 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/app"
+	"github.com/Medikong/services/services/auth-service/internal/application/failure"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/cryptography"
+	"github.com/Medikong/services/services/auth-service/internal/interface/http/httputil"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
-	"github.com/Medikong/services/services/auth-service/internal/security"
-	"github.com/Medikong/services/services/auth-service/internal/transport/httputil"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
@@ -112,13 +114,14 @@ func newHTTPHarness(t *testing.T, development bool, options app.ServerOptions) *
 
 	databaseURL := startPostgres(t, ctx)
 	redisURL := startRedis(t, ctx)
+	t.Setenv("AUTH_SESSION_STATUS_ENABLED", "true")
+	t.Setenv("REDIS_URL", redisURL)
 	var cfg config.ServerConfig
 	if development {
 		cfg = loadDevelopmentHTTPServerConfig(t, databaseURL)
 	} else {
 		cfg = loadProductionHTTPServerConfig(t, databaseURL)
 	}
-	cfg.Auth.SessionStatusRedisURL = redisURL
 	var db *pgxpool.Pool
 	if development {
 		db = migrateSchemas(t, ctx, cfg.Postgres)
@@ -200,7 +203,7 @@ func configureHTTPEnvironment(t *testing.T, databaseURL string) {
 	t.Setenv("AUTH_USER_PROOF_ISSUER", "user-service")
 	t.Setenv("AUTH_ALLOWED_ORIGINS", httpE2ETestOrigin)
 	t.Setenv("AUTH_COOKIE_SECURE", "true")
-	t.Setenv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_refresh")
+	t.Setenv("AUTH_SESSION_COOKIE_NAME", "__Secure-dm_refresh")
 	t.Setenv("AUTH_FLOW_COOKIE_NAME", "__Host-dm_auth")
 	t.Setenv("AUTH_INTENT_TTL", "15m")
 	t.Setenv("AUTH_REGISTRATION_TTL", "30m")
@@ -211,7 +214,11 @@ func configureHTTPEnvironment(t *testing.T, databaseURL string) {
 	t.Setenv("AUTH_ACCESS_TTL", "5m")
 	t.Setenv("AUTH_PROOF_TTL", "5m")
 	t.Setenv("AUTH_RECOVERY_TTL", "2m")
-	t.Setenv("AUTH_SESSION_STATUS_REDIS_URL", "redis://127.0.0.1:6379/0")
+	t.Setenv("AUTH_SESSION_STATUS_TIMEOUT", "200ms")
+	t.Setenv("AUTH_SESSION_STATUS_DB_TIMEOUT", "100ms")
+	t.Setenv("AUTH_SESSION_STATUS_CACHE_TTL", "5m")
+	t.Setenv("AUTH_SESSION_STATUS_TOMBSTONE_TTL", "20m")
+	t.Setenv("AUTH_SESSION_STATUS_MAX_DB_LOOKUPS", "32")
 	t.Setenv("AUTH_PASSWORD_MIN_LENGTH", "12")
 	t.Setenv("READINESS_CHECK_TIMEOUT", "1s")
 	t.Setenv("SHUTDOWN_TIMEOUT", "2s")
@@ -373,6 +380,10 @@ func decodeHTTPError(t *testing.T, response *httpE2EResponse, wantStatus int, wa
 }
 
 func errorCode(err error) string {
+	var typed *failure.Error
+	if errors.As(err, &typed) {
+		return typed.Code
+	}
 	oopsErr, ok := oops.AsOops(err)
 	if !ok {
 		return ""
@@ -474,7 +485,7 @@ func namedResponseCookie(t *testing.T, response *httpE2EResponse, name string) *
 func assertCredentialCookie(t *testing.T, cookie *http.Cookie, name string) {
 	t.Helper()
 	wantPath, wantSameSite := "/", http.SameSiteLaxMode
-	if name == "__Host-dm_refresh" {
+	if name == "__Secure-dm_refresh" {
 		wantPath, wantSameSite = "/api/v1/auth/sessions", http.SameSiteStrictMode
 	}
 	if cookie == nil || cookie.Name != name || cookie.Value == "" || cookie.Path != wantPath || !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != wantSameSite {
@@ -531,7 +542,7 @@ func decryptDeliveryCode(t *testing.T, ctx context.Context, db *pgxpool.Pool, ch
 		Code        string `json:"code"`
 		Destination string `json:"destination"`
 	}
-	keys := security.Keys{ReplayKey: []byte(httpE2EReplayKey)}
+	keys := cryptography.Keys{ReplayKey: []byte(httpE2EReplayKey)}
 	if err := keys.Open(ciphertext, &payload); err != nil {
 		t.Fatal("decrypt HTTP E2E delivery payload")
 	}

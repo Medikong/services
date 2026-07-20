@@ -4,132 +4,137 @@ package integration_test
 
 import (
 	"context"
-	"sort"
-	"strings"
+	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	applicationsessionprojection "github.com/Medikong/services/services/auth-service/internal/application/sessionprojection"
+	domainsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	postgresinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/postgres"
+	redisinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/redis"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_SessionStatusProjection_real_redis_and_postgres_surface(t *testing.T) {
-	// Given
+func Test_SessionStatusProjection_retries_Redis_failure_and_acknowledges_exact_outbox_version(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	db := migratedDomainPool(t, ctx)
-	redisURL := startRedis(t, ctx)
-	options, err := redis.ParseURL(redisURL)
+
+	options, err := redis.ParseURL(startRedis(t, ctx))
 	require.NoError(t, err)
 	client := redis.NewClient(options)
 	t.Cleanup(func() { require.NoError(t, client.Close()) })
 
+	userID, sessionID := seedProjectionSession(t, ctx, db)
+	sessions := postgresinfra.NewSessionRepository(db)
+	projection, err := redisinfra.NewSessionProjection(
+		sessions, client, time.Second, 100*time.Millisecond, 5*time.Minute, 15*time.Minute, 32,
+	)
+	require.NoError(t, err)
+	allowed, err := projection.Check(ctx, userID, sessionID)
+	require.NoError(t, err)
+	require.True(t, allowed)
+
+	_, err = db.Exec(ctx, `
+		UPDATE auth_sessions
+		SET session_status = 'revoked', revoked_at = now(), revocation_reason = 'integration_test'
+		WHERE session_id = $1
+	`, sessionID)
+	require.NoError(t, err)
+	assertProjectionOutboxState(t, ctx, db, sessionID, 1, "pending", "pending")
+
+	unavailableClient := redis.NewClient(&redis.Options{
+		Addr: runtimeUnusedAddress(t), DialTimeout: 20 * time.Millisecond,
+		ReadTimeout: 20 * time.Millisecond, WriteTimeout: 20 * time.Millisecond,
+	})
+	t.Cleanup(func() { require.NoError(t, unavailableClient.Close()) })
+	unavailableProjection, err := redisinfra.NewSessionProjection(
+		sessions, unavailableClient, 100*time.Millisecond, 20*time.Millisecond, 5*time.Minute, 15*time.Minute, 32,
+	)
+	require.NoError(t, err)
+	repository := postgresinfra.NewSessionStatusProjectionRepository(db)
+	failingRelay := newProjectionRelay(t, repository, unavailableProjection, "status-worker-failing")
+	result, err := failingRelay.RunOnce(ctx)
+	require.NoError(t, err)
+	require.Equal(t, applicationsessionprojection.Result{Claimed: 1, Retried: 1}, result)
+	assertProjectionOutboxState(t, ctx, db, sessionID, 1, "pending", "pending")
+
+	time.Sleep(20 * time.Millisecond)
+	healthyRelay := newProjectionRelay(t, repository, projection, "status-worker-healthy")
+	result, err = healthyRelay.RunOnce(ctx)
+	require.NoError(t, err)
+	require.Equal(t, applicationsessionprojection.Result{Claimed: 1, Applied: 1}, result)
+	assertProjectionOutboxState(t, ctx, db, sessionID, 1, "published", "pending")
+
+	allowed, err = projection.Check(ctx, userID, sessionID)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	encoded, err := client.Get(ctx, "auth:session-status:v2:"+sessionID.String()).Bytes()
+	require.NoError(t, err)
+	var cached struct {
+		Status  string `json:"status"`
+		Version int64  `json:"version"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &cached))
+	require.Equal(t, domainsession.StatusRevoked, cached.Status)
+	require.EqualValues(t, 1, cached.Version)
+	ttl, err := client.TTL(ctx, "auth:session-status:v2:"+sessionID.String()).Result()
+	require.NoError(t, err)
+	require.Positive(t, ttl)
+	require.LessOrEqual(t, ttl, 15*time.Minute)
+}
+
+func newProjectionRelay(
+	t *testing.T,
+	repository applicationsessionprojection.Repository,
+	sink applicationsessionprojection.Sink,
+	workerID string,
+) *applicationsessionprojection.Service {
+	t.Helper()
+	relay, err := applicationsessionprojection.New(repository, sink, applicationsessionprojection.Config{
+		WorkerID: workerID, BatchSize: 10, PollInterval: time.Second,
+		Lease: 2 * time.Second, ApplyTimeout: 500 * time.Millisecond,
+		BaseBackoff: 5 * time.Millisecond, MaxBackoff: 50 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	return relay
+}
+
+func seedProjectionSession(t *testing.T, ctx context.Context, db *pgxpool.Pool) (uuid.UUID, uuid.UUID) {
+	t.Helper()
 	userID, identityID, linkID, sessionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, userID, identityID, linkID)
-	_, err = db.Exec(ctx, `
+	_, err := db.Exec(ctx, `
 		INSERT INTO auth_sessions (
 			session_id, user_id, identity_id, identity_link_id, authentication_method,
 			session_status, client_channel, issued_at, idle_expires_at, absolute_expires_at
 		) VALUES ($1, $2, $3, $4, 'email_password', 'active', 'web', now(), now() + interval '20 minutes', now() + interval '1 hour')
 	`, sessionID, userID, identityID, linkID)
 	require.NoError(t, err)
-	status := appsession.NewStatusService(appsession.StatusServiceOptions{
-		Cache:  appsession.NewRedisStatusCache(client),
-		Source: appsession.NewPostgresStatusSource(db, 15*time.Minute),
-		Config: appsession.StatusServiceConfig{
-			ActiveTTL: 5 * time.Minute, AccessTTL: 15 * time.Minute,
-			FallbackTimeout: 100 * time.Millisecond, MaxFallbacks: 32,
-		},
-	})
-	sessions := appsession.NewPostgresRepository(db)
-	sessions.UseStatusProjection(status)
-	check := appsession.StatusCheck{UserID: userID, SessionID: sessionID, TokenID: uuid.New()}
-
-	// When
-	active := status.Check(ctx, check)
-
-	// Then
-	require.Equal(t, appsession.StatusActive, active)
-	key := appsession.RedisStatusKey(sessionID)
-	activeFields, err := client.HGetAll(ctx, key).Result()
-	require.NoError(t, err)
-	require.Equal(t, "active", activeFields["status"])
-	activeTTL, err := client.TTL(ctx, key).Result()
-	require.NoError(t, err)
-	require.Positive(t, activeTTL)
-	require.LessOrEqual(t, activeTTL, 5*time.Minute)
-	require.NotContains(t, strings.Join(mapValues(activeFields), " "), check.TokenID.String())
-	t.Logf("redis key=auth:session-status:{<synthetic-sid>} status=%s ttl_seconds=%d fields=%v", activeFields["status"], int64(activeTTL.Seconds()), mapKeys(activeFields))
-	require.NoError(t, client.HSet(ctx, key, "access_token", "eyJhbGciOiJSUzI1NiJ9.adversarial.signature").Err())
-
-	// When
-	tx, err := db.Begin(ctx)
-	require.NoError(t, err)
-	fences, err := sessions.FenceRevocation(ctx, tx, sessionID)
-	require.NoError(t, err)
-	err = sessions.Revoke(ctx, tx, sessionID, "integration_test")
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit(ctx))
-	require.NoError(t, fences.Resolve(ctx))
-
-	// Then
-	revokedFields, err := client.HGetAll(ctx, key).Result()
-	require.NoError(t, err)
-	require.Equal(t, "revoked", revokedFields["status"])
-	require.NotEmpty(t, revokedFields["revoked_until"])
-	require.NotContains(t, revokedFields, "access_token")
-	revokedTTL, err := client.TTL(ctx, key).Result()
-	require.NoError(t, err)
-	require.Greater(t, revokedTTL, 14*time.Minute)
-	require.LessOrEqual(t, revokedTTL, 15*time.Minute)
-	t.Logf("redis key=auth:session-status:{<synthetic-sid>} status=%s ttl_seconds=%d revoked_until=present fields=%v", revokedFields["status"], int64(revokedTTL.Seconds()), mapKeys(revokedFields))
-
-	var cacheEvents, revokedEvents int
-	err = db.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE event_type = 'Auth.SessionStatusCacheUpdated'),
-			count(*) FILTER (WHERE event_type = 'Auth.SessionRevoked')
-		FROM auth_outbox_events WHERE aggregate_id = $1
-	`, sessionID).Scan(&cacheEvents, &revokedEvents)
-	require.NoError(t, err)
-	require.Equal(t, 1, cacheEvents)
-	require.Equal(t, 1, revokedEvents)
-
-	// When
-	require.NoError(t, client.Del(ctx, key).Err())
-	relay, err := appsession.NewStatusProjectionRelay(
-		outbox.NewPostgresRepository(db), status,
-		outbox.Config{
-			WorkerID: "integration-status-worker", BatchSize: 10, PollInterval: time.Second,
-			Lease: time.Minute, MaxAttempts: 5, BaseBackoff: time.Second, MaxBackoff: 30 * time.Second,
-		},
-	)
-	require.NoError(t, err)
-	result, err := relay.RunOnce(ctx)
-
-	// Then
-	require.NoError(t, err)
-	require.Equal(t, 1, result.Published)
-	repairedFields, err := client.HGetAll(ctx, key).Result()
-	require.NoError(t, err)
-	require.Equal(t, "revoked", repairedFields["status"])
+	return userID, sessionID
 }
 
-func mapValues(fields map[string]string) []string {
-	values := make([]string, 0, len(fields))
-	for _, value := range fields {
-		values = append(values, value)
-	}
-	return values
-}
-
-func mapKeys(fields map[string]string) []string {
-	keys := make([]string, 0, len(fields))
-	for key := range fields {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
+func assertProjectionOutboxState(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	sessionID uuid.UUID,
+	version int64,
+	wantCacheStatus, wantRevokedStatus string,
+) {
+	t.Helper()
+	var cacheStatus, revokedStatus string
+	err := db.QueryRow(ctx, `
+		SELECT
+			max(publish_status) FILTER (WHERE event_type = 'Auth.SessionStatusCacheUpdated'),
+			max(publish_status) FILTER (WHERE event_type = 'Auth.SessionRevoked')
+		FROM auth_outbox_events
+		WHERE aggregate_type = 'Session' AND aggregate_id = $1 AND aggregate_version = $2
+	`, sessionID, version).Scan(&cacheStatus, &revokedStatus)
+	require.NoError(t, err)
+	require.Equal(t, wantCacheStatus, cacheStatus)
+	require.Equal(t, wantRevokedStatus, revokedStatus)
 }

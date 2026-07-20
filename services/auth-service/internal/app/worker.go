@@ -4,10 +4,8 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/grafana/pyroscope-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
@@ -16,29 +14,26 @@ import (
 	"github.com/Medikong/services/packages/go-platform/httpserver"
 	"github.com/Medikong/services/packages/go-platform/logger"
 	"github.com/Medikong/services/packages/go-platform/operational"
-	"github.com/Medikong/services/services/auth-service/internal/auth"
-	"github.com/Medikong/services/services/auth-service/internal/domain/challenge"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	"github.com/Medikong/services/services/auth-service/internal/domain/session"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/messaging/outbox"
+	authmigration "github.com/Medikong/services/services/auth-service/internal/infrastructure/migration"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
-	"github.com/Medikong/services/services/auth-service/internal/security"
 )
 
 type Worker struct {
-	cfg                 config.WorkerConfig
-	resources           Resources
-	metrics             *observability.Metrics
-	health              *operational.Handler
-	adminHTTP           *http.Server
-	runAudit            func(context.Context) error
-	runDomainOutbox     func(context.Context) error
-	runStatusProjection func(context.Context) error
-	runDelivery         func(context.Context) error
-	kafkaPublisher      *outbox.KafkaPublisher
-	cleanup             func(context.Context) (int64, error)
-	cleanupInterval     time.Duration
-	profiler            *pyroscope.Profiler
+	cfg                  config.WorkerConfig
+	resources            Resources
+	metrics              *observability.Metrics
+	health               *operational.Handler
+	adminHTTP            *http.Server
+	runAudit             func(context.Context) error
+	runDomainOutbox      func(context.Context) error
+	runDelivery          func(context.Context) error
+	runSessionProjection func(context.Context) error
+	kafkaPublisher       *outbox.KafkaPublisher
+	cleanup              func(context.Context) (int64, error)
+	cleanupInterval      time.Duration
+	profiler             *pyroscope.Profiler
 }
 
 func NewWorker(ctx context.Context, cfg config.WorkerConfig) (*Worker, error) {
@@ -73,44 +68,7 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
 		return nil, err
 	}
-	hostname, err := os.Hostname()
-	if err != nil {
-		if profiler != nil {
-			_ = profiler.Stop()
-		}
-		_ = resources.Close()
-		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
-		return nil, oops.In("auth_worker").Code("worker.hostname_failed").Wrap(err)
-	}
-	auditWorker, err := audit.NewWorker(audit.WorkerConfig{
-		Pool:           resources.DB,
-		WorkerID:       hostname + ":" + uuid.NewString(),
-		BatchSize:      cfg.Audit.BatchSize,
-		PollInterval:   cfg.Audit.PollInterval,
-		Lease:          cfg.Audit.Lease,
-		PublishTimeout: cfg.Audit.PublishTimeout,
-		MaxAttempts:    cfg.Audit.MaxAttempts,
-		BaseBackoff:    cfg.Audit.BaseBackoff,
-		MaxBackoff:     cfg.Audit.MaxBackoff,
-		Publish: func(ctx context.Context, event audit.Event) error {
-			return audit.Archive(ctx, resources.AuditSink, event)
-		},
-		OnAttempt: func(ctx context.Context, attempt audit.Attempt) {
-			metrics.RecordAuditAttempt(attempt.Result)
-			args := []any{"event_id", attempt.EventID, "attempt", attempt.Attempts, "result", attempt.Result}
-			if attempt.Err != nil {
-				args = append(args, logger.Err(attempt.Err))
-			}
-			switch attempt.Result {
-			case "dead":
-				logger.Error(ctx, "audit.outbox.attempted", args...)
-			case "retry":
-				logger.Warn(ctx, "audit.outbox.attempted", args...)
-			default:
-				logger.Info(ctx, "audit.outbox.attempted", args...)
-			}
-		},
-	})
+	wiring, err := wireWorker(ctx, cfg, resources, metrics, publisher)
 	if err != nil {
 		if profiler != nil {
 			_ = profiler.Stop()
@@ -118,101 +76,10 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		_ = resources.Close()
 		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
 		return nil, err
-	}
-	var kafkaPublisher *outbox.KafkaPublisher
-	if publisher == nil && cfg.Broker.Enabled {
-		kafkaPublisher, err = outbox.NewKafkaPublisher(ctx, cfg.Broker.Brokers, cfg.Broker.Topic, cfg.Broker.PublishTimeout)
-		if err != nil {
-			if profiler != nil {
-				_ = profiler.Stop()
-			}
-			_ = resources.Close()
-			_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
-			return nil, err
-		}
-		publisher = kafkaPublisher
-	}
-	var runDomainOutbox func(context.Context) error
-	if publisher != nil {
-		relay, relayErr := outbox.New(outbox.NewPostgresRepository(resources.DB), publisher, outbox.Config{
-			WorkerID: hostname + ":auth-outbox:" + uuid.NewString(), BatchSize: cfg.Audit.BatchSize,
-			PollInterval: cfg.Audit.PollInterval, Lease: cfg.Audit.Lease, MaxAttempts: cfg.Audit.MaxAttempts,
-			BaseBackoff: cfg.Audit.BaseBackoff, MaxBackoff: cfg.Audit.MaxBackoff,
-		})
-		if relayErr != nil {
-			if kafkaPublisher != nil {
-				kafkaPublisher.Close()
-			}
-			if profiler != nil {
-				_ = profiler.Stop()
-			}
-			_ = resources.Close()
-			_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
-			return nil, relayErr
-		}
-		runDomainOutbox = relay.Run
-	}
-	statusService := session.NewStatusService(session.StatusServiceOptions{
-		Cache:  session.NewRedisStatusCache(resources.SessionStatusRedis),
-		Source: session.NewPostgresStatusSource(resources.DB, cfg.Auth.AccessTTL),
-		Config: session.StatusServiceConfig{
-			ActiveTTL: cfg.Auth.SessionStatusCacheTTL, AccessTTL: cfg.Auth.AccessTTL,
-			FallbackTimeout: cfg.Auth.SessionStatusDBTimeout, MaxFallbacks: cfg.Auth.SessionStatusMaxDBLookups,
-		},
-	})
-	statusRelay, err := session.NewStatusProjectionRelay(outbox.NewPostgresRepository(resources.DB), statusService, outbox.Config{
-		WorkerID: hostname + ":session-status:" + uuid.NewString(), BatchSize: cfg.Audit.BatchSize,
-		PollInterval: time.Second, Lease: cfg.Audit.Lease, MaxAttempts: cfg.Audit.MaxAttempts,
-		BaseBackoff: time.Second, MaxBackoff: 30 * time.Second,
-	})
-	if err != nil {
-		if kafkaPublisher != nil {
-			kafkaPublisher.Close()
-		}
-		if profiler != nil {
-			_ = profiler.Stop()
-		}
-		_ = resources.Close()
-		_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
-		return nil, err
-	}
-	var runDelivery func(context.Context) error
-	if cfg.Delivery.Enabled {
-		keys := security.Keys{
-			CredentialHMAC: []byte(cfg.Auth.CredentialHMACKey),
-			ReplayKey:      []byte(cfg.Auth.ReplayEncryptionKey),
-		}
-		delivery, deliveryErr := challenge.NewDeliveryService(
-			challenge.NewPostgresRepository(resources.DB),
-			keys,
-			challenge.DeliveryConfig{
-				WorkerID: hostname + ":auth-delivery:" + uuid.NewString(),
-				EmailURL: cfg.Delivery.EmailURL, SMSURL: cfg.Delivery.SMSURL,
-				EmailToken: cfg.Delivery.EmailBearerToken, SMSToken: cfg.Delivery.SMSBearerToken,
-				RequestTimeout: cfg.Delivery.RequestTimeout, PollInterval: cfg.Delivery.PollInterval,
-				Lease: cfg.Delivery.Lease, BatchSize: cfg.Delivery.BatchSize, MaxAttempts: cfg.Delivery.MaxAttempts,
-				BaseBackoff: cfg.Delivery.BaseBackoff, MaxBackoff: cfg.Delivery.MaxBackoff,
-			},
-		)
-		if deliveryErr != nil {
-			if kafkaPublisher != nil {
-				kafkaPublisher.Close()
-			}
-			if profiler != nil {
-				_ = profiler.Stop()
-			}
-			_ = resources.Close()
-			_ = shutdownMetrics(metrics, cfg.Lifecycle.ShutdownTimeout)
-			return nil, deliveryErr
-		}
-		runDelivery = delivery.Run
 	}
 	checks := map[string]operational.Check{
 		"source_database": func(ctx context.Context) error {
 			return checkWorkerSourceDatabase(ctx, resources.DB, cfg.Development)
-		},
-		"session_status_redis": func(ctx context.Context) error {
-			return resources.SessionStatusRedis.Ping(ctx).Err()
 		},
 	}
 	if resources.AuditSink != resources.DB {
@@ -220,8 +87,11 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 			return checkAuditDatabase(ctx, resources.AuditSink)
 		}
 	}
-	if kafkaPublisher != nil {
-		checks["broker"] = kafkaPublisher.Ping
+	if wiring.kafkaPublisher != nil {
+		checks["broker"] = wiring.kafkaPublisher.Ping
+	}
+	if resources.Redis != nil {
+		checks["redis"] = func(ctx context.Context) error { return resources.Redis.Ping(ctx).Err() }
 	}
 	healthState := operational.NewHandler(operational.Config{
 		Service:          cfg.Service.Name + "-worker",
@@ -236,21 +106,19 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 	adminHTTP.WriteTimeout = 0
 	metrics.SetReady(true)
 	return &Worker{
-		cfg:                 cfg,
-		resources:           resources,
-		metrics:             metrics,
-		health:              healthState,
-		adminHTTP:           adminHTTP,
-		runAudit:            auditWorker.Run,
-		runDomainOutbox:     runDomainOutbox,
-		runStatusProjection: statusRelay.Run,
-		runDelivery:         runDelivery,
-		kafkaPublisher:      kafkaPublisher,
-		cleanup: func(ctx context.Context) (int64, error) {
-			return audit.DeleteDeliveredBefore(ctx, resources.DB, time.Now().UTC().Add(-cfg.Audit.Retention), cfg.Audit.CleanupLimit)
-		},
-		cleanupInterval: time.Hour,
-		profiler:        profiler,
+		cfg:                  cfg,
+		resources:            resources,
+		metrics:              metrics,
+		health:               healthState,
+		adminHTTP:            adminHTTP,
+		runAudit:             wiring.runAudit,
+		runDomainOutbox:      wiring.runDomainOutbox,
+		runDelivery:          wiring.runDelivery,
+		runSessionProjection: wiring.runSessionProjection,
+		kafkaPublisher:       wiring.kafkaPublisher,
+		cleanup:              wiring.cleanup,
+		cleanupInterval:      time.Hour,
+		profiler:             profiler,
 	}, nil
 }
 
@@ -268,11 +136,11 @@ func checkWorkerSourceDatabase(ctx context.Context, db *pgxpool.Pool, developmen
 	if err := checkAuditDatabase(ctx, db); err != nil {
 		return err
 	}
-	if err := auth.CheckSchema(ctx, db); err != nil {
+	if err := authmigration.CheckSchema(ctx, db); err != nil {
 		return err
 	}
 	if development.VirtualAdaptersEnabled {
-		return auth.CheckDevelopmentSchema(ctx, db)
+		return authmigration.CheckDevelopmentSchema(ctx, db)
 	}
 	return nil
 }
@@ -298,12 +166,9 @@ func (w *Worker) Run(ctx context.Context) error {
 		adminResult = results
 		go func() { results <- serveHTTP(w.adminHTTP, listener, "worker-admin") }()
 	}
-	backgroundCount := 2
+	backgroundCount := 1
 	backgroundResult := make(chan error, 4)
 	go func() { backgroundResult <- runResilient(runCtx, "audit", w.cfg.Audit.PollInterval, w.runAudit) }()
-	go func() {
-		backgroundResult <- runResilient(runCtx, "session_status_projection", time.Second, w.runStatusProjection)
-	}()
 	if w.runDomainOutbox != nil {
 		backgroundCount++
 		go func() {
@@ -314,6 +179,12 @@ func (w *Worker) Run(ctx context.Context) error {
 		backgroundCount++
 		go func() {
 			backgroundResult <- runResilient(runCtx, "verification_delivery", w.cfg.Delivery.PollInterval, w.runDelivery)
+		}()
+	}
+	if w.runSessionProjection != nil {
+		backgroundCount++
+		go func() {
+			backgroundResult <- runResilient(runCtx, "session_projection", w.cfg.Audit.PollInterval, w.runSessionProjection)
 		}()
 	}
 
@@ -350,11 +221,11 @@ func (w *Worker) Run(ctx context.Context) error {
 			deleted, err := w.cleanup(cleanupCtx)
 			cancel()
 			if err != nil {
-				logger.Error(runCtx, "audit.outbox.cleanup_failed", logger.Err(err))
+				logger.Error(runCtx, "worker.cleanup_failed", logger.Err(err))
 				continue
 			}
 			if deleted > 0 {
-				logger.Info(runCtx, "audit.outbox.cleaned", "deleted", deleted)
+				logger.Info(runCtx, "worker.records_cleaned", "deleted", deleted)
 			}
 		}
 	}

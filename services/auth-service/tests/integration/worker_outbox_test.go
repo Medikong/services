@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/app"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	domainoutbox "github.com/Medikong/services/services/auth-service/internal/domain/outbox"
+	outboxinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/messaging/outbox"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/google/uuid"
 )
@@ -29,7 +30,7 @@ func TestWorkerPublishesDomainOutboxWhenPublisherIsInjected(t *testing.T) {
 	db := migrateSchemas(t, ctx, workerCfg.Postgres)
 	t.Cleanup(db.Close)
 
-	event := outbox.Event{
+	event := domainoutbox.Event{
 		ID: uuid.New(), Type: "Auth.RegistrationLinked", AggregateType: "Registration", AggregateID: uuid.New(), Version: 1,
 		Payload: json.RawMessage(`{"status":"linked"}`), CorrelationID: uuid.New(), OccurredAt: time.Now().UTC(),
 	}
@@ -37,14 +38,14 @@ func TestWorkerPublishesDomainOutboxWhenPublisherIsInjected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin outbox transaction: %v", err)
 	}
-	if err := outbox.NewPostgresRepository(db).Append(ctx, tx, event); err != nil {
+	if err := outboxinfra.NewPostgresRepository(db).Append(ctx, tx, event); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("append domain outbox event: %v", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit domain outbox event: %v", err)
 	}
-	publisher := &outbox.RecordingPublisher{}
+	publisher := &outboxinfra.RecordingPublisher{}
 	worker, err := app.NewWorkerWithPublisher(ctx, workerCfg, publisher)
 	if err != nil {
 		t.Fatalf("construct worker: %v", err)

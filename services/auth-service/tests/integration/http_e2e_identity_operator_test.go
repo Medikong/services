@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Medikong/services/services/auth-service/internal/app"
-	appoperator "github.com/Medikong/services/services/auth-service/internal/domain/operator"
+	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
 	"github.com/google/uuid"
 )
 
@@ -431,8 +431,8 @@ func TestHTTPIdentityOperatorAndActionE2E(t *testing.T) {
 		}
 		firstResponse := harness.do(request)
 		decodeHTTPEnvelope(t, firstResponse, http.StatusOK, &first)
-		newCookie := responseCookie(t, firstResponse, "__Host-dm_refresh")
-		assertCredentialCookie(t, newCookie, "__Host-dm_refresh")
+		newCookie := responseCookie(t, firstResponse, "__Secure-dm_refresh")
+		assertCredentialCookie(t, newCookie, "__Secure-dm_refresh")
 		if newCookie.MaxAge <= 0 || newCookie.MaxAge > oldCookie.MaxAge {
 			t.Fatal("remembered replacement session did not preserve its cookie lifetime")
 		}
@@ -451,7 +451,7 @@ func TestHTTPIdentityOperatorAndActionE2E(t *testing.T) {
 		}
 		recoveryResponse := harness.do(request)
 		decodeHTTPEnvelope(t, recoveryResponse, http.StatusOK, &recovered)
-		recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_refresh")
+		recoveredCookie := responseCookie(t, recoveryResponse, "__Secure-dm_refresh")
 		if recovered.ReplacementID != first.ReplacementID || recovered.Session.SessionID != first.Session.SessionID || recovered.Access.AccessToken != first.Access.AccessToken || recoveredCookie.Value != newCookie.Value {
 			t.Fatal("phone-replacement delivery recovery changed the original result")
 		}
@@ -788,8 +788,8 @@ func completeIdentityE2EWebSignIn(t *testing.T, harness *httpE2EHarness, intent 
 	decodeHTTPEnvelope(t, response, http.StatusOK, &data)
 	data.SessionID = data.Session.SessionID
 	data.CSRFToken = intent.CSRFToken
-	data.Cookie = responseCookie(t, response, "__Host-dm_refresh")
-	assertCredentialCookie(t, data.Cookie, "__Host-dm_refresh")
+	data.Cookie = responseCookie(t, response, "__Secure-dm_refresh")
+	assertCredentialCookie(t, data.Cookie, "__Secure-dm_refresh")
 	if rememberMe && data.Cookie.MaxAge <= 0 {
 		t.Fatal("remembered web session is missing Max-Age")
 	}
@@ -819,10 +819,10 @@ func reauthenticateIdentityE2E(t *testing.T, harness *httpE2EHarness, session id
 	decodeHTTPEnvelope(t, firstResponse, http.StatusOK, &first)
 	first.SessionID = first.Session.SessionID
 	first.CSRFToken = session.CSRFToken
-	first.NewCookie = responseCookie(t, firstResponse, "__Host-dm_refresh")
+	first.NewCookie = responseCookie(t, firstResponse, "__Secure-dm_refresh")
 	first.OldCookie = session.Cookie
 	first.RequestKey = key
-	assertCredentialCookie(t, first.NewCookie, "__Host-dm_refresh")
+	assertCredentialCookie(t, first.NewCookie, "__Secure-dm_refresh")
 	if (session.Cookie.MaxAge == 0 && first.NewCookie.MaxAge != 0) || (session.Cookie.MaxAge > 0 && (first.NewCookie.MaxAge <= 0 || first.NewCookie.MaxAge > session.Cookie.MaxAge)) {
 		t.Fatal("reauthentication changed the remember-me cookie behavior")
 	}
@@ -831,7 +831,7 @@ func reauthenticateIdentityE2E(t *testing.T, harness *httpE2EHarness, session id
 	decodeHTTPEnvelope(t, recoveryResponse, http.StatusOK, &recovered)
 	recovered.SessionID = recovered.Session.SessionID
 	recovered.CSRFToken = session.CSRFToken
-	recoveredCookie := responseCookie(t, recoveryResponse, "__Host-dm_refresh")
+	recoveredCookie := responseCookie(t, recoveryResponse, "__Secure-dm_refresh")
 	if recovered.Proof != first.Proof || recovered.SessionID != first.SessionID || recovered.CSRFToken != first.CSRFToken || recoveredCookie.Value != first.NewCookie.Value {
 		t.Fatal("reauthentication delivery recovery changed the original result")
 	}

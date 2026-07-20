@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,4 +37,24 @@ type PasswordCredential struct {
 	IdentityID uuid.UUID
 	Hash       string
 	Status     string
+}
+
+func NormalizePhone(value string) (string, error) {
+	value = strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(value), " ", ""), "-", "")
+	if !strings.HasPrefix(value, "+") || len(value) < 8 {
+		return "", ErrInvalidPhone
+	}
+	for _, character := range value[1:] {
+		if character < '0' || character > '9' {
+			return "", ErrInvalidPhone
+		}
+	}
+	return value, nil
+}
+
+func MaskPhone(value string) string {
+	if len(value) <= 4 {
+		return "****"
+	}
+	return value[:3] + strings.Repeat("*", len(value)-5) + value[len(value)-2:]
 }

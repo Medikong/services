@@ -30,7 +30,8 @@ from auth_e2e_common import generate_rsa_private_key  # noqa: E402
 REDIS_CLIENT_METRIC = "db_client_connections_use_time_milliseconds_count"
 REDIS_SCOPE = "github.com/redis/go-redis/extra/redisotel"
 POSTGRES_SCOPE = "github.com/exaring/otelpgx"
-ROUTE = "/internal/ext-authz"
+ROUTE = "/internal/session/status"
+SESSION_STATUS_KEY_PREFIX = "auth:session-status:v2:"
 OPERATIONAL_ROUTES = ("/healthz", "/readyz", "/metrics")
 JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 EMAIL_PATTERN = re.compile(
@@ -155,6 +156,7 @@ class MetricSnapshot:
     keyspace_hits: float
     keyspace_misses: float
     client_ok: float
+    client_nil: float
     client_error: float
 
 
@@ -514,7 +516,7 @@ def _delete_session_cache(
         "valkey-cli",
         "-x",
         "DEL",
-        input_text=f"auth:session-status:{{{session_id}}}",
+        input_text=f"{SESSION_STATUS_KEY_PREFIX}{session_id}",
         capture=True,
         condition="Session cache 삭제에 실패했습니다",
     )
@@ -522,6 +524,161 @@ def _delete_session_cache(
         raise CheckFailure("Redis fixture", "Session cache 삭제 결과를 확인하지 못했습니다")
     if require_existing and result.stdout.strip() != "1":
         raise CheckFailure("Redis fixture", "결정적 miss 준비를 위한 기존 cache 삭제가 없었습니다")
+
+
+def _postgres_boolean(settings: Settings, sql: str, condition: str) -> bool:
+    result = _compose(
+        settings,
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "app",
+        "-d",
+        "auth_service",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-qAt",
+        input_text=sql,
+        capture=True,
+        condition=condition,
+    )
+    value = result.stdout.strip()
+    if value not in {"t", "f"}:
+        raise CheckFailure("PostgreSQL projection", "비민감 boolean 판정 결과가 올바르지 않습니다")
+    return value == "t"
+
+
+def _wait_postgres_boolean(settings: Settings, sql: str, condition: str) -> None:
+    deadline = time.monotonic() + settings.timeout_seconds
+    while time.monotonic() < deadline:
+        if _postgres_boolean(settings, sql, condition):
+            return
+        time.sleep(settings.poll_seconds)
+    raise CheckFailure("PostgreSQL projection", condition)
+
+
+def _revoke_session_in_postgres(settings: Settings, session_id: str) -> None:
+    canonical_session_id = str(UUID(session_id))
+    sql = f"""
+BEGIN;
+UPDATE auth_sessions
+SET session_status = 'revoked',
+    revoked_at = now(),
+    revocation_reason = 'observability_e2e',
+    updated_at = now()
+WHERE session_id = '{canonical_session_id}'::uuid
+  AND session_status = 'active';
+COMMIT;
+SELECT EXISTS (
+    SELECT 1
+    FROM auth_sessions AS sessions
+    JOIN auth_session_status_projection_jobs AS jobs
+      ON jobs.session_id = sessions.session_id
+     AND jobs.session_version = sessions.row_version
+    WHERE sessions.session_id = '{canonical_session_id}'::uuid
+      AND sessions.session_status = 'revoked'
+      AND jobs.target_status = 'revoked'
+      AND jobs.delivery_status IN ('pending', 'processing')
+);
+"""
+    if not _postgres_boolean(
+        settings,
+        sql,
+        "Redis 장애 중 Session 폐기와 projection 작업 생성에 실패했습니다",
+    ):
+        raise CheckFailure(
+            "PostgreSQL projection",
+            "Redis 장애 중 Session 폐기와 projection 작업이 원자적으로 남지 않았습니다",
+        )
+
+
+def _wait_projection_retry(settings: Settings, session_id: str) -> None:
+    canonical_session_id = str(UUID(session_id))
+    _wait_postgres_boolean(
+        settings,
+        f"""
+SELECT EXISTS (
+    SELECT 1
+    FROM auth_session_status_projection_jobs
+    WHERE session_id = '{canonical_session_id}'::uuid
+      AND target_status = 'revoked'
+      AND (
+        (delivery_status = 'pending'
+         AND attempt_count >= 1
+         AND last_error_code = 'projection_apply_failed')
+        OR (delivery_status = 'processing' AND attempt_count >= 2)
+      )
+);
+""",
+        "Redis 장애 중 worker의 projection 재시도 기록을 확인하지 못했습니다",
+    )
+
+
+def _wait_projection_delivered(settings: Settings, session_id: str) -> None:
+    canonical_session_id = str(UUID(session_id))
+    _wait_postgres_boolean(
+        settings,
+        f"""
+SELECT EXISTS (
+    SELECT 1
+    FROM auth_session_status_projection_jobs
+    WHERE session_id = '{canonical_session_id}'::uuid
+      AND target_status = 'revoked'
+      AND delivery_status = 'delivered'
+      AND attempt_count >= 2
+      AND delivered_at IS NOT NULL
+      AND lease_owner IS NULL
+      AND lease_until IS NULL
+      AND last_error_code IS NULL
+);
+""",
+        "Redis 복구 후 worker가 projection 작업을 완료하지 못했습니다",
+    )
+
+
+def _revoked_status_request(settings: Settings, access_token: str) -> ScenarioResponse:
+    request_id = str(uuid4())
+    result = _request(
+        "GET",
+        f"{settings.auth_url}{ROUTE}",
+        headers={"Authorization": f"Bearer {access_token}", "X-Request-Id": request_id},
+        backend="Auth projection",
+    )
+    if result.status != 401:
+        raise CheckFailure("Auth projection", "폐기된 Session status 응답이 HTTP 401이 아닙니다")
+    payload = _json(result, "Auth projection")
+    if payload.get("code") != "AUTH_SESSION_REVOKED":
+        raise CheckFailure("Auth projection", "폐기된 Session의 공개 오류 code가 다릅니다")
+    if payload.get("requestId") != request_id:
+        raise CheckFailure("Auth projection", "폐기 응답의 request ID가 요청과 다릅니다")
+    return ScenarioResponse(
+        name="projection 폐기",
+        request_id=request_id,
+        trace_id=_required_trace_header(result, "projection 폐기"),
+        status=result.status,
+    )
+
+
+def _verify_projection_retry(settings: Settings, credentials: Credentials) -> ScenarioResponse:
+    redis_stopped = False
+    try:
+        _compose(settings, "stop", "redis", condition="projection 재시도용 Redis 중단에 실패했습니다")
+        redis_stopped = True
+        _revoke_session_in_postgres(settings, credentials.session_id)
+        _wait_projection_retry(settings, credentials.session_id)
+    finally:
+        if redis_stopped:
+            _compose(
+                settings,
+                "start",
+                "redis",
+                condition="projection 재시도용 Redis 복구 시작에 실패했습니다",
+            )
+    _wait_status(settings, "Auth readiness", f"{settings.admin_url}/readyz")
+    _wait_projection_delivered(settings, credentials.session_id)
+    return _revoked_status_request(settings, credentials.access_token)
 
 
 def _scenario_request(
@@ -664,10 +821,12 @@ def _trace_is_complete(
         and _is_server(span)
     ]
     redis_spans = _redis_spans(spans)
-    if len(servers) != 1 or not any(span.name == "hgetall" for span in redis_spans):
+    if len(servers) != 1 or not any(span.name == "get" for span in redis_spans):
         return False
     if mode == "miss":
-        return bool(_postgres_spans(spans)) and any(span.name == "eval" for span in redis_spans)
+        return bool(_postgres_spans(spans)) and any(
+            span.name in {"evalsha", "eval"} for span in redis_spans
+        )
     return True
 
 
@@ -744,40 +903,56 @@ def _validate_trace(
         raise CheckFailure("Tempo", f"{scenario.name} HTTP route 속성이 다릅니다")
 
     redis_spans = _redis_spans(spans)
-    read_spans = [span for span in redis_spans if span.name == "hgetall"]
-    if len(read_spans) != 1 or read_spans[0].parent_span_id != server.span_id:
-        raise CheckFailure("Tempo", f"{scenario.name} Redis HGETALL이 HTTP span의 직접 자식이 아닙니다")
+    get_spans = [span for span in redis_spans if span.name == "get"]
+    if len(get_spans) != 1 or get_spans[0].parent_span_id != server.span_id:
+        raise CheckFailure("Tempo", f"{scenario.name} Redis GET이 HTTP span의 직접 자식이 아닙니다")
     for span in redis_spans:
         if "db.statement" in span.attributes or "db.query.text" in span.attributes:
             raise CheckFailure("Tempo", "Redis span에 명령 인자나 key/value가 노출됐습니다")
 
     postgres_spans = _postgres_spans(spans)
-    eval_spans = [span for span in redis_spans if span.name == "eval"]
+    pipelines = [span for span in redis_spans if span.name.startswith("redis.pipeline ")]
+    cas_spans = [span for span in redis_spans if span.name in {"evalsha", "eval"}]
     if mode == "miss":
         selects = [
             span
             for span in postgres_spans
             if str(span.attributes.get("db.operation.name", "")).upper() == "SELECT"
         ]
+        write_pipelines = [
+            span
+            for span in pipelines
+            if all(command in span.name for command in ("sadd", "expire"))
+        ]
         if not selects:
             raise CheckFailure("Tempo", "cache miss trace에 PostgreSQL 조회가 없습니다")
-        if len(eval_spans) != 1:
-            raise CheckFailure("Tempo", "cache miss trace에 Redis EVAL write-through가 없습니다")
-        write_through = eval_spans[0]
-        if write_through.parent_span_id != server.span_id:
-            raise CheckFailure("Tempo", "Redis write-through가 HTTP span의 직접 자식이 아닙니다")
-        if all(span.start_ns for span in (read_spans[0], selects[0], write_through)) and not (
-            read_spans[0].start_ns <= selects[0].start_ns <= write_through.start_ns
+        if not cas_spans or not any(not _is_error(span) for span in cas_spans):
+            raise CheckFailure("Tempo", "cache miss trace에 Redis CAS write-through가 없습니다")
+        if len(write_pipelines) != 1:
+            raise CheckFailure("Tempo", "cache miss trace에 Redis reverse-index write가 없습니다")
+        pipeline = write_pipelines[0]
+        if pipeline.parent_span_id != server.span_id or any(
+            span.parent_span_id != server.span_id for span in cas_spans
         ):
-            raise CheckFailure("Tempo", "miss의 Redis-PostgreSQL-write-through 순서가 다릅니다")
+            raise CheckFailure("Tempo", "Redis write-through가 HTTP span의 직접 자식이 아닙니다")
+        successful_cas = next(span for span in reversed(cas_spans) if not _is_error(span))
+        if all(span.start_ns for span in (get_spans[0], selects[0], successful_cas, pipeline)) and not (
+            get_spans[0].start_ns
+            <= selects[0].start_ns
+            <= successful_cas.start_ns
+            <= pipeline.start_ns
+        ):
+            raise CheckFailure("Tempo", "miss의 Redis-PostgreSQL-CAS-write-through 순서가 다릅니다")
     elif mode == "hit":
         if postgres_spans:
             raise CheckFailure("Tempo", "cache hit trace에 PostgreSQL 조회가 포함됐습니다")
-        if eval_spans:
+        if pipelines:
             raise CheckFailure("Tempo", "cache hit trace에 Redis write-through가 포함됐습니다")
+        if cas_spans:
+            raise CheckFailure("Tempo", "cache hit trace에 Redis CAS write-through가 포함됐습니다")
     elif mode == "fault":
-        if not _is_error(read_spans[0]) or not read_spans[0].events:
-            raise CheckFailure("Tempo", "Redis 장애 HGETALL span에 error 상태와 event가 없습니다")
+        if not _is_error(get_spans[0]) or not get_spans[0].events:
+            raise CheckFailure("Tempo", "Redis 장애 GET span에 error 상태와 event가 없습니다")
         if not _is_error(server):
             raise CheckFailure("Tempo", "Redis 장애 HTTP span이 error 상태가 아닙니다")
     else:
@@ -853,6 +1028,7 @@ def _metric_snapshot(settings: Settings, not_before: float) -> MetricSnapshot:
         keyspace_hits=server_values["keyspace_hits"],
         keyspace_misses=server_values["keyspace_misses"],
         client_ok=_prometheus_value(settings, _client_metric_query("command", "ok")),
+        client_nil=_prometheus_value(settings, _client_metric_query("command", "nil")),
         client_error=_prometheus_value(settings, _client_metric_query("command", "error")),
     )
 
@@ -1243,7 +1419,7 @@ def _assert_sensitive_absent(
         credentials.refresh_token,
         credentials.session_id,
         credentials.flow_token,
-        f"auth:session-status:{{{credentials.session_id}}}",
+        f"{SESSION_STATUS_KEY_PREFIX}{credentials.session_id}",
     )
     if any(value and value in serialized for value in exact_values):
         raise CheckFailure("보안", "trace 또는 log에 fixture 인증정보나 Redis key/value가 노출됐습니다")
@@ -1297,9 +1473,10 @@ def _run_smoke(settings: Settings) -> None:
     miss_metrics = _wait_metrics(
         settings,
         time.time(),
-        "cache miss/client command ok/write-through/server miss metric 증가가 확인되지 않았습니다",
+        "cache miss/client nil/CAS ok/server miss metric 증가가 확인되지 않았습니다",
         lambda current: (
-            current.client_ok >= baseline.client_ok + 2
+            current.client_nil > baseline.client_nil
+            and current.client_ok > baseline.client_ok
             and current.keyspace_misses > baseline.keyspace_misses
             and current.commands > baseline.commands
         ),
@@ -1372,10 +1549,14 @@ def _run_smoke(settings: Settings) -> None:
         ),
     )
 
-    if len({miss.request_id, hit.request_id, fault.request_id, recovery.request_id}) != 4:
+    print("[검증] Redis 장애 중 Session 폐기와 worker 재시도를 확인합니다", flush=True)
+    revoked = _verify_projection_retry(settings, credentials)
+    revoked_trace = _validate_trace(settings, revoked, "hit")
+
+    if len({miss.request_id, hit.request_id, fault.request_id, recovery.request_id, revoked.request_id}) != 5:
         raise CheckFailure("runner", "시나리오 request ID가 고유하지 않습니다")
     print("[검증] Loki access log의 request/trace/route/status 상관관계를 확인합니다", flush=True)
-    scenario_traces = [miss_trace, hit_trace, fault_trace, recovery_trace]
+    scenario_traces = [miss_trace, hit_trace, fault_trace, recovery_trace, revoked_trace]
     access_logs = [
         _wait_access_log(settings, run_start_ns, evidence) for evidence in scenario_traces
     ]
@@ -1398,7 +1579,7 @@ def _run_smoke(settings: Settings) -> None:
         credentials,
     )
     print(
-        "[성공] Tempo trace, Auth/Redis metric, Loki log, Grafana datasource API, 장애 복구, 민감정보 비노출을 모두 확인했습니다",
+        "[성공] Tempo trace, Auth/Redis metric, Loki log, Grafana datasource API, 장애 복구, worker projection 재시도, 민감정보 비노출을 모두 확인했습니다",
         flush=True,
     )
 

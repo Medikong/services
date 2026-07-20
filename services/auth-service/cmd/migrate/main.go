@@ -11,7 +11,7 @@ import (
 	"github.com/Medikong/services/packages/go-audit"
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/packages/go-platform/logger"
-	"github.com/Medikong/services/services/auth-service/internal/auth"
+	authmigration "github.com/Medikong/services/services/auth-service/internal/infrastructure/migration"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 )
 
@@ -40,12 +40,12 @@ func run() int {
 		log.ErrorContext(ctx, "audit source migration failed", logger.Err(err))
 		return 1
 	}
-	if err := auth.Migrate(ctx, db); err != nil {
+	if err := authmigration.Migrate(ctx, db); err != nil {
 		log.ErrorContext(ctx, "authentication migration failed", logger.Err(err))
 		return 1
 	}
 	if cfg.Development.VirtualAdaptersEnabled {
-		if err := auth.MigrateDevelopment(ctx, db); err != nil {
+		if err := authmigration.MigrateDevelopment(ctx, db); err != nil {
 			log.ErrorContext(ctx, "development authentication migration failed", logger.Err(err))
 			return 1
 		}

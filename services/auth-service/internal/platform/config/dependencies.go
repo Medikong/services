@@ -5,8 +5,76 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Medikong/services/packages/go-platform/redisutil"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
+
+type SessionStatusConfig struct {
+	Enabled           bool
+	Redis             redisutil.Config
+	Timeout           time.Duration
+	DBFallbackTimeout time.Duration
+	CacheTTL          time.Duration
+	TombstoneTTL      time.Duration
+	MaxDBLookups      int
+}
+
+func loadSessionStatus() (SessionStatusConfig, error) {
+	enabled, err := boolEnv("AUTH_SESSION_STATUS_ENABLED", false)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	timeout, err := durationEnv("AUTH_SESSION_STATUS_TIMEOUT", 200*time.Millisecond)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	dbFallbackTimeout, err := durationEnv("AUTH_SESSION_STATUS_DB_TIMEOUT", 100*time.Millisecond)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	cacheTTL, err := durationEnv("AUTH_SESSION_STATUS_CACHE_TTL", 5*time.Minute)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	tombstoneTTL, err := durationEnv("AUTH_SESSION_STATUS_TOMBSTONE_TTL", 20*time.Minute)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	maxDBLookups, err := intEnv("AUTH_SESSION_STATUS_MAX_DB_LOOKUPS", 32)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	config := SessionStatusConfig{
+		Enabled: enabled, Timeout: timeout, DBFallbackTimeout: dbFallbackTimeout,
+		CacheTTL: cacheTTL, TombstoneTTL: tombstoneTTL, MaxDBLookups: maxDBLookups,
+	}
+	if enabled {
+		config.Redis, err = redisutil.LoadConfigFromEnv(strings.TrimSpace(os.Getenv("REDIS_URL")))
+		if err != nil {
+			return SessionStatusConfig{}, configErr.With("config", "session_status", "setting", "redis").Wrap(err)
+		}
+	}
+	return config, config.Validate()
+}
+
+func (c SessionStatusConfig) Validate() error {
+	err := validation.ValidateStruct(&c,
+		validation.Field(&c.Timeout, validation.Min(time.Nanosecond)),
+		validation.Field(&c.DBFallbackTimeout, validation.Min(time.Nanosecond), validation.Max(c.Timeout)),
+		validation.Field(&c.CacheTTL, validation.Required, validation.Min(time.Nanosecond)),
+		validation.Field(&c.TombstoneTTL, validation.Required, validation.Min(c.CacheTTL)),
+		validation.Field(&c.MaxDBLookups, validation.Min(1), validation.Max(32)),
+	)
+	if err != nil {
+		return configErr.With("config", "session_status").Wrap(err)
+	}
+	if c.Enabled {
+		if err := c.Redis.Validate(); err != nil {
+			return configErr.With("config", "session_status", "setting", "redis").Wrap(err)
+		}
+	}
+	return nil
+}
 
 type BrokerConfig struct {
 	Enabled        bool

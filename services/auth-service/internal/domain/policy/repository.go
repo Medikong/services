@@ -3,17 +3,19 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
+
+var ErrNotFound = errors.New("policy not found")
 
 type Repository interface {
 	ListActive(context.Context) ([]Snapshot, error)
-	ListActiveForUpdate(context.Context, pgx.Tx) ([]Snapshot, error)
-	FindActiveForUpdate(context.Context, pgx.Tx, string) (Snapshot, error)
-	SupersedeAndInsert(context.Context, pgx.Tx, Snapshot, json.RawMessage, string, uuid.UUID) (Snapshot, error)
+	ListActiveForUpdate(context.Context) ([]Snapshot, error)
+	FindActiveForUpdate(context.Context, string) (Snapshot, error)
+	SupersedeAndInsert(context.Context, Snapshot, json.RawMessage, string, uuid.UUID) (Snapshot, error)
 	FindGlobalActive(context.Context) (GlobalSnapshot, error)
-	FindGlobalActiveForUpdate(context.Context, pgx.Tx) (GlobalSnapshot, error)
-	ActivateGlobal(context.Context, pgx.Tx, json.RawMessage, uuid.UUID, string) (GlobalSnapshot, error)
+	FindGlobalActiveForUpdate(context.Context) (GlobalSnapshot, error)
+	ActivateGlobal(context.Context, json.RawMessage, uuid.UUID, string) (GlobalSnapshot, error)
 }

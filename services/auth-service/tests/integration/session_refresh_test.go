@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	appstate "github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
+	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/clock"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/cryptography"
+	postgresinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,18 +23,17 @@ func TestRefreshReuseRevokesSessionAndRefreshFamily(t *testing.T) {
 	seedRefreshPrincipal(t, ctx, db, userID, identityID, linkID)
 
 	keys := integrationSecurityKeys(t)
-	service := appsession.NewService(db, keys, appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute}, appsession.NewPostgresRepository(db), appstate.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db))
-	tx, err := db.Begin(ctx)
+	repository := postgresinfra.NewSessionRepository(db)
+	service := appsession.NewService(
+		postgresinfra.NewSessionTransactor(db),
+		cryptography.NewSession(keys),
+		clock.System{},
+		appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: 5 * time.Minute},
+		repository,
+	)
+	issued, err := service.Issue(ctx, appsession.IssueInput{UserID: userID, IdentityID: identityID, IdentityLink: linkID, Method: "phone_otp", Channel: "ios"})
 	if err != nil {
-		t.Fatalf("begin session issuance: %v", err)
-	}
-	issued, err := service.IssueTx(ctx, tx, appsession.IssueInput{UserID: userID, IdentityID: identityID, IdentityLink: linkID, Method: "phone_otp", Channel: "ios"})
-	if err != nil {
-		_ = tx.Rollback(ctx)
 		t.Fatalf("issue mobile session: %v", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatalf("commit session issuance: %v", err)
 	}
 
 	firstKey := uuid.NewString()
@@ -62,6 +61,13 @@ func TestRefreshReuseRevokesSessionAndRefreshFamily(t *testing.T) {
 	}
 	if rotationEvents != 1 {
 		t.Fatalf("refresh outbox events=%d, want 1", rotationEvents)
+	}
+	var auditEvents int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM audit_outbox WHERE event_name='auth.session.refresh_rotated' AND idempotency_key=$1`, firstKey).Scan(&auditEvents); err != nil {
+		t.Fatalf("count refresh audit events: %v", err)
+	}
+	if auditEvents != 1 {
+		t.Fatalf("refresh audit events=%d, want 1", auditEvents)
 	}
 	if _, err := service.Refresh(ctx, issued.RefreshToken, "", uuid.NewString()); err == nil {
 		t.Fatal("reused refresh token unexpectedly succeeded")

@@ -4624,8 +4624,8 @@ components:
     WebRefreshCookie:
       type: apiKey
       in: cookie
-      name: __Host-dm_refresh
-      description: 웹 refresh family를 가리키는 회전형 HttpOnly cookie다. 보호 API의 credential로 사용할 수 없다.
+      name: __Secure-dm_refresh
+      description: 웹 refresh family를 가리키며 session 경로로 제한한 회전형 HttpOnly cookie다. 보호 API의 credential로 사용할 수 없다.
     MobileAuthFlowToken:
       type: apiKey
       in: header
@@ -4817,15 +4817,15 @@ components:
     SetRefreshAndClearAuthCookies:
       description: |
         로그인 또는 회원가입 완료 응답에서 두 개의 Set-Cookie 필드를 보낸다. 첫 필드는
-        `__Host-dm_refresh`를 새로 발급하며 서버 refresh expiry를 넘지 않는 Max-Age를
+        `__Secure-dm_refresh`를 새로 발급하며 서버 refresh expiry를 넘지 않는 Max-Age를
         포함한다. 둘째 필드는 `__Host-dm_auth`를 Max-Age=0으로 폐기한다.
         클라이언트와 중간 계층은 반복된 Set-Cookie 필드를 쉼표로 합치지 않는다.
       schema:
         type: string
       x-multiple: true
-      example: __Host-dm_refresh=opaque-random; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict
+      example: __Secure-dm_refresh=opaque-random; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict
       x-required-set-cookie-fields:
-        - __Host-dm_refresh
+        - __Secure-dm_refresh
         - __Host-dm_auth
     ClearAuthFlowCookie:
       description: 웹 사전 인증 cookie를 즉시 폐기하는 Set-Cookie 필드다.
@@ -4840,13 +4840,13 @@ components:
       schema:
         type: string
       x-multiple: true
-      example: __Host-dm_refresh=opaque-random; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict
+      example: __Secure-dm_refresh=opaque-random; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict
     ClearRefreshCookie:
       description: 웹 refresh cookie를 즉시 폐기하는 Set-Cookie 필드다.
       schema:
         type: string
       x-multiple: true
-      example: __Host-dm_refresh=; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict; Max-Age=0
+      example: __Secure-dm_refresh=; Path=/api/v1/auth/sessions; HttpOnly; Secure; SameSite=Strict; Max-Age=0
     VaryAuthorization:
       description: 인증 응답을 공유 캐시가 Authorization header별로 구분하도록 하는 값이다.
       schema:
