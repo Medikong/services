@@ -21,7 +21,12 @@ COPY services/catalog-service services/catalog-service
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --project services/catalog-service --no-install-project --no-dev
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /workspace/services/catalog-service
+
 WORKDIR /workspace/services/catalog-service
+
+USER 10001
 
 EXPOSE 8081
 

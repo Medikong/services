@@ -21,7 +21,12 @@ COPY services/order-service services/order-service
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --project services/order-service --no-install-project --no-dev
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /workspace/services/order-service
+
 WORKDIR /workspace/services/order-service
+
+USER 10001
 
 EXPOSE 8082
 
