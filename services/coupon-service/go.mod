@@ -6,7 +6,7 @@ require (
 	github.com/Medikong/services/packages/go-authz v0.0.0
 	github.com/Medikong/services/packages/go-contracts v0.0.0
 	github.com/Medikong/services/packages/go-platform v0.0.0
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/google/uuid v1.6.0
 	github.com/grafana/pyroscope-go v1.4.1

@@ -14,8 +14,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.12 /uv /uvx /bin/
 COPY packages/contracts packages/contracts
 COPY packages/errors packages/errors
 COPY packages/kafka-utils packages/kafka-utils
+COPY packages/metrics packages/metrics
 COPY packages/middleware packages/middleware
 COPY packages/observability packages/observability
+COPY packages/server packages/server
 COPY services/notification-service services/notification-service
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -26,7 +28,7 @@ RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
 
 WORKDIR /workspace/services/notification-service
 
-USER appuser
+USER 10001
 
 EXPOSE 8084
 
