@@ -269,13 +269,12 @@ jobs:
           TRIVY_IMAGE_BUILD_OUTCOME: ${{ steps.trivy-image-build.outcome }}
           TRIVY_SCAN_OUTCOME: ${{ steps.trivy-scan.outcome }}
           IMAGE_BUILD_OUTCOME: ${{ steps.image-build.outcome }}
-          DEPLOY_PLAN_OUTCOME: ${{ steps.deploy-plan.outcome }}
-          DEPLOY_PLAN_UPLOAD_OUTCOME: ${{ steps.deploy-plan-upload.outcome }}
+          IMAGE_DIGEST: ${{ steps.image-build.outputs.digest }}
         run: |
           set -euo pipefail
           status="success"
           stage="complete"
-          reason="이미지 publish와 deploy plan 작성 완료"
+          reason="이미지 빌드 및 ECR 푸시 완료"
 
           check_outcome() {
             local candidate_stage="$1"
@@ -295,14 +294,7 @@ jobs:
           check_outcome "ecr-login" "Amazon ECR 로그인 실패" "${ECR_LOGIN_OUTCOME}"
           check_outcome "trivy-image-build" "Trivy 검사 대상 이미지 빌드 실패" "${TRIVY_IMAGE_BUILD_OUTCOME}"
           check_outcome "trivy-scan" "Trivy CRITICAL 취약점 검사 실패" "${TRIVY_SCAN_OUTCOME}"
-          check_outcome "image-build" "다중 아키텍처 이미지 build 또는 ECR push 실패" "${IMAGE_BUILD_OUTCOME}"
-          check_outcome "deploy-plan" "ECR digest 조회 또는 deploy plan 작성 실패" "${DEPLOY_PLAN_OUTCOME}"
-          check_outcome "deploy-plan-upload" "서비스 deploy plan artifact 업로드 실패" "${DEPLOY_PLAN_UPLOAD_OUTCOME}"
-
-          digest=""
-          if [ -f "deploy-plan/${{ matrix.image }}.json" ]; then
-            digest="$(jq -r '.digest // ""' "deploy-plan/${{ matrix.image }}.json")"
-          fi
+          check_outcome "image-build" "다중 아키텍처 이미지 빌드 또는 ECR 푸시 실패" "${IMAGE_BUILD_OUTCOME}"
 
           mkdir -p publish-results
           jq -n \
@@ -311,7 +303,7 @@ jobs:
             --arg status "${status}" \
             --arg stage "${stage}" \
             --arg reason "${reason}" \
-            --arg digest "${digest}" \
+            --arg digest "${IMAGE_DIGEST}" \
             '{
               image: $image,
               tag: $tag,
@@ -345,7 +337,6 @@ jobs:
 
     steps:
       - name: 이미지별 deploy plan 다운로드
-        id: deploy-plan-download
         uses: actions/download-artifact@v4
         with:
           pattern: deploy-plan-*
@@ -353,7 +344,6 @@ jobs:
           merge-multiple: true
 
       - name: 통합 deploy plan 작성
-        id: deploy-plan-assemble
         shell: bash
         run: |
           set -euo pipefail
@@ -374,7 +364,6 @@ jobs:
           cat deploy-plan.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: 통합 deploy plan 업로드
-        id: deploy-plan-upload
         uses: actions/upload-artifact@v4
         with:
           name: image-publish-deploy-plan
@@ -384,7 +373,6 @@ jobs:
           if-no-files-found: error
 
       - name: gitops repo 체크아웃
-        id: gitops-checkout
         uses: actions/checkout@v4
         with:
           repository: Medikong/e-gitops
@@ -392,7 +380,6 @@ jobs:
           path: gitops
 
       - name: gitops values 이미지 digest 업데이트
-        id: gitops-update
         shell: bash
         run: |
           set -euo pipefail
@@ -464,7 +451,6 @@ jobs:
           done < <(jq -c '.[]' ../deploy-plan.json)
 
       - name: gitops repo push
-        id: gitops-push
         shell: bash
         run: |
           set -euo pipefail
@@ -482,64 +468,11 @@ jobs:
           git commit -m "chore: deploy images for ${{ needs.select-images.outputs.deploy_tag }}"
           git push
 
-      - name: GitOps 반영 결과 작성
-        id: gitops-result
-        if: always()
-        shell: bash
-        env:
-          DEPLOY_PLAN_DOWNLOAD_OUTCOME: ${{ steps.deploy-plan-download.outcome }}
-          DEPLOY_PLAN_ASSEMBLE_OUTCOME: ${{ steps.deploy-plan-assemble.outcome }}
-          DEPLOY_PLAN_UPLOAD_OUTCOME: ${{ steps.deploy-plan-upload.outcome }}
-          GITOPS_CHECKOUT_OUTCOME: ${{ steps.gitops-checkout.outcome }}
-          GITOPS_UPDATE_OUTCOME: ${{ steps.gitops-update.outcome }}
-          GITOPS_PUSH_OUTCOME: ${{ steps.gitops-push.outcome }}
-        run: |
-          set -euo pipefail
-          status="success"
-          stage="complete"
-          reason="GitOps 배포 값 반영 완료"
-
-          check_outcome() {
-            local candidate_stage="$1"
-            local candidate_reason="$2"
-            local outcome="$3"
-            if [ "${status}" = "success" ] && [ "${outcome}" != "success" ]; then
-              status="failure"
-              stage="${candidate_stage}"
-              reason="${candidate_reason} (step outcome: ${outcome})"
-            fi
-          }
-
-          check_outcome "deploy-plan-download" "서비스 deploy plan artifact 다운로드 실패" "${DEPLOY_PLAN_DOWNLOAD_OUTCOME}"
-          check_outcome "deploy-plan-assemble" "통합 deploy plan 작성 실패" "${DEPLOY_PLAN_ASSEMBLE_OUTCOME}"
-          check_outcome "deploy-plan-upload" "통합 deploy plan artifact 업로드 실패" "${DEPLOY_PLAN_UPLOAD_OUTCOME}"
-          check_outcome "gitops-checkout" "GitOps 저장소 checkout 실패" "${GITOPS_CHECKOUT_OUTCOME}"
-          check_outcome "gitops-update" "GitOps 서비스 values 업데이트 실패" "${GITOPS_UPDATE_OUTCOME}"
-          check_outcome "gitops-push" "GitOps 저장소 commit 또는 push 실패" "${GITOPS_PUSH_OUTCOME}"
-
-          mkdir -p deploy-result
-          jq -n \
-            --arg status "${status}" \
-            --arg stage "${stage}" \
-            --arg reason "${reason}" \
-            '{status: $status, stage: $stage, reason: $reason}' \
-            > deploy-result/deploy-result.json
-          printf 'status=%s\n' "${status}" >> "${GITHUB_OUTPUT}"
-
-      - name: GitOps 반영 결과 업로드
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitops-deploy-result
-          path: deploy-result/deploy-result.json
-          if-no-files-found: error
-
   notify:
-    name: Discord deploy 결과 알림
+    name: Discord ECR 이미지 결과 알림
     needs:
       - select-images
       - publish
-      - deploy-plan
     # 이미지가 선택되지 않은 정상 no-op은 알리지 않고, 선택 단계 자체의 실패는 알린다.
     if: >-
       ${{
@@ -564,30 +497,17 @@ jobs:
           path: notification/publish-results
           merge-multiple: true
 
-      - name: GitOps 반영 결과 다운로드
-        if: needs.deploy-plan.result != 'skipped'
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: gitops-deploy-result
-          path: notification/deploy-result
-
-      - name: Discord deploy 결과 전송
+      - name: Discord ECR 이미지 결과 전송
         env:
-          DISCORD_DEPLOY_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
+          DISCORD_IMAGE_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
           SELECT_RESULT: ${{ needs.select-images.result }}
-          PUBLISH_RESULT: ${{ needs.publish.result }}
-          DEPLOY_RESULT: ${{ needs.deploy-plan.result }}
           SELECTED_IMAGES_JSON: ${{ needs.select-images.outputs.images }}
-          DEPLOY_ENVIRONMENT: ${{ needs.select-images.outputs.deploy_environment }}
-          DEPLOY_TARGET: ${{ needs.select-images.outputs.deploy_target }}
-          DEPLOY_TAG: ${{ needs.select-images.outputs.deploy_tag || github.ref_name }}
+          SOURCE_TAG: ${{ needs.select-images.outputs.deploy_tag || github.ref_name }}
         run: |
-          bash .github/scripts/send-discord-deploy.sh \
-            --template .github/notifications/discord/deploy-result.json \
+          bash .github/scripts/send-discord-image-publish.sh \
+            --template .github/notifications/discord/image-publish-result.json \
             --publish-results-dir notification/publish-results \
-            --deploy-result-file notification/deploy-result/deploy-result.json \
-            --output "${RUNNER_TEMP}/discord-deploy-payload.json"
+            --output "${RUNNER_TEMP}/discord-image-publish-payload.json"
 
   no-image-publish:
     name: 이미지 publish 없음

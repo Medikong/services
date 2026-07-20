@@ -6,21 +6,19 @@ FAILURE_COLOR=15158332
 DISCORD_FIELD_LIMIT=1024
 template_path=""
 publish_results_dir=""
-deploy_result_file=""
 output_path=""
 dry_run=false
 
 usage() {
   printf '%s\n' \
-    'Usage: send-discord-deploy.sh --template PATH --publish-results-dir PATH' \
-    '       --deploy-result-file PATH --output PATH [--dry-run]'
+    'Usage: send-discord-image-publish.sh --template PATH --publish-results-dir PATH' \
+    '       --output PATH [--dry-run]'
 }
 
 while (($# > 0)); do
   case "$1" in
     --template) template_path="${2:-}"; shift 2 ;;
     --publish-results-dir) publish_results_dir="${2:-}"; shift 2 ;;
-    --deploy-result-file) deploy_result_file="${2:-}"; shift 2 ;;
     --output) output_path="${2:-}"; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -32,7 +30,7 @@ while (($# > 0)); do
   esac
 done
 
-if [[ -z "${template_path}" || -z "${publish_results_dir}" || -z "${deploy_result_file}" || -z "${output_path}" ]]; then
+if [[ -z "${template_path}" || -z "${publish_results_dir}" || -z "${output_path}" ]]; then
   usage >&2
   exit 2
 fi
@@ -101,6 +99,8 @@ fi
 
 services=""
 service_failures=""
+success_count=0
+failure_count=0
 while IFS= read -r selected; do
   image_name="$(jq -r '.image' <<<"${selected}")"
   image_tag="$(jq -r '.tag' <<<"${selected}")"
@@ -113,20 +113,19 @@ while IFS= read -r selected; do
   if [[ -z "${result}" ]]; then
     printf -v line '❌ `%s` · `%s` · 결과 파일 없음' "${image_name}" "${image_tag}"
     printf -v failure_line '`%s`: 이미지 publish 결과 파일을 확인할 수 없습니다.' "${image_name}"
+    failure_count=$((failure_count + 1))
   else
     status="$(jq -r '.status' <<<"${result}")"
     reason="$(jq -r '.reason' <<<"${result}")"
     if [[ "${status}" == "success" ]]; then
       digest="$(short_digest "$(jq -r '.digest' <<<"${result}")")"
-      if [[ "${PUBLISH_RESULT:-}" == "success" ]]; then
-        printf -v line '✅ `%s` · `%s` · `%s`' "${image_name}" "${image_tag}" "${digest}"
-      else
-        printf -v line '⚠️ `%s` · `%s` · 이미지 게시 완료, GitOps 미반영' "${image_name}" "${image_tag}"
-      fi
+      printf -v line '✅ `%s:%s` · `%s`' "${image_name}" "${image_tag}" "${digest}"
       failure_line=""
+      success_count=$((success_count + 1))
     else
-      printf -v line '❌ `%s` · `%s` · %s' "${image_name}" "${image_tag}" "${reason}"
+      printf -v line '❌ `%s:%s` · %s' "${image_name}" "${image_tag}" "${reason}"
       printf -v failure_line '`%s`: %s' "${image_name}" "${reason}"
+      failure_count=$((failure_count + 1))
     fi
   fi
 
@@ -140,37 +139,30 @@ done < <(jq -c '.[]' <<<"${selected_images_json}")
 
 [[ -n "${services}" ]] || services="서비스 결과를 확인할 수 없습니다."
 services="$(truncate_field "${services}")"
+service_count="$(jq 'length' <<<"${selected_images_json}")"
 
 failure_reasons=""
 if [[ "${SELECT_RESULT:-}" != "success" ]]; then
-  failure_reasons="- deploy tag 해석 또는 이미지 선택 단계가 실패했습니다."
-  current_stage="이미지 선택 실패 · 배포 중단"
-elif [[ "${PUBLISH_RESULT:-}" != "success" ]]; then
-  failure_reasons="${service_failures:-- 이미지 build, 보안 검사 또는 ECR publish 단계가 실패했습니다.}"
-  current_stage="이미지 publish 실패 · GitOps 반영 미실행"
+  failure_reasons="- Git 태그 해석 또는 이미지 선택 단계가 실패했습니다."
 elif [[ -n "${service_failures}" ]]; then
   failure_reasons="${service_failures}"
-  current_stage="이미지 publish 결과 확인 실패 · GitOps 반영 상태 확인 필요"
-elif [[ "${DEPLOY_RESULT:-}" != "success" ]]; then
-  deploy_reason=""
-  if [[ -f "${deploy_result_file}" ]]; then
-    deploy_reason="$(jq -r '.reason // "GitOps 반영 결과를 확인할 수 없습니다."' "${deploy_result_file}" 2>/dev/null || true)"
-  fi
-  failure_reasons="- ${deploy_reason:-deploy plan 조립 또는 GitOps 저장소 반영 단계가 실패했습니다.}"
-  current_stage="GitOps 반영 실패 · Argo CD 반영 전"
-else
-  current_stage="GitOps 반영 완료 · Argo CD 동기화 대기"
+elif ((success_count != service_count)); then
+  failure_reasons="- 이미지 빌드, 보안 검사 또는 ECR 푸시 결과를 확인할 수 없습니다."
 fi
 
-service_count="$(jq 'length' <<<"${selected_images_json}")"
-if [[ -z "${failure_reasons}" ]]; then
-  title="✅ DropMong Deploy · GitOps 반영 완료"
-  description="${service_count}개 서비스의 이미지 게시와 GitOps 배포 값 반영이 완료되었습니다."
-  failure_reason="해당 없음"
+if [[ "${SELECT_RESULT:-}" != "success" ]]; then
+  title="❌ DropMong · ECR 이미지 선택 실패"
+  description="Git 태그를 해석하지 못해 ECR 이미지 푸시를 시작하지 않았습니다."
+  failure_reason="$(truncate_field "${failure_reasons}")"
+  color="${FAILURE_COLOR}"
+elif [[ -z "${failure_reasons}" ]]; then
+  title="📦 DropMong · ECR 이미지 푸시 완료"
+  description="컨테이너 이미지 ${success_count}개를 ECR에 푸시했습니다."
+  failure_reason=""
   color="${SUCCESS_COLOR}"
 else
-  title="❌ DropMong Deploy · 배포 준비 실패"
-  description="서비스 이미지 게시 또는 GitOps 반영 과정이 실패했습니다. 실패 원인과 GitHub Actions 로그를 확인해 주세요."
+  title="❌ DropMong · ECR 이미지 푸시 실패"
+  description="대상 ${service_count}개 중 성공 ${success_count}개, 실패 ${failure_count}개입니다. GitHub Actions 로그를 확인해 주세요."
   failure_reason="$(truncate_field "${failure_reasons}")"
   color="${FAILURE_COLOR}"
 fi
@@ -183,12 +175,10 @@ else
 fi
 source_sha="${GITHUB_SHA:-}"
 source_sha="${source_sha:0:8}"
-printf -v environment_value '`%s`' "${DEPLOY_ENVIRONMENT:-확인 불가}"
-printf -v target_value '`%s`' "${DEPLOY_TARGET:-확인 불가}"
-printf -v deploy_tag_value '`%s`' "${DEPLOY_TAG:-확인 불가}"
+printf -v registry_value '`%s`' "${IMAGE_REGISTRY:-확인 불가}"
+printf -v source_tag_value '`%s`' "${SOURCE_TAG:-확인 불가}"
 printf -v source_sha_value '`%s`' "${source_sha:-확인 불가}"
 printf -v actor_value '`%s`' "${GITHUB_ACTOR:-확인 불가}"
-printf -v current_stage_value '`%s`' "${current_stage}"
 timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 context_json="$(
@@ -197,22 +187,19 @@ context_json="$(
     --arg description "${description}" \
     --arg run_url "${run_url}" \
     --argjson color "${color}" \
-    --arg environment "${environment_value}" \
-    --arg target "${target_value}" \
     --argjson service_count "${service_count}" \
     --arg services "${services}" \
     --arg failure_reason "${failure_reason}" \
-    --arg deploy_tag "${deploy_tag_value}" \
+    --arg registry "${registry_value}" \
+    --arg source_tag "${source_tag_value}" \
     --arg source_sha "${source_sha_value}" \
     --arg actor "${actor_value}" \
-    --arg current_stage "${current_stage_value}" \
     --arg timestamp "${timestamp}" \
     '{
       title: $title, description: $description, run_url: $run_url, color: $color,
-      environment: $environment, target: $target, service_count: $service_count,
-      services: $services, failure_reason: $failure_reason, deploy_tag: $deploy_tag,
-      source_sha: $source_sha, actor: $actor, current_stage: $current_stage,
-      timestamp: $timestamp
+      service_count: $service_count, services: $services,
+      failure_reason: $failure_reason, registry: $registry, source_tag: $source_tag,
+      source_sha: $source_sha, actor: $actor, timestamp: $timestamp
     }'
 )"
 
@@ -238,6 +225,7 @@ jq --argjson context "${context_json}" '
       .
     end;
   render($context)
+  | (.embeds[].fields) |= map(select(.value != ""))
 ' "${template_path}" > "${output_path}"
 
 if ! jq -e '[.. | strings | select(contains("{{"))] | length == 0' "${output_path}" >/dev/null; then
@@ -247,8 +235,8 @@ fi
 if [[ "${dry_run}" == "true" ]]; then
   exit 0
 fi
-if [[ -z "${DISCORD_DEPLOY_WEBHOOK:-}" ]]; then
-  printf 'DISCORD_DEPLOY_WEBHOOK GitHub Secret이 설정되지 않았습니다.\n' >&2
+if [[ -z "${DISCORD_IMAGE_WEBHOOK:-}" ]]; then
+  printf 'Discord 이미지 알림용 GitHub Secret이 설정되지 않았습니다.\n' >&2
   exit 1
 fi
 if ! command -v curl >/dev/null 2>&1; then
@@ -260,5 +248,5 @@ curl --fail --silent --show-error \
   --header 'Content-Type: application/json' \
   --header 'User-Agent: DropMong-GitHub-Actions/1.0' \
   --data-binary "@${output_path}" \
-  "${DISCORD_DEPLOY_WEBHOOK}" \
+  "${DISCORD_IMAGE_WEBHOOK}" \
   >/dev/null

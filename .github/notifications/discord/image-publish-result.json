@@ -1,0 +1,50 @@
+{
+  "username": "DropMong Image",
+  "allowed_mentions": {
+    "parse": []
+  },
+  "embeds": [
+    {
+      "title": "{{ title }}",
+      "description": "{{ description }}",
+      "url": "{{ run_url }}",
+      "color": "{{ color }}",
+      "fields": [
+        {
+          "name": "이미지",
+          "value": "{{ services }}",
+          "inline": false
+        },
+        {
+          "name": "실패 원인",
+          "value": "{{ failure_reason }}",
+          "inline": false
+        },
+        {
+          "name": "ECR 레지스트리",
+          "value": "{{ registry }}",
+          "inline": false
+        },
+        {
+          "name": "Git 태그",
+          "value": "{{ source_tag }}",
+          "inline": false
+        },
+        {
+          "name": "커밋",
+          "value": "{{ source_sha }}",
+          "inline": true
+        },
+        {
+          "name": "요청자",
+          "value": "{{ actor }}",
+          "inline": true
+        }
+      ],
+      "footer": {
+        "text": "DropMong Image · GitHub Actions"
+      },
+      "timestamp": "{{ timestamp }}"
+    }
+  ]
+}
