@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +9,7 @@ import pytest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SERVICES = (
     "catalog-service",
+    "interest-service",
     "notification-service",
     "order-service",
     "payment-service",
@@ -33,8 +33,8 @@ def test_cli_stdout_is_exact_utf8_lf_bytes(
 ) -> None:
     result = subprocess.run(
         (
-            sys.executable,
-            "scripts/list_services.py",
+            "sh",
+            "scripts/list_services.sh",
             "list",
             "--mode",
             "tests",

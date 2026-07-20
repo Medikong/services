@@ -8,16 +8,17 @@ vars:
   IMAGE_REGISTRY: '{{default "10.10.10.10:5000" .IMAGE_REGISTRY}}'
   IMAGE_NAMESPACE: '{{default "" .IMAGE_NAMESPACE}}'
   IMAGE_TAG: '{{default "latest" .IMAGE_TAG}}'
+  IMAGE_SERVICES: '{{default "" .IMAGE_SERVICES}}'
   DEV_IMAGE_REGISTRY: '{{default "localhost:5001" .DEV_IMAGE_REGISTRY}}'
   DEV_IMAGE_NAMESPACE: '{{default "" .DEV_IMAGE_NAMESPACE}}'
   DEV_IMAGE_TAG: '{{default "dev" .DEV_IMAGE_TAG}}'
   DOCKER_BUILD_PLATFORMS: '{{default "linux/amd64,linux/arm64" .DOCKER_BUILD_PLATFORMS}}'
   DOCKER_BUILD_CACHE_FROM: '{{default "" .DOCKER_BUILD_CACHE_FROM}}'
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
-  PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
+  PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
   PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
-  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
+  SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.sh" .SERVICE_LIST_SCRIPT}}'
   GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/... ./services/user-service/..." .GO_TEST_PACKAGES}}'
   GO_BENCH_TIME: '{{default "1s" .GO_BENCH_TIME}}'
 
@@ -60,10 +61,9 @@ tasks:
         if [ ! -x "${venv_python}" ]; then
           venv_python="${venv_dir}/Scripts/python.exe"
         fi
-        python_bin='{{.PYTHON_BIN}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
         install_args=""
-        for project in $(find packages -mindepth 2 -maxdepth 2 -name pyproject.toml | sort) $("${python_bin}" "${service_list}" list --mode pyprojects --format shell); do
+        for project in $(find packages -mindepth 2 -maxdepth 2 -name pyproject.toml | sort) $(sh "${service_list}" list --mode pyprojects --format shell); do
           install_args="${install_args} -r ${project} --group ${project}:test"
         done
         if [ -z "${install_args}" ]; then
@@ -354,7 +354,6 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
-        python_bin='{{.PYTHON_BIN}}'
         if [ -z "${image_registry}" ]; then
           printf '%s\n' 'IMAGE_REGISTRY is required, for example: task app-images-build IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
@@ -394,7 +393,10 @@ tasks:
           printf 'building %s/%s:%s\n' "${image_prefix}" "${service}" "${image_tag}"
           docker buildx build ${cache_args} --platform "${build_platforms}" --push -f "services/${service}/Dockerfile" -t "${image_prefix}/${service}:${image_tag}" .
         }
-        services="$("${python_bin}" "${service_list}" list --mode images --format shell)"
+        services='{{.IMAGE_SERVICES}}'
+        if [ -z "${services}" ]; then
+          services="$(sh "${service_list}" list --mode images --format shell)"
+        fi
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service Docker images found; image build skipped.'
           exit 0
@@ -425,13 +427,15 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
-        python_bin='{{.PYTHON_BIN}}'
         image_prefix="${image_registry}"
         if [ -n "${image_namespace}" ]; then
           image_prefix="${image_registry%/}/${image_namespace#/}"
         fi
         pids=""
-        services="$("${python_bin}" "${service_list}" list --mode images --format shell)"
+        services='{{.IMAGE_SERVICES}}'
+        if [ -z "${services}" ]; then
+          services="$(sh "${service_list}" list --mode images --format shell)"
+        fi
         if [ -z "${services}" ]; then
           printf '%s\n' 'No managed service Docker images found; image push skipped.'
           exit 0
@@ -463,7 +467,6 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
-        python_bin='{{.PYTHON_BIN}}'
         if [ -z "${requested}" ]; then
           printf '%s\n' 'SERVICE is required, for example: task app-image-build SERVICE=<service-name> IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=dev' >&2
           exit 2
@@ -478,7 +481,7 @@ tasks:
         fi
         normalize_service() {
           raw="$1"
-          for candidate in $("${python_bin}" "${service_list}" list --mode images --format shell); do
+          for candidate in $(sh "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
@@ -539,10 +542,9 @@ tasks:
         image_namespace='{{.IMAGE_NAMESPACE}}'
         image_tag='{{.IMAGE_TAG}}'
         service_list='{{.SERVICE_LIST_SCRIPT}}'
-        python_bin='{{.PYTHON_BIN}}'
         normalize_service() {
           raw="$1"
-          for candidate in $("${python_bin}" "${service_list}" list --mode images --format shell); do
+          for candidate in $(sh "${service_list}" list --mode images --format shell); do
             if [ "${raw}" = "${candidate}" ]; then
               printf '%s\n' "${candidate}"
               return 0
