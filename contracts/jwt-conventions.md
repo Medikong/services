@@ -12,7 +12,7 @@
 | issuer 설정 | `AUTH_JWT_ISSUER`가 없으면 `ServiceName`(`auth-service`)으로 fallback하며 operational mode도 이를 거부하지 않음 | 환경별 issuer를 명시적으로 공급하고 운영 fallback을 허용하지 않음 | 후속 Auth runtime/config 작업 |
 | 활성 Auth values | 공통 `values/services/auth.yaml`에는 `AUTH_JWT_SECRET` 선언이 있으나, private-dev/aws-dev 환경 overlay의 `container.env` 목록이 이를 대체한다. 따라서 두 active effective stack에는 각각 `JWT_SECRET` 하나만 남고 최신 RS256 입력은 없다. `values/services/dev/auth.yaml`은 두 active Application에서 참조하지 않는다. | legacy 목록을 제거하고 private key, key ID, issuer를 승인된 Secret-backed 경로로 공급 | 후속 GitOps Auth migration |
 | 활성 Gateway | `platform/kong`이 concrete HS256 JWT credential을 render | Istio RS256/JWKS 검증과 HTTP ext_authz | 후속 Gateway/GitOps migration |
-| 활성 Gateway identity/role | `ticketing-identity-headers`가 `email`/`role` claim을 읽어 `X-User-Email`/`X-User-Role`을 만들고, `ticketing-role-*`가 JWT role claim으로 `403` 인가 결정을 내린다. Notification, Interest, Order, Payment ingress에 관련 plugin attachment가 남아 있다. | 세 identity header만 재생성하고 role/email 기반 Gateway 인가를 제거 | 후속 Gateway/GitOps migration |
+| 활성 Gateway identity/role | `dropmong-identity-headers`가 `email`/`role` claim을 읽어 `X-User-Email`/`X-User-Role`을 만들고, `dropmong-role-*`가 JWT role claim으로 `403` 인가 결정을 내린다. Notification, Interest, Order, Payment ingress에 관련 plugin attachment가 연결된다. | 세 identity header만 재생성하고 role/email 기반 Gateway 인가를 제거 | Gateway/GitOps 계약 확인 필요 |
 | 업무 runtime의 legacy trust | Notification과 Interest runtime이 `X-User-Role`을 입력으로 받아 role 기반 `403`을 결정한다. | `X-User-Id`와 업무 소유 데이터로 인가하고 role/email header를 신뢰하지 않음 | 후속 Notification/Interest 서비스 migration |
 | Session check | stage worktree 소스에 `/internal/ext-authz` Handler와 router 등록 구현; 공개 OpenAPI와 활성 GitOps/Istio 연결 없음 | 내부 check를 배포하고 세 identity header만 허용 | 후속 GitOps/Istio 작업 |
 

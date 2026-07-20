@@ -1,1 +1,0 @@
-"""Concert service application package."""

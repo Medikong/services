@@ -90,7 +90,7 @@ Redis 장애 정책:
 cd service
 COUPON_REDIS_GATE_ENABLED=false task test-e2e
 COUPON_REDIS_GATE_ENABLED=true task test-e2e
-COUPON_REDIS_GATE_ENABLED=true task benchmark-api-smoke
+COUPON_REDIS_GATE_ENABLED=true task test-service SERVICE=coupon-service
 ```
 
 Docker Desktop Kubernetes:

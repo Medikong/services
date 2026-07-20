@@ -46,14 +46,14 @@ def test_create_kafka_producer_configures_aiokafka_producer() -> None:
 
     producer = create_kafka_producer(
         "kafka:9092",
-        client_id="reservation-service",
+        client_id="order-service",
         producer_factory=factory,
     )
 
     assert producer is not None
     assert producer.raw_producer is producers[0]
     assert producers[0].kwargs["bootstrap_servers"] == "kafka:9092"
-    assert producers[0].kwargs["client_id"] == "reservation-service"
+    assert producers[0].kwargs["client_id"] == "order-service"
     assert producers[0].kwargs["value_serializer"]({"eventId": EVENT_ID, "count": 1}) == (
         b'{"eventId":"6c98a5ce-8913-5597-9ad7-c617f71f0be3","count":1}'
     )

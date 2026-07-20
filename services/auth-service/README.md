@@ -50,7 +50,7 @@ Auth는 access JWT나 내부 인증 헤더에 role, permission, email, membershi
 - 공통 `values/services/auth.yaml`은 legacy `AUTH_JWT_SECRET`을 선언하지만 Helm의 목록 coalescing에서 private-dev/aws-dev overlay의 전체 `container.env` 목록으로 대체됩니다. 따라서 두 active effective stack에는 각각 legacy `JWT_SECRET` 하나만 남습니다. 저장소의 dev overlay도 `JWT_SECRET`을 선언하지만 두 active Application에서 참조하지 않습니다.
 - 활성 Kong shared resources는 HS256 JWT credential을 render합니다.
 - 활성 private-dev/aws-dev values stack은 현재 코드가 요구하는 RS256 private key와 key ID를 공급하지 않습니다.
-- 활성 Kong `ticketing-identity-headers`는 JWT의 email/role claim을 읽어 `X-User-Email`/`X-User-Role`을 만들고, `ticketing-role-*`는 role claim으로 인가와 legacy `403`을 결정합니다. Notification, Interest, Order, Payment ingress attachment가 남아 있습니다.
+- 활성 Kong `dropmong-identity-headers`는 JWT의 email/role claim을 읽어 `X-User-Email`/`X-User-Role`을 만들고, `dropmong-role-*`는 role claim으로 인가와 `403`을 결정합니다. Notification, Interest, Order, Payment ingress attachment가 연결됩니다.
 - Notification과 Interest runtime은 아직 `X-User-Role`을 신뢰해 role 기반 접근을 판정합니다.
 
 따라서 현재 GitOps desired state는 최신 Auth 코드와 호환되는 RS256-ready 또는 identity-only-ready 배포가 아닙니다. 후속 Auth config 작업은 운영 issuer fallback을 거부해야 하고, 후속 GitOps 작업은 legacy JWT secret/Kong credential과 role/email plugin 경로를 제거한 뒤 private key, key ID, issuer를 승인된 Secret-backed 경로로 공급해야 합니다. Notification/Interest 후속 작업도 role header trust를 제거해야 합니다. 이 README 변경은 배포 manifest나 서비스 runtime을 수정하거나 blocker를 해소하지 않습니다.

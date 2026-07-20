@@ -27,17 +27,17 @@ Server Component는 현재 Route Handler를 다시 호출하지 않고 같은 `s
 | 영역 | 코드·API 사실 | 로컬·검증 설정 | 배포 상태 | 판정 |
 | --- | --- | --- | --- | --- |
 | Catalog | `catalog.ts`가 `CATALOG_INTERNAL_BASE_URL`이 있으면 `GET /drops`, `GET /drops/{dropId}`를 호출 | `.env.local`, CI, Playwright, Docker smoke에 Catalog URL이 없고 `DEV_MOCK_MODE=true` | 확인한 GitOps에 `catalog-service`, `dropmong-web` 선언 없음 | 코드 지원, 실행·배포 미연결 |
-| Auth | `auth-service`에 `GET /api/v1/auth/context`와 HTTP E2E가 구현됨 | 웹 `auth.ts`와 `/api/web/auth/context`는 개발용 서명 cookie만 읽음 | GitOps HEAD에는 ticketing/MediKong 표기의 동명 `/auth` route가 있으나 현재 작업 트리에서는 비활성. 어느 쪽도 canonical `/api/v1/auth/**`를 공개하지 않으며 DropMong 동일성·실제 배포 미확인 | API 구현, 프론트 미연결 |
+| Auth | `auth-service`에 `GET /api/v1/auth/context`와 HTTP E2E가 구현됨 | 웹 `auth.ts`와 `/api/web/auth/context`는 개발용 서명 cookie만 읽음 | GitOps의 DropMong `/auth` route와 canonical `/api/v1/auth/**`의 일치 여부 및 실제 배포는 미확인 | API 구현, 프론트 미연결 |
 | Checkout snapshot·confirm | 웹 Route Handler와 보안 검사는 구현됨 | `checkout.ts`가 `DEV_MOCK_MODE=true`에서만 fixture 결과를 생성 | canonical Checkout 서비스·Ingress 미확정 | fixture |
 | Order | `order-service`에 `POST /orders`, `GET /orders/{orderId}`가 구현됨 | 웹은 `dev-order.*` 식별자와 fixture만 사용 | 확인한 GitOps에 `order-service` 선언 없음 | API 존재, 프론트 미연결 |
-| Payment | `payment-service`에 mock 승인·실패와 단건 조회 API가 구현됨 | 웹 호출 client 없음 | ticketing/MediKong 표기의 동명 route는 있으나 현재 DropMong checkout과의 동일성 미확인 | API 존재, 프론트 미연결 |
+| Payment | `payment-service`에 mock 승인·실패와 단건 조회 API가 구현됨 | 웹 호출 client 없음 | GitOps에 DropMong `/payments` route가 있으나 실제 배포는 미확인 | API 존재, 프론트 미연결 |
 | 배송 | 주문 완료 화면의 상태와 예상 배송일만 표시 | `getOrderResult` fixture | 소유 서비스·API·Ingress 미확인 | fixture, 소유 미확정 |
 | 쿠폰 | `coupon-service`에 구매자 보유 쿠폰 API가 구현됨 | Checkout 문구와 할인액은 fixture, 웹 client 없음 | DropMong 표기의 private-dev·`/coupons` 선언은 있으나 현재 `/api/v1/**` 계약과 경로가 달라 canonical API Ingress는 미연결, 실제 배포 미확인 | API 존재, 프론트 미연결 |
 | 포인트 | 서비스 inventory와 웹 client에 원장 API 없음 | Checkout 안내 문구와 금액만 fixture | 소유 서비스·Ingress 미확인 | 소유 미확정 |
 | 결제수단 | Checkout에 `MOCK_CARD`만 제공 | 실제 결제수단 조회 없음 | 소유 서비스·Ingress 미확인 | fixture, 소유 미확정 |
 | User | 사용자 생성·본인 프로필 API가 구현됨 | 웹 client 없음 | DropMong 표기의 private-dev와 `/api/v1/users`, `/api/v1/users/me` Ingress 선언 있음, 실제 동기화 미확인 | API 존재, 프론트 미연결 |
 | Interest | 관심·랭킹 API가 구현됨 | 웹 client 없음 | 확인한 GitOps에 `interest-service` 선언 없음 | API 존재, 프론트 미연결 |
-| Notification | 구매자 알림 API가 구현됨 | 웹 client 없음 | ticketing/MediKong 표기의 동명 route는 있으나 현재 DropMong checkout과의 동일성 미확인 | API 존재, 프론트 미연결 |
+| Notification | 구매자 알림 API가 구현됨 | 웹 client 없음 | GitOps에 DropMong `/notifications` route가 있으나 실제 배포는 미확인 | API 존재, 프론트 미연결 |
 
 `DEV_MOCK_MODE=false`에서는 준비되지 않은 Checkout 계약을 성공처럼 대체하지 않고 `WEB_CHECKOUT_CONTRACT_UNAVAILABLE`을 반환합니다. Catalog upstream 장애도 mock으로 바꾸지 않습니다.
 
