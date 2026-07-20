@@ -64,13 +64,18 @@ def observability_config_from_env(
     service_name: str,
     *,
     env: Mapping[str, str],
+    default_service_version: str | None = None,
+    default_service_environment: str | None = None,
 ) -> ObservabilityConfig:
     otlp_endpoint = _optional_env(env, "OTEL_EXPORTER_OTLP_ENDPOINT")
     otlp_traces_endpoint = _optional_env(env, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
     return ObservabilityConfig(
         service_name=service_name,
-        service_version=_optional_env(env, "SERVICE_VERSION"),
-        service_environment=_optional_env(env, "SERVICE_ENVIRONMENT"),
+        service_version=_optional_env(env, "SERVICE_VERSION")
+        or default_service_version,
+        service_environment=(
+            _optional_env(env, "SERVICE_ENVIRONMENT") or default_service_environment
+        ),
         otel_sdk_disabled=env.get("OTEL_SDK_DISABLED", "").lower() == "true",
         otel_traces_exporter=env.get("OTEL_TRACES_EXPORTER", "otlp"),
         otlp_trace_exporter_endpoint=otlp_traces_endpoint or otlp_endpoint,
@@ -102,7 +107,9 @@ def _callsite_module_prefixes_from_env(env: Mapping[str, str]) -> tuple[str, ...
     return prefixes or DEFAULT_CALLSITE_MODULE_PREFIXES
 
 
-def _profiling_config_from_env(service_name: str, env: Mapping[str, str]) -> ProfilingConfig:
+def _profiling_config_from_env(
+    service_name: str, env: Mapping[str, str]
+) -> ProfilingConfig:
     tags = _profiling_tags_from_env(
         env,
         service_name=service_name,
@@ -112,9 +119,14 @@ def _profiling_config_from_env(service_name: str, env: Mapping[str, str]) -> Pro
     return ProfilingConfig(
         enabled=_bool_env(env, "PYROSCOPE_ENABLED", default=False),
         server_address=_optional_env(env, "PYROSCOPE_SERVER_ADDRESS"),
-        application_name=_optional_env(env, "PYROSCOPE_APPLICATION_NAME") or service_name,
-        sample_rate=_positive_int_env(env, "PYROSCOPE_SAMPLE_RATE", default=DEFAULT_PYROSCOPE_SAMPLE_RATE),
-        span_profiles_enabled=_bool_env(env, "PYROSCOPE_SPAN_PROFILES_ENABLED", default=False),
+        application_name=_optional_env(env, "PYROSCOPE_APPLICATION_NAME")
+        or service_name,
+        sample_rate=_positive_int_env(
+            env, "PYROSCOPE_SAMPLE_RATE", default=DEFAULT_PYROSCOPE_SAMPLE_RATE
+        ),
+        span_profiles_enabled=_bool_env(
+            env, "PYROSCOPE_SPAN_PROFILES_ENABLED", default=False
+        ),
         oncpu=_bool_env(env, "PYROSCOPE_ONCPU", default=True),
         gil_only=_bool_env(env, "PYROSCOPE_GIL_ONLY", default=True),
         tags=tags,
@@ -154,15 +166,23 @@ def _parse_tag_env(value: str | None) -> dict[str, str]:
         key = key.strip()
         tag_value = tag_value.strip()
         if not separator or not key or not tag_value:
-            raise ValueError("PYROSCOPE_TAGS entries must use non-empty key=value pairs")
+            raise ValueError(
+                "PYROSCOPE_TAGS entries must use non-empty key=value pairs"
+            )
         tags[key] = tag_value
     return tags
 
 
 def _validate_pyroscope_tag_key(key: str) -> str:
     normalized = key.strip().lower()
-    if normalized in PYROSCOPE_FORBIDDEN_TAG_KEYS or normalized.endswith("_id") and normalized != "run_id":
-        raise ValueError(f"PYROSCOPE_TAGS contains forbidden high-cardinality tag key: {key}")
+    if (
+        normalized in PYROSCOPE_FORBIDDEN_TAG_KEYS
+        or normalized.endswith("_id")
+        and normalized != "run_id"
+    ):
+        raise ValueError(
+            f"PYROSCOPE_TAGS contains forbidden high-cardinality tag key: {key}"
+        )
     if normalized not in PYROSCOPE_ALLOWED_TAG_KEYS:
         allowed = ", ".join(PYROSCOPE_ALLOWED_TAG_KEYS)
         raise ValueError(f"PYROSCOPE_TAGS allows only low-cardinality keys: {allowed}")

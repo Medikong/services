@@ -5,12 +5,16 @@ from dataclasses import dataclass
 
 import anyio
 from fastapi import FastAPI
+from observability import (
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_pool_events,
+)
 from sqlalchemy import text
+import sqlalchemy.ext.asyncio as sqlalchemy_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from app.kafka_workers import (
@@ -59,7 +63,8 @@ def resources_from_env(metrics: PaymentMetrics | None = None) -> AppResources:
             metrics=metrics,
         )
 
-    engine = create_async_engine(
+    instrument_sqlalchemy()
+    engine = sqlalchemy_asyncio.create_async_engine(
         _async_database_url(database_url),
         pool_pre_ping=True,
         pool_size=5,
@@ -68,6 +73,7 @@ def resources_from_env(metrics: PaymentMetrics | None = None) -> AppResources:
         pool_recycle=1800,
         connect_args={"timeout": 3.0},
     )
+    instrument_sqlalchemy_pool_events(engine.sync_engine)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     refund_repository = PostgresRefundRepository(
         session_factory,

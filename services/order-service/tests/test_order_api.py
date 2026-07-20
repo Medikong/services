@@ -43,11 +43,27 @@ def test_metrics_exposes_order_service_readiness_metric() -> None:
     client = TestClient(create_app(OrderStore()))
 
     # When
+    client.get("/healthz")
     response = client.get("/metrics")
 
     # Then
     assert response.status_code == 200
-    assert 'service_ready{service_name="order-service"' in response.text
+    assert 'service_name="order-service"' in response.text
+    assert _service_ready_value(response.text) == 0.0
+    assert "# TYPE http_server_request_duration_seconds histogram" in response.text
+    assert 'http_route="/healthz"' in response.text
+    assert 'http_route_kind="probe"' in response.text
+    assert 'http_response_status_code="200"' in response.text
+
+    assert client.get("/readyz").status_code == 200
+    assert _service_ready_value(client.get("/metrics").text) == 1.0
+
+
+def _service_ready_value(metrics_text: str) -> float:
+    line = next(
+        line for line in metrics_text.splitlines() if line.startswith("service_ready{")
+    )
+    return float(line.rsplit(" ", maxsplit=1)[1])
 
 
 def test_resources_from_env_defers_kafka_clients_until_lifespan(
@@ -245,6 +261,4 @@ def test_create_order_ignores_untrusted_owner_role_header() -> None:
 
     # Then
     assert response.status_code == 201
-    assert response.json()["data"]["userId"] == (
-        "00000000-0000-4000-8000-000000000003"
-    )
+    assert response.json()["data"]["userId"] == ("00000000-0000-4000-8000-000000000003")

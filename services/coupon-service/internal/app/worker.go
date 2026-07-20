@@ -45,7 +45,7 @@ func newWorker(ctx context.Context, cfg config.WorkerConfig, external externalPo
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	metrics, err := observability.NewMetrics(cfg.Service.Name + "-worker")
+	metrics, err := observability.NewMetrics(cfg.Service.Name+"-worker", cfg.Service.Version, cfg.Service.Environment)
 	if err != nil {
 		return nil, err
 	}

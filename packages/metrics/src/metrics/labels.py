@@ -16,8 +16,8 @@ FORBIDDEN_HIGH_CARDINALITY_LABELS = frozenset(
         "user_id",
         "order_id",
         "payment_id",
-        "reservation_id",
-        "ticket_id",
+        "drop_id",
+        "coupon_id",
         "path",
         "raw_path",
     }
@@ -84,9 +84,16 @@ class ServiceIdentity:
 
 
 def assert_safe_metric_label_names(label_names: Iterable[str]) -> None:
-    forbidden = sorted(FORBIDDEN_HIGH_CARDINALITY_LABELS.intersection(label_names))
+    forbidden = sorted(
+        label_name
+        for label_name in label_names
+        if label_name in FORBIDDEN_HIGH_CARDINALITY_LABELS
+        or label_name.endswith("_id")
+    )
     if forbidden:
-        raise ValueError(f"high-cardinality metric labels are not allowed: {', '.join(forbidden)}")
+        raise ValueError(
+            f"high-cardinality metric labels are not allowed: {', '.join(forbidden)}"
+        )
 
 
 def _require_label_value(name: str, value: str | None) -> None:

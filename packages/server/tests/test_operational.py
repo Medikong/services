@@ -61,7 +61,9 @@ def test_readyz_surfaces_unexpected_check_exception_as_failed_check() -> None:
         raise RuntimeError("boom")
 
     app = FastAPI()
-    register_test_operational_handlers(app, readiness_checks={"database": failing_check})
+    register_test_operational_handlers(
+        app, readiness_checks={"database": failing_check}
+    )
     client = TestClient(app)
 
     response = client.get("/readyz")
@@ -82,6 +84,7 @@ def test_metrics_returns_prometheus_text_and_http_metrics() -> None:
     assert response.headers["content-type"].startswith("text/plain; version=0.0.4")
     assert "http_server_request_duration_seconds" in response.text
     assert "http_server_active_requests" in response.text
+    assert 'http_route_kind="probe"' in response.text
     assert "service_ready" in response.text
     assert 'http_route="/healthz"' in response.text
     assert 'http_request_method="GET"' in response.text
@@ -189,13 +192,28 @@ def test_http_metrics_do_not_expose_high_cardinality_labels() -> None:
         "span_id",
         "correlation_id",
         "user_id",
+        "order_id",
         "payment_id",
-        "reservation_id",
-        "ticket_id",
+        "drop_id",
+        "coupon_id",
         "path",
     )
     for label in forbidden_labels:
         assert f"{label}=" not in response.text
+
+
+def test_http_metrics_bound_arbitrary_request_methods() -> None:
+    app = FastAPI()
+    register_test_operational_handlers(app, readiness_checks={})
+    client = TestClient(app)
+
+    assert client.request("X-CARDINALITY-1", "/healthz").status_code == 405
+    assert client.request("X-CARDINALITY-2", "/healthz").status_code == 405
+
+    metrics = client.get("/metrics").text
+    assert 'http_request_method="OTHER"' in metrics
+    assert "X-CARDINALITY-1" not in metrics
+    assert "X-CARDINALITY-2" not in metrics
 
 
 def test_operational_handlers_require_service_identity_values() -> None:
@@ -218,7 +236,7 @@ def test_operational_handlers_require_service_identity_values() -> None:
 def test_metrics_configurator_can_register_service_specific_metrics() -> None:
     def configure_metrics(registry: CollectorRegistry) -> None:
         business_gauge = Gauge(
-            "ticketing_business_value",
+            "dropmong_business_value",
             "Service-specific business metric owned by the service.",
             registry=registry,
         )
@@ -235,7 +253,7 @@ def test_metrics_configurator_can_register_service_specific_metrics() -> None:
     response = client.get("/metrics")
 
     assert response.status_code == 200
-    assert "ticketing_business_value 7.0" in response.text
+    assert "dropmong_business_value 7.0" in response.text
 
 
 def test_operational_handlers_can_preserve_legacy_ready_status_without_checks() -> None:
@@ -275,7 +293,9 @@ def test_operational_handlers_can_include_timestamp_for_existing_contracts() -> 
 
 
 def test_required_settings_readiness_check_reports_missing_values() -> None:
-    check = required_settings_readiness_check({"service_name": "test-service", "database_url": ""})
+    check = required_settings_readiness_check(
+        {"service_name": "test-service", "database_url": ""}
+    )
 
     assert check() == "failed: missing required setting: database_url"
 

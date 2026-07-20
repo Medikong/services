@@ -36,7 +36,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	metrics, err := observability.NewMetrics(cfg.Service.Name)
+	metrics, err := observability.NewMetrics(cfg.Service.Name, cfg.Service.Version, cfg.Service.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,11 @@ func NewServer(ctx context.Context, cfg config.ServerConfig) (*Server, error) {
 		return nil, err
 	}
 	router, err := userhttp.NewRouter(userhttp.RouterConfig{
-		ServiceName: cfg.Service.Name, RequestTimeout: cfg.HTTP.RequestTimeout,
+		ServiceName:        cfg.Service.Name,
+		ServiceVersion:     cfg.Service.Version,
+		ServiceEnvironment: cfg.Service.Environment,
+		RequestTimeout:     cfg.HTTP.RequestTimeout,
+		Metrics:            metrics.HTTP(),
 	}, userHandler, proofHandler, health)
 	if err != nil {
 		cleanup()

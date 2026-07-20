@@ -15,25 +15,22 @@ func Metrics(config Config) Middleware {
 			}
 			startedAt := time.Now()
 			recorder := newResponseRecorder(w)
-			activeLabels := map[string]string{
-				"service_name":        config.ServiceName,
-				"http_request_method": r.Method,
-			}
-			config.Metrics.Add("http_server_active_requests", activeLabels, 1)
+			activeRoute := routePattern(config.RoutePattern, r)
+			activeRouteKind := routeKind(activeRoute)
+			config.Metrics.Begin(r.Method, activeRoute, activeRouteKind)
 			defer func() {
 				route := routePattern(config.RoutePattern, r)
 				routeKind := routeKind(route)
 				statusCode := fmt.Sprintf("%d", recorder.StatusCode())
-				requestLabels := map[string]string{
-					"service_name":              config.ServiceName,
-					"http_request_method":       r.Method,
-					"http_route":                route,
-					"http_route_kind":           routeKind,
-					"http_response_status_code": statusCode,
-				}
-				config.Metrics.Add("http_server_active_requests", activeLabels, -1)
-				config.Metrics.Add("http_server_request_duration_seconds", requestLabels, time.Since(startedAt).Seconds())
-				config.Metrics.Inc("http_server_requests_total", requestLabels)
+				config.Metrics.End(
+					r.Method,
+					activeRoute,
+					activeRouteKind,
+					route,
+					routeKind,
+					statusCode,
+					time.Since(startedAt),
+				)
 			}()
 			next.ServeHTTP(recorder.Writer(), r)
 		})

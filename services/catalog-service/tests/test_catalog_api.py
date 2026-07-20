@@ -96,6 +96,26 @@ def test_readyz_returns_ready_catalog_check() -> None:
     assert response.json()["checks"] == {"catalog": "ok"}
 
 
+def test_metrics_exposes_common_http_histogram_contract() -> None:
+    client = _client()
+    client.get("/healthz")
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "# TYPE http_server_request_duration_seconds histogram" in response.text
+    assert 'service_name="catalog-service"' in response.text
+    assert 'http_route="/healthz"' in response.text
+    assert 'http_route_kind="probe"' in response.text
+    assert 'http_response_status_code="200"' in response.text
+    assert _service_ready_value(response.text) == 0.0
+    assert 'service_version="0.1.0"' in response.text
+    assert 'service_environment="local"' in response.text
+
+    assert client.get("/readyz").status_code == 200
+    assert _service_ready_value(client.get("/metrics").text) == 1.0
+
+
 def test_list_drops_returns_open_drop_with_product() -> None:
     client = _client()
 
@@ -149,6 +169,14 @@ def test_readyz_fails_when_catalog_migration_is_missing() -> None:
 
     assert response.status_code == 503
     assert response.json()["checks"] == {"catalog": "migration_required"}
+    assert _service_ready_value(client.get("/metrics").text) == 0.0
+
+
+def _service_ready_value(metrics_text: str) -> float:
+    line = next(
+        line for line in metrics_text.splitlines() if line.startswith("service_ready{")
+    )
+    return float(line.rsplit(" ", maxsplit=1)[1])
 
 
 def test_readyz_returns_bounded_503_when_database_connection_is_refused(

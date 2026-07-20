@@ -37,12 +37,6 @@ class PaymentMetrics:
         return "".join(
             [
                 _metric_header(
-                    "service_ready",
-                    "Service readiness state. Ready is 1, not ready is 0.",
-                    "gauge",
-                ),
-                _metric_sample("service_ready", self._labels, 1),
-                _metric_header(
                     "payments_approved_total",
                     "Payments approved successfully.",
                     "counter",

@@ -11,7 +11,11 @@ from starlette.responses import Response
 from middleware import get_current_client_action_id, is_safe_request_id
 from middleware import get_current_request_id as get_runtime_request_id
 from observability.config import ObservabilityConfig
-from observability.tracing import current_trace_context, set_current_span_attributes, trace_recorder
+from observability.tracing import (
+    current_trace_context,
+    set_current_span_attributes,
+    trace_recorder,
+)
 
 
 REQUEST_ID_HEADER = "X-Request-Id"
@@ -27,7 +31,9 @@ def get_current_request_id() -> str | None:
     return request_id_context.get()
 
 
-def instrument_fastapi_app(app: FastAPI, config: ObservabilityConfig | None = None) -> None:
+def instrument_fastapi_app(
+    app: FastAPI, config: ObservabilityConfig | None = None
+) -> None:
     # 들어오는 HTTP 요청 span은 FastAPI 계측이 자동으로 만든다.
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
@@ -88,7 +94,13 @@ def create_request_log_middleware(config: ObservabilityConfig) -> RequestMiddlew
             duration_ms = int(duration_seconds * 1000)
             route_kind = _route_kind(route)
             severity_text = _request_severity(status_code, duration_ms)
-            logger.info(
+            if severity_text == "ERROR":
+                write_log = logger.error
+            elif severity_text == "WARN":
+                write_log = logger.warning
+            else:
+                write_log = logger.info
+            write_log(
                 "http.request.completed",
                 **{
                     "service.name": config.service_name,
@@ -135,13 +147,15 @@ def _valid_request_id(request_id: str) -> bool:
 def _route_template(request: Request) -> str:
     route = request.scope.get("route")
     path = getattr(route, "path", None)
-    return str(path or request.url.path)
+    return str(path) if path else "unmatched"
 
 
 def _route_kind(route: str) -> str:
+    if route == "unmatched":
+        return "unmatched"
     if route in PROBE_ROUTES:
         return "probe"
-    if route.startswith("/debug") or route.startswith("/_debug"):
+    if route.startswith(("/debug", "/_debug", "/__debug")):
         return "debug"
     return "api"
 

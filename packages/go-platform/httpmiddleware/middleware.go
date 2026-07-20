@@ -10,9 +10,11 @@ import (
 type Middleware func(http.Handler) http.Handler
 
 type Config struct {
-	ServiceName  string
-	Metrics      *metrics.Registry
-	RoutePattern func(*http.Request) string
+	ServiceName        string
+	ServiceVersion     string
+	ServiceEnvironment string
+	Metrics            *metrics.HTTP
+	RoutePattern       func(*http.Request) string
 }
 
 func Stack(config Config, next http.Handler) http.Handler {

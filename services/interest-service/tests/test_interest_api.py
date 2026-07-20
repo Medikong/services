@@ -33,6 +33,31 @@ def test_readyz_returns_ready_interest_checks() -> None:
     assert response.json()["checks"] == {"interests": "ok"}
 
 
+def test_metrics_exposes_common_http_histogram_contract() -> None:
+    client = TestClient(create_app(InterestStore()))
+    client.get("/healthz")
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "# TYPE http_server_request_duration_seconds histogram" in response.text
+    assert 'service_name="interest-service"' in response.text
+    assert 'http_route="/healthz"' in response.text
+    assert 'http_route_kind="probe"' in response.text
+    assert 'http_response_status_code="200"' in response.text
+    assert _service_ready_value(response.text) == 0.0
+
+    assert client.get("/readyz").status_code == 200
+    assert _service_ready_value(client.get("/metrics").text) == 1.0
+
+
+def _service_ready_value(metrics_text: str) -> float:
+    line = next(
+        line for line in metrics_text.splitlines() if line.startswith("service_ready{")
+    )
+    return float(line.rsplit(" ", maxsplit=1)[1])
+
+
 def test_add_interest_without_auth_headers_is_rejected() -> None:
     # Given
     client = TestClient(create_app(InterestStore()))
@@ -88,7 +113,9 @@ def test_add_then_remove_interest_excludes_it_from_list() -> None:
     client.put(f"/v1/users/me/interests/{DROP_ID}", headers=AUTH_HEADERS)
 
     # When
-    remove_response = client.delete(f"/v1/users/me/interests/{DROP_ID}", headers=AUTH_HEADERS)
+    remove_response = client.delete(
+        f"/v1/users/me/interests/{DROP_ID}", headers=AUTH_HEADERS
+    )
     list_response = client.get("/v1/users/me/interests", headers=AUTH_HEADERS)
 
     # Then

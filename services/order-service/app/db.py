@@ -5,11 +5,15 @@ from dataclasses import dataclass, field
 
 import anyio
 from fastapi import FastAPI
+from observability import (
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_pool_events,
+)
+import sqlalchemy.ext.asyncio as sqlalchemy_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from app.messaging import (
@@ -55,7 +59,8 @@ def resources_from_env(metrics: OrderMetrics | None = None) -> AppResources:
             metrics=order_metrics,
         )
 
-    engine = create_async_engine(
+    instrument_sqlalchemy()
+    engine = sqlalchemy_asyncio.create_async_engine(
         _async_database_url(database_url),
         pool_pre_ping=True,
         pool_size=5,
@@ -63,6 +68,7 @@ def resources_from_env(metrics: OrderMetrics | None = None) -> AppResources:
         pool_timeout=5.0,
         pool_recycle=1800,
     )
+    instrument_sqlalchemy_pool_events(engine.sync_engine)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     payment_policy = order_payment_policy_from_env()
     repository = PostgresOrderRepository(

@@ -60,7 +60,7 @@ type Options struct {
 	AllowedOrigins []string
 }
 
-func NewRouter(backend Backend, options Options) (http.Handler, error) {
+func NewRouter(backend Backend, options Options) (*chi.Mux, error) {
 	if backend == nil {
 		return nil, oops.New("coupon HTTP backend is required")
 	}

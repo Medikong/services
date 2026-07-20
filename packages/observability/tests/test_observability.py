@@ -7,7 +7,7 @@ import types
 from uuid import UUID, uuid5
 
 from errors import in_domain
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 import pytest
 from middleware import (
@@ -672,6 +672,29 @@ def test_instrument_sqlalchemy_engine_registers_sqlalchemy_instrumentation(monke
     assert instrumented_engines == [engine]
 
 
+def test_instrument_sqlalchemy_registers_global_wrapper_once(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class FakeSQLAlchemyInstrumentor:
+        def instrument(self, **kwargs: object) -> None:
+            calls.append(kwargs)
+
+    fake_sqlalchemy_instrumentation = types.SimpleNamespace(
+        SQLAlchemyInstrumentor=FakeSQLAlchemyInstrumentor
+    )
+    monkeypatch.setattr(database_module, "_sqlalchemy_instrumented", False)
+    monkeypatch.setitem(
+        sys.modules,
+        "opentelemetry.instrumentation.sqlalchemy",
+        fake_sqlalchemy_instrumentation,
+    )
+
+    database_module.instrument_sqlalchemy()
+    database_module.instrument_sqlalchemy()
+
+    assert calls == [{}]
+
+
 def test_instrument_sqlalchemy_pool_events_records_checkout_and_checkin(monkeypatch) -> None:
     recorder = RecordingTraceRecorder()
     listeners: list[tuple[object, str, object]] = []
@@ -888,9 +911,37 @@ def test_request_observability_logs_failed_request_fields(caplog) -> None:
     assert log["span_id"]
     assert log["service.name"] == "test-service"
     assert log["severity"] == "WARN"
+    assert log["http.route"] == "unmatched"
+    assert log["http.route.kind"] == "unmatched"
+    assert "/missing" not in json.dumps(log)
     assert log["http.status_code"] == 404
     assert log["log.policy"] == "keep"
     assert isinstance(log["duration_ms"], int)
+    assert _request_log_record(caplog.records).levelno == logging.WARNING
+
+
+def test_request_observability_marks_double_underscore_debug_route(caplog) -> None:
+    app = _observed_app(ObservabilityConfig(service_name="test-service"))
+
+    @app.get("/__debug/status/{status_code}")
+    def debug_status(status_code: int) -> Response:
+        return Response(status_code=status_code)
+
+    caplog.set_level(logging.INFO)
+    client = TestClient(app)
+
+    response = client.get(
+        "/__debug/status/500",
+        headers={"X-Request-Id": "77777777-7777-4777-8777-777777777777"},
+    )
+
+    assert response.status_code == 500
+    log = _request_log(caplog.records)
+    assert log["http.route"] == "/__debug/status/{status_code}"
+    assert log["http.route.kind"] == "debug"
+    assert log["severity_text"] == "ERROR"
+    assert log["log.policy"] == "keep"
+    assert _request_log_record(caplog.records).levelno == logging.ERROR
 
 
 def test_request_observability_marks_probe_routes_for_collector_policy(caplog) -> None:
@@ -946,6 +997,7 @@ def test_request_observability_marks_slow_requests_for_collector_policy(caplog, 
     assert log["duration_ms"] == 1000
     assert log["severity"] == "WARN"
     assert log["log.policy"] == "keep"
+    assert _request_log_record(caplog.records).levelno == logging.WARNING
 
 
 def test_error_context_reads_errors_package_context() -> None:
@@ -1030,11 +1082,15 @@ def _observed_app(config: ObservabilityConfig) -> FastAPI:
 
 
 def _request_log(records: list[logging.LogRecord]) -> dict[str, object]:
+    return json.loads(_request_log_record(records).message)
+
+
+def _request_log_record(records: list[logging.LogRecord]) -> logging.LogRecord:
     for record in reversed(records):
         if record.name == "test-service" and record.message.startswith("{"):
             payload = json.loads(record.message)
             if payload.get("event") == "http.request.completed":
-                return payload
+                return record
     raise AssertionError("request JSON log was not emitted")
 
 

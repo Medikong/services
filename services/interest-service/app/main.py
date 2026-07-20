@@ -13,6 +13,13 @@ from observability import (
     observability_config_from_env,
     request_id_middleware_options,
 )
+from prometheus_client import CollectorRegistry
+from server import (
+    ServiceReadiness,
+    register_http_metrics,
+    register_service_readiness,
+    render_metrics,
+)
 
 from app.counter_repository import DropInterestCounterRepository
 from app.counter_store import DropInterestCounterStore
@@ -73,7 +80,8 @@ def create_app(
             repository=repository,
             counter_repository=counter_repository or DropInterestCounterStore(),
             view_repository=view_repository or view_store,
-            view_ranking_repository=view_ranking_repository or DropViewRankingStore(view_store),
+            view_ranking_repository=view_ranking_repository
+            or DropViewRankingStore(view_store),
             event_publisher=event_publisher or NoopInterestEventPublisher(),
         )
     else:
@@ -84,7 +92,7 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
-    _configure_observability(app)
+    common_metrics, service_readiness = _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -92,6 +100,7 @@ def create_app(
 
     @app.get("/readyz", response_model=ReadinessResponse)
     def readyz() -> ReadinessResponse:
+        service_readiness.set(True)
         return ReadinessResponse(
             status="ready",
             service=SERVICE_NAME,
@@ -101,13 +110,7 @@ def create_app(
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return (
-            "# HELP service_ready Service readiness state. Ready is 1, not ready is 0.\n"
-            "# TYPE service_ready gauge\n"
-            f'service_ready{{service_name="{SERVICE_NAME}",'
-            f'service_version="{SERVICE_VERSION}",'
-            f'service_environment="{SERVICE_ENVIRONMENT}"}} 1\n'
-        )
+        return render_metrics(common_metrics)
 
     @app.put("/v1/users/me/interests/{dropId}", response_model=InterestResponse)
     async def add_interest(
@@ -127,7 +130,9 @@ def create_app(
             # 바로 반영한다 — Interest와 트랜잭션은 분리돼 있어(다른 테이블) 정합성 레벨 분리
             # 원칙(RULE.A.07-03)은 유지되고, 이 샌드박스엔 실제 소비 가능한 브로커가 없다.
             await resources.counter_repository.increment(drop_id)
-            await resources.event_publisher.publish_interest_added(user.user_id, drop_id)
+            await resources.event_publisher.publish_interest_added(
+                user.user_id, drop_id
+            )
         return InterestResponse(data=_interest_from_result(result))
 
     @app.delete(
@@ -148,7 +153,9 @@ def create_app(
         )
         if isinstance(result, InterestChanged):
             await resources.counter_repository.decrement(drop_id)
-            await resources.event_publisher.publish_interest_removed(user.user_id, drop_id)
+            await resources.event_publisher.publish_interest_removed(
+                user.user_id, drop_id
+            )
         _interest_from_result(result)
 
     @app.get("/v1/users/me/interests", response_model=InterestListResponse)
@@ -162,7 +169,10 @@ def create_app(
             limit=limit,
             cursor=cursor,
         )
-        items = [InterestListItem(dropId=interest.dropId, addedAt=interest.updatedAt) for interest in interests]
+        items = [
+            InterestListItem(dropId=interest.dropId, addedAt=interest.updatedAt)
+            for interest in interests
+        ]
         next_cursor = items[-1].dropId if has_next and items else None
         return InterestListResponse(
             data=tuple(items),
@@ -199,7 +209,11 @@ def create_app(
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None),
     ) -> TrendingRankingListResponse:
-        items, has_next, bucket_start = await resources.view_ranking_repository.get_latest_bucket(
+        (
+            items,
+            has_next,
+            bucket_start,
+        ) = await resources.view_ranking_repository.get_latest_bucket(
             limit=limit,
             cursor=cursor,
         )
@@ -220,18 +234,40 @@ def create_app(
     ) -> DropInterestStatsResponse:
         stats = await resources.counter_repository.get(DropId(dropId))
         if stats is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="drop not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="drop not found"
+            )
         return DropInterestStatsResponse(data=stats)
 
     return app
 
 
-def _configure_observability(app: FastAPI) -> None:
-    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+def _configure_observability(
+    app: FastAPI,
+) -> tuple[CollectorRegistry, ServiceReadiness]:
+    config = observability_config_from_env(
+        SERVICE_NAME,
+        env=os.environ,
+        default_service_version=SERVICE_VERSION,
+        default_service_environment=SERVICE_ENVIRONMENT,
+    )
     configure_process_observability(config)
+    metrics_registry = register_http_metrics(
+        app,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
+    readiness = register_service_readiness(
+        metrics_registry,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
     app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
     app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
+    return metrics_registry, readiness
 
 
 def authenticated_user(

@@ -126,6 +126,14 @@ func With(args ...any) *slog.Logger {
 	return Default().With(args...)
 }
 
+func TraceIDs(ctx context.Context) (string, string) {
+	span := trace.SpanContextFromContext(ctx)
+	if !span.IsValid() {
+		return "", ""
+	}
+	return span.TraceID().String(), span.SpanID().String()
+}
+
 func Err(err error) slog.Attr {
 	if err == nil {
 		return slog.Any("error", nil)
@@ -270,10 +278,23 @@ type traceHandler struct {
 func (h traceHandler) Handle(ctx context.Context, record slog.Record) error {
 	span := trace.SpanContextFromContext(ctx)
 	if span.IsValid() {
-		record.AddAttrs(
-			slog.String("trace_id", span.TraceID().String()),
-			slog.String("span_id", span.SpanID().String()),
-		)
+		hasTraceID := false
+		hasSpanID := false
+		record.Attrs(func(attr slog.Attr) bool {
+			switch attr.Key {
+			case "trace_id":
+				hasTraceID = true
+			case "span_id":
+				hasSpanID = true
+			}
+			return !(hasTraceID && hasSpanID)
+		})
+		if !hasTraceID {
+			record.AddAttrs(slog.String("trace_id", span.TraceID().String()))
+		}
+		if !hasSpanID {
+			record.AddAttrs(slog.String("span_id", span.SpanID().String()))
+		}
 	}
 	return h.Handler.Handle(ctx, record)
 }

@@ -3,6 +3,7 @@ package httpmiddleware
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,9 @@ func routeKind(route string) string {
 	}
 	if route == "unmatched" {
 		return "unmatched"
+	}
+	if strings.HasPrefix(route, "/debug") || strings.HasPrefix(route, "/_debug") || strings.HasPrefix(route, "/__debug") {
+		return "debug"
 	}
 	return "api"
 }

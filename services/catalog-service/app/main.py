@@ -15,6 +15,13 @@ from observability import (
     instrument_fastapi_app,
     observability_config_from_env,
 )
+from prometheus_client import CollectorRegistry
+from server import (
+    ServiceReadiness,
+    register_http_metrics,
+    register_service_readiness,
+    render_metrics,
+)
 
 from app.catalog import CatalogReadiness, DropDetail
 from app.db import Database, create_database, lifespan_for
@@ -33,8 +40,8 @@ from app.schemas import (
 from app.store import CatalogStore
 
 SERVICE_NAME: Final = "catalog-service"
-SERVICE_VERSION: Final = "0.1.0"
-SERVICE_ENVIRONMENT: Final = "local"
+SERVICE_VERSION: Final = os.getenv("SERVICE_VERSION", "0.1.0")
+SERVICE_ENVIRONMENT: Final = os.getenv("SERVICE_ENVIRONMENT", "local")
 
 
 def create_app(repository: CatalogRepository | None = None) -> FastAPI:
@@ -59,7 +66,7 @@ def create_app(repository: CatalogRepository | None = None) -> FastAPI:
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(database, consumer_factory),
     )
-    _configure_observability(app)
+    common_metrics, service_readiness = _configure_observability(app)
 
     @app.get("/healthz")
     async def healthz() -> HealthResponse:
@@ -67,17 +74,13 @@ def create_app(repository: CatalogRepository | None = None) -> FastAPI:
 
     @app.get("/readyz")
     async def readyz(response: Response) -> ReadinessResponse:
-        return _readiness_response(await store.readiness(), response)
+        readiness = _readiness_response(await store.readiness(), response)
+        service_readiness.set(response.status_code == status.HTTP_200_OK)
+        return readiness
 
     @app.get("/metrics", response_class=PlainTextResponse)
     async def metrics() -> str:
-        return (
-            "# HELP service_ready Service readiness state. "
-            "Ready is 1, not ready is 0.\n"
-            "# TYPE service_ready gauge\n"
-            'service_ready{service_name="catalog-service",'
-            'service_version="0.1.0",service_environment="local"} 1\n'
-        )
+        return render_metrics(common_metrics)
 
     @app.get("/drops")
     async def list_drops(
@@ -107,9 +110,28 @@ def create_app(repository: CatalogRepository | None = None) -> FastAPI:
     return app
 
 
-def _configure_observability(app: FastAPI) -> None:
-    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+def _configure_observability(
+    app: FastAPI,
+) -> tuple[CollectorRegistry, ServiceReadiness]:
+    config = observability_config_from_env(
+        SERVICE_NAME,
+        env=os.environ,
+        default_service_version=SERVICE_VERSION,
+        default_service_environment=SERVICE_ENVIRONMENT,
+    )
     configure_process_observability(config)
+    metrics_registry = register_http_metrics(
+        app,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
+    readiness = register_service_readiness(
+        metrics_registry,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
     app.add_middleware(
         RequestIdMiddleware,
         header_name=REQUEST_ID_HEADER,
@@ -118,6 +140,7 @@ def _configure_observability(app: FastAPI) -> None:
     )
     _ = app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
+    return metrics_registry, readiness
 
 
 def _readiness_response(

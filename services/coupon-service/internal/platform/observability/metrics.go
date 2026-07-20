@@ -12,6 +12,7 @@ import (
 	otelprometheus "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 
+	platformmetrics "github.com/Medikong/services/packages/go-platform/metrics"
 	platformtelemetry "github.com/Medikong/services/packages/go-platform/telemetry"
 )
 
@@ -25,10 +26,11 @@ type Metrics struct {
 	redisGateTotal  *prometheus.CounterVec
 	dbFinalizeTotal *prometheus.CounterVec
 	ready           prometheus.Gauge
+	http            *platformmetrics.HTTP
 	meterProvider   *sdkmetric.MeterProvider
 }
 
-func NewMetrics(service string) (*Metrics, error) {
+func NewMetrics(service, version, environment string) (*Metrics, error) {
 	metrics := &Metrics{
 		service:  service,
 		registry: prometheus.NewRegistry(),
@@ -57,9 +59,13 @@ func NewMetrics(service string) (*Metrics, error) {
 			Help: "Coupon PostgreSQL finalization outcomes after admission.",
 		}, []string{"service_name", "result"}),
 		ready: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:        "service_ready",
-			Help:        "Service readiness state.",
-			ConstLabels: prometheus.Labels{"service_name": service},
+			Name: "service_ready",
+			Help: "Service readiness state.",
+			ConstLabels: prometheus.Labels{
+				"service_name":        service,
+				"service_version":     version,
+				"service_environment": environment,
+			},
 		}),
 	}
 	if err := metrics.registry.Register(collectors.NewGoCollector()); err != nil {
@@ -81,6 +87,13 @@ func NewMetrics(service string) (*Metrics, error) {
 			return nil, registerError(name, err)
 		}
 	}
+	httpMetrics, err := platformmetrics.NewHTTP(metrics.registry, platformmetrics.ServiceIdentity{
+		Name: service, Version: version, Environment: environment,
+	})
+	if err != nil {
+		return nil, registerError("http", err)
+	}
+	metrics.http = httpMetrics
 	exporter, err := otelprometheus.New(otelprometheus.WithRegisterer(metrics.registry))
 	if err != nil {
 		return nil, registerError("opentelemetry", err)
@@ -96,6 +109,10 @@ func NewMetrics(service string) (*Metrics, error) {
 	otel.SetMeterProvider(metrics.meterProvider)
 	metrics.ready.Set(0)
 	return metrics, nil
+}
+
+func (m *Metrics) HTTP() *platformmetrics.HTTP {
+	return m.http
 }
 
 func (m *Metrics) Handler() http.Handler {

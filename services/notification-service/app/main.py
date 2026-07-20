@@ -13,6 +13,13 @@ from observability import (
     observability_config_from_env,
     request_id_middleware_options,
 )
+from prometheus_client import CollectorRegistry
+from server import (
+    ServiceReadiness,
+    register_http_metrics,
+    register_service_readiness,
+    render_metrics,
+)
 
 from app.db import AppResources, lifespan_for, resources_from_env
 from app.metrics import NotificationMetrics
@@ -55,7 +62,7 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
-    _configure_observability(app)
+    common_metrics, service_readiness = _configure_observability(app)
 
     @app.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -66,6 +73,7 @@ def create_app(
         repository_ready = await resources.repository.is_ready()
         if not repository_ready:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        service_readiness.set(repository_ready)
         return ReadinessResponse(
             status="ready" if repository_ready else "not_ready",
             service=SERVICE_NAME,
@@ -78,7 +86,7 @@ def create_app(
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return resources.notification_metrics.render()
+        return render_metrics(common_metrics) + resources.notification_metrics.render()
 
     @app.get("/notifications", response_model=NotificationListResponse)
     async def list_notifications(
@@ -101,12 +109,32 @@ def create_app(
     return app
 
 
-def _configure_observability(app: FastAPI) -> None:
-    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+def _configure_observability(
+    app: FastAPI,
+) -> tuple[CollectorRegistry, ServiceReadiness]:
+    config = observability_config_from_env(
+        SERVICE_NAME,
+        env=os.environ,
+        default_service_version=SERVICE_VERSION,
+        default_service_environment=SERVICE_ENVIRONMENT,
+    )
     configure_process_observability(config)
+    metrics_registry = register_http_metrics(
+        app,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
+    readiness = register_service_readiness(
+        metrics_registry,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
     app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
     app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
+    return metrics_registry, readiness
 
 
 def read_notifications_context(

@@ -9,14 +9,18 @@ import (
 
 	"github.com/Medikong/services/packages/go-platform/httpapi"
 	platformmiddleware "github.com/Medikong/services/packages/go-platform/httpmiddleware"
+	platformmetrics "github.com/Medikong/services/packages/go-platform/metrics"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/user-service/internal/development"
 	"github.com/Medikong/services/services/user-service/internal/domain/user"
 )
 
 type RouterConfig struct {
-	ServiceName    string
-	RequestTimeout time.Duration
+	ServiceName        string
+	ServiceVersion     string
+	ServiceEnvironment string
+	RequestTimeout     time.Duration
+	Metrics            *platformmetrics.HTTP
 }
 
 func NewRouter(
@@ -24,14 +28,20 @@ func NewRouter(
 	userHandler *user.UserHandler,
 	proofHandler *development.ProofHandler,
 	health *operational.Handler,
-) (http.Handler, error) {
+) (*chi.Mux, error) {
 	if userHandler == nil || health == nil || cfg.ServiceName == "" || cfg.RequestTimeout <= 0 {
 		return nil, oops.In("user_router").Code("router.dependencies_required").
 			New("router dependencies and request timeout are required")
 	}
 	router := chi.NewRouter()
 	router.Use(func(next http.Handler) http.Handler {
-		return platformmiddleware.Stack(platformmiddleware.Config{ServiceName: cfg.ServiceName, RoutePattern: RoutePattern}, next)
+		return platformmiddleware.Stack(platformmiddleware.Config{
+			ServiceName:        cfg.ServiceName,
+			ServiceVersion:     cfg.ServiceVersion,
+			ServiceEnvironment: cfg.ServiceEnvironment,
+			Metrics:            cfg.Metrics,
+			RoutePattern:       platformmiddleware.ChiRoutePattern(router),
+		}, next)
 	})
 	router.Use(platformmiddleware.Timeout(cfg.RequestTimeout))
 	router.Use(health.RejectWhileDraining)
@@ -53,12 +63,4 @@ func NewRouter(
 		development.RegisterRoutes(router, proofHandler)
 	}
 	return router, nil
-}
-
-func RoutePattern(r *http.Request) string {
-	pattern := chi.RouteContext(r.Context()).RoutePattern()
-	if pattern == "" {
-		return "unmatched"
-	}
-	return pattern
 }

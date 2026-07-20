@@ -16,7 +16,7 @@ import (
 func TestRunDrainsBeforeWaitingForInflightRequest(t *testing.T) {
 	publicAddr := unusedAddress(t)
 	adminAddr := unusedAddress(t)
-	metrics, err := observability.NewMetrics("auth-service-shutdown-test")
+	metrics, err := observability.NewMetrics("auth-service-shutdown-test", "test", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -83,11 +83,13 @@ def test_readyz_returns_bounded_503_when_postgres_is_unreachable(
         started_at = monotonic()
         response = client.get("/readyz")
         elapsed_seconds = monotonic() - started_at
+        ready_value = _service_ready_value(client.get("/metrics").text)
 
     # Then
     assert response.status_code == 503
     assert response.json()["status"] == "not_ready"
     assert response.json()["checks"]["notifications"] == "migration_required"
+    assert ready_value == 0.0
     assert elapsed_seconds < 3.0
 
 
@@ -96,11 +98,27 @@ def test_metrics_exposes_notification_service_readiness_metric() -> None:
     client = TestClient(create_app(NotificationStore()))
 
     # When
+    client.get("/healthz")
     response = client.get("/metrics")
 
     # Then
     assert response.status_code == 200
-    assert 'service_ready{service_name="notification-service"' in response.text
+    assert 'service_name="notification-service"' in response.text
+    assert _service_ready_value(response.text) == 0.0
+    assert "# TYPE http_server_request_duration_seconds histogram" in response.text
+    assert 'http_route="/healthz"' in response.text
+    assert 'http_route_kind="probe"' in response.text
+    assert 'http_response_status_code="200"' in response.text
+
+    assert client.get("/readyz").status_code == 200
+    assert _service_ready_value(client.get("/metrics").text) == 1.0
+
+
+def _service_ready_value(metrics_text: str) -> float:
+    line = next(
+        line for line in metrics_text.splitlines() if line.startswith("service_ready{")
+    )
+    return float(line.rsplit(" ", maxsplit=1)[1])
 
 
 def test_metrics_exposes_notification_business_metrics() -> None:

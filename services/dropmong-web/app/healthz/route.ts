@@ -1,13 +1,11 @@
-import { NextResponse } from "next/server";
+import { withBffJsonRoute } from "@/server/bff/route-handler";
 
-export function GET() {
-  return NextResponse.json({
-    status: "ok",
-    service: "dropmong-web",
-    timestamp: new Date().toISOString(),
-  }, {
-    headers: {
-      "Cache-Control": "no-store",
-    },
+export async function GET(request: Request) {
+  return withBffJsonRoute(request, "/healthz", async () => {
+    return {
+      status: "ok",
+      service: "dropmong-web",
+      timestamp: new Date().toISOString(),
+    };
   });
 }

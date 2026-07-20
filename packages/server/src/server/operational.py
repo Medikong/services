@@ -6,6 +6,7 @@ from fastapi import FastAPI, Path, Query, Request, status
 from fastapi.responses import JSONResponse, Response
 from metrics import (
     ServiceIdentity,
+    bounded_http_method,
     http_server_active_requests,
     http_server_request_duration_seconds,
     service_ready,
@@ -13,6 +14,7 @@ from metrics import (
 from prometheus_client import (
     CollectorRegistry,
     GCCollector,
+    Gauge,
     PlatformCollector,
     ProcessCollector,
     generate_latest,
@@ -29,6 +31,31 @@ PROMETHEUS_TEXT_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 DEBUG_STATUS_ROUTE_DEV_ENVIRONMENTS = frozenset({"local", "dev", "test"})
 
 
+class ServiceReadiness:
+    def __init__(self, metric: Gauge, identity: ServiceIdentity) -> None:
+        self._metric = metric
+        self._labels = identity.service_labels()
+        self.set(False)
+
+    def set(self, ready: bool) -> None:
+        self._metric.labels(**self._labels).set(1 if ready else 0)
+
+
+def register_service_readiness(
+    registry: CollectorRegistry,
+    *,
+    service_name: str,
+    service_version: str,
+    service_environment: str,
+) -> ServiceReadiness:
+    identity = ServiceIdentity(
+        service_name=service_name,
+        service_version=service_version,
+        service_environment=service_environment,
+    )
+    return ServiceReadiness(service_ready(registry), identity)
+
+
 def register_operational_handlers(
     app: FastAPI,
     *,
@@ -43,63 +70,22 @@ def register_operational_handlers(
     readiness_failure_status: str = "not_ready",
     include_readiness_checks: bool = True,
 ) -> CollectorRegistry:
-    metrics_registry = registry or CollectorRegistry(auto_describe=True)
-    configure_runtime_collectors(metrics_registry)
-    # 서비스 식별 label
-    # - 적용 대상: 모든 공통 HTTP/readiness 메트릭
-    # - 입력 기준: 호출자가 외부 설정/env를 해석해 넘긴 값만 사용
-    # - 실패 기준: 누락/빈 값은 잘못된 운영 설정으로 보고 즉시 예외
-    service_identity = ServiceIdentity(
+    metrics_registry = register_http_metrics(
+        app,
+        service_name=service_name,
+        service_version=service_version,
+        service_environment=service_environment,
+        registry=registry,
+    )
+    service_readiness = register_service_readiness(
+        metrics_registry,
         service_name=service_name,
         service_version=service_version,
         service_environment=service_environment,
     )
 
-    # Prometheus metric handles
-    # - 생성자 위치: packages/metrics
-    # - 이 모듈 책임: 요청별 label 값 계산과 metric 기록
-    # - 범위: P0 공통 HTTP/readiness metric
-    request_duration_metric = http_server_request_duration_seconds(metrics_registry)
-    active_requests_metric = http_server_active_requests(metrics_registry)
-    service_ready_metric = service_ready(metrics_registry)
-    service_ready_metric.labels(**service_identity.service_labels()).set(0)
-
     if configure_metrics is not None:
         configure_metrics(metrics_registry)
-
-    app.state.operational_metrics_registry = metrics_registry
-
-    @app.middleware("http")
-    async def collect_http_metrics(request: Request, call_next):
-        started_at = perf_counter()
-        status_code = "500"
-        # http_route label
-        # - 사용: FastAPI route template
-        # - 예시: /payments/{payment_id}
-        # - 금지: /payments/pay-123 같은 raw URL path
-        http_route = _route_template(request)
-        base_http_labels = {
-            **service_identity.service_labels(),
-            "http_route": http_route,
-            "http_request_method": request.method,
-        }
-        active_requests_metric.labels(**base_http_labels).inc()
-
-        try:
-            response = await call_next(request)
-            status_code = str(response.status_code)
-            return response
-        finally:
-            duration = perf_counter() - started_at
-            # active request gauge
-            # - 증가: 요청 처리 시작
-            # - 감소: 응답/예외와 무관하게 finally에서 보장
-            # - 목적: 느린 요청, downstream 대기, handler hang 감지
-            active_requests_metric.labels(**base_http_labels).dec()
-            request_duration_metric.labels(
-                **base_http_labels,
-                http_response_status_code=status_code,
-            ).observe(duration)
 
     @app.get("/healthz")
     def healthz() -> dict[str, object]:
@@ -113,7 +99,7 @@ def register_operational_handlers(
     def readyz() -> JSONResponse:
         checks = _run_readiness_checks(readiness_checks)
         is_ready = all(result == "ok" for result in checks.values())
-        service_ready_metric.labels(**service_identity.service_labels()).set(1 if is_ready else 0)
+        service_readiness.set(is_ready)
         payload = _operational_payload(
             status=readiness_success_status if is_ready else readiness_failure_status,
             service_name=service_name,
@@ -123,17 +109,75 @@ def register_operational_handlers(
             payload["checks"] = checks
 
         if not is_ready:
-            return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload)
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload
+            )
 
         return JSONResponse(status_code=status.HTTP_200_OK, content=payload)
 
     @app.get("/metrics")
     def metrics() -> Response:
-        return Response(content=generate_latest(metrics_registry), media_type=PROMETHEUS_TEXT_CONTENT_TYPE)
+        return Response(
+            content=render_metrics(metrics_registry),
+            media_type=PROMETHEUS_TEXT_CONTENT_TYPE,
+        )
 
-    register_debug_status_route(app, service_name=service_name, service_environment=service_environment)
+    register_debug_status_route(
+        app, service_name=service_name, service_environment=service_environment
+    )
 
     return metrics_registry
+
+
+def register_http_metrics(
+    app: FastAPI,
+    *,
+    service_name: str,
+    service_version: str,
+    service_environment: str,
+    registry: CollectorRegistry | None = None,
+) -> CollectorRegistry:
+    metrics_registry = registry or CollectorRegistry(auto_describe=True)
+    configure_runtime_collectors(metrics_registry)
+    service_identity = ServiceIdentity(
+        service_name=service_name,
+        service_version=service_version,
+        service_environment=service_environment,
+    )
+    request_duration_metric = http_server_request_duration_seconds(metrics_registry)
+    active_requests_metric = http_server_active_requests(metrics_registry)
+
+    app.state.operational_metrics_registry = metrics_registry
+
+    @app.middleware("http")
+    async def collect_http_metrics(request: Request, call_next):
+        started_at = perf_counter()
+        status_code = "500"
+        http_route = _route_template(request)
+        base_http_labels = {
+            **service_identity.service_labels(),
+            "http_route": http_route,
+            "http_route_kind": _route_kind(http_route),
+            "http_request_method": bounded_http_method(request.method),
+        }
+        active_requests_metric.labels(**base_http_labels).inc()
+
+        try:
+            response = await call_next(request)
+            status_code = str(response.status_code)
+            return response
+        finally:
+            active_requests_metric.labels(**base_http_labels).dec()
+            request_duration_metric.labels(
+                **base_http_labels,
+                http_response_status_code=status_code,
+            ).observe(perf_counter() - started_at)
+
+    return metrics_registry
+
+
+def render_metrics(registry: CollectorRegistry) -> str:
+    return generate_latest(registry).decode("utf-8")
 
 
 def register_debug_status_route(
@@ -175,9 +219,15 @@ def configure_runtime_collectors(registry: CollectorRegistry) -> None:
     ProcessCollector(registry=registry)
 
 
-def required_settings_readiness_check(required_values: Mapping[str, object]) -> ReadinessCheck:
+def required_settings_readiness_check(
+    required_values: Mapping[str, object],
+) -> ReadinessCheck:
     def check() -> str:
-        missing = [name for name, value in required_values.items() if value is None or value == ""]
+        missing = [
+            name
+            for name, value in required_values.items()
+            if value is None or value == ""
+        ]
         if missing:
             return f"failed: missing required setting: {', '.join(missing)}"
         return "ok"
@@ -214,6 +264,16 @@ def _route_template(request: Request) -> str:
     return "unmatched"
 
 
+def _route_kind(route: str) -> str:
+    if route in {"/health", "/healthz", "/readyz", "/metrics"}:
+        return "probe"
+    if route.startswith(("/debug", "/_debug", "/__debug")):
+        return "debug"
+    if route == "unmatched":
+        return "unmatched"
+    return "api"
+
+
 def _is_debug_status_route_environment(service_environment: str) -> bool:
     normalized = service_environment.strip().lower()
     return normalized in DEBUG_STATUS_ROUTE_DEV_ENVIRONMENTS
@@ -225,7 +285,9 @@ def _debug_service_key(service_name: str | None) -> str:
     return service_name.removesuffix("-service")
 
 
-def _run_readiness_checks(readiness_checks: Mapping[str, ReadinessCheck]) -> dict[str, str]:
+def _run_readiness_checks(
+    readiness_checks: Mapping[str, ReadinessCheck],
+) -> dict[str, str]:
     checks: dict[str, str] = {}
     for name, readiness_check in readiness_checks.items():
         try:
@@ -235,7 +297,9 @@ def _run_readiness_checks(readiness_checks: Mapping[str, ReadinessCheck]) -> dic
     return checks
 
 
-def _operational_payload(*, status: str, service_name: str, include_timestamp: bool) -> dict[str, object]:
+def _operational_payload(
+    *, status: str, service_name: str, include_timestamp: bool
+) -> dict[str, object]:
     payload: dict[str, object] = {"status": status, "service": service_name}
     if include_timestamp:
         payload["timestamp"] = datetime.now(UTC).isoformat()

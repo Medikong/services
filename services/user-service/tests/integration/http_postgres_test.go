@@ -330,7 +330,7 @@ func newTestRuntime(t *testing.T, ctx context.Context) *testRuntime {
 	if err != nil {
 		t.Fatal(err)
 	}
-	metrics, err := observability.NewMetrics("user-service-integration")
+	metrics, err := observability.NewMetrics("user-service-integration", "test", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

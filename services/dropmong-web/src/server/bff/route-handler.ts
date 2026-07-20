@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { RecentAuthRequiredError, toBffError } from "@/server/bff/errors";
-import { recordRequest, traceIdFromTraceparent } from "@/server/bff/observability";
+import { beginRequest, recordRequest, traceIdFromTraceparent } from "@/server/bff/observability";
 import { createRequestContext, type RequestContext } from "@/server/bff/request-context";
 
 type BffRouteHandler = (context: RequestContext) => Promise<unknown>;
@@ -30,6 +30,8 @@ export async function withBffResponseRoute(
   const context = createRequestContext(request.headers, route, request.method);
   const startedAt = performance.now();
   let response: NextResponse;
+
+  beginRequest(context);
 
   try {
     response = await handler(context);

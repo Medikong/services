@@ -643,6 +643,20 @@ wheels = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.1.0"
+source = { editable = "../../packages/metrics" }
+dependencies = [
+    { name = "prometheus-client" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "prometheus-client", specifier = "==0.23.1" }]
+
+[package.metadata.requires-dev]
+test = [{ name = "pytest", specifier = "==9.0.2" }]
+
+[[package]]
 name = "middleware"
 version = "0.1.0"
 source = { editable = "../../packages/middleware" }
@@ -664,6 +678,7 @@ dependencies = [
     { name = "kafka-utils" },
     { name = "observability" },
     { name = "orjson" },
+    { name = "server" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -683,6 +698,7 @@ requires-dist = [
     { name = "kafka-utils", editable = "../../packages/kafka-utils" },
     { name = "observability", editable = "../../packages/observability" },
     { name = "orjson", specifier = ">=3.11.0,<4.0.0" },
+    { name = "server", editable = "../../packages/server" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.41,<3.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0,<1.0.0" },
 ]
@@ -1039,6 +1055,15 @@ wheels = [
 ]
 
 [[package]]
+name = "prometheus-client"
+version = "0.23.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/53/3edb5d68ecf6b38fcbcc1ad28391117d2a322d9a1a3eff04bfdb184d8c3b/prometheus_client-0.23.1.tar.gz", hash = "sha256:6ae8f9081eaaaf153a2e959d2e6c4f4fb57b12ef76c8c7980202f1e57b48b2ce", size = 80481, upload-time = "2025-09-18T20:47:25.043Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl", hash = "sha256:dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99", size = 61145, upload-time = "2025-09-18T20:47:23.875Z" },
+]
+
+[[package]]
 name = "protobuf"
 version = "6.33.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1282,6 +1307,35 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+source = { editable = "../../packages/server" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "metrics" },
+    { name = "middleware" },
+    { name = "observability" },
+    { name = "prometheus-client" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = "==0.124.0" },
+    { name = "metrics", editable = "../../packages/metrics" },
+    { name = "middleware", editable = "../../packages/middleware" },
+    { name = "observability", editable = "../../packages/observability" },
+    { name = "prometheus-client", specifier = "==0.23.1" },
+    { name = "sqlalchemy", specifier = ">=2.0.41,<3.0.0" },
+]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "pytest", specifier = "==9.0.2" },
 ]
 
 [[package]]

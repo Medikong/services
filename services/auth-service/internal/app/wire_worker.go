@@ -72,6 +72,9 @@ func wireWorker(ctx context.Context, cfg config.WorkerConfig, resources Resource
 	if publisher == nil && cfg.Broker.Enabled {
 		kafkaPublisher, err = outbox.NewKafkaPublisher(
 			ctx,
+			workerServiceName(cfg.Service.Name),
+			cfg.Service.Version,
+			cfg.Service.Environment,
 			cfg.Broker.Brokers,
 			cfg.Broker.Topic,
 			cfg.Broker.PublishTimeout,

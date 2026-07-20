@@ -3,6 +3,7 @@ from metrics.http import (
     HTTP_REQUEST_DURATION_LABELS,
     HttpActiveRequestLabel,
     HttpRequestDurationLabel,
+    bounded_http_method,
     http_server_active_requests,
     http_server_request_duration_seconds,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "ServiceIdentity",
     "ServiceReadyLabel",
     "assert_safe_metric_label_names",
+    "bounded_http_method",
     "connect_metrics_for_events",
     "connect_counter",
     "connect_histogram",

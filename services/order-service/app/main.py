@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, ORJSONResponse, PlainTextResponse
 from middleware import is_safe_request_id
+from prometheus_client import CollectorRegistry
 from observability import (
     REQUEST_ID_HEADER,
     RequestIdMiddleware,
@@ -17,6 +18,12 @@ from observability import (
     error_response,
     record_exception,
     register_error_handlers,
+)
+from server import (
+    ServiceReadiness,
+    register_http_metrics,
+    register_service_readiness,
+    render_metrics,
 )
 
 from app.models import (
@@ -75,7 +82,7 @@ def create_app(
         default_response_class=ORJSONResponse,
         lifespan=lifespan_for(resources),
     )
-    _configure_observability(app)
+    common_metrics, service_readiness = _configure_observability(app)
     register_error_handlers(app, service_name=SERVICE_NAME, domain="order")
 
     @app.exception_handler(Exception)
@@ -107,6 +114,7 @@ def create_app(
         )
         if not migration_is_current:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        service_readiness.set(migration_is_current)
         return ReadinessResponse(
             status="ready" if migration_is_current else "not_ready",
             service=SERVICE_NAME,
@@ -130,7 +138,7 @@ def create_app(
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> str:
-        return order_metrics.render()
+        return render_metrics(common_metrics) + order_metrics.render()
 
     @app.post(
         "/orders",
@@ -198,9 +206,28 @@ def create_app(
     return app
 
 
-def _configure_observability(app: FastAPI) -> None:
-    config = observability_config_from_env(SERVICE_NAME, env=os.environ)
+def _configure_observability(
+    app: FastAPI,
+) -> tuple[CollectorRegistry, ServiceReadiness]:
+    config = observability_config_from_env(
+        SERVICE_NAME,
+        env=os.environ,
+        default_service_version=SERVICE_VERSION,
+        default_service_environment=SERVICE_ENVIRONMENT,
+    )
     configure_process_observability(config)
+    metrics_registry = register_http_metrics(
+        app,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
+    readiness = register_service_readiness(
+        metrics_registry,
+        service_name=SERVICE_NAME,
+        service_version=SERVICE_VERSION,
+        service_environment=SERVICE_ENVIRONMENT,
+    )
     app.add_middleware(
         RequestIdMiddleware,
         header_name=REQUEST_ID_HEADER,
@@ -209,6 +236,7 @@ def _configure_observability(app: FastAPI) -> None:
     )
     app.middleware("http")(create_request_log_middleware(config))
     instrument_fastapi_app(app, config)
+    return metrics_registry, readiness
 
 
 def create_order_context(

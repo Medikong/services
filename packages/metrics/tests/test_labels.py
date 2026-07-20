@@ -12,6 +12,7 @@ from metrics import (
     SERVICE_READY_LABELS,
     ServiceIdentity,
     assert_safe_metric_label_names,
+    bounded_http_method,
     connect_counter,
     connect_histogram,
     connect_metric,
@@ -34,14 +35,24 @@ def test_common_http_label_names_match_prometheus_policy() -> None:
         "service_version",
         "service_environment",
         "http_route",
+        "http_route_kind",
         "http_request_method",
         "http_response_status_code",
     )
+
+
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    (("get", "GET"), ("PATCH", "PATCH"), ("X-CARDINALITY-1", "OTHER")),
+)
+def test_http_method_metric_label_is_bounded(method: str, expected: str) -> None:
+    assert bounded_http_method(method) == expected
     assert HTTP_ACTIVE_REQUEST_LABELS == (
         "service_name",
         "service_version",
         "service_environment",
         "http_route",
+        "http_route_kind",
         "http_request_method",
     )
     assert SERVICE_READY_LABELS == (
@@ -85,15 +96,33 @@ def test_service_identity_requires_service_version_and_environment() -> None:
     }
 
     with pytest.raises(ValueError, match="service_version"):
-        ServiceIdentity(service_name="payment-service", service_version="", service_environment="test")
+        ServiceIdentity(
+            service_name="payment-service",
+            service_version="",
+            service_environment="test",
+        )
 
     with pytest.raises(ValueError, match="service_environment"):
-        ServiceIdentity(service_name="payment-service", service_version="test-version", service_environment="")
+        ServiceIdentity(
+            service_name="payment-service",
+            service_version="test-version",
+            service_environment="",
+        )
 
 
-def test_high_cardinality_labels_are_rejected() -> None:
-    with pytest.raises(ValueError, match="request_id"):
-        assert_safe_metric_label_names(["service_name", "request_id"])
+@pytest.mark.parametrize(
+    "label_name",
+    (
+        "request_id",
+        "reservation_id",
+        "ticket_id",
+        "drop_id",
+        "coupon_id",
+    ),
+)
+def test_high_cardinality_labels_are_rejected(label_name: str) -> None:
+    with pytest.raises(ValueError, match=label_name):
+        assert_safe_metric_label_names(["service_name", label_name])
 
 
 def test_metric_label_event_helpers_use_class_schema() -> None:
@@ -176,7 +205,12 @@ def test_metric_signal_connectors_use_event_label_schema() -> None:
     counter_signal = SampleSignal()
     histogram_signal = SampleSignal()
     service_labels = {"service_name": "sample-service"}
-    counter = Counter("sample_events_total", "Sample events.", ("service_name", "result", "route_kind"), registry=registry)
+    counter = Counter(
+        "sample_events_total",
+        "Sample events.",
+        ("service_name", "result", "route_kind"),
+        registry=registry,
+    )
     histogram = Histogram(
         "sample_duration_seconds",
         "Sample duration.",
@@ -187,7 +221,9 @@ def test_metric_signal_connectors_use_event_label_schema() -> None:
     counter_spec = metric_spec_for(SampleEvent, CounterMetricSpec)
     histogram_spec = metric_spec_for(SampleEvent, HistogramMetricSpec)
 
-    connect_counter(counter_signal, counter, service_labels, SampleEvent, spec=counter_spec)
+    connect_counter(
+        counter_signal, counter, service_labels, SampleEvent, spec=counter_spec
+    )
     connect_histogram(
         histogram_signal,
         histogram,
@@ -262,10 +298,14 @@ def test_metric_signal_connectors_accept_custom_record_callbacks() -> None:
     counter_spec = metric_spec_for(SampleEvent, CounterMetricSpec)
     histogram_spec = metric_spec_for(SampleEvent, HistogramMetricSpec)
 
-    def record_counter(metric: object, labels: dict[str, str], recorded_event: object) -> None:
+    def record_counter(
+        metric: object, labels: dict[str, str], recorded_event: object
+    ) -> None:
         counter_calls.append((metric, labels, recorded_event))
 
-    def record_histogram(metric: object, labels: dict[str, str], value: float, recorded_event: object) -> None:
+    def record_histogram(
+        metric: object, labels: dict[str, str], value: float, recorded_event: object
+    ) -> None:
         histogram_calls.append((metric, labels, value, recorded_event))
 
     connect_counter(
@@ -292,7 +332,11 @@ def test_metric_signal_connectors_accept_custom_record_callbacks() -> None:
     assert counter_calls == [
         (
             counter_metric,
-            {"service_name": "sample-service", "result": "success", "route_kind": "list"},
+            {
+                "service_name": "sample-service",
+                "result": "success",
+                "route_kind": "list",
+            },
             event,
         )
     ]
@@ -353,10 +397,14 @@ def test_metric_specs_drive_metric_connector_dispatch() -> None:
     counter_spec = metric_spec_for(SampleEvent, CounterMetricSpec)
     histogram_spec = metric_spec_for(SampleEvent, HistogramMetricSpec)
 
-    def record_counter(metric: object, labels: dict[str, str], recorded_event: object) -> None:
+    def record_counter(
+        metric: object, labels: dict[str, str], recorded_event: object
+    ) -> None:
         counter_calls.append((metric, labels, recorded_event))
 
-    def record_histogram(metric: object, labels: dict[str, str], value: float, recorded_event: object) -> None:
+    def record_histogram(
+        metric: object, labels: dict[str, str], value: float, recorded_event: object
+    ) -> None:
         histogram_calls.append((metric, labels, value, recorded_event))
 
     assert counter_spec.name == "sample_events_total"
@@ -385,7 +433,11 @@ def test_metric_specs_drive_metric_connector_dispatch() -> None:
     assert counter_calls == [
         (
             counter_metric,
-            {"service_name": "sample-service", "result": "success", "route_kind": "list"},
+            {
+                "service_name": "sample-service",
+                "result": "success",
+                "route_kind": "list",
+            },
             event,
         )
     ]
@@ -452,7 +504,9 @@ def test_metric_specs_create_and_connect_prometheus_metrics() -> None:
         event_types,
     )
 
-    signal.send(SampleEvent(result=Result.SUCCESS, route_kind="list", duration_seconds=0.5))
+    signal.send(
+        SampleEvent(result=Result.SUCCESS, route_kind="list", duration_seconds=0.5)
+    )
     metrics_text = generate_latest(registry).decode("utf-8")
 
     assert "auto_sample_events_total" in metrics_text

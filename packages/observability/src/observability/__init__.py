@@ -14,7 +14,12 @@ from observability.config import (
     ProfilingConfig,
     observability_config_from_env,
 )
-from observability.database import instrument_motor_client, instrument_sqlalchemy_engine, instrument_sqlalchemy_pool_events
+from observability.database import (
+    instrument_motor_client,
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_engine,
+    instrument_sqlalchemy_pool_events,
+)
 from observability.exceptions import ErrorRecordingMiddleware, record_exception
 from observability.fastapi import (
     REQUEST_ID_HEADER,
@@ -89,6 +94,7 @@ __all__ = [
     "instrument_motor_client",
     "instrument_redis",
     "instrument_fastapi_app",
+    "instrument_sqlalchemy",
     "instrument_sqlalchemy_engine",
     "instrument_sqlalchemy_pool_events",
     "observability_config_from_env",

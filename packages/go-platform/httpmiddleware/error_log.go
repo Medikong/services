@@ -24,16 +24,27 @@ func ErrorLog(config Config) Middleware {
 					level = slog.LevelError
 					severity = "ERROR"
 				}
+				requestID := requestcontext.RequestID(r.Context())
+				traceID, spanID := logger.TraceIDs(r.Context())
+				route := routePattern(config.RoutePattern, r)
 				logger.Default().Log(r.Context(), level, "http.request.failed",
+					"event", "http.request.failed",
 					"service.name", config.ServiceName,
+					"service.version", config.ServiceVersion,
+					"service.environment", config.ServiceEnvironment,
 					"severity", severity,
 					"severity_text", severity,
-					"request_id", requestcontext.RequestID(r.Context()),
+					"request_id", requestID,
+					"correlation_id", requestID,
+					"trace_id", traceID,
+					"span_id", spanID,
 					"http.method", r.Method,
-					"http.route", routePattern(config.RoutePattern, r),
+					"http.route", route,
+					"http.route.kind", routeKind(route),
 					"http.status_code", statusCode,
 					"http.error_code", code,
 					"log.kind", "error",
+					"log.policy", "keep",
 					logger.Err(err),
 				)
 				if statusCode < http.StatusInternalServerError {

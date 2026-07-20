@@ -15,7 +15,7 @@ type RouteProps = { params: Promise<{ path: string[] }> };
 
 export async function GET(request: Request, { params }: RouteProps) {
   const path = (await params).path.join("/");
-  return withBffJsonRoute(request, `/api/web/seller/${path}`, async () => {
+  return withBffJsonRoute(request, "/api/web/seller/[...path]", async () => {
     if (path !== "context") throw notFound();
     return toSellerContext(getRequestSellerActor(request));
   });
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: RouteProps) {
       return response;
     });
   }
-  return withBffJsonRoute(request, `/api/web/seller/${path}`, async (context) => executeSellerCommand(request, context, getRequestSellerActor(request), path));
+  return withBffJsonRoute(request, "/api/web/seller/[...path]", async (context) => executeSellerCommand(request, context, getRequestSellerActor(request), path));
 }
 
 function notFound(): BffError {

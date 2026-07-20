@@ -5,7 +5,12 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppres
 from dataclasses import dataclass, field
 
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from observability import (
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_pool_events,
+)
+import sqlalchemy.ext.asyncio as sqlalchemy_asyncio
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.counter_repository import DropInterestCounterRepository
 from app.counter_store import DropInterestCounterStore
@@ -39,14 +44,18 @@ class AppResources:
     counter_repository: DropInterestCounterRepository
     view_repository: DropViewRepository
     view_ranking_repository: DropViewRankingRepository
-    event_publisher: InterestEventPublisher = field(default_factory=NoopInterestEventPublisher)
+    event_publisher: InterestEventPublisher = field(
+        default_factory=NoopInterestEventPublisher
+    )
     engine: AsyncEngine | None = None
     kafka_publisher: KafkaInterestEventPublisher | None = None
 
 
 def resources_from_env() -> AppResources:
     database_url = os.getenv("DATABASE_URL", "")
-    kafka_runtime = kafka_runtime_from_bootstrap(os.getenv("KAFKA_BOOTSTRAP_SERVERS", ""))
+    kafka_runtime = kafka_runtime_from_bootstrap(
+        os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
+    )
     event_publisher = kafka_runtime.publisher or NoopInterestEventPublisher()
 
     if database_url == "":
@@ -60,7 +69,8 @@ def resources_from_env() -> AppResources:
             kafka_publisher=kafka_runtime.publisher,
         )
 
-    engine = create_async_engine(
+    instrument_sqlalchemy()
+    engine = sqlalchemy_asyncio.create_async_engine(
         _async_database_url(database_url),
         pool_pre_ping=True,
         pool_size=5,
@@ -68,6 +78,7 @@ def resources_from_env() -> AppResources:
         pool_timeout=5.0,
         pool_recycle=1800,
     )
+    instrument_sqlalchemy_pool_events(engine.sync_engine)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     return AppResources(
         repository=PostgresInterestRepository(session_factory),

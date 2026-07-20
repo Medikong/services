@@ -7,12 +7,16 @@ from dataclasses import dataclass
 from typing import Final
 
 import anyio
+import sqlalchemy.ext.asyncio as sqlalchemy_asyncio
 from fastapi import FastAPI
+from observability import (
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_pool_events,
+)
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from app.messaging import InventoryConsumerFactory
@@ -34,7 +38,9 @@ class Database:
 def create_database(database_url: str | None = None) -> Database:
     """Create the async engine and session factory without touching schema."""
     url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
-    engine = create_async_engine(url, pool_pre_ping=True)
+    instrument_sqlalchemy()
+    engine = sqlalchemy_asyncio.create_async_engine(url, pool_pre_ping=True)
+    instrument_sqlalchemy_pool_events(engine.sync_engine)
     return Database(
         engine=engine,
         sessions=async_sessionmaker(engine, expire_on_commit=False),

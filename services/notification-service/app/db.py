@@ -5,7 +5,12 @@ from dataclasses import dataclass
 
 import anyio
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from observability import (
+    instrument_sqlalchemy,
+    instrument_sqlalchemy_pool_events,
+)
+import sqlalchemy.ext.asyncio as sqlalchemy_asyncio
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.messaging import KafkaRuntime, kafka_runtime_from_bootstrap
 from app.metrics import NotificationMetrics
@@ -35,7 +40,8 @@ def resources_from_env(notification_metrics: NotificationMetrics) -> AppResource
             kafka_bootstrap_servers=kafka_bootstrap_servers,
         )
 
-    engine = create_async_engine(
+    instrument_sqlalchemy()
+    engine = sqlalchemy_asyncio.create_async_engine(
         _async_database_url(database_url),
         pool_pre_ping=True,
         pool_size=5,
@@ -43,6 +49,7 @@ def resources_from_env(notification_metrics: NotificationMetrics) -> AppResource
         pool_timeout=5.0,
         pool_recycle=1800,
     )
+    instrument_sqlalchemy_pool_events(engine.sync_engine)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     return AppResources(
         repository=PostgresNotificationRepository(session_factory),

@@ -102,6 +102,26 @@ func handleRecord(ctx context.Context, config ConsumerConfig, record *kgo.Record
 	return nil
 }
 
+func StartProducerSpan(ctx context.Context, topic string) (context.Context, trace.Span) {
+	return otel.Tracer("github.com/Medikong/services/packages/go-platform/kafka").Start(
+		ctx,
+		"publish "+topic,
+		trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.operation", "publish"),
+			attribute.String("messaging.destination.name", topic),
+		),
+	)
+}
+
+func Inject(ctx context.Context, record *kgo.Record) {
+	if record == nil {
+		return
+	}
+	otel.GetTextMapPropagator().Inject(ctx, recordCarrier{record: record})
+}
+
 type recordCarrier struct {
 	record *kgo.Record
 }

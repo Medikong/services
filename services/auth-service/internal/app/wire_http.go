@@ -18,9 +18,10 @@ import (
 	httpsession "github.com/Medikong/services/services/auth-service/internal/interface/http/session"
 	httpuserauthstate "github.com/Medikong/services/services/auth-service/internal/interface/http/userauthstate"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
+	"github.com/Medikong/services/services/auth-service/internal/platform/observability"
 )
 
-func wireHTTP(cfg config.ServerConfig, health *operational.Handler, useCases serverUseCases) (http.Handler, error) {
+func wireHTTP(cfg config.ServerConfig, health *operational.Handler, metrics *observability.Metrics, useCases serverUseCases) (http.Handler, error) {
 	credentials, err := httpauth.New(httpauth.Config{
 		SessionCookieName:  cfg.Auth.SessionCookieName,
 		AuthFlowCookieName: cfg.Auth.AuthFlowCookieName,
@@ -33,7 +34,13 @@ func wireHTTP(cfg config.ServerConfig, health *operational.Handler, useCases ser
 		return nil, err
 	}
 	csrf := httputil.NewCSRF(cfg.Auth.AllowedOrigins)
-	router := httpinterface.NewRouter(cfg.Service.Name, cfg.HTTP.RequestTimeout, health)
+	router := httpinterface.NewRouter(httpinterface.RouterConfig{
+		ServiceName:        cfg.Service.Name,
+		ServiceVersion:     cfg.Service.Version,
+		ServiceEnvironment: cfg.Service.Environment,
+		RequestTimeout:     cfg.HTTP.RequestTimeout,
+		Metrics:            metrics.HTTP(),
+	}, health)
 
 	httpjwks.RegisterRoutes(router, httpjwks.NewController(useCases.keys))
 	httpintent.RegisterRoutes(

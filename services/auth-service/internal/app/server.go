@@ -36,7 +36,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	metrics, err := observability.NewMetrics(cfg.Service.Name)
+	metrics, err := observability.NewMetrics(cfg.Service.Name, cfg.Service.Version, cfg.Service.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func NewServer(ctx context.Context, cfg config.ServerConfig, options ServerOptio
 		cleanup()
 		return nil, err
 	}
-	publicHandler, err := wireHTTP(cfg, health, useCases)
+	publicHandler, err := wireHTTP(cfg, health, metrics, useCases)
 	if err != nil {
 		cleanup()
 		return nil, err

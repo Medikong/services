@@ -26,11 +26,19 @@ func AccessLog(config Config) Middleware {
 					level = slog.LevelError
 					policy = "keep"
 				}
+				requestID := requestcontext.RequestID(r.Context())
+				traceID, spanID := logger.TraceIDs(r.Context())
 				logger.Default().Log(r.Context(), level, "http.request.completed",
+					"event", "http.request.completed",
 					"service.name", config.ServiceName,
+					"service.version", config.ServiceVersion,
+					"service.environment", config.ServiceEnvironment,
 					"severity", severity,
 					"severity_text", severity,
-					"request_id", requestcontext.RequestID(r.Context()),
+					"request_id", requestID,
+					"correlation_id", requestID,
+					"trace_id", traceID,
+					"span_id", spanID,
 					"client_action_id", requestcontext.ClientActionID(r.Context()),
 					"http.method", r.Method,
 					"http.route", route,

@@ -5,7 +5,20 @@ from typing import Any
 
 _sqlalchemy_instrumented_engine_ids: set[int] = set()
 _sqlalchemy_pool_event_engine_ids: set[int] = set()
+_sqlalchemy_instrumented = False
 _pymongo_instrumented = False
+
+
+def instrument_sqlalchemy() -> None:
+    global _sqlalchemy_instrumented
+
+    if _sqlalchemy_instrumented:
+        return
+
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+    SQLAlchemyInstrumentor().instrument()
+    _sqlalchemy_instrumented = True
 
 
 def instrument_sqlalchemy_engine(engine: Any) -> None:

@@ -11,6 +11,7 @@ dependencies = [
     "kafka-utils",
     "observability",
     "orjson>=3.11.0,<4.0.0",
+    "server",
     "sqlalchemy[asyncio]>=2.0.41,<3.0.0",
     "uvicorn[standard]>=0.49.0,<1.0.0",
 ]
@@ -21,6 +22,7 @@ errors = { path = "../../packages/errors", editable = true }
 kafka-utils = { path = "../../packages/kafka-utils", editable = true }
 middleware = { path = "../../packages/middleware", editable = true }
 observability = { path = "../../packages/observability", editable = true }
+server = { path = "../../packages/server", editable = true }
 
 [dependency-groups]
 test = [
@@ -29,5 +31,5 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = [".", "../../packages/contracts/src", "../../packages/errors/src", "../../packages/middleware/src", "../../packages/observability/src"]
+pythonpath = [".", "../../packages/contracts/src", "../../packages/errors/src", "../../packages/metrics/src", "../../packages/middleware/src", "../../packages/observability/src", "../../packages/server/src"]
 testpaths = ["tests"]

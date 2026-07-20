@@ -46,7 +46,7 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	metrics, err := observability.NewMetrics(cfg.Service.Name + "-worker")
+	metrics, err := observability.NewMetrics(workerServiceName(cfg.Service.Name), cfg.Service.Version, cfg.Service.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		return nil, err
 	}
 	profileService := cfg.Service
-	profileService.Name += "-worker"
+	profileService.Name = workerServiceName(profileService.Name)
 	profiler, err := observability.StartProfiler(profileService, cfg.Profile)
 	if err != nil {
 		_ = resources.Close()
@@ -94,7 +94,7 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		checks["redis"] = func(ctx context.Context) error { return resources.Redis.Ping(ctx).Err() }
 	}
 	healthState := operational.NewHandler(operational.Config{
-		Service:          cfg.Service.Name + "-worker",
+		Service:          workerServiceName(cfg.Service.Name),
 		ReadinessTimeout: cfg.Lifecycle.ReadinessTimeout,
 		Checks:           checks,
 		Metrics:          metrics.Handler(),
@@ -120,6 +120,10 @@ func NewWorkerWithPublisher(ctx context.Context, cfg config.WorkerConfig, publis
 		cleanupInterval:      time.Hour,
 		profiler:             profiler,
 	}, nil
+}
+
+func workerServiceName(baseServiceName string) string {
+	return baseServiceName + "-worker"
 }
 
 func checkWorkerSchemas(ctx context.Context, resources Resources, development config.DevelopmentConfig) error {

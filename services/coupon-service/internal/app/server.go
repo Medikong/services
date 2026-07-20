@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/grafana/pyroscope-go"
 	"github.com/samber/oops"
 
@@ -58,7 +57,7 @@ func newServer(ctx context.Context, cfg config.ServerConfig, external externalPo
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	metrics, err := observability.NewMetrics(cfg.Service.Name)
+	metrics, err := observability.NewMetrics(cfg.Service.Name, cfg.Service.Version, cfg.Service.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +100,11 @@ func newServer(ctx context.Context, cfg config.ServerConfig, external externalPo
 		return closeOnError(err)
 	}
 	publicHandler := platformmiddleware.Stack(platformmiddleware.Config{
-		ServiceName:  cfg.Service.Name,
-		RoutePattern: routePattern,
+		ServiceName:        cfg.Service.Name,
+		ServiceVersion:     cfg.Service.Version,
+		ServiceEnvironment: cfg.Service.Environment,
+		Metrics:            metrics.HTTP(),
+		RoutePattern:       platformmiddleware.ChiRoutePattern(router),
 	}, router)
 	publicHandler = httpcontract.Timeout(cfg.HTTP.RequestTimeout)(publicHandler)
 	publicHandler = health.RejectWhileDraining(publicHandler)
@@ -127,14 +129,6 @@ func newServer(ctx context.Context, cfg config.ServerConfig, external externalPo
 		commandSource:  external.commandSource,
 		commandIngress: backend.components.commandIngress,
 	}, nil
-}
-
-func routePattern(request *http.Request) string {
-	pattern := chi.RouteContext(request.Context()).RoutePattern()
-	if pattern == "" {
-		return "unmatched"
-	}
-	return pattern
 }
 
 func (s *Server) Run(ctx context.Context) error {

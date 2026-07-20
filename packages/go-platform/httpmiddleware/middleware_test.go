@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -200,10 +202,20 @@ func TestRecoveryReraisesAfterResponseStarted(t *testing.T) {
 
 func TestMetricsUseRoutePatternAndAvoidHighCardinalityLabels(t *testing.T) {
 	logger.Configure(io.Discard, "test-service")
-	registry := metrics.NewRegistry()
+	registry := prometheus.NewRegistry()
+	httpMetrics, err := metrics.NewHTTP(registry, metrics.ServiceIdentity{
+		Name:        "test-service",
+		Version:     "test-version",
+		Environment: "test",
+	})
+	if err != nil {
+		t.Fatalf("NewHTTP() error = %v", err)
+	}
 	handler := Stack(Config{
-		ServiceName: "test-service",
-		Metrics:     registry,
+		ServiceName:        "test-service",
+		ServiceVersion:     "test-version",
+		ServiceEnvironment: "test",
+		Metrics:            httpMetrics,
 		RoutePattern: func(*http.Request) string {
 			return "/v1/auth/{sessionId}/revoke"
 		},
@@ -214,12 +226,23 @@ func TestMetricsUseRoutePatternAndAvoidHighCardinalityLabels(t *testing.T) {
 	request.Header.Set(requestcontext.RequestIDHeader, "req-123")
 
 	handler.ServeHTTP(httptest.NewRecorder(), request)
-	var metricsText strings.Builder
-	registry.WritePrometheus(&metricsText)
-	output := metricsText.String()
+	response := httptest.NewRecorder()
+	promhttp.HandlerFor(registry, promhttp.HandlerOpts{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	output := response.Body.String()
 
 	if !strings.Contains(output, `http_route="/v1/auth/{sessionId}/revoke"`) {
 		t.Fatalf("metrics do not include route pattern: %s", output)
+	}
+	for _, expected := range []string{
+		"# TYPE http_server_request_duration_seconds histogram",
+		`http_route_kind="api"`,
+		`http_response_status_code="204"`,
+		`service_version="test-version"`,
+		`service_environment="test"`,
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("metrics do not include %q: %s", expected, output)
+		}
 	}
 	for _, forbidden := range []string{"session-123", "req-123", "request_id", "user_id"} {
 		if strings.Contains(output, forbidden) {

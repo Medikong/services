@@ -60,12 +60,6 @@ class OrderMetrics:
         return "".join(
             [
                 _metric_header(
-                    "service_ready",
-                    "Service readiness state. Ready is 1, not ready is 0.",
-                    "gauge",
-                ),
-                _metric_sample("service_ready", self._labels, 1),
-                _metric_header(
                     "orders_created_total",
                     "Orders created successfully.",
                     "counter",

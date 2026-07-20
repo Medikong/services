@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	platformmetrics "github.com/Medikong/services/packages/go-platform/metrics"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/auth-service/internal/interface/http/httputil"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func TestRouterPreservesNotFoundAndMethodNotAllowedResponses(t *testing.T) {
-	router := NewRouter("auth-service", time.Second, operational.New("auth-service", nil))
+	router := NewRouter(testRouterConfig(time.Second), operational.New("auth-service", nil))
 	router.Get("/known", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -37,7 +41,7 @@ func TestRouterPreservesNotFoundAndMethodNotAllowedResponses(t *testing.T) {
 
 func TestRouterPreservesRequestIDWhenDraining(t *testing.T) {
 	health := operational.New("auth-service", nil)
-	router := NewRouter("auth-service", time.Second, health)
+	router := NewRouter(testRouterConfig(time.Second), health)
 	router.Get("/work", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -56,7 +60,7 @@ func TestRouterPreservesRequestIDWhenDraining(t *testing.T) {
 }
 
 func TestRouterPreservesRecoveryAndTimeoutMiddleware(t *testing.T) {
-	router := NewRouter("auth-service", time.Millisecond, operational.New("auth-service", nil))
+	router := NewRouter(testRouterConfig(time.Millisecond), operational.New("auth-service", nil))
 	router.Get("/panic", func(http.ResponseWriter, *http.Request) {
 		panic("router test panic")
 	})
@@ -67,6 +71,67 @@ func TestRouterPreservesRecoveryAndTimeoutMiddleware(t *testing.T) {
 	for _, path := range []string{"/panic", "/timeout"} {
 		response := serveRouterRequest(router, http.MethodGet, path, "")
 		assertRouterError(t, response, http.StatusServiceUnavailable, "AUTH_SERVICE_UNAVAILABLE")
+	}
+}
+
+func TestRouterExposesActiveGaugeWithPreMatchedAPITemplate(t *testing.T) {
+	registry := prometheus.NewRegistry()
+	httpMetrics, err := platformmetrics.NewHTTP(registry, platformmetrics.ServiceIdentity{
+		Name: "auth-service", Version: "test", Environment: "test",
+	})
+	if err != nil {
+		t.Fatalf("NewHTTP() error = %v", err)
+	}
+	config := testRouterConfig(time.Second)
+	config.Metrics = httpMetrics
+	router := NewRouter(config, operational.New("auth-service", nil))
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	router.Get("/api/v1/auth/metrics-test/{intentId}", func(w http.ResponseWriter, _ *http.Request) {
+		close(requestStarted)
+		<-releaseRequest
+		w.WriteHeader(http.StatusNoContent)
+	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		router.ServeHTTP(
+			httptest.NewRecorder(),
+			httptest.NewRequest(http.MethodGet, "/api/v1/auth/metrics-test/private-intent", nil),
+		)
+	}()
+	<-requestStarted
+
+	response := httptest.NewRecorder()
+	promhttp.HandlerFor(registry, promhttp.HandlerOpts{}).ServeHTTP(
+		response,
+		httptest.NewRequest(http.MethodGet, "/metrics", nil),
+	)
+	output := response.Body.String()
+	for _, expected := range []string{
+		`http_server_active_requests{`,
+		`http_route="/api/v1/auth/metrics-test/{intentId}"`,
+		`http_route_kind="api"`,
+		`} 1`,
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("active metric is missing %q: %s", expected, output)
+		}
+	}
+	if strings.Contains(output, "private-intent") {
+		t.Fatalf("active metric contains raw path: %s", output)
+	}
+
+	close(releaseRequest)
+	<-done
+}
+
+func testRouterConfig(timeout time.Duration) RouterConfig {
+	return RouterConfig{
+		ServiceName:        "auth-service",
+		ServiceVersion:     "test",
+		ServiceEnvironment: "test",
+		RequestTimeout:     timeout,
 	}
 }
 

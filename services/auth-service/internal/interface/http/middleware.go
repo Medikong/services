@@ -10,22 +10,34 @@ import (
 
 	"github.com/Medikong/services/packages/go-platform/httpapi"
 	platformmiddleware "github.com/Medikong/services/packages/go-platform/httpmiddleware"
+	platformmetrics "github.com/Medikong/services/packages/go-platform/metrics"
 	"github.com/Medikong/services/packages/go-platform/operational"
 	"github.com/Medikong/services/services/auth-service/internal/application/failure"
 	"github.com/Medikong/services/services/auth-service/internal/interface/http/httputil"
 )
 
-func NewRouter(serviceName string, requestTimeout time.Duration, health *operational.Handler) *chi.Mux {
+type RouterConfig struct {
+	ServiceName        string
+	ServiceVersion     string
+	ServiceEnvironment string
+	RequestTimeout     time.Duration
+	Metrics            *platformmetrics.HTTP
+}
+
+func NewRouter(config RouterConfig, health *operational.Handler) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(httputil.IDMiddleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return platformmiddleware.Stack(platformmiddleware.Config{
-			ServiceName:  serviceName,
-			RoutePattern: routePattern,
+			ServiceName:        config.ServiceName,
+			ServiceVersion:     config.ServiceVersion,
+			ServiceEnvironment: config.ServiceEnvironment,
+			Metrics:            config.Metrics,
+			RoutePattern:       platformmiddleware.ChiRoutePattern(router),
 		}, next)
 	})
 	router.Use(recoverHTTP)
-	router.Use(timeoutHTTP(requestTimeout))
+	router.Use(timeoutHTTP(config.RequestTimeout))
 	router.Use(rejectWhileDraining(health))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, r, httpapi.NotFound("AUTH_ROUTE_NOT_FOUND").
@@ -38,14 +50,6 @@ func NewRouter(serviceName string, requestTimeout time.Duration, health *operati
 			New("auth method not allowed"))
 	})
 	return router
-}
-
-func routePattern(r *http.Request) string {
-	pattern := chi.RouteContext(r.Context()).RoutePattern()
-	if pattern == "" {
-		return "unmatched"
-	}
-	return pattern
 }
 
 func rejectWhileDraining(health *operational.Handler) func(http.Handler) http.Handler {
