@@ -23,7 +23,8 @@ x-auth-e2e-env: &auth-e2e-env
   AUTH_USER_PROOF_ISSUER: user-service
   AUTH_COOKIE_SECURE: "true"
   AUTH_ALLOWED_ORIGINS: https://app.e2e.test
-  AUTH_SESSION_STATUS_REDIS_URL: redis://redis:6379/0
+  AUTH_SESSION_STATUS_ENABLED: "true"
+  REDIS_URL: redis://redis:6379/0
   OTEL_TRACES_EXPORTER: none
 
 services:
