@@ -16,11 +16,12 @@ import (
 )
 
 type Metrics struct {
-	registry      *prometheus.Registry
-	service       string
-	auditTotal    *prometheus.CounterVec
-	ready         prometheus.Gauge
-	meterProvider *sdkmetric.MeterProvider
+	registry               *prometheus.Registry
+	service                string
+	auditTotal             *prometheus.CounterVec
+	sessionProjectionTotal *prometheus.CounterVec
+	ready                  prometheus.Gauge
+	meterProvider          *sdkmetric.MeterProvider
 }
 
 func NewMetrics(service string) (*Metrics, error) {
@@ -31,6 +32,10 @@ func NewMetrics(service string) (*Metrics, error) {
 			Name: "auth_audit_outbox_attempts_total",
 			Help: "Audit outbox delivery outcomes.",
 		}, []string{"service_name", "result"}),
+		sessionProjectionTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "auth_session_projection_attempts_total",
+			Help: "Session status projection delivery outcomes.",
+		}, []string{"service_name", "result"}),
 		ready: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:        "service_ready",
 			Help:        "Service readiness state.",
@@ -38,10 +43,11 @@ func NewMetrics(service string) (*Metrics, error) {
 		}),
 	}
 	for name, collector := range map[string]prometheus.Collector{
-		"audit":     metrics.auditTotal,
-		"go":        collectors.NewGoCollector(),
-		"process":   collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		"readiness": metrics.ready,
+		"audit":              metrics.auditTotal,
+		"go":                 collectors.NewGoCollector(),
+		"process":            collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		"readiness":          metrics.ready,
+		"session_projection": metrics.sessionProjectionTotal,
 	} {
 		if err := metrics.registry.Register(collector); err != nil {
 			return nil, oops.In("auth_metrics").Code("metrics.register_failed").With("collector", name).Wrap(err)
@@ -66,6 +72,10 @@ func NewMetrics(service string) (*Metrics, error) {
 
 func (m *Metrics) RecordAuditAttempt(result string) {
 	m.auditTotal.WithLabelValues(m.service, result).Inc()
+}
+
+func (m *Metrics) RecordSessionProjectionAttempt(result string) {
+	m.sessionProjectionTotal.WithLabelValues(m.service, result).Inc()
 }
 
 func (m *Metrics) Handler() http.Handler {

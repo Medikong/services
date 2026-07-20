@@ -10,16 +10,17 @@ import (
 )
 
 type WorkerConfig struct {
-	Service     ServiceConfig
-	AdminAddr   string
-	Lifecycle   LifecycleConfig
-	Postgres    platformdb.PostgresConfig
-	Auth        AuthConfig
-	Audit       AuditConfig
-	Broker      BrokerConfig
-	Delivery    DeliveryConfig
-	Development DevelopmentConfig
-	Profile     ProfileConfig
+	Service       ServiceConfig
+	AdminAddr     string
+	Lifecycle     LifecycleConfig
+	Postgres      platformdb.PostgresConfig
+	Auth          AuthConfig
+	SessionStatus SessionStatusConfig
+	Audit         AuditConfig
+	Broker        BrokerConfig
+	Delivery      DeliveryConfig
+	Development   DevelopmentConfig
+	Profile       ProfileConfig
 }
 
 func LoadWorker() (WorkerConfig, error) {
@@ -40,6 +41,10 @@ func LoadWorker() (WorkerConfig, error) {
 	if err != nil {
 		return WorkerConfig{}, err
 	}
+	sessionStatus, err := loadSessionStatus()
+	if err != nil {
+		return WorkerConfig{}, err
+	}
 	auditConfig, err := loadAudit()
 	if err != nil {
 		return WorkerConfig{}, err
@@ -57,16 +62,17 @@ func LoadWorker() (WorkerConfig, error) {
 		return WorkerConfig{}, err
 	}
 	cfg := WorkerConfig{
-		Service:     service,
-		AdminAddr:   stringEnv("WORKER_ADMIN_ADDR", ":9092"),
-		Lifecycle:   lifecycle,
-		Postgres:    postgres,
-		Auth:        authConfig,
-		Audit:       auditConfig,
-		Broker:      broker,
-		Delivery:    delivery,
-		Development: development,
-		Profile:     profile,
+		Service:       service,
+		AdminAddr:     stringEnv("WORKER_ADMIN_ADDR", ":9092"),
+		Lifecycle:     lifecycle,
+		Postgres:      postgres,
+		Auth:          authConfig,
+		SessionStatus: sessionStatus,
+		Audit:         auditConfig,
+		Broker:        broker,
+		Delivery:      delivery,
+		Development:   development,
+		Profile:       profile,
 	}
 	if err := cfg.Validate(); err != nil {
 		return WorkerConfig{}, err
@@ -83,6 +89,7 @@ func (c WorkerConfig) Validate() error {
 		validation.Field(&c.Postgres, validation.By(func(any) error {
 			return validation.Validate(c.Postgres.DatabaseURL, validation.Required)
 		})),
+		validation.Field(&c.SessionStatus),
 		validation.Field(&c.Audit),
 		validation.Field(&c.Broker),
 		validation.Field(&c.Delivery),

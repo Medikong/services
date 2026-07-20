@@ -25,6 +25,7 @@ type Session struct {
 	AuthenticatedAt time.Time
 	ExpiresAt       time.Time
 	Status          string
+	Version         int64
 }
 
 type Credential struct {

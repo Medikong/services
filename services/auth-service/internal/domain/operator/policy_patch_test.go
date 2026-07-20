@@ -7,7 +7,7 @@ import (
 
 func TestPatchPolicyRulesKeepsOnlySupportedFields(t *testing.T) {
 	previous := json.RawMessage(`{"failureThreshold":5,"windowSeconds":900,"lockSeconds":900,"resetFailureOnSuccess":true}`)
-	raw, err := patchPolicyRules("login_lock", previous, map[string]any{
+	raw, err := PatchPolicyRules("login_lock", previous, map[string]any{
 		"policyName":       "login-lock",
 		"failureThreshold": float64(6),
 		"changeReason":     "SECURITY_BASELINE_UPDATE",
@@ -26,7 +26,7 @@ func TestPatchPolicyRulesKeepsOnlySupportedFields(t *testing.T) {
 
 func TestPatchPolicyRulesRejectsInvalidRelationshipAndUnknownField(t *testing.T) {
 	previous := json.RawMessage(`{"webIdleSeconds":1800,"webAbsoluteSeconds":43200,"mobileAccessSeconds":900,"mobileRefreshSeconds":1209600,"webRememberMeSeconds":2592000,"internalContextSeconds":300}`)
-	_, err := patchPolicyRules("session_ttl", previous, map[string]any{
+	_, err := PatchPolicyRules("session_ttl", previous, map[string]any{
 		"policyName":         "session-ttl",
 		"webIdleSeconds":     float64(50000),
 		"webAbsoluteSeconds": float64(100),
@@ -35,7 +35,7 @@ func TestPatchPolicyRulesRejectsInvalidRelationshipAndUnknownField(t *testing.T)
 	if err == nil {
 		t.Fatal("expected invalid TTL relationship to be rejected")
 	}
-	_, err = patchPolicyRules("session_ttl", previous, map[string]any{
+	_, err = PatchPolicyRules("session_ttl", previous, map[string]any{
 		"policyName":   "session-ttl",
 		"unknown":      true,
 		"changeReason": "SECURITY_BASELINE_UPDATE",
@@ -46,7 +46,7 @@ func TestPatchPolicyRulesRejectsInvalidRelationshipAndUnknownField(t *testing.T)
 }
 
 func TestPatchPolicyRulesReplacesAndValidatesRuleBundles(t *testing.T) {
-	raw, err := patchPolicyRules("verification_rules", nil, map[string]any{
+	raw, err := PatchPolicyRules("verification_rules", nil, map[string]any{
 		"policyName": "verification",
 		"rules": []any{
 			map[string]any{"purpose": "password_reset", "channel": "email_code", "ttlSeconds": float64(300), "maxAttempts": float64(5), "maxSends": float64(3), "resendIntervalSeconds": float64(60)},
@@ -56,7 +56,7 @@ func TestPatchPolicyRulesReplacesAndValidatesRuleBundles(t *testing.T) {
 	if err != nil || len(raw) == 0 {
 		t.Fatalf("expected valid replacement, raw=%s err=%v", raw, err)
 	}
-	_, err = patchPolicyRules("verification_rules", nil, map[string]any{
+	_, err = PatchPolicyRules("verification_rules", nil, map[string]any{
 		"policyName": "verification",
 		"rules": []any{
 			map[string]any{"purpose": "phone_change", "channel": "sms_code", "ttlSeconds": float64(300), "maxAttempts": float64(5), "maxSends": float64(3), "resendIntervalSeconds": float64(60)},

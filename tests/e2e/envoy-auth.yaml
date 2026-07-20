@@ -145,7 +145,7 @@ static_resources:
                           uri: http://auth-service:8080
                           cluster: auth_service
                           timeout: 0.2s
-                        path_prefix: /internal/ext-authz
+                        path_prefix: /internal/session/status
                         authorization_response:
                           allowed_upstream_headers:
                             patterns:

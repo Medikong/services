@@ -14,11 +14,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	appstate "github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
-	"github.com/Medikong/services/services/auth-service/internal/security"
+	appsession "github.com/Medikong/services/services/auth-service/internal/application/session"
+	appstate "github.com/Medikong/services/services/auth-service/internal/application/userauthstate"
+	domainsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
+	domainstate "github.com/Medikong/services/services/auth-service/internal/domain/userauthstate"
+	clockinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/clock"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/cryptography"
+	postgresinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/postgres"
 )
 
 type allowAuthorizationDecision struct{}
@@ -39,17 +41,20 @@ func TestApplyUserAccountStatusRevokesTargetSessionsAndReplays(t *testing.T) {
 	operatorUserID, operatorIdentityID, operatorLinkID := uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, operatorUserID, operatorIdentityID, operatorLinkID)
 	operatorSession := issueIntegrationSession(t, ctx, db, keys, operatorUserID, operatorIdentityID, operatorLinkID)
-	principal := appsession.Principal{
+	principal := domainsession.Principal{
 		Authenticated: true, UserID: operatorUserID, SessionID: uuid.MustParse(operatorSession.SessionID),
 		Method: "email_password", AuthenticatedAt: time.Now().UTC(),
 	}
-	verifier, err := security.NewUserProofVerifier("user-service", "user-local-1", integrationUserProofPublicKey(), 30*time.Second, nil)
+	verifier, err := cryptography.NewUserProofVerifier("user-service", "user-local-1", integrationUserProofPublicKey(), 30*time.Second, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	service := appstate.NewService(
-		db, appstate.NewPostgresRepository(db), appsession.NewPostgresRepository(db), verifier,
-		allowAuthorizationDecision{}, appstate.Config{StrongAuthTTL: 5 * time.Minute},
+		postgresinfra.NewUserAuthStateTransactor(db),
+		cryptography.NewUserAuthStateProofVerifier(verifier),
+		allowAuthorizationDecision{},
+		appstate.Config{StrongAuthTTL: 5 * time.Minute},
+		clockinfra.System{},
 	)
 	proof := signUserStatusProof(t, targetUserID, uuid.NewString(), "restricted", 2, time.Now().UTC())
 	input := appstate.ApplyInput{Principal: principal, PathUserID: targetUserID.String(), UserStatusChangeProof: proof, AuthorizationDecision: "allow"}
@@ -57,7 +62,7 @@ func TestApplyUserAccountStatusRevokesTargetSessionsAndReplays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply user status: %v", err)
 	}
-	if !result.Applied || result.AccountStatus != appstate.StatusRestricted || result.UserVersion != 2 {
+	if !result.Applied || result.AccountStatus != domainstate.StatusRestricted || result.UserVersion != 2 {
 		t.Fatalf("unexpected apply result: %#v", result)
 	}
 	var sessionStatus, credentialStatus string
@@ -81,27 +86,21 @@ func TestApplyUserAccountStatusRevokesTargetSessionsAndReplays(t *testing.T) {
 	}
 }
 
-func issueIntegrationSession(t *testing.T, ctx context.Context, db *pgxpool.Pool, keys security.Keys, userID, identityID, linkID uuid.UUID) appsession.Issued {
+func issueIntegrationSession(t *testing.T, ctx context.Context, db *pgxpool.Pool, keys cryptography.Keys, userID, identityID, linkID uuid.UUID) appsession.Issued {
 	t.Helper()
-	sessions := appsession.NewPostgresRepository(db)
+	sessions := postgresinfra.NewSessionRepository(db)
 	service := appsession.NewService(
-		db, keys,
+		postgresinfra.NewSessionTransactor(db),
+		cryptography.NewSession(keys),
+		clockinfra.System{},
 		appsession.Config{AccessTTL: time.Minute, RefreshTTL: time.Hour, SessionTTL: time.Hour, RecoveryTTL: time.Minute},
-		sessions, appstate.NewPostgresRepository(db), idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db),
+		sessions,
 	)
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	issued, err := service.IssueTx(ctx, tx, appsession.IssueInput{
+	issued, err := service.Issue(ctx, appsession.IssueInput{
 		UserID: userID, IdentityID: identityID, IdentityLink: linkID,
 		Method: "email_password", Channel: "ios",
 	})
 	if err != nil {
-		_ = tx.Rollback(ctx)
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return issued
@@ -116,7 +115,7 @@ func signUserStatusProof(t *testing.T, userID uuid.UUID, changeID, status string
 	if err != nil {
 		t.Fatal(err)
 	}
-	claims, err := json.Marshal(security.UserStatusProof{
+	claims, err := json.Marshal(cryptography.UserStatusProof{
 		Issuer: "user-service", Audience: "auth-service", Purpose: "apply_user_status",
 		StatusChangeID: changeID, UserID: userID.String(), AccountStatus: status,
 		UserVersion: version, ChangedAt: changedAt.Unix(), IssuedAt: now.Unix(), ExpiresAt: now.Add(5 * time.Minute).Unix(), Nonce: uuid.NewString(),
@@ -137,7 +136,7 @@ func signUserCreationProof(t *testing.T, registrationID string, userID uuid.UUID
 	if err != nil {
 		t.Fatal(err)
 	}
-	claims, err := json.Marshal(security.UserProofClaims{
+	claims, err := json.Marshal(cryptography.UserProofClaims{
 		Issuer: "user-service", Audience: "auth-service", Purpose: "complete_registration",
 		RegistrationID: registrationID, UserID: userID.String(), UserVersion: version,
 		IssuedAt: now.Unix(), ExpiresAt: now.Add(5 * time.Minute).Unix(), Nonce: uuid.NewString(),

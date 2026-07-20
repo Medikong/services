@@ -24,6 +24,9 @@ func TestLoadServerUsesRuntimeDefaults(t *testing.T) {
 	if cfg.HTTP.PublicAddr != ":8080" || cfg.HTTP.AdminAddr != ":9090" {
 		t.Fatalf("HTTP addresses = %q, %q", cfg.HTTP.PublicAddr, cfg.HTTP.AdminAddr)
 	}
+	if cfg.Auth.SessionCookieName != "__Secure-dm_refresh" || cfg.Auth.AuthFlowCookieName != "__Host-dm_auth" || !cfg.Auth.CookieSecure {
+		t.Fatal("browser cookie defaults are invalid")
+	}
 }
 
 func testPrivateKeyPEM(t *testing.T) string {
@@ -43,6 +46,30 @@ func TestLoadServerRequiresDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	if _, err := LoadServer(); err == nil {
 		t.Fatal("LoadServer() error = nil, want database URL validation error")
+	}
+}
+
+func TestLoadServerRejectsInsecurePrefixedCookies(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/auth?sslmode=disable")
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", testPrivateKeyPEM(t))
+	t.Setenv("AUTH_JWT_KEY_ID", "test-key")
+	t.Setenv("AUTH_COOKIE_SECURE", "false")
+
+	if _, err := LoadServer(); err == nil {
+		t.Fatal("LoadServer() error = nil, want browser cookie prefix validation error")
+	}
+}
+
+func TestLoadServerAllowsInsecureUnprefixedCookiesInLocalDevelopment(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://app:app@localhost:5432/auth?sslmode=disable")
+	t.Setenv("AUTH_JWT_PRIVATE_KEY_PEM", testPrivateKeyPEM(t))
+	t.Setenv("AUTH_JWT_KEY_ID", "test-key")
+	t.Setenv("AUTH_COOKIE_SECURE", "false")
+	t.Setenv("AUTH_SESSION_COOKIE_NAME", "dm_refresh")
+	t.Setenv("AUTH_FLOW_COOKIE_NAME", "dm_auth")
+
+	if _, err := LoadServer(); err != nil {
+		t.Fatalf("LoadServer() error = %v", err)
 	}
 }
 

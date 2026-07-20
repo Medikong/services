@@ -14,6 +14,8 @@ type SessionStatusConfig struct {
 	Redis             redisutil.Config
 	Timeout           time.Duration
 	DBFallbackTimeout time.Duration
+	CacheTTL          time.Duration
+	TombstoneTTL      time.Duration
 }
 
 func loadSessionStatus() (SessionStatusConfig, error) {
@@ -29,7 +31,18 @@ func loadSessionStatus() (SessionStatusConfig, error) {
 	if err != nil {
 		return SessionStatusConfig{}, err
 	}
-	config := SessionStatusConfig{Enabled: enabled, Timeout: timeout, DBFallbackTimeout: dbFallbackTimeout}
+	cacheTTL, err := durationEnv("AUTH_SESSION_STATUS_CACHE_TTL", 5*time.Minute)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	tombstoneTTL, err := durationEnv("AUTH_SESSION_STATUS_TOMBSTONE_TTL", 20*time.Minute)
+	if err != nil {
+		return SessionStatusConfig{}, err
+	}
+	config := SessionStatusConfig{
+		Enabled: enabled, Timeout: timeout, DBFallbackTimeout: dbFallbackTimeout,
+		CacheTTL: cacheTTL, TombstoneTTL: tombstoneTTL,
+	}
 	if enabled {
 		config.Redis, err = redisutil.LoadConfigFromEnv(strings.TrimSpace(os.Getenv("REDIS_URL")))
 		if err != nil {
@@ -43,6 +56,8 @@ func (c SessionStatusConfig) Validate() error {
 	err := validation.ValidateStruct(&c,
 		validation.Field(&c.Timeout, validation.Min(time.Nanosecond)),
 		validation.Field(&c.DBFallbackTimeout, validation.Min(time.Nanosecond), validation.Max(c.Timeout)),
+		validation.Field(&c.CacheTTL, validation.Required, validation.Min(time.Nanosecond)),
+		validation.Field(&c.TombstoneTTL, validation.Required, validation.Min(c.CacheTTL)),
 	)
 	if err != nil {
 		return configErr.With("config", "session_status").Wrap(err)

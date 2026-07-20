@@ -13,7 +13,7 @@ import (
 	"github.com/Medikong/services/packages/go-audit"
 	platformdb "github.com/Medikong/services/packages/go-platform/database"
 	"github.com/Medikong/services/services/auth-service/internal/app"
-	"github.com/Medikong/services/services/auth-service/internal/auth"
+	authmigration "github.com/Medikong/services/services/auth-service/internal/infrastructure/migration"
 	"github.com/Medikong/services/services/auth-service/internal/platform/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
@@ -102,7 +102,7 @@ func configureDevelopmentEnvironment(t *testing.T, databaseURL string) {
 func migrateSchemas(t *testing.T, ctx context.Context, postgres platformdb.PostgresConfig) *pgxpool.Pool {
 	t.Helper()
 	db := migrateProductionSchemas(t, ctx, postgres)
-	if err := auth.MigrateDevelopment(ctx, db); err != nil {
+	if err := authmigration.MigrateDevelopment(ctx, db); err != nil {
 		db.Close()
 		t.Fatalf("migrate development auth schema: %v", err)
 	}
@@ -119,7 +119,7 @@ func migrateProductionSchemas(t *testing.T, ctx context.Context, postgres platfo
 		db.Close()
 		t.Fatalf("migrate audit schema: %v", err)
 	}
-	if err := auth.Migrate(ctx, db); err != nil {
+	if err := authmigration.Migrate(ctx, db); err != nil {
 		db.Close()
 		t.Fatalf("migrate auth schema: %v", err)
 	}

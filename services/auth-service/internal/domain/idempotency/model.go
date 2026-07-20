@@ -29,3 +29,16 @@ type ReplayPayload struct {
 	ExpiresAt   time.Time
 	DestroyedAt *time.Time
 }
+
+func NewRecord(operation string, scopeHash, keyHash, requestHash []byte, resourceID, replayID *uuid.UUID, expiresAt time.Time) Record {
+	return Record{
+		ID:          uuid.New(),
+		Operation:   operation,
+		ScopeHash:   scopeHash,
+		KeyHash:     keyHash,
+		RequestHash: requestHash,
+		ResourceID:  resourceID,
+		ReplayID:    replayID,
+		ExpiresAt:   expiresAt,
+	}
+}

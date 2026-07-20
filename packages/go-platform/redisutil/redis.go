@@ -137,7 +137,8 @@ func Open(ctx context.Context, cfg Config, optionFns ...Option) (*goredis.Client
 	}
 	options, err := goredis.ParseURL(cfg.URL)
 	if err != nil {
-		return nil, oops.In("platform_redis").Code("redis.invalid_url").Wrap(err)
+		// ParseURL errors can echo the original URL, including embedded credentials.
+		return nil, oops.In("platform_redis").Code("redis.invalid_url").New("Redis URL is invalid")
 	}
 	options.PoolSize = cfg.PoolSize
 	options.MinIdleConns = cfg.MinIdleConns

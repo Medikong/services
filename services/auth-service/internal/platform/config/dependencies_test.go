@@ -19,8 +19,55 @@ func TestDependencyConfigsRequireExplicitEndpoints(t *testing.T) {
 }
 
 func TestSessionStatusTimeoutContainsDatabaseFallback(t *testing.T) {
-	config := SessionStatusConfig{Timeout: 100 * time.Millisecond, DBFallbackTimeout: 101 * time.Millisecond}
+	config := SessionStatusConfig{
+		Timeout: 100 * time.Millisecond, DBFallbackTimeout: 101 * time.Millisecond,
+		CacheTTL: time.Minute, TombstoneTTL: 2 * time.Minute,
+	}
 	if err := config.Validate(); err == nil {
 		t.Fatal("SessionStatusConfig.Validate() error = nil")
+	}
+}
+
+func TestSessionStatusCacheTTLValidation(t *testing.T) {
+	tests := []struct {
+		name   string
+		config SessionStatusConfig
+	}{
+		{
+			name: "cache ttl required",
+			config: SessionStatusConfig{
+				Timeout: time.Second, DBFallbackTimeout: 100 * time.Millisecond,
+				TombstoneTTL: time.Minute,
+			},
+		},
+		{
+			name: "tombstone must outlive active cache",
+			config: SessionStatusConfig{
+				Timeout: time.Second, DBFallbackTimeout: 100 * time.Millisecond,
+				CacheTTL: 2 * time.Minute, TombstoneTTL: time.Minute,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.config.Validate(); err == nil {
+				t.Fatal("SessionStatusConfig.Validate() error = nil")
+			}
+		})
+	}
+}
+
+func TestSessionStatusCacheTTLDefaults(t *testing.T) {
+	t.Setenv("AUTH_SESSION_STATUS_ENABLED", "false")
+	t.Setenv("AUTH_SESSION_STATUS_TIMEOUT", "")
+	t.Setenv("AUTH_SESSION_STATUS_DB_TIMEOUT", "")
+	t.Setenv("AUTH_SESSION_STATUS_CACHE_TTL", "")
+	t.Setenv("AUTH_SESSION_STATUS_TOMBSTONE_TTL", "")
+	config, err := loadSessionStatus()
+	if err != nil {
+		t.Fatalf("loadSessionStatus() error = %v", err)
+	}
+	if config.CacheTTL != 5*time.Minute || config.TombstoneTTL != 20*time.Minute {
+		t.Fatalf("session status TTL defaults = (%s, %s)", config.CacheTTL, config.TombstoneTTL)
 	}
 }

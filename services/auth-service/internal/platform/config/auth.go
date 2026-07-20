@@ -84,6 +84,9 @@ func (c AuthConfig) Validate(operational bool) error {
 	if _, exists := c.JWTRetiringPublicKeys[c.JWTKeyID]; exists {
 		return validation.NewError("jwt_retiring_public_keys", "active AUTH_JWT_KEY_ID cannot also be retiring")
 	}
+	if !c.CookieSecure && (hasBrowserCookiePrefix(c.SessionCookieName) || hasBrowserCookiePrefix(c.AuthFlowCookieName)) {
+		return validation.NewError("cookie_secure", "AUTH_COOKIE_SECURE must be true when a cookie name uses __Secure- or __Host-")
+	}
 	if operational && !c.CookieSecure {
 		return validation.NewError("cookie_secure", "AUTH_COOKIE_SECURE must be true outside local development")
 	}
@@ -100,6 +103,10 @@ func (c AuthConfig) Validate(operational bool) error {
 		}
 	}
 	return nil
+}
+
+func hasBrowserCookiePrefix(name string) bool {
+	return strings.HasPrefix(name, "__Secure-") || strings.HasPrefix(name, "__Host-")
 }
 
 type DevelopmentConfig struct {
@@ -273,7 +280,7 @@ func loadAuth(environment string) (AuthConfig, error) {
 		SessionTTL: sessionTTL, RememberMeSessionTTL: rememberTTL, RefreshTTL: refreshTTL,
 		AccessTTL: accessTTL, ProofTTL: proofTTL, RecoveryTTL: recoveryTTL,
 		PasswordMinLength:  passwordMinLength,
-		SessionCookieName:  stringEnv("AUTH_SESSION_COOKIE_NAME", "__Host-dm_refresh"),
+		SessionCookieName:  stringEnv("AUTH_SESSION_COOKIE_NAME", "__Secure-dm_refresh"),
 		AuthFlowCookieName: stringEnv("AUTH_FLOW_COOKIE_NAME", "__Host-dm_auth"),
 		CookieSecure:       cookieSecure,
 		AllowedOrigins:     stringListEnv("AUTH_ALLOWED_ORIGINS", originDefault),

@@ -25,7 +25,10 @@ import (
 	"time"
 )
 
-const maxBodyBytes = 16 << 10
+const (
+	maxBodyBytes           = 16 << 10
+	sessionStatusKeyPrefix = "auth:session-status:v2:"
+)
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
@@ -550,7 +553,7 @@ func (s *controlServer) redisDelete(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_session"})
 		return
 	}
-	if _, err := redisCommand("DEL", "auth:session-status:"+request.SessionID); err != nil {
+	if _, err := redisCommand("DEL", sessionStatusKeyPrefix+request.SessionID); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "redis_unavailable"})
 		return
 	}
@@ -581,7 +584,7 @@ func (s *controlServer) redisStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_session"})
 		return
 	}
-	result, err := redisCommand("EXISTS", "auth:session-status:"+sessionID)
+	result, err := redisCommand("EXISTS", sessionStatusKeyPrefix+sessionID)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "redis_unavailable"})
 		return

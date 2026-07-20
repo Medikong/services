@@ -314,8 +314,8 @@ func TestProductionHTTPRegistrationAPI(t *testing.T) {
 	if replayedData.Session.SessionID != completedData.Session.SessionID || replayedData.Access.AccessToken != completedData.Access.AccessToken {
 		t.Fatal("API.A.300-06 idempotent retry did not replay the same logical session")
 	}
-	sessionCookie := responseCookie(t, completedResponse, "__Host-dm_refresh")
-	assertCredentialCookie(t, sessionCookie, "__Host-dm_refresh")
+	sessionCookie := responseCookie(t, completedResponse, "__Secure-dm_refresh")
+	assertCredentialCookie(t, sessionCookie, "__Secure-dm_refresh")
 	if sessionCookie.MaxAge <= 0 {
 		t.Fatal("remembered registration session is missing Max-Age")
 	}

@@ -56,6 +56,22 @@ func TestOpenReturnsRawClient(t *testing.T) {
 	}
 }
 
+func TestOpenDoesNotExposeInvalidURLCredentials(t *testing.T) {
+	const credential = "do-not-log-this-password"
+	cfg, err := LoadConfigFromEnv("redis://worker:" + credential + "@%zz:6379/0")
+	if err != nil {
+		t.Fatal("LoadConfigFromEnv() unexpectedly rejected the URL before Open")
+	}
+
+	_, err = Open(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Open() error = nil, want invalid URL error")
+	}
+	if strings.Contains(err.Error(), credential) || strings.Contains(err.Error(), cfg.URL) {
+		t.Fatal("Open() error exposes Redis URL credentials")
+	}
+}
+
 func TestOpenUsesInjectedProvidersAndSanitizesCommandArguments(t *testing.T) {
 	server := miniredis.RunT(t)
 	cfg, err := LoadConfigFromEnv("redis://" + server.Addr() + "/0")

@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Medikong/services/services/auth-service/internal/domain"
-	"github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
-	appoperator "github.com/Medikong/services/services/auth-service/internal/domain/operator"
-	"github.com/Medikong/services/services/auth-service/internal/domain/outbox"
-	"github.com/Medikong/services/services/auth-service/internal/domain/policy"
+	appoperator "github.com/Medikong/services/services/auth-service/internal/application/operator"
+	domainidempotency "github.com/Medikong/services/services/auth-service/internal/domain/idempotency"
+	domainoperator "github.com/Medikong/services/services/auth-service/internal/domain/operator"
+	domainoutbox "github.com/Medikong/services/services/auth-service/internal/domain/outbox"
 	appsession "github.com/Medikong/services/services/auth-service/internal/domain/session"
-	"github.com/Medikong/services/services/auth-service/internal/security"
+	"github.com/Medikong/services/services/auth-service/internal/infrastructure/cryptography"
+	postgresinfra "github.com/Medikong/services/services/auth-service/internal/infrastructure/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,21 +25,23 @@ func TestGlobalPolicySnapshotHasSingleActiveVersion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	db := migratedDomainPool(t, ctx)
-	repository := policy.NewPostgresRepository(db)
+	tx := beginDomainTx(t, ctx, db)
+	repository := postgresinfra.NewPolicyRepository(tx)
 	before, err := repository.FindGlobalActive(ctx)
 	if err != nil {
+		rollbackDomainTx(ctx, tx)
 		t.Fatalf("find bootstrap global policy: %v", err)
 	}
 	if before.Version < 1 || len(before.Document) == 0 {
+		rollbackDomainTx(ctx, tx)
 		t.Fatalf("invalid bootstrap policy snapshot: %#v", before)
 	}
-	tx := beginDomainTx(t, ctx, db)
-	locked, err := repository.FindGlobalActiveForUpdate(ctx, tx)
+	locked, err := repository.FindGlobalActiveForUpdate(ctx)
 	if err != nil || locked.Version != before.Version {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("lock global policy: snapshot=%#v err=%v", locked, err)
 	}
-	after, err := repository.ActivateGlobal(ctx, tx, locked.Document, uuid.New(), "TEST_POLICY_SNAPSHOT")
+	after, err := repository.ActivateGlobal(ctx, locked.Document, uuid.New(), "TEST_POLICY_SNAPSHOT")
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("activate global policy: %v", err)
@@ -70,8 +72,11 @@ func TestPolicyUpdateCreatesOneGlobalSnapshotAndReplaysSameKey(t *testing.T) {
 	}
 	keys := integrationSecurityKeys(t)
 	service := appoperator.NewService(
-		db, keys, appoperator.NewPostgresRepository(db), policy.NewPostgresRepository(db),
-		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.DenyApprovalPort{}, allowAuthorizationDecision{},
+		postgresinfra.NewOperatorTransactor(db),
+		cryptography.NewOperatorCryptography(keys),
+		appoperator.Config{StrongAuthTTL: time.Minute},
+		appoperator.DenyApprovalPort{},
+		allowAuthorizationDecision{},
 	)
 	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Method: "email_password", AuthenticatedAt: time.Now().UTC()}
 	before, err := service.PolicyView(ctx, principal, "allow")
@@ -163,8 +168,11 @@ func TestManualActionReplaysOriginalActionResult(t *testing.T) {
 	seedRefreshPrincipal(t, ctx, db, targetUserID, identityID, linkID)
 	keys := testOperatorKeys(t)
 	service := appoperator.NewService(
-		db, keys, appoperator.NewPostgresRepository(db), policy.NewPostgresRepository(db),
-		idempotency.NewPostgresRepository(db), outbox.NewPostgresRepository(db), appoperator.Config{StrongAuthTTL: time.Minute}, appoperator.StaticApprovalPort{Allow: true}, allowAuthorizationDecision{},
+		postgresinfra.NewOperatorTransactor(db),
+		cryptography.NewOperatorCryptography(keys),
+		appoperator.Config{StrongAuthTTL: time.Minute},
+		appoperator.StaticApprovalPort{Allow: true},
+		allowAuthorizationDecision{},
 	)
 	principal := appsession.Principal{Authenticated: true, SessionID: uuid.New(), UserID: operatorID, Method: "email_password", AuthenticatedAt: time.Now().UTC()}
 	input := appoperator.ManualInput{
@@ -198,29 +206,29 @@ func TestManualActionRepositoryTransactionIsAtomic(t *testing.T) {
 	operatorID, targetUserID, identityID, linkID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	seedRefreshPrincipal(t, ctx, db, targetUserID, identityID, linkID)
 	keys := testOperatorKeys(t)
-	idempotencyRepository := idempotency.NewPostgresRepository(db)
-	operatorRepository := appoperator.NewPostgresRepository(db)
 	tx := beginDomainTx(t, ctx, db)
+	idempotencyRepository := postgresinfra.NewIdempotencyRepository(tx)
+	operatorRepository := postgresinfra.NewOperatorRepository(tx)
 	actionID := uuid.New()
-	record := idempotency.NewRecord("manual_auth_action", keys.Hash("manual_auth_action", operatorID.String()), keys.Hash("manual-key"), keys.Hash("revoke_identity_link", "identity_link", linkID.String(), "CUSTOMER_SUPPORT"), &actionID, nil, time.Now().UTC().Add(time.Hour))
-	if err := idempotencyRepository.CreateProcessing(ctx, tx, record, "ManualAction"); err != nil {
+	record := domainidempotency.NewRecord("manual_auth_action", keys.Hash("manual_auth_action", operatorID.String()), keys.Hash("manual-key"), keys.Hash("revoke_identity_link", "identity_link", linkID.String(), "CUSTOMER_SUPPORT"), &actionID, nil, time.Now().UTC().Add(time.Hour))
+	if err := idempotencyRepository.CreateProcessing(ctx, record, "ManualAction"); err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("create manual idempotency record: %v", err)
 	}
-	version, err := operatorRepository.ApplyManual(ctx, tx, appoperator.ManualAction{ID: actionID, OperatorID: operatorID, CaseID: "case-atomic", TargetType: "identity_link", TargetID: linkID.String(), Action: "revoke_identity_link", ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-atomic", EvidenceRef: "evidence-atomic", ExpectedVersion: 0, IdempotencyID: &record.ID})
+	version, err := operatorRepository.ApplyManual(ctx, domainoperator.ManualAction{ID: actionID, OperatorID: operatorID, CaseID: "case-atomic", TargetType: "identity_link", TargetID: linkID.String(), Action: "revoke_identity_link", ReasonCode: "CUSTOMER_SUPPORT", ApprovalID: "approval-atomic", EvidenceRef: "evidence-atomic", ExpectedVersion: 0, IdempotencyID: &record.ID})
 	if err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("apply manual repository action: %v", err)
 	}
-	if err := idempotencyRepository.Complete(ctx, tx, record.ID, "completed"); err != nil {
+	if err := idempotencyRepository.Complete(ctx, record.ID, "completed"); err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("complete manual idempotency record: %v", err)
 	}
-	if err := outbox.NewPostgresRepository(db).Append(ctx, tx, outbox.Event{ID: uuid.New(), Type: "Auth.ManualActionCompleted", AggregateType: "ManualAction", AggregateID: actionID, Version: version, Payload: json.RawMessage(`{"status":"completed"}`), CorrelationID: uuid.New()}); err != nil {
+	if err := postgresinfra.NewOutboxAppender(tx).Append(ctx, domainoutbox.Event{ID: uuid.New(), Type: "Auth.ManualActionCompleted", AggregateType: "ManualAction", AggregateID: actionID, Version: version, Payload: json.RawMessage(`{"status":"completed"}`), CorrelationID: uuid.New()}); err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("append manual domain outbox: %v", err)
 	}
-	if err := domain.AppendAudit(ctx, tx, "auth.manual_action.completed", "operator", operatorID, actionID, map[string]string{"action": "revoke_identity_link"}, "manual-key"); err != nil {
+	if err := postgresinfra.NewAuditAppender(tx).Append(ctx, "auth.manual_action.completed", "operator", operatorID, actionID, map[string]string{"action": "revoke_identity_link"}, "manual-key"); err != nil {
 		rollbackDomainTx(ctx, tx)
 		t.Fatalf("append manual audit outbox: %v", err)
 	}
@@ -237,7 +245,7 @@ func seedOperatorState(t *testing.T, ctx context.Context, db *pgxpool.Pool, user
 	}
 }
 
-func testOperatorKeys(t *testing.T) security.Keys {
+func testOperatorKeys(t *testing.T) cryptography.Keys {
 	t.Helper()
 	return integrationSecurityKeys(t)
 }
