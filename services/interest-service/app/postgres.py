@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, UniqueConstraint, func, select
+from sqlalchemy import BigInteger, DateTime, Float, Integer, String, UniqueConstraint, case, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -16,6 +16,8 @@ from app.models import (
     UpcomingRankingItem,
     UserId,
 )
+from app.counter_repository import MIN_VIEWS_FOR_RATIO, RECENCY_WINDOW
+from app.repository import InterestRepository
 from app.store import (
     InterestChanged,
     InterestToggleConflict,
@@ -144,6 +146,24 @@ class PostgresInterestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def count_active_updated_in_window(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> dict[DropId, int]:
+        async with self._session_factory() as session:
+            query = (
+                select(InterestRecord.drop_id, func.count().label("count"))
+                .where(
+                    InterestRecord.status == InterestStatus.ACTIVE.value,
+                    InterestRecord.updated_at >= start,
+                    InterestRecord.updated_at < end,
+                )
+                .group_by(InterestRecord.drop_id)
+            )
+            rows = (await session.execute(query)).all()
+            return {DropId(row.drop_id): row.count for row in rows}
+
 
 def _interest_from_record(record: InterestRecord) -> Interest:
     return Interest(
@@ -170,6 +190,41 @@ class DropViewRecord(Base):
     viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class DropViewCounterRecord(Base):
+    """`기다리는 상품 랭킹`(2026-07-21 재설계)의 전환율 분모 + 최근 활동 게이트용 누적 조회수.
+
+    `drop_views`(3시간 배치용, 6시간만 보관)와 별개로 리셋 없이 계속 누적한다.
+    """
+
+    __tablename__ = "drop_view_counters"
+
+    drop_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PostgresDropViewCounterRepository:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        self._session_factory = session_factory
+
+    async def increment(self, drop_id: DropId) -> None:
+        now = datetime.now(UTC)
+        async with self._session_factory() as session:
+            statement = (
+                pg_insert(DropViewCounterRecord)
+                .values(drop_id=drop_id, view_count=1, last_viewed_at=now)
+                .on_conflict_do_update(
+                    index_elements=[DropViewCounterRecord.drop_id],
+                    set_={
+                        "view_count": DropViewCounterRecord.view_count + 1,
+                        "last_viewed_at": now,
+                    },
+                )
+            )
+            await session.execute(statement)
+            await session.commit()
+
+
 class DropViewRankingRecord(Base):
     __tablename__ = "drop_view_rankings"
 
@@ -177,6 +232,10 @@ class DropViewRankingRecord(Base):
     rank: Mapped[int] = mapped_column(Integer, primary_key=True)
     drop_id: Mapped[str] = mapped_column(String(64), nullable=False)
     viewer_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 2026-07-20: 찜 속도(new_interest_count)/전환율(conversion_rate) 신호 추가.
+    # 정렬 기준(rank)은 여전히 viewer_count 기준 — 참고 필드로만 동봉한다.
+    new_interest_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    conversion_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -228,20 +287,60 @@ class PostgresDropInterestCounterRepository:
         limit: int,
         cursor: str | None,
     ) -> tuple[list[UpcomingRankingItem], bool]:
+        """2026-07-21 재설계: 정렬 기준을 누적 찜수 단독에서 전환율(찜/조회) 기반으로 바꿈.
+
+        - 최근 활동 게이트(`RECENCY_WINDOW`): 찜/조회 둘 다 오래 활동이 없으면 후보 제외
+          ("얼어붙은 비율" — 인기 절정기 이후 활동이 끊긴 드롭이 그 시절 높은 전환율로
+          영원히 상위권에 남는 것을 막는다).
+        - 표본 부족 폴백(`MIN_VIEWS_FOR_RATIO`): 조회수가 너무 적으면 전환율 대신
+          원시 찜수로 하위 티어에 배치한다.
+        """
         offset = int(cursor) if cursor is not None else 0
+        view_count_expr = func.coalesce(DropViewCounterRecord.view_count, 0)
+        last_activity_expr = func.greatest(
+            DropInterestCounterRecord.updated_at,
+            func.coalesce(DropViewCounterRecord.last_viewed_at, DropInterestCounterRecord.updated_at),
+        )
+        meets_threshold_expr = view_count_expr >= MIN_VIEWS_FOR_RATIO
+        conversion_rate_expr = case(
+            (meets_threshold_expr, DropInterestCounterRecord.interest_count / func.cast(view_count_expr, Float)),
+            else_=None,
+        )
+
         async with self._session_factory() as session:
+            recency_cutoff = datetime.now(UTC) - RECENCY_WINDOW
             query = (
-                select(DropInterestCounterRecord)
-                .order_by(DropInterestCounterRecord.interest_count.desc(), DropInterestCounterRecord.drop_id)
+                select(
+                    DropInterestCounterRecord.drop_id,
+                    DropInterestCounterRecord.interest_count,
+                    view_count_expr.label("view_count"),
+                    conversion_rate_expr.label("conversion_rate"),
+                )
+                .outerjoin(
+                    DropViewCounterRecord,
+                    DropViewCounterRecord.drop_id == DropInterestCounterRecord.drop_id,
+                )
+                .where(last_activity_expr >= recency_cutoff)
+                .order_by(
+                    case((meets_threshold_expr, 0), else_=1),
+                    conversion_rate_expr.desc(),
+                    DropInterestCounterRecord.interest_count.desc(),
+                    DropInterestCounterRecord.drop_id,
+                )
                 .offset(offset)
                 .limit(limit + 1)
             )
-            rows = (await session.execute(query)).scalars().all()
+            rows = (await session.execute(query)).all()
             has_next = len(rows) > limit
             selected = rows[:limit]
             items = [
-                UpcomingRankingItem(dropId=record.drop_id, interestCount=record.interest_count)
-                for record in selected
+                UpcomingRankingItem(
+                    dropId=row.drop_id,
+                    interestCount=row.interest_count,
+                    viewCount=row.view_count,
+                    conversionRate=row.conversion_rate,
+                )
+                for row in selected
             ]
             return items, has_next
 
@@ -259,8 +358,13 @@ class PostgresDropViewRepository:
 class PostgresDropViewRankingRepository:
     """실시간 조회 랭킹 배치 Worker 전용 저장소(`SD.A.0730` "실시간 조회 랭킹 배치 Worker" 참고)."""
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        interest_repository: InterestRepository,
+    ) -> None:
         self._session_factory = session_factory
+        self._interest_repository = interest_repository
 
     async def compute_and_store_bucket(
         self,
@@ -268,6 +372,10 @@ class PostgresDropViewRankingRepository:
         bucket_end: datetime,
         limit: int,
     ) -> None:
+        new_interest_counts = await self._interest_repository.count_active_updated_in_window(
+            bucket_start,
+            bucket_end,
+        )
         async with self._session_factory() as session:
             viewer_count = func.count(func.distinct(DropViewRecord.user_id))
             query = (
@@ -286,12 +394,15 @@ class PostgresDropViewRankingRepository:
             )
             now = datetime.now(UTC)
             for rank, row in enumerate(rows, start=1):
+                new_interest_count = new_interest_counts.get(DropId(row.drop_id), 0)
                 session.add(
                     DropViewRankingRecord(
                         bucket_start=bucket_start,
                         rank=rank,
                         drop_id=row.drop_id,
                         viewer_count=row.viewer_count,
+                        new_interest_count=new_interest_count,
+                        conversion_rate=(new_interest_count / row.viewer_count) if row.viewer_count > 0 else None,
                         computed_at=now,
                     ),
                 )
@@ -322,7 +433,13 @@ class PostgresDropViewRankingRepository:
             has_next = len(rows) > limit
             selected = rows[:limit]
             items = [
-                TrendingRankingItem(dropId=record.drop_id, rank=record.rank, viewerCount=record.viewer_count)
+                TrendingRankingItem(
+                    dropId=record.drop_id,
+                    rank=record.rank,
+                    viewerCount=record.viewer_count,
+                    newInterestCount=record.new_interest_count,
+                    conversionRate=record.conversion_rate,
+                )
                 for record in selected
             ]
             return items, has_next, max_bucket

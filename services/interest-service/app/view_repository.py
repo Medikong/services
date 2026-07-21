@@ -8,6 +8,16 @@ class DropViewRepository(Protocol):
     async def record_view(self, drop_id: DropId, user_id: UserId) -> None: ...
 
 
+class DropViewCounterRepository(Protocol):
+    """드롭별 누적 조회수(리셋 없음) 저장소.
+
+    `기다리는 상품 랭킹`(2026-07-21 재설계)의 전환율(찜/조회) 정렬과, 죽은 드롭을
+    걸러내는 최근 활동 게이트(`last_viewed_at`) 둘 다에 쓰인다.
+    """
+
+    async def increment(self, drop_id: DropId) -> None: ...
+
+
 class DropViewRankingRepository(Protocol):
     """실시간 조회 랭킹 배치 Worker가 쓰는 저장소.
 

@@ -1,13 +1,14 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import anyio
 from fastapi.testclient import TestClient
 
 from app.counter_store import DropInterestCounterStore
 from app.main import create_app
-from app.store import InterestStore
+from app.models import InterestStatus
+from app.store import InterestStore, ToggleInterestCommand
 from app.view_ranking_worker import bucket_boundaries_for, next_run_at
-from app.view_store import DropViewRankingStore, DropViewStore
+from app.view_store import DropViewCounterStore, DropViewRankingStore, DropViewStore
 
 AUTH_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
 OPERATOR_HEADERS = {"X-User-Id": "operator-001", "X-User-Role": "OPERATOR"}
@@ -16,7 +17,7 @@ DROP_B = "7d4a8f2c-5e14-46be-9b9b-987f5d69e002"
 
 
 def _client() -> TestClient:
-    return TestClient(create_app(InterestStore(), DropInterestCounterStore()))
+    return TestClient(create_app(InterestStore(), DropInterestCounterStore(DropViewCounterStore())))
 
 
 def test_add_interest_increments_upcoming_ranking() -> None:
@@ -27,10 +28,10 @@ def test_add_interest_increments_upcoming_ranking() -> None:
     client.put(f"/v1/users/me/interests/{DROP_A}", headers=AUTH_HEADERS)
     response = client.get("/v1/rankings/drops/upcoming")
 
-    # Then
+    # Then: 조회 기록이 없어(viewCount=0, MIN_VIEWS_FOR_RATIO 미달) 전환율 폴백 티어로 원시 찜수 정렬됨.
     assert response.status_code == 200
     body = response.json()["data"]
-    assert body == [{"dropId": DROP_A, "interestCount": 1}]
+    assert body == [{"dropId": DROP_A, "interestCount": 1, "viewCount": 0, "conversionRate": None}]
 
 
 def test_removing_interest_decrements_ranking_to_zero_but_keeps_entry() -> None:
@@ -44,7 +45,7 @@ def test_removing_interest_decrements_ranking_to_zero_but_keeps_entry() -> None:
 
     # Then
     assert response.status_code == 200
-    assert response.json()["data"] == [{"dropId": DROP_A, "interestCount": 0}]
+    assert response.json()["data"] == [{"dropId": DROP_A, "interestCount": 0, "viewCount": 0, "conversionRate": None}]
 
 
 def test_duplicate_add_interest_does_not_double_increment() -> None:
@@ -74,6 +75,47 @@ def test_upcoming_ranking_orders_by_interest_count_descending() -> None:
     data = response.json()["data"]
     assert [item["dropId"] for item in data] == [DROP_B, DROP_A]
     assert [item["interestCount"] for item in data] == [2, 1]
+
+
+def test_upcoming_ranking_uses_conversion_rate_with_recency_gate_and_fallback_tier() -> None:
+    # Given: 2026-07-21 재설계 검증 — 세 드롭으로 세 가지 케이스를 동시에 확인한다.
+    view_counter_store = DropViewCounterStore()
+    counter_store = DropInterestCounterStore(view_counter_store)
+    old_frozen_drop = "drop-old-frozen"  # 절정기 전환율 40%였지만 활동이 오래전에 끊김 — 최근활동게이트로 제외돼야 함
+    active_drop = "drop-active"  # 전환율 40%, 최근 활동 있음 — 1티어(전환율 정렬)
+    low_sample_drop = "drop-low-sample"  # 조회 3회뿐(표본 부족) — 2티어(찜수 폴백)
+
+    # When
+    async def run() -> tuple[list, bool]:
+        for _ in range(800):
+            await counter_store.increment(old_frozen_drop)
+        for _ in range(2000):
+            await view_counter_store.increment(old_frozen_drop)
+        for _ in range(40):
+            await counter_store.increment(active_drop)
+        for _ in range(100):
+            await view_counter_store.increment(active_drop)
+        for _ in range(5):
+            await counter_store.increment(low_sample_drop)
+        for _ in range(3):
+            await view_counter_store.increment(low_sample_drop)
+
+        # old_frozen_drop만 활동 시각을 30일 전으로 되돌려 "얼어붙은 비율" 상태를 재현한다.
+        stale_time = datetime.now(UTC) - timedelta(days=30)
+        counter_store._updated_at[old_frozen_drop] = stale_time
+        view_counter_store.last_viewed_at[old_frozen_drop] = stale_time
+
+        return await counter_store.list_by_interest_count(limit=10, cursor=None)
+
+    items, has_next = anyio.run(run)
+
+    # Then: 얼어붙은 드롭은 전환율(40%)이 active_drop과 같아도 결과에서 아예 빠진다.
+    assert has_next is False
+    assert [item.dropId for item in items] == [active_drop, low_sample_drop]
+    assert [(item.interestCount, item.viewCount, item.conversionRate) for item in items] == [
+        (40, 100, 0.4),
+        (5, 3, None),  # 표본 부족(조회 3 < MIN_VIEWS_FOR_RATIO 20) — 전환율 대신 원시 찜수로 폴백
+    ]
 
 
 def test_upcoming_ranking_pagination_returns_cursor() -> None:
@@ -120,11 +162,12 @@ def test_trending_ranking_returns_populated_snapshot_after_batch_runs_through_th
     # Given: record_drop_view API로 조회를 기록하고, 배치가 하는 것과 똑같이 스냅샷을 계산한 뒤
     # /v1/rankings/drops/trending API로 그 결과를 읽는다(레포지토리 직접 호출이 아니라 API 경유로 검증).
     view_store = DropViewStore()
-    ranking_store = DropViewRankingStore(view_store)
+    interest_store = InterestStore()
+    ranking_store = DropViewRankingStore(view_store, interest_store)
     client = TestClient(
         create_app(
-            InterestStore(),
-            DropInterestCounterStore(),
+            interest_store,
+            DropInterestCounterStore(DropViewCounterStore()),
             view_repository=view_store,
             view_ranking_repository=ranking_store,
         ),
@@ -149,6 +192,8 @@ def test_trending_ranking_returns_populated_snapshot_after_batch_runs_through_th
         (DROP_A, 1, 2),
         (DROP_B, 2, 1),
     ]
+    # 이 테스트에선 찜을 안 눌렀으니 찜 속도는 0, 전환율은 0/조회자수 = 0.0이어야 한다(조회는 있었으므로 None이 아님).
+    assert [(item["newInterestCount"], item["conversionRate"]) for item in body["data"]] == [(0, 0.0), (0, 0.0)]
 
 
 def test_trending_ranking_is_empty_before_any_batch_run() -> None:
@@ -214,7 +259,8 @@ def test_next_run_at_is_next_boundary_plus_grace_period() -> None:
 def test_compute_and_store_bucket_ranks_by_distinct_viewers_and_prunes_old_views() -> None:
     # Given
     view_store = DropViewStore()
-    ranking_store = DropViewRankingStore(view_store)
+    interest_store = InterestStore()
+    ranking_store = DropViewRankingStore(view_store, interest_store)
     bucket_start = datetime(2026, 7, 14, 3, 0, tzinfo=UTC)
     bucket_end = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
     in_bucket = bucket_start.replace(hour=4)
@@ -244,3 +290,46 @@ def test_compute_and_store_bucket_ranks_by_distinct_viewers_and_prunes_old_views
     ]
     # 보존 기간(bucket_start - 3h)보다 오래된 조회 기록은 정리된다.
     assert all(viewed_at >= bucket_start.replace(hour=0) for _, _, viewed_at in view_store.views)
+
+
+def test_compute_and_store_bucket_includes_new_interest_count_and_conversion_rate() -> None:
+    # Given: 2026-07-20 김정엽 멘토링 피드백 대응 — 찜 속도(newInterestCount)와
+    # 전환율(conversionRate = newInterestCount / viewerCount)이 조회자 수와 같은 구간 기준으로 계산돼야 한다.
+    view_store = DropViewStore()
+    interest_store = InterestStore()
+    ranking_store = DropViewRankingStore(view_store, interest_store)
+    bucket_start = datetime(2026, 7, 14, 3, 0, tzinfo=UTC)
+    bucket_end = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
+    in_bucket = bucket_start.replace(hour=4)
+    before_bucket = bucket_start.replace(hour=1)
+
+    # DROP_A: 조회 4명, 그 중 2명이 이 구간 안에서 새로 찜(전환율 50%)
+    view_store.views = [
+        (DROP_A, "viewer-1", in_bucket),
+        (DROP_A, "viewer-2", in_bucket),
+        (DROP_A, "viewer-3", in_bucket),
+        (DROP_A, "viewer-4", in_bucket),
+        (DROP_B, "viewer-5", in_bucket),  # DROP_B: 조회 1명, 찜 0명(전환율 0%)
+    ]
+    # When
+    async def run() -> tuple[list, bool, datetime | None]:
+        for fan_id in ("fan-1", "fan-2", "fan-3"):
+            await interest_store.upsert_status(
+                ToggleInterestCommand(user_id=fan_id, drop_id=DROP_A, target_status=InterestStatus.ACTIVE),
+            )
+        # 찜 시각을 구간 안/밖으로 직접 맞춘다(fan-3만 구간 밖) — view_store.views를 직접 재작성하는
+        # 다른 테스트들과 같은 패턴.
+        interest_store._records[("fan-1", DROP_A)].updated_at = in_bucket
+        interest_store._records[("fan-2", DROP_A)].updated_at = in_bucket
+        interest_store._records[("fan-3", DROP_A)].updated_at = before_bucket
+
+        await ranking_store.compute_and_store_bucket(bucket_start, bucket_end, limit=100)
+        return await ranking_store.get_latest_bucket(limit=10, cursor=None)
+
+    items, _, _ = anyio.run(run)
+
+    # Then
+    assert [(item.dropId, item.newInterestCount, item.conversionRate) for item in items] == [
+        (DROP_A, 2, 0.5),
+        (DROP_B, 0, 0.0),
+    ]

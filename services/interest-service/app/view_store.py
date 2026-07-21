@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from app.models import DropId, TrendingRankingItem, UserId
+from app.repository import InterestRepository
 
 RETENTION_WINDOW = timedelta(hours=3)
 
@@ -16,11 +17,24 @@ class DropViewStore:
         self.views.append((drop_id, user_id, datetime.now(UTC)))
 
 
+class DropViewCounterStore:
+    """In-memory DropViewCounterRepository 구현. 리셋 없는 누적 조회수 + 마지막 조회 시각을 유지한다."""
+
+    def __init__(self) -> None:
+        self.view_counts: dict[DropId, int] = {}
+        self.last_viewed_at: dict[DropId, datetime] = {}
+
+    async def increment(self, drop_id: DropId) -> None:
+        self.view_counts[drop_id] = self.view_counts.get(drop_id, 0) + 1
+        self.last_viewed_at[drop_id] = datetime.now(UTC)
+
+
 class DropViewRankingStore:
     """In-memory DropViewRankingRepository 구현. DropViewStore와 짝을 이뤄 배치 로직을 검증한다."""
 
-    def __init__(self, view_store: DropViewStore) -> None:
+    def __init__(self, view_store: DropViewStore, interest_repository: InterestRepository) -> None:
         self._view_store = view_store
+        self._interest_repository = interest_repository
         self._buckets: dict[datetime, list[TrendingRankingItem]] = {}
         self._latest_bucket_start: datetime | None = None
 
@@ -35,9 +49,20 @@ class DropViewRankingStore:
             if bucket_start <= viewed_at < bucket_end:
                 counts[drop_id].add(user_id)
 
+        new_interest_counts = await self._interest_repository.count_active_updated_in_window(
+            bucket_start,
+            bucket_end,
+        )
+
         ranked = sorted(counts.items(), key=lambda item: (-len(item[1]), item[0]))[:limit]
         self._buckets[bucket_start] = [
-            TrendingRankingItem(dropId=drop_id, rank=index + 1, viewerCount=len(users))
+            TrendingRankingItem(
+                dropId=drop_id,
+                rank=index + 1,
+                viewerCount=len(users),
+                newInterestCount=new_interest_counts.get(drop_id, 0),
+                conversionRate=(new_interest_counts.get(drop_id, 0) / len(users)) if len(users) > 0 else None,
+            )
             for index, (drop_id, users) in enumerate(ranked)
         ]
         if self._latest_bucket_start is None or bucket_start > self._latest_bucket_start:
