@@ -502,6 +502,24 @@ services:
       timeout: 5s
       retries: 20
 
+  interest-service:
+    build:
+      context: ../..
+      dockerfile: services/interest-service/Dockerfile
+    environment:
+      <<: *service-e2e-env
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/interest_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${INTEREST_SERVICE_PORT:-18089}:8085"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/readyz').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   purchase-newman:
     build:
       context: .

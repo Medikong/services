@@ -35,6 +35,7 @@ vars:
   PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT: '{{default "dropmong-payment-failure-idempotency" .PAYMENT_FAILURE_IDEMPOTENCY_COMPOSE_PROJECT}}'
   PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE: '{{default "" .PAYMENT_FAILURE_IDEMPOTENCY_SMOKE_IMAGE}}'
   PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+  INTEREST_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-interest-postgres" .INTEREST_POSTGRES_COMPOSE_PROJECT}}'
   PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
   E2E_SCENARIO: '{{default "all" .E2E_SCENARIO}}'
   E2E_REPORT_NAME: '{{default "e2e" .E2E_REPORT_NAME}}'
@@ -988,6 +989,33 @@ tasks:
           -e NOTIFICATION_TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/notification_service \
           -v "${repo_root}":/workspace -w /workspace/services/notification-service \
           {{.TEST_RUNNER_IMAGE_PREFIX}}-notification-service:local \
+          sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration'
+
+  test-interest-postgres-integration:
+    desc: Run interest-service integration tests against real PostgreSQL; a missing database is fatal.
+    cmds:
+      - |
+        set -eu
+        repo_root="$(cd "{{.ROOT_DIR}}" && pwd -P)"
+        project='{{.INTEREST_POSTGRES_COMPOSE_PROJECT}}'
+        file='{{.ROOT_DIR}}/{{.E2E_COMPOSE_FILE}}'
+        compose_cmd='{{.DOCKER_COMPOSE}}'
+        cleanup() {
+          status="$?"
+          set +e
+          ${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans
+          cleanup_status="$?"
+          if [ "${status}" -ne 0 ]; then exit "${status}"; fi
+          exit "${cleanup_status}"
+        }
+        trap cleanup EXIT
+        ${compose_cmd} -p "${project}" -f "${file}" down -v --remove-orphans
+        ${compose_cmd} -p "${project}" -f "${file}" up -d --wait --wait-timeout {{.E2E_WAIT_TIMEOUT_SECONDS}} postgres
+        task --dir "${repo_root}/tests" test-runner-build SERVICE=interest-service
+        docker run --rm --network "${project}_default" \
+          -e TEST_DATABASE_URL=postgresql+asyncpg://app:app@postgres:5432/interest_service \
+          -v "${repo_root}":/workspace -w /workspace/services/interest-service \
+          {{.TEST_RUNNER_IMAGE_PREFIX}}-interest-service:local \
           sh -c 'PYTHONPATH=. python -m pytest -p no:cacheprovider -q --maxfail=1 tests/integration'
 
   test-purchase-contracts:

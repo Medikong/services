@@ -16,6 +16,7 @@ vars:
   DOCKER_BUILD_CACHE_TO: '{{default "" .DOCKER_BUILD_CACHE_TO}}'
   PYTHON_BIN: '{{default "python" .PYTHON_BIN}}'
   PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-purchase-postgres" .PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+  INTEREST_POSTGRES_COMPOSE_PROJECT: '{{default "dropmong-interest-postgres" .INTEREST_POSTGRES_COMPOSE_PROJECT}}'
   PURCHASE_LIFECYCLE_COMPOSE_PREFIX: '{{default "dropmong-purchase-lifecycle" .PURCHASE_LIFECYCLE_COMPOSE_PREFIX}}'
   SERVICE_LIST_SCRIPT: '{{default "scripts/list_services.py" .SERVICE_LIST_SCRIPT}}'
   GO_TEST_PACKAGES: '{{default "./packages/go-audit/... ./packages/go-platform/... ./packages/go-authz/... ./packages/go-contracts/... ./services/auth-service/... ./services/coupon-service/... ./services/go-reference-service/... ./services/user-service/..." .GO_TEST_PACKAGES}}'
@@ -321,6 +322,13 @@ tasks:
       - task: tests:test-purchase-postgres-integration
         vars:
           PURCHASE_POSTGRES_COMPOSE_PROJECT: '{{.PURCHASE_POSTGRES_COMPOSE_PROJECT}}'
+
+  test-interest-postgres-integration:
+    desc: Run interest-service integration tests against required PostgreSQL 16.
+    cmds:
+      - task: tests:test-interest-postgres-integration
+        vars:
+          INTEREST_POSTGRES_COMPOSE_PROJECT: '{{.INTEREST_POSTGRES_COMPOSE_PROJECT}}'
 
   test-purchase-contracts:
     desc: Run shared purchase event and OpenAPI contract tests.
