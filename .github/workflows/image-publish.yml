@@ -131,26 +131,32 @@ jobs:
 
     steps:
       - name: 소스 내려받기
+        id: source-checkout
         uses: actions/checkout@v4
 
       - name: Task 설치
+        id: task-setup
         uses: go-task/setup-task@v2
         with:
           repo-token: ${{ github.token }}
 
       - name: AWS 인증 (OIDC)
+        id: aws-auth
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::205623789422:role/github-actions-ecr-role
           aws-region: ap-northeast-2
 
       - name: Docker Buildx 설정
+        id: buildx-setup
         uses: docker/setup-buildx-action@v3
 
       - name: ECR 로그인
+        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Trivy 스캔용 이미지 빌드
+        id: trivy-image-build
         run: |
           docker build \
             --platform linux/amd64 \
@@ -158,6 +164,7 @@ jobs:
             -t ${{ matrix.image }}:scan \
             .
       - name: Trivy CRITICAL 스캔 (ECR push 차단)
+        id: trivy-scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.image }}:scan
@@ -166,6 +173,7 @@ jobs:
           exit-code: 1
           ignore-unfixed: true
       - name: Docker 이미지 빌드
+        id: image-build
         shell: bash
         working-directory: ${{ github.workspace }}
         env:
@@ -241,11 +249,83 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: 이미지별 deploy plan 업로드
+        id: deploy-plan-upload
         uses: actions/upload-artifact@v4
         with:
           name: deploy-plan-${{ matrix.image }}
           path: deploy-plan/${{ matrix.image }}.json
           if-no-files-found: error
+
+      - name: 이미지 publish 결과 작성
+        id: publish-result
+        if: always()
+        shell: bash
+        env:
+          SOURCE_CHECKOUT_OUTCOME: ${{ steps.source-checkout.outcome }}
+          TASK_SETUP_OUTCOME: ${{ steps.task-setup.outcome }}
+          AWS_AUTH_OUTCOME: ${{ steps.aws-auth.outcome }}
+          BUILDX_SETUP_OUTCOME: ${{ steps.buildx-setup.outcome }}
+          ECR_LOGIN_OUTCOME: ${{ steps.ecr-login.outcome }}
+          TRIVY_IMAGE_BUILD_OUTCOME: ${{ steps.trivy-image-build.outcome }}
+          TRIVY_SCAN_OUTCOME: ${{ steps.trivy-scan.outcome }}
+          IMAGE_BUILD_OUTCOME: ${{ steps.image-build.outcome }}
+          IMAGE_DIGEST: ${{ steps.image-build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          status="success"
+          stage="complete"
+          reason="이미지 빌드 및 ECR 푸시 완료"
+
+          check_outcome() {
+            local candidate_stage="$1"
+            local candidate_reason="$2"
+            local outcome="$3"
+            if [ "${status}" = "success" ] && [ "${outcome}" != "success" ]; then
+              status="failure"
+              stage="${candidate_stage}"
+              reason="${candidate_reason} (step outcome: ${outcome})"
+            fi
+          }
+
+          check_outcome "source-checkout" "서비스 저장소 checkout 실패" "${SOURCE_CHECKOUT_OUTCOME}"
+          check_outcome "task-setup" "Task 설치 실패" "${TASK_SETUP_OUTCOME}"
+          check_outcome "aws-auth" "AWS OIDC 인증 실패" "${AWS_AUTH_OUTCOME}"
+          check_outcome "buildx-setup" "Docker Buildx 설정 실패" "${BUILDX_SETUP_OUTCOME}"
+          check_outcome "ecr-login" "Amazon ECR 로그인 실패" "${ECR_LOGIN_OUTCOME}"
+          check_outcome "trivy-image-build" "Trivy 검사 대상 이미지 빌드 실패" "${TRIVY_IMAGE_BUILD_OUTCOME}"
+          check_outcome "trivy-scan" "Trivy CRITICAL 취약점 검사 실패" "${TRIVY_SCAN_OUTCOME}"
+          check_outcome "image-build" "다중 아키텍처 이미지 빌드 또는 ECR 푸시 실패" "${IMAGE_BUILD_OUTCOME}"
+
+          mkdir -p publish-results
+          jq -n \
+            --arg image "${{ matrix.image }}" \
+            --arg tag "${{ matrix.tag }}" \
+            --arg status "${status}" \
+            --arg stage "${stage}" \
+            --arg reason "${reason}" \
+            --arg digest "${IMAGE_DIGEST}" \
+            '{
+              image: $image,
+              tag: $tag,
+              status: $status,
+              stage: $stage,
+              reason: $reason,
+              digest: $digest
+            }' > "publish-results/${{ matrix.image }}.json"
+          printf 'status=%s\n' "${status}" >> "${GITHUB_OUTPUT}"
+
+      - name: 이미지 publish 결과 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-result-${{ matrix.image }}
+          path: publish-results/${{ matrix.image }}.json
+          if-no-files-found: error
+
+      - name: 이미지 publish 실패 반영
+        if: always() && steps.publish-result.outputs.status != 'success'
+        shell: bash
+        run: exit 1
 
   deploy-plan:
     name: deploy plan 조립 및 gitops 업데이트
@@ -388,15 +468,46 @@ jobs:
           git commit -m "chore: deploy images for ${{ needs.select-images.outputs.deploy_tag }}"
           git push
 
-      - name: Discord 배포 알림
-        if: always()
-        uses: sarisia/actions-status-discord@v1
+  notify:
+    name: Discord ECR 이미지 결과 알림
+    needs:
+      - select-images
+      - publish
+    # 이미지가 선택되지 않은 정상 no-op은 알리지 않고, 선택 단계 자체의 실패는 알린다.
+    if: >-
+      ${{
+        always() &&
+        (
+          needs.select-images.result != 'success' ||
+          needs.select-images.outputs.image_count != '0'
+        )
+      }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 서비스 저장소 checkout
+        uses: actions/checkout@v4
+
+      - name: 이미지 publish 결과 다운로드
+        if: needs.publish.result != 'skipped'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
         with:
-          webhook: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
-          status: ${{ job.status }}
-          title: "이미지 배포 완료"
-          description: "배포 태그: ${{ needs.select-images.outputs.deploy_tag }}"
-          color: 0x00ff00
+          pattern: publish-result-*
+          path: notification/publish-results
+          merge-multiple: true
+
+      - name: Discord ECR 이미지 결과 전송
+        env:
+          DISCORD_IMAGE_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
+          SELECT_RESULT: ${{ needs.select-images.result }}
+          SELECTED_IMAGES_JSON: ${{ needs.select-images.outputs.images }}
+          SOURCE_TAG: ${{ needs.select-images.outputs.deploy_tag || github.ref_name }}
+        run: |
+          bash .github/scripts/send-discord-image-publish.sh \
+            --template .github/notifications/discord/image-publish-result.json \
+            --publish-results-dir notification/publish-results \
+            --output "${RUNNER_TEMP}/discord-image-publish-payload.json"
 
   no-image-publish:
     name: 이미지 publish 없음

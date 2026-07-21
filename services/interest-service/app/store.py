@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -98,6 +99,17 @@ class InterestStore:
         selected = active[start : start + limit]
         has_next = start + limit < len(active)
         return [_interest_from_record(record) for record in selected], has_next
+
+    async def count_active_updated_in_window(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> dict[DropId, int]:
+        counts: dict[DropId, int] = defaultdict(int)
+        for record in self._records.values():
+            if record.status is InterestStatus.ACTIVE and start <= record.updated_at < end:
+                counts[record.drop_id] += 1
+        return dict(counts)
 
 
 def _interest_from_record(record: _InterestRecord) -> Interest:

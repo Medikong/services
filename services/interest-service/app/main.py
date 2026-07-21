@@ -49,8 +49,8 @@ from app.store import (
     ToggleInterestCommand,
     ToggleInterestResult,
 )
-from app.view_repository import DropViewRankingRepository, DropViewRepository
-from app.view_store import DropViewRankingStore, DropViewStore
+from app.view_repository import DropViewCounterRepository, DropViewRankingRepository, DropViewRepository
+from app.view_store import DropViewCounterStore, DropViewRankingStore, DropViewStore
 
 SERVICE_NAME: Final = "interest-service"
 SERVICE_VERSION: Final = os.getenv("SERVICE_VERSION", "0.1.0")
@@ -72,16 +72,20 @@ def create_app(
     counter_repository: DropInterestCounterRepository | None = None,
     view_repository: DropViewRepository | None = None,
     view_ranking_repository: DropViewRankingRepository | None = None,
+    view_counter_repository: DropViewCounterRepository | None = None,
     event_publisher: InterestEventPublisher | None = None,
 ) -> FastAPI:
     if repository is not None:
         view_store = DropViewStore()
+        view_counter_store = DropViewCounterStore()
+        resolved_view_counter_repository = view_counter_repository or view_counter_store
         resources = AppResources(
             repository=repository,
-            counter_repository=counter_repository or DropInterestCounterStore(),
+            counter_repository=counter_repository or DropInterestCounterStore(view_counter_store),
             view_repository=view_repository or view_store,
             view_ranking_repository=view_ranking_repository
-            or DropViewRankingStore(view_store),
+            or DropViewRankingStore(view_store, repository),
+            view_counter_repository=resolved_view_counter_repository,
             event_publisher=event_publisher or NoopInterestEventPublisher(),
         )
     else:
@@ -187,7 +191,11 @@ def create_app(
         dropId: str,
         user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
     ) -> None:
-        await resources.view_repository.record_view(DropId(dropId), user.user_id)
+        drop_id = DropId(dropId)
+        await resources.view_repository.record_view(drop_id, user.user_id)
+        # 2026-07-21: 기다리는 상품 랭킹의 전환율 분모 + 최근 활동 게이트용 누적 조회수.
+        # drop_views(3시간 배치용, 6시간만 보관)와 별개로 리셋 없이 유지한다.
+        await resources.view_counter_repository.increment(drop_id)
 
     @app.get("/v1/rankings/drops/upcoming", response_model=UpcomingRankingListResponse)
     async def list_upcoming_ranking(
