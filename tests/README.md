@@ -89,6 +89,21 @@ task test-service SERVICE=order-service
 task test-service SERVICE=order
 ```
 
+## interest-service PostgreSQL 통합 테스트
+
+`services/interest-service/tests/integration/`은 실제 PostgreSQL 16이 있어야만 도는 테스트다(전환율/최근활동게이트/폴백티어 정렬, 동시 첫 찜의 UniqueConstraint 충돌 처리 등 — 인메모리 단위 테스트로는 검증 불가능한 실제 DB 제약/쿼리 동작). `test-purchase-postgres-integration`과 같은 패턴으로 Postgres 컨테이너만 띄우고 별도 test-runner 이미지로 실행한다.
+
+```bash
+task test-interest-postgres-integration
+```
+
+`TEST_DATABASE_URL`이 없으면 스킵되도록 각 테스트가 `pytest.mark.skipif`로 가드돼 있어서, 로컬에서 직접 지정해도 실행할 수 있다.
+
+```bash
+TEST_DATABASE_URL=postgresql+asyncpg://<user>:<password>@localhost:5432/<database> \
+  uv run --group test pytest tests/integration/test_ranking_postgres.py
+```
+
 ## 공통 E2E 진입점
 
 구매와 인증 E2E의 사용자 진입점은 하나다. `SCENARIO`를 생략하면 구매 컬렉션과 인증 컬렉션 전체를 차례로 실행한다.
