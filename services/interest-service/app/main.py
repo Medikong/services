@@ -1,4 +1,6 @@
+import asyncio
 import os
+import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
@@ -55,6 +57,12 @@ from app.view_store import DropViewCounterStore, DropViewRankingStore, DropViewS
 SERVICE_NAME: Final = "interest-service"
 SERVICE_VERSION: Final = os.getenv("SERVICE_VERSION", "0.1.0")
 SERVICE_ENVIRONMENT: Final = os.getenv("SERVICE_ENVIRONMENT", "local")
+
+# 카나리/블루그린 배포 전략 비교 실험용 (2026-07-22, experiment/interest-service-synthetic-regression
+# 브랜치 전용, main엔 merge 안 함). 이 브랜치에서 빌드한 이미지는 카나리(v2) 슬롯에만
+# 배포해 관측 가능한 회귀(지연+에러)를 인위적으로 재현한다.
+SYNTHETIC_REGRESSION_DELAY_SECONDS: Final = 0.5
+SYNTHETIC_REGRESSION_ERROR_RATE: Final = 0.2
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +225,12 @@ def create_app(
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None),
     ) -> TrendingRankingListResponse:
+        await asyncio.sleep(SYNTHETIC_REGRESSION_DELAY_SECONDS)
+        if random.random() < SYNTHETIC_REGRESSION_ERROR_RATE:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="synthetic regression test",
+            )
         (
             items,
             has_next,
