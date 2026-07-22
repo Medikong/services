@@ -39,7 +39,6 @@ from app.models import (
     TrendingRankingListResponse,
     UpcomingRankingListResponse,
     UserId,
-    UserRole,
 )
 from app.repository import InterestRepository
 from app.store import (
@@ -59,11 +58,6 @@ SERVICE_ENVIRONMENT: Final = os.getenv("SERVICE_ENVIRONMENT", "local")
 
 @dataclass(frozen=True, slots=True)
 class AuthenticatedUser:
-    user_id: UserId
-
-
-@dataclass(frozen=True, slots=True)
-class AuthenticatedOperator:
     user_id: UserId
 
 
@@ -238,7 +232,7 @@ def create_app(
     )
     async def get_drop_interest_stats(
         dropId: str,
-        _operator: Annotated[AuthenticatedOperator, Depends(authenticated_operator)],
+        _user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
     ) -> DropInterestStatsResponse:
         stats = await resources.counter_repository.get(DropId(dropId))
         if stats is None:
@@ -287,35 +281,8 @@ def _configure_observability(
 
 def authenticated_user(
     x_user_id: Annotated[str, Header(alias="X-User-Id")],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
 ) -> AuthenticatedUser:
-    match x_user_role:
-        case UserRole.CUSTOMER:
-            return AuthenticatedUser(user_id=UserId(x_user_id))
-        case UserRole.OPERATOR | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="customer role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
-
-
-def authenticated_operator(
-    x_user_id: Annotated[str, Header(alias="X-User-Id")],
-    x_user_role: Annotated[UserRole, Header(alias="X-User-Role")],
-) -> AuthenticatedOperator:
-    # API.A.07-07 1차 스코프: role=operator만 허용한다(브랜드 운영자는 소유권 검증 방식 확정 전까지 범위 밖).
-    match x_user_role:
-        case UserRole.OPERATOR:
-            return AuthenticatedOperator(user_id=UserId(x_user_id))
-        case UserRole.CUSTOMER | UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="operator role required",
-            )
-        case unreachable:
-            assert_never(unreachable)
+    return AuthenticatedUser(user_id=UserId(x_user_id))
 
 
 def _offset_after(cursor: str | None, page_size: int) -> int:

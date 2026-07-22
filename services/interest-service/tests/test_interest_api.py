@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import SERVICE_VERSION, create_app
 from app.store import InterestStore
 
-AUTH_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
+AUTH_HEADERS = {"X-User-Id": "user-001"}
 DROP_ID = "7d4a8f2c-5e14-46be-9b9b-987f5d69e001"
 
 
@@ -150,13 +150,13 @@ def test_list_my_interests_returns_only_active_interests_for_the_user() -> None:
     assert body["pageInfo"] == {"nextCursor": None, "hasNext": False}
 
 
-def test_operator_role_cannot_add_interest() -> None:
+def test_any_authenticated_user_can_add_interest_without_role_header() -> None:
     # Given
     client = TestClient(create_app(InterestStore()))
-    headers = {"X-User-Id": "operator-001", "X-User-Role": "OPERATOR"}
+    headers = {"X-User-Id": "operator-001"}
 
     # When
     response = client.put(f"/v1/users/me/interests/{DROP_ID}", headers=headers)
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 200

@@ -14,13 +14,6 @@ class InterestStatus(StrEnum):
     INACTIVE = "inactive"
 
 
-@unique
-class UserRole(StrEnum):
-    CUSTOMER = "CUSTOMER"
-    OPERATOR = "OPERATOR"
-    ADMIN = "ADMIN"
-
-
 class Interest(BaseModel):
     model_config = ConfigDict(frozen=True)
 

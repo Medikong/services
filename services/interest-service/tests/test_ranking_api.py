@@ -10,8 +10,8 @@ from app.store import InterestStore, ToggleInterestCommand
 from app.view_ranking_worker import bucket_boundaries_for, next_run_at
 from app.view_store import DropViewCounterStore, DropViewRankingStore, DropViewStore
 
-AUTH_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
-OPERATOR_HEADERS = {"X-User-Id": "operator-001", "X-User-Role": "OPERATOR"}
+AUTH_HEADERS = {"X-User-Id": "user-001"}
+SECOND_USER_HEADERS = {"X-User-Id": "user-002"}
 DROP_A = "7d4a8f2c-5e14-46be-9b9b-987f5d69e001"
 DROP_B = "7d4a8f2c-5e14-46be-9b9b-987f5d69e002"
 
@@ -55,7 +55,7 @@ def test_duplicate_add_interest_does_not_double_increment() -> None:
     # When
     client.put(f"/v1/users/me/interests/{DROP_A}", headers=AUTH_HEADERS)
     client.put(f"/v1/users/me/interests/{DROP_A}", headers=AUTH_HEADERS)  # idempotent, no state change
-    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats", headers=OPERATOR_HEADERS)
+    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats", headers=AUTH_HEADERS)
 
     # Then
     assert response.json()["data"]["interestCount"] == 1
@@ -66,7 +66,7 @@ def test_upcoming_ranking_orders_by_interest_count_descending() -> None:
     client = _client()
     client.put(f"/v1/users/me/interests/{DROP_A}", headers=AUTH_HEADERS)
     client.put(f"/v1/users/me/interests/{DROP_B}", headers=AUTH_HEADERS)
-    client.put(f"/v1/users/me/interests/{DROP_B}", headers={"X-User-Id": "user-002", "X-User-Role": "CUSTOMER"})
+    client.put(f"/v1/users/me/interests/{DROP_B}", headers=SECOND_USER_HEADERS)
 
     # When
     response = client.get("/v1/rankings/drops/upcoming")
@@ -173,7 +173,7 @@ def test_trending_ranking_returns_populated_snapshot_after_batch_runs_through_th
         ),
     )
     client.post(f"/v1/drops/{DROP_A}/views", headers=AUTH_HEADERS)
-    client.post(f"/v1/drops/{DROP_A}/views", headers={"X-User-Id": "user-002", "X-User-Role": "CUSTOMER"})
+    client.post(f"/v1/drops/{DROP_A}/views", headers=SECOND_USER_HEADERS)
     client.post(f"/v1/drops/{DROP_B}/views", headers=AUTH_HEADERS)
 
     bucket_start = datetime(2026, 7, 14, 3, 0, tzinfo=UTC)
@@ -210,15 +210,15 @@ def test_trending_ranking_is_empty_before_any_batch_run() -> None:
     assert body["bucketStart"] is None
 
 
-def test_interest_stats_requires_operator_role() -> None:
+def test_interest_stats_requires_authenticated_user() -> None:
     # Given
     client = _client()
 
     # When
-    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats", headers=AUTH_HEADERS)
+    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats")
 
     # Then
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 def test_interest_stats_returns_404_for_unknown_drop() -> None:
@@ -226,7 +226,7 @@ def test_interest_stats_returns_404_for_unknown_drop() -> None:
     client = _client()
 
     # When
-    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats", headers=OPERATOR_HEADERS)
+    response = client.get(f"/v1/operator/drops/{DROP_A}/interest-stats", headers=AUTH_HEADERS)
 
     # Then
     assert response.status_code == 404
