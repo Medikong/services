@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Final, assert_never
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from observability import (
     RequestIdMiddleware,
@@ -274,6 +274,13 @@ def _configure_observability(
     )
     app.add_middleware(RequestIdMiddleware, **request_id_middleware_options())
     app.middleware("http")(create_request_log_middleware(config))
+
+    @app.middleware("http")
+    async def add_service_version_header(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Service-Version"] = SERVICE_VERSION
+        return response
+
     instrument_fastapi_app(app, config)
     return metrics_registry, readiness
 

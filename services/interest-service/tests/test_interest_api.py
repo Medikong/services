@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.main import SERVICE_VERSION, create_app
 from app.store import InterestStore
 
 AUTH_HEADERS = {"X-User-Id": "user-001", "X-User-Role": "CUSTOMER"}
@@ -18,6 +18,17 @@ def test_healthz_returns_interest_service_identity() -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["service"] == "interest-service"
+
+
+def test_responses_expose_service_version_header() -> None:
+    # Given
+    client = TestClient(create_app(InterestStore()))
+
+    # When
+    response = client.get("/healthz")
+
+    # Then
+    assert response.headers["x-service-version"] == SERVICE_VERSION
 
 
 def test_readyz_returns_ready_interest_checks() -> None:
