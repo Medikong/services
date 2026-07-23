@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -93,5 +94,35 @@ func TestLoadServerRejectsAmbiguousJWTPrivateKeySources(t *testing.T) {
 	t.Setenv("AUTH_JWT_PRIVATE_KEY_FILE", "/run/secrets/auth-jwt")
 	if _, err := LoadServer(); err == nil {
 		t.Fatal("LoadServer() error = nil")
+	}
+}
+
+func TestDevelopmentConfigRequiresExactly32ByteVirtualMessageKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		keySize int
+		wantErr bool
+	}{
+		{name: "16 bytes", keySize: 16, wantErr: true},
+		{name: "24 bytes", keySize: 24, wantErr: true},
+		{name: "32 bytes", keySize: 32, wantErr: false},
+		{name: "64 bytes", keySize: 64, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := DevelopmentConfig{
+				Enabled:                true,
+				RouteEnabled:           true,
+				VirtualAdaptersEnabled: true,
+				AccessToken:            "development-access-token",
+				VirtualMessageKey:      strings.Repeat("k", test.keySize),
+			}
+
+			err := config.Validate(true)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("DevelopmentConfig.Validate(true) error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
 	}
 }

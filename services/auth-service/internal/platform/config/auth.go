@@ -133,8 +133,8 @@ func (c DevelopmentConfig) Validate(allowed bool) error {
 	if c.Enabled && strings.TrimSpace(c.AccessToken) == "" {
 		return validation.NewError("development", "AUTH_DEV_ACCESS_TOKEN is required when development mode is enabled")
 	}
-	if c.VirtualAdaptersEnabled && len(strings.TrimSpace(c.VirtualMessageKey)) < 32 {
-		return validation.NewError("development", "AUTH_VIRTUAL_MESSAGE_KEY must be at least 32 bytes when virtual adapters are enabled")
+	if c.VirtualAdaptersEnabled && len(c.VirtualMessageKey) != 32 {
+		return validation.NewError("development", "AUTH_VIRTUAL_MESSAGE_KEY must be exactly 32 bytes when virtual adapters are enabled")
 	}
 	if !c.Enabled && (strings.TrimSpace(c.AccessToken) != "" || strings.TrimSpace(c.VirtualMessageKey) != "") {
 		return validation.NewError("development", "development secrets require AUTH_DEVELOPMENT_ENABLED=true")

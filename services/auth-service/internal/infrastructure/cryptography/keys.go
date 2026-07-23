@@ -61,8 +61,8 @@ func (k Keys) Validate(virtualEnabled bool) error {
 			return errors.New("retiring JWT keys require a distinct key ID and RSA public key")
 		}
 	}
-	if virtualEnabled && len(k.VirtualKey) < 32 {
-		return errors.New("virtual message key must be at least 32 bytes")
+	if virtualEnabled && len(k.VirtualKey) != 32 {
+		return errors.New("virtual message key must be exactly 32 bytes")
 	}
 	return nil
 }

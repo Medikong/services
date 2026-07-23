@@ -159,6 +159,39 @@ func TestAccessTokenSignerRejectsNonUUIDIdentifiers(t *testing.T) {
 	}
 }
 
+func TestKeysRequireExactly32ByteVirtualMessageKey(t *testing.T) {
+	privateKey := privateKeyPEM(t, testPrivateKey(t))
+	tests := []struct {
+		name    string
+		keySize int
+		wantErr bool
+	}{
+		{name: "16 bytes", keySize: 16, wantErr: true},
+		{name: "24 bytes", keySize: 24, wantErr: true},
+		{name: "32 bytes", keySize: 32, wantErr: false},
+		{name: "64 bytes", keySize: 64, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			keys := Keys{
+				CredentialHMAC: []byte("01234567890123456789012345678901"),
+				ReplayKey:      []byte("01234567890123456789012345678901"),
+				JWTKey:         privateKey,
+				JWTKeyID:       "active-key",
+				JWTIssuer:      "auth-service",
+				JWTAudiences:   []string{"dropmong-api"},
+				VirtualKey:     []byte(strings.Repeat("k", test.keySize)),
+			}
+
+			err := keys.Validate(true)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("Keys.Validate(true) error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func testPrivateKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
