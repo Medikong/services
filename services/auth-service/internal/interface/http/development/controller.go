@@ -76,6 +76,37 @@ func (c *DevelopmentController) VirtualMessage(w http.ResponseWriter, r *http.Re
 	})
 }
 
+type bulkTokensRequest struct {
+	Count      int   `json:"count"`
+	TTLSeconds int64 `json:"ttlSeconds"`
+}
+
+func (c *DevelopmentController) BulkTokens(w http.ResponseWriter, r *http.Request) {
+	if credentialErr := c.credentials.DevelopmentToken(r); credentialErr != nil {
+		httputil.WriteError(w, r, developmentEndpointNotFound())
+		return
+	}
+	var request bulkTokensRequest
+	if problem := httputil.DecodeJSON(w, r, &request); problem != nil {
+		httputil.WriteError(w, r, problem)
+		return
+	}
+	result, err := c.virtual.IssueBulkTokens(r.Context(), applicationdevelopment.BulkTokenInput{
+		Count: request.Count, TTLSeconds: request.TTLSeconds,
+	})
+	if err != nil {
+		httputil.WriteError(w, r, err)
+		return
+	}
+	httputil.WriteJSON(w, r, http.StatusCreated, map[string]any{
+		"count": len(result.Tokens), "tokens": result.Tokens,
+	})
+}
+
 func virtualMessageNotFound() error {
 	return failure.NotFound("AUTH_VIRTUAL_MESSAGE_NOT_FOUND", "가상 인증 메시지를 찾을 수 없습니다.")
+}
+
+func developmentEndpointNotFound() error {
+	return failure.NotFound("AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND", "개발 전용 API를 찾을 수 없습니다.")
 }

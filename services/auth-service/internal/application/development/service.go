@@ -15,10 +15,11 @@ type Service struct {
 	cryptography Cryptography
 	ownership    IntentOwnershipVerifier
 	clock        Clock
+	sessions     SessionIssuer
 }
 
-func NewService(transactions Transactor, cryptography Cryptography, ownership IntentOwnershipVerifier, clock Clock) *Service {
-	return &Service{transactions: transactions, cryptography: cryptography, ownership: ownership, clock: clock}
+func NewService(transactions Transactor, cryptography Cryptography, ownership IntentOwnershipVerifier, clock Clock, sessions SessionIssuer) *Service {
+	return &Service{transactions: transactions, cryptography: cryptography, ownership: ownership, clock: clock, sessions: sessions}
 }
 
 type VirtualMessageInput struct {
@@ -43,7 +44,8 @@ func (s *Service) GetVirtualMessage(ctx context.Context, input VirtualMessageInp
 		return VirtualMessageOutput{}, virtualNotFound()
 	}
 	var output VirtualMessageOutput
-	err = s.transactions.WithinTransaction(ctx, func(repository Repository) error {
+	err = s.transactions.WithinTransaction(ctx, func(repositories TxRepositories) error {
+		repository := repositories.Virtual
 		current, findErr := repository.FindChallenge(ctx, challengeID)
 		if errors.Is(findErr, domainchallenge.ErrNotFound) {
 			return virtualNotFound()

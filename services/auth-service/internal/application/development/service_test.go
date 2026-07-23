@@ -26,7 +26,7 @@ func TestGetVirtualMessageUsesPasswordResetIntentOwnership(t *testing.T) {
 		intent:              domainintent.Intent{ID: intentID},
 	}
 	ownership := &developmentOwnershipFake{}
-	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{code: "123456"}, ownership, developmentClock{now: now})
+	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{code: "123456"}, ownership, developmentClock{now: now}, nil)
 
 	output, err := service.GetVirtualMessage(context.Background(), VirtualMessageInput{
 		ChallengeID: challengeID.String(), OwnerProof: "owner-proof", CSRFToken: "csrf",
@@ -50,7 +50,7 @@ func TestGetVirtualMessageHidesOwnershipFailure(t *testing.T) {
 		intent:              domainintent.Intent{ID: intentID},
 	}
 	ownership := &developmentOwnershipFake{err: failure.Forbidden("AUTH_INTENT_OWNERSHIP_INVALID", "invalid")}
-	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{code: "123456"}, ownership, developmentClock{now: time.Now().UTC()})
+	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{code: "123456"}, ownership, developmentClock{now: time.Now().UTC()}, nil)
 
 	_, err := service.GetVirtualMessage(context.Background(), VirtualMessageInput{ChallengeID: challengeID.String()})
 	assertDevelopmentFailure(t, err, failure.KindNotFound, "AUTH_VIRTUAL_MESSAGE_NOT_FOUND")
@@ -63,7 +63,7 @@ func TestGetVirtualMessagePreservesUnavailableProjectionContract(t *testing.T) {
 		projectionErr: domainchallenge.ErrVirtualUnavailable,
 		intent:        domainintent.Intent{ID: intentID},
 	}
-	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{}, &developmentOwnershipFake{}, developmentClock{now: time.Now().UTC()})
+	service := NewService(developmentTransactorFake{repository: repository}, developmentCryptographyFake{}, &developmentOwnershipFake{}, developmentClock{now: time.Now().UTC()}, nil)
 
 	_, err := service.GetVirtualMessage(context.Background(), VirtualMessageInput{ChallengeID: challengeID.String()})
 	assertDevelopmentFailure(t, err, failure.KindConflict, "AUTH_VIRTUAL_MESSAGE_UNAVAILABLE")
@@ -84,8 +84,8 @@ type developmentTransactorFake struct {
 	repository Repository
 }
 
-func (f developmentTransactorFake) WithinTransaction(ctx context.Context, run func(Repository) error) error {
-	return run(f.repository)
+func (f developmentTransactorFake) WithinTransaction(ctx context.Context, run func(TxRepositories) error) error {
+	return run(TxRepositories{Virtual: f.repository})
 }
 
 type developmentRepositoryFake struct {

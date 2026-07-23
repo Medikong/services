@@ -45,6 +45,9 @@ func (s *Service) IssueTx(ctx context.Context, repositories TxRepositories, inpu
 	if input.RememberMe && s.config.RememberMeSessionTTL > 0 {
 		sessionTTL = s.config.RememberMeSessionTTL
 	}
+	if input.SessionTTLOverride > 0 {
+		sessionTTL = input.SessionTTLOverride
+	}
 	if channel != domainsession.ChannelWeb && s.config.RefreshTTL > sessionTTL {
 		sessionTTL = s.config.RefreshTTL
 	}
@@ -60,7 +63,11 @@ func (s *Service) IssueTx(ctx context.Context, repositories TxRepositories, inpu
 		ExpiresAt: expiresAt, RememberMe: input.RememberMe,
 	}
 	credential := domainsession.Credential{ID: credentialID, SessionID: sessionID, ExpiresAt: expiresAt}
-	accessToken, accessExpiresAt, err := s.cryptography.SignAccessToken(input.UserID, sessionID, s.config.AccessTTL)
+	accessTTL := s.config.AccessTTL
+	if input.AccessTTLOverride > 0 {
+		accessTTL = input.AccessTTLOverride
+	}
+	accessToken, accessExpiresAt, err := s.cryptography.SignAccessToken(input.UserID, sessionID, accessTTL)
 	if err != nil {
 		return Issued{}, unavailable(err)
 	}

@@ -193,13 +193,20 @@ type Claims struct {
 }
 
 func (k Keys) SignAccessToken(userID, sessionID string, ttl time.Duration) (string, time.Time, error) {
+	privateKey, err := parseRSAPrivateKey(k.JWTKey)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return k.signAccessToken(userID, sessionID, ttl, privateKey)
+}
+
+func (k Keys) signAccessToken(userID, sessionID string, ttl time.Duration, privateKey *rsa.PrivateKey) (string, time.Time, error) {
 	if !isNonZeroUUID(userID) || !isNonZeroUUID(sessionID) {
 		return "", time.Time{}, oops.In("auth_security").Code("jwt.identifier_invalid").
 			New("access token subject and session ID must be non-zero UUIDs")
 	}
-	privateKey, err := parseRSAPrivateKey(k.JWTKey)
-	if err != nil {
-		return "", time.Time{}, err
+	if privateKey == nil {
+		return "", time.Time{}, oops.In("auth_security").Code("jwt.key_invalid").New("access token private key is required")
 	}
 	now := k.now()
 	expiresAt := now.Add(ttl)

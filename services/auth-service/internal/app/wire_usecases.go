@@ -178,6 +178,7 @@ func wireUseCases(cfg config.ServerConfig, options ServerOptions, adapters serve
 			cryptography.NewDevelopment(adapters.keys),
 			bootstrap,
 			adapters.clock,
+			sessions,
 		)
 	}
 

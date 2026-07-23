@@ -1,6 +1,7 @@
 package cryptography
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"time"
 
@@ -9,11 +10,14 @@ import (
 )
 
 type Session struct {
-	keys Keys
+	keys             Keys
+	accessPrivateKey *rsa.PrivateKey
+	accessKeyErr     error
 }
 
 func NewSession(keys Keys) *Session {
-	return &Session{keys: keys}
+	privateKey, err := parseRSAPrivateKey(keys.JWTKey)
+	return &Session{keys: keys, accessPrivateKey: privateKey, accessKeyErr: err}
 }
 
 func (c *Session) Hash(values ...string) []byte {
@@ -41,7 +45,10 @@ func (c *Session) OpenTokenSet(ciphertext []byte) (applicationsession.TokenSet, 
 }
 
 func (c *Session) SignAccessToken(userID, sessionID uuid.UUID, ttl time.Duration) (string, time.Time, error) {
-	return c.keys.SignAccessToken(userID.String(), sessionID.String(), ttl)
+	if c.accessKeyErr != nil {
+		return "", time.Time{}, c.accessKeyErr
+	}
+	return c.keys.signAccessToken(userID.String(), sessionID.String(), ttl, c.accessPrivateKey)
 }
 
 func (c *Session) VerifyAccessToken(raw string) (applicationsession.AccessClaims, error) {

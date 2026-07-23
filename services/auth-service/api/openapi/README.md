@@ -3,7 +3,7 @@
 `archive/blueprint/50-service-design/A_300_auth/A_300_40-api/openapi/` is the source of truth. This directory contains only generated, self-contained bundles used by the service and CI.
 
 - `openapi.bundle.yaml` is the production `API.A.300-01~29` bundle.
-- `dev.openapi.bundle.yaml` is the development-only `API.A.300-30` bundle.
+- `dev.openapi.bundle.yaml` is the development-only `API.A.300-30` and `API.A.300-34` bundle.
 - `source.json` records the source origin and SHA-256 values for the source tree and both bundles.
 - `redocly.yaml` is the source lint configuration copied with the bundle snapshot.
 

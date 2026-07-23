@@ -102,6 +102,151 @@ paths:
           $ref: '#/components/responses/VirtualMessageRateLimited'
         '503':
           $ref: '#/components/responses/VirtualMessageServiceUnavailable'
+  /api/v1/dev/auth/test-tokens/bulk:
+    post:
+      tags:
+        - Development
+      summary: 개발용 사용자와 Access Token 일괄 발급
+      description: |
+        요청한 수량만큼 서로 다른 Auth 사용자와 Session을 만들고 각 Session에 연결된 Access JWT를 반환한다.
+        회원가입, 로그인 또는 OTP 인증을 대신하는 개발환경 전용 API이며 운영 환경에는 Route를 등록하지 않는다.
+      operationId: issueDevelopmentBulkTokens
+      x-api-id: API.A.300-34
+      x-use-case: UC.A.300
+      x-service-design: SD.A.30040
+      x-error-codes:
+        AUTH_INPUT_INVALID: 400
+        AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND: 404
+        AUTH_SERVICE_UNAVAILABLE: 503
+      x-environments:
+        - local
+        - test
+        - demo-restricted
+      security:
+        - DevAccessToken: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - count
+              properties:
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                ttlSeconds:
+                  type: integer
+                  minimum: 60
+                  maximum: 86400
+                  default: 86400
+                  description: Access Token 유효시간이다. 생략하면 24시간을 사용한다.
+            example:
+              count: 100
+              ttlSeconds: 86400
+      responses:
+        '201':
+          description: 요청 수량만큼 Auth 사용자, Session, Access Token을 새로 발급했다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - count
+                      - tokens
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 1
+                        maximum: 10000
+                      tokens:
+                        type: array
+                        minItems: 1
+                        maxItems: 10000
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required:
+                            - userId
+                            - sessionId
+                            - accessToken
+                            - accessTokenExpiresAt
+                          properties:
+                            userId:
+                              type: string
+                              format: uuid
+                            sessionId:
+                              type: string
+                              format: uuid
+                            accessToken:
+                              type: string
+                              minLength: 1
+                              x-sensitive: true
+                            accessTokenExpiresAt:
+                              type: string
+                              format: date-time
+                  meta:
+                    $ref: '#/components/schemas/ResponseMeta'
+              example:
+                data:
+                  count: 1
+                  tokens:
+                    - userId: 4f4f1f5c-cb8d-4e28-9753-4ed9435e5272
+                      sessionId: 41542a14-705f-41dc-84f5-4deefba59fb8
+                      accessToken: <signed-jwt>
+                      accessTokenExpiresAt: '2026-07-24T09:15:00Z'
+                meta:
+                  requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+        '400':
+          $ref: '#/components/responses/InputInvalid'
+        '404':
+          description: 개발 전용 Route가 비활성화됐거나 개발 접근 token이 유효하지 않다.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      status:
+                        type: integer
+                        enum:
+                          - 404
+                      code:
+                        type: string
+                        enum:
+                          - AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND
+              example:
+                status: 404
+                code: AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND
+                message: 개발 전용 API를 찾을 수 없습니다.
+                requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+        '503':
+          $ref: '#/components/responses/AuthServiceUnavailable'
 components:
   securitySchemes:
     DevAccessToken:
@@ -389,6 +534,62 @@ components:
             requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
     VirtualMessageServiceUnavailable:
       description: 가상 인증 메시지 저장소 또는 필수 내부 의존성을 일시적으로 사용할 수 없다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 503
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_SERVICE_UNAVAILABLE
+          example:
+            status: 503
+            code: AUTH_SERVICE_UNAVAILABLE
+            message: 잠시 뒤 다시 시도해주세요.
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    InputInvalid:
+      description: 요청 형식 또는 schema가 유효하지 않다.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties:
+                  status:
+                    type: integer
+                    enum:
+                      - 400
+                  code:
+                    type: string
+                    enum:
+                      - AUTH_INPUT_INVALID
+          example:
+            status: 400
+            code: AUTH_INPUT_INVALID
+            message: 입력값을 확인한 뒤 다시 시도해주세요.
+            requestId: 30d9fa85-0a18-4263-98b6-231dca5a6fb8
+    AuthServiceUnavailable:
+      description: 인증 저장소 또는 필수 내부 의존성을 일시적으로 사용할 수 없다.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/XRequestId'

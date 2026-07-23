@@ -723,6 +723,106 @@ func TestHTTPDevelopmentVirtualMessageE2E(t *testing.T) {
 	})
 }
 
+func TestHTTPDevelopmentBulkTokensE2E(t *testing.T) {
+	harness := newDevelopmentHTTPHarness(t)
+	path := "/api/v1/dev/auth/test-tokens/bulk"
+
+	t.Run("hidden credential error", func(t *testing.T) {
+		response := harness.do(httpE2ERequest{
+			Method: http.MethodPost, Path: path, JSON: map[string]any{"count": 1},
+			Credentials: httpE2ECredentials{DevelopmentAccessToken: "invalid-development-access"},
+		})
+		decodeHTTPError(t, response, http.StatusNotFound, "AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND")
+	})
+
+	type tokenData struct {
+		UserID               string    `json:"userId"`
+		SessionID            string    `json:"sessionId"`
+		AccessToken          string    `json:"accessToken"`
+		AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	}
+	type bulkData struct {
+		Count  int         `json:"count"`
+		Tokens []tokenData `json:"tokens"`
+	}
+
+	seenUsers, seenSessions := map[string]struct{}{}, map[string]struct{}{}
+	for _, testCase := range []struct {
+		count      int
+		ttlSeconds int64
+		wantTTL    time.Duration
+	}{
+		{count: 3, wantTTL: 24 * time.Hour},
+		{count: 2, ttlSeconds: 7200, wantTTL: 2 * time.Hour},
+	} {
+		body := map[string]any{"count": testCase.count}
+		if testCase.ttlSeconds > 0 {
+			body["ttlSeconds"] = testCase.ttlSeconds
+		}
+		requestedAt := time.Now().UTC()
+		var data bulkData
+		response := harness.do(httpE2ERequest{
+			Method: http.MethodPost, Path: path, JSON: body,
+			Credentials: httpE2ECredentials{DevelopmentAccessToken: httpE2EDevelopmentToken},
+		})
+		decodeHTTPEnvelope(t, response, http.StatusCreated, &data)
+		if data.Count != testCase.count || len(data.Tokens) != testCase.count {
+			t.Fatalf("bulk token count = %d/%d, want %d", data.Count, len(data.Tokens), testCase.count)
+		}
+		for _, token := range data.Tokens {
+			if _, err := uuid.Parse(token.UserID); err != nil {
+				t.Fatalf("invalid user id %q", token.UserID)
+			}
+			if _, err := uuid.Parse(token.SessionID); err != nil {
+				t.Fatalf("invalid session id %q", token.SessionID)
+			}
+			if token.AccessToken == "" || !token.AccessTokenExpiresAt.After(time.Now()) {
+				t.Fatal("bulk token response is incomplete")
+			}
+			if token.AccessTokenExpiresAt.Before(requestedAt.Add(testCase.wantTTL-time.Minute)) || token.AccessTokenExpiresAt.After(requestedAt.Add(testCase.wantTTL+time.Minute)) {
+				t.Fatalf("access token TTL = %s, want approximately %s", token.AccessTokenExpiresAt.Sub(requestedAt), testCase.wantTTL)
+			}
+			if _, duplicate := seenUsers[token.UserID]; duplicate {
+				t.Fatalf("duplicate user id %s", token.UserID)
+			}
+			if _, duplicate := seenSessions[token.SessionID]; duplicate {
+				t.Fatalf("duplicate session id %s", token.SessionID)
+			}
+			seenUsers[token.UserID], seenSessions[token.SessionID] = struct{}{}, struct{}{}
+			var sessionExpiresAt time.Time
+			if err := harness.db.QueryRow(harness.ctx, `SELECT absolute_expires_at FROM auth_sessions WHERE session_id = $1`, token.SessionID).Scan(&sessionExpiresAt); err != nil {
+				t.Fatalf("read generated session expiry: %v", err)
+			}
+			if sessionExpiresAt.Before(token.AccessTokenExpiresAt) {
+				t.Fatalf("session expires before access token: %s < %s", sessionExpiresAt, token.AccessTokenExpiresAt)
+			}
+
+			contextResponse := harness.do(httpE2ERequest{
+				Method: http.MethodGet, Path: "/api/v1/auth/context",
+				Credentials: httpE2ECredentials{AccessToken: token.AccessToken},
+			})
+			assertHTTPResponse(t, contextResponse, http.StatusOK, "application/json")
+			var envelope struct {
+				Data map[string]any      `json:"data"`
+				Meta httpE2EResponseMeta `json:"meta"`
+			}
+			decodeHTTPJSON(t, contextResponse.body, &envelope)
+			if authenticated, _ := envelope.Data["authenticated"].(bool); !authenticated || envelope.Data["userId"] != token.UserID {
+				t.Fatal("issued access token did not authenticate its generated user")
+			}
+
+			statusResponse := harness.do(httpE2ERequest{
+				Method: http.MethodPost, Path: "/internal/session/status/loadtest/probe",
+				Credentials: httpE2ECredentials{AccessToken: token.AccessToken},
+			})
+			assertHTTPNoContent(t, statusResponse, http.StatusOK)
+			if statusResponse.header.Get("X-User-Id") != token.UserID || statusResponse.header.Get("X-Session-Id") != token.SessionID {
+				t.Fatal("issued access token did not pass the ingress session-status check")
+			}
+		}
+	}
+}
+
 func createIdentityE2EWebIntent(t *testing.T, harness *httpE2EHarness, intentType string, actionContext map[string]any) identityE2EIntent {
 	t.Helper()
 	body := map[string]any{"returnPath": "/drops/http-e2e", "intentType": intentType}

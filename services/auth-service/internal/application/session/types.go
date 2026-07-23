@@ -27,13 +27,15 @@ type TokenSet struct {
 }
 
 type IssueInput struct {
-	UserID       uuid.UUID
-	IdentityID   uuid.UUID
-	IdentityLink uuid.UUID
-	Method       string
-	Channel      string
-	RememberMe   bool
-	WebCSRFToken string
+	UserID             uuid.UUID
+	IdentityID         uuid.UUID
+	IdentityLink       uuid.UUID
+	Method             string
+	Channel            string
+	RememberMe         bool
+	WebCSRFToken       string
+	AccessTTLOverride  time.Duration
+	SessionTTLOverride time.Duration
 }
 
 type Issued struct {

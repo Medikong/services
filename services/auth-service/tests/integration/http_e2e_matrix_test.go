@@ -55,6 +55,7 @@ var httpAPICases = []httpAPICase{
 	{ID: "API.A.300-29", Environment: "production", Method: "POST", Path: "/api/v1/auth/intents/{intentId}/action-resume", SuccessStatuses: []string{"200"}, ErrorStatus: "410", ErrorCode: "AUTH_INTENT_EXPIRED"},
 	{ID: "API.A.300-30", Environment: "development", Method: "GET", Path: "/api/v1/dev/auth/verification-messages/{challengeId}", SuccessStatuses: []string{"200"}, ErrorStatus: "404", ErrorCode: "AUTH_VIRTUAL_MESSAGE_NOT_FOUND"},
 	{ID: "API.A.300-31", Environment: "production", Method: "PUT", Path: "/api/v1/operator/auth/users/{userId}/account-status", SuccessStatuses: []string{"200"}, ErrorStatus: "403", ErrorCode: "AUTH_FORBIDDEN"},
+	{ID: "API.A.300-34", Environment: "development", Method: "POST", Path: "/api/v1/dev/auth/test-tokens/bulk", SuccessStatuses: []string{"201"}, ErrorStatus: "404", ErrorCode: "AUTH_DEVELOPMENT_ENDPOINT_NOT_FOUND"},
 }
 
 type openAPIDocument struct {
@@ -73,8 +74,8 @@ func TestHTTPAPIMatrixMatchesBundledOpenAPI(t *testing.T) {
 	if len(production) != 30 {
 		t.Fatalf("production OpenAPI operation count = %d, want 30", len(production))
 	}
-	if len(development) != 1 {
-		t.Fatalf("development OpenAPI operation count = %d, want 1", len(development))
+	if len(development) != 2 {
+		t.Fatalf("development OpenAPI operation count = %d, want 2", len(development))
 	}
 	seen := make(map[string]struct{}, len(httpAPICases))
 	for _, testCase := range httpAPICases {
@@ -108,11 +109,11 @@ func TestHTTPAPIMatrixMatchesBundledOpenAPI(t *testing.T) {
 			}
 		})
 	}
-	if len(seen) != 31 {
-		t.Fatalf("API matrix entry count = %d, want 31", len(seen))
+	if len(seen) != 32 {
+		t.Fatalf("API matrix entry count = %d, want 32", len(seen))
 	}
 	for key, operation := range production {
-		if strings.Contains(key, "/api/v1/dev/") || operation.APIID == "API.A.300-30" {
+		if strings.Contains(key, "/api/v1/dev/") || operation.APIID == "API.A.300-30" || operation.APIID == "API.A.300-34" {
 			t.Fatalf("production OpenAPI includes a development operation")
 		}
 	}

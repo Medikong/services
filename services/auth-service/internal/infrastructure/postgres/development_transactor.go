@@ -16,13 +16,14 @@ func NewDevelopmentTransactor(pool *pgxpool.Pool) *DevelopmentTransactor {
 	return &DevelopmentTransactor{pool: pool}
 }
 
-func (t *DevelopmentTransactor) WithinTransaction(ctx context.Context, run func(applicationdevelopment.Repository) error) error {
+func (t *DevelopmentTransactor) WithinTransaction(ctx context.Context, run func(applicationdevelopment.TxRepositories) error) error {
 	tx, err := t.pool.Begin(ctx)
 	if err != nil {
 		return oops.In("development_transactor").Code("transaction.begin_failed").Wrap(err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	if err := run(NewDevelopmentRepository(tx)); err != nil {
+	repository := NewDevelopmentRepository(tx)
+	if err := run(applicationdevelopment.TxRepositories{Virtual: repository, Fixtures: repository}); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {

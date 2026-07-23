@@ -32,6 +32,19 @@ type UserAuthStateReader interface {
 	FindForUpdate(context.Context, uuid.UUID) (domainuserauthstate.State, error)
 }
 
+type BulkRepository interface {
+	CreateAccessSessionsBulk(context.Context, []domainsession.Session) error
+}
+
+type BulkUserAuthStateReader interface {
+	FindActiveForUpdate(context.Context, []uuid.UUID) (map[uuid.UUID]struct{}, error)
+}
+
+type BulkTxRepositories struct {
+	Sessions      BulkRepository
+	UserAuthState BulkUserAuthStateReader
+}
+
 type IdempotencyRepository interface {
 	FindForUpdate(context.Context, string, []byte, []byte) (domainidempotency.Record, error)
 	ClaimProcessing(context.Context, domainidempotency.Record, string) (domainidempotency.Record, bool, error)

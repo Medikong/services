@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": "@redocly/cli@2.38.0",
   "sourceOrigin": "../archive/blueprint/50-service-design/A_300_auth/A_300_40-api/openapi",
-  "sourceTreeSha256": "9874932cf83cab4eba1233e8402ba8c44f59663a435ba6396fd900d9a00407c0",
+  "sourceTreeSha256": "e1d58c3f2bf8c930dbf784d83a93d750ab1134269a5bb1da387e04d8b0114051",
   "production": {
     "entry": "openapi.yaml",
     "sourceSha256": "98a45d2900fe032207116db879c91949d339faa1acd9815a727fa8aa71562a9c",
@@ -11,8 +11,8 @@
   },
   "development": {
     "entry": "dev.openapi.yaml",
-    "sourceSha256": "e4a789bd8449502af8deb2eb65c0b5471a36412138fc63787a8e168e2625fbae",
+    "sourceSha256": "6e26a5be1ccaca9c75488270682b2b827461ae799de37a14aa6eada50dd7d552",
     "bundle": "dev.openapi.bundle.yaml",
-    "bundleSha256": "d060790531cd0c6f6e12edb72c661c592e9e91d6a2223c7b19c6c3f38612d78e"
+    "bundleSha256": "14bc51212949e87931b47630fb0926030499e7414d875833767badffaf0d6660"
   }
 }
