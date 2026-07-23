@@ -171,6 +171,9 @@ def main() -> int:
             max_attempts=args.max_attempts,
             backoff_seconds=args.backoff_seconds,
             timeout_seconds=args.timeout_seconds,
+            expected_ingress_fingerprint=environment.get(
+                "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT"
+            ),
         )
     except ConfigurationStop as stop:
         run_id = "invalid" if stop.reason_code == "RUN_ID_INVALID" else args.run_id

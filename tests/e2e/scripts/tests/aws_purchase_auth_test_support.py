@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -11,10 +12,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Iterator, TypedDict, cast
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPOSITORY_ROOT / "tests/e2e/scripts/run_aws_purchase_auth.py"
 RUN_ID = "aws-purchase-20260723T150000Z-1234abcd"
+_EXPECTED_INGRESS_FINGERPRINT = "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT"
 SAFE_JWT = (
     "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3QifQ."
     "eyJzdWIiOiJzeW50aGV0aWMtY3VzdG9tZXIifQ."
@@ -22,6 +23,7 @@ SAFE_JWT = (
 )
 _RUNTIME_INPUTS = (
     "AWS_PURCHASE_INGRESS_BASE_URL",
+    _EXPECTED_INGRESS_FINGERPRINT,
     "AWS_PURCHASE_JWT",
     "SYNTHETIC_CUSTOMER_EMAIL",
     "SYNTHETIC_CUSTOMER_PASSWORD",
@@ -259,9 +261,11 @@ def invoke_runner(
     )
     for name in _RUNTIME_INPUTS:
         environment.pop(name, None)
-    environment.update(
-        {"AWS_PURCHASE_JWT": SAFE_JWT} if runtime_env is None else runtime_env
-    )
+    inputs = {"AWS_PURCHASE_JWT": SAFE_JWT} if runtime_env is None else runtime_env
+    environment.update(inputs)
+    if approved_url := base_url or environment.get("AWS_PURCHASE_INGRESS_BASE_URL"):
+        digest = hashlib.sha256(approved_url.encode()).hexdigest()
+        environment.setdefault(_EXPECTED_INGRESS_FINGERPRINT, f"sha256:{digest}")
     result = subprocess.run(
         command,
         cwd=REPOSITORY_ROOT,

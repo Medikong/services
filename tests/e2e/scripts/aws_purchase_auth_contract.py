@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import hmac
+import ipaddress
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -16,6 +18,8 @@ type JsonValue = (
 )
 _RUN_ID_PATTERN: Final = re.compile(r"aws-purchase-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}")
 _JWT_SEGMENT_PATTERN: Final = re.compile(r"[A-Za-z0-9_-]+")
+_INGRESS_FINGERPRINT_PATTERN: Final = re.compile(r"sha256:[a-f0-9]{64}")
+_DIRECT_SERVICE_LABELS: Final = frozenset({"auth-service"})
 
 
 class Verdict(StrEnum):
@@ -112,12 +116,17 @@ def build_config(
     max_attempts: int,
     backoff_seconds: float,
     timeout_seconds: float,
+    expected_ingress_fingerprint: str | None = None,
 ) -> RunnerConfig:
     if _RUN_ID_PATTERN.fullmatch(run_id) is None:
         raise ConfigurationStop("RUN_ID_INVALID")
     base_url = _select_base_url(base_url_argument, base_url_environment)
     normalized_url = _normalize_base_url(base_url)
     fingerprint = ingress_fingerprint(normalized_url)
+    _validate_expected_ingress_fingerprint(
+        expected_ingress_fingerprint,
+        fingerprint,
+    )
     _validate_route(auth_route, fingerprint)
     _validate_route(protected_route, fingerprint)
     if json_output.resolve() == junit_output.resolve():
@@ -182,7 +191,7 @@ def is_jwt_shaped(token: str) -> bool:
 
 def ingress_fingerprint(base_url: str) -> str:
     digest = hashlib.sha256(base_url.encode("utf-8")).hexdigest()
-    return f"sha256:{digest[:16]}"
+    return f"sha256:{digest}"
 
 
 def _select_base_url(argument: str | None, environment: str | None) -> str:
@@ -219,9 +228,32 @@ def _normalize_base_url(value: str) -> str:
     ):
         raise ConfigurationStop("INGRESS_URL_INVALID")
     normalized_hostname = hostname.rstrip(".").lower()
-    if normalized_hostname.endswith(".svc") or ".svc." in normalized_hostname:
-        raise ConfigurationStop("INGRESS_SERVICE_DNS_FORBIDDEN")
+    _reject_direct_service_dns(normalized_hostname)
     return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+
+
+def _reject_direct_service_dns(hostname: str) -> None:
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        labels = tuple(hostname.split("."))
+    else:
+        return
+    if len(labels) == 1 or labels[0] in _DIRECT_SERVICE_LABELS or "svc" in labels:
+        raise ConfigurationStop("INGRESS_SERVICE_DNS_FORBIDDEN")
+
+
+def _validate_expected_ingress_fingerprint(
+    value: str | None,
+    actual: str,
+) -> None:
+    expected = _nonempty(value)
+    if expected is None:
+        raise ConfigurationStop("INGRESS_IDENTITY_MISSING", actual)
+    if _INGRESS_FINGERPRINT_PATTERN.fullmatch(expected) is None:
+        raise ConfigurationStop("INGRESS_IDENTITY_INVALID", actual)
+    if not hmac.compare_digest(expected, actual):
+        raise ConfigurationStop("INGRESS_IDENTITY_MISMATCH", actual)
 
 
 def _validate_route(value: str, fingerprint: str) -> None:

@@ -150,10 +150,6 @@ def test_rejected_bearer_token_is_classified_without_leaking_it(
     ("base_url", "reason_code"),
     [
         ("not-a-url", "INGRESS_URL_INVALID"),
-        (
-            "http://order-service.default.svc.cluster.local:8082",
-            "INGRESS_SERVICE_DNS_FORBIDDEN",
-        ),
     ],
 )
 def test_invalid_ingress_configuration_blocks_without_fallback(
@@ -165,6 +161,57 @@ def test_invalid_ingress_configuration_blocks_without_fallback(
 
     assert invocation.result.returncode == 3
     assert invocation.report()["reason_code"] == reason_code
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://auth-service:8081",
+        "http://auth-service.default:8081",
+        "http://auth-service.default.svc:8081",
+        "http://auth-service.default.svc.cluster.local:8081",
+    ],
+)
+def test_direct_kubernetes_service_dns_blocks_before_network(
+    tmp_path: Path,
+    base_url: str,
+) -> None:
+    invocation = invoke_runner(tmp_path, base_url=base_url)
+
+    assert invocation.result.returncode == 3
+    report = invocation.report()
+    assert report["reason_code"] == "INGRESS_SERVICE_DNS_FORBIDDEN"
+    assert report["stages"] == []
+    assert report["purchase_requests_sent"] == 0
+
+
+@pytest.mark.parametrize(
+    ("expected_fingerprint", "reason_code"),
+    [
+        ("", "INGRESS_IDENTITY_MISSING"),
+        ("sha256:invalid", "INGRESS_IDENTITY_INVALID"),
+        (f"sha256:{'0' * 64}", "INGRESS_IDENTITY_MISMATCH"),
+    ],
+)
+def test_unapproved_ingress_identity_blocks_before_network(
+    tmp_path: Path,
+    expected_fingerprint: str,
+    reason_code: str,
+) -> None:
+    invocation = invoke_runner(
+        tmp_path,
+        base_url="http://private-service.private-lan:8081",
+        runtime_env={
+            "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT": expected_fingerprint,
+            "AWS_PURCHASE_JWT": SAFE_JWT,
+        },
+    )
+
+    assert invocation.result.returncode == 3
+    report = invocation.report()
+    assert report["reason_code"] == reason_code
+    assert report["stages"] == []
+    assert report["purchase_requests_sent"] == 0
 
 
 def test_mobile_login_acquires_jwt_from_secret_environment_pair(

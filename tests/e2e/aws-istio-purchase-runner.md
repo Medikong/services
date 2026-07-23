@@ -9,9 +9,13 @@ header.
 ## Runtime inputs
 
 Configure exactly one public Istio ingress base URL with `--base-url` or
-`AWS_PURCHASE_INGRESS_BASE_URL`. The control-plane endpoint
+`AWS_PURCHASE_INGRESS_BASE_URL`. The trusted control plane must independently
+inject `AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT` as `sha256:` followed by the
+64 lowercase hex characters for that approved normalized origin. The runner
+never derives this approval from the requested URL. The control-plane endpoint
 `http://10.20.10.4:32080` is a known environment-specific example, not a
-default. Kubernetes service DNS names are rejected.
+default. Short, namespace-qualified, and `.svc` Kubernetes service DNS names
+are rejected even if their fingerprint is supplied.
 
 Use one approved credential mode:
 
@@ -24,6 +28,7 @@ artifacts. The runner emits only a base-URL fingerprint, run-derived request
 identifiers, stage status, and reason codes.
 
 ```text
+AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT=sha256:<approved-64-hex-digest> \
 uv run tests/e2e/scripts/run_aws_purchase_auth.py \
   --base-url http://10.20.10.4:32080 \
   --run-id aws-purchase-YYYYMMDDTHHMMSSZ-1234abcd \
