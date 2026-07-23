@@ -235,6 +235,13 @@ def _configure_observability(
         validator=is_safe_request_id,
     )
     app.middleware("http")(create_request_log_middleware(config))
+
+    @app.middleware("http")
+    async def add_service_version_header(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Service-Version"] = SERVICE_VERSION
+        return response
+
     instrument_fastapi_app(app, config)
     return metrics_registry, readiness
 
