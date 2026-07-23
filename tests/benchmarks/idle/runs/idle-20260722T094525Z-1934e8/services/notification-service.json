@@ -1,0 +1,379 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "notification-service",
+  "status": "passed",
+  "project": "dmidle-260722t094525z1934e8-notification",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "sample_count": 2,
+  "components": {
+    "notification-service": {
+      "role": "app",
+      "sample_count": 2,
+      "container_id": "264e4eeee41b",
+      "container_name": "dmidle-260722t094525z1934e8-notification-notification-service-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 2.905,
+          "p50": 2.905,
+          "p95": 3.4225,
+          "max": 3.48
+        },
+        "cpu_cores": {
+          "mean": 0.02905,
+          "p50": 0.02905,
+          "p95": 0.034225,
+          "max": 0.0348
+        },
+        "memory_usage_bytes": {
+          "mean": 83251691.0,
+          "p50": 83251691.0,
+          "p95": 83577274.1,
+          "max": 83613450
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 1.0,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "pids": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 5.0,
+          "max": 5
+        },
+        "network_rx_bytes": {
+          "mean": 21150.0,
+          "p50": 21150.0,
+          "p95": 21555.0,
+          "max": 21600
+        },
+        "network_tx_bytes": {
+          "mean": 26150.0,
+          "p50": 26150.0,
+          "p95": 26645.0,
+          "max": 26700
+        },
+        "block_read_bytes": {
+          "mean": 594500000.0,
+          "p50": 594500000.0,
+          "p95": 612050000.0,
+          "max": 614000000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "postgres": {
+      "role": "database",
+      "sample_count": 2,
+      "container_id": "62ffe544b20b",
+      "container_name": "dmidle-260722t094525z1934e8-notification-postgres-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 2.52,
+          "p50": 2.52,
+          "p95": 3.699,
+          "max": 3.83
+        },
+        "cpu_cores": {
+          "mean": 0.0252,
+          "p50": 0.0252,
+          "p95": 0.03699,
+          "max": 0.0383
+        },
+        "memory_usage_bytes": {
+          "mean": 24746393.5,
+          "p50": 24746393.5,
+          "p95": 24963448.75,
+          "max": 24987566
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.295,
+          "p50": 0.295,
+          "p95": 0.2995,
+          "max": 0.3
+        },
+        "pids": {
+          "mean": 7.0,
+          "p50": 7.0,
+          "p95": 7.0,
+          "max": 7
+        },
+        "network_rx_bytes": {
+          "mean": 13600.0,
+          "p50": 13600.0,
+          "p95": 13600.0,
+          "max": 13600
+        },
+        "network_tx_bytes": {
+          "mean": 8240.0,
+          "p50": 8240.0,
+          "p95": 8240.0,
+          "max": 8240
+        },
+        "block_read_bytes": {
+          "mean": 1090000000.0,
+          "p50": 1090000000.0,
+          "p95": 1117000000.0,
+          "max": 1120000000
+        },
+        "block_write_bytes": {
+          "mean": 171000000.0,
+          "p50": 171000000.0,
+          "p95": 171000000.0,
+          "max": 171000000
+        }
+      }
+    },
+    "kafka": {
+      "role": "broker",
+      "sample_count": 2,
+      "container_id": "0afbde134b6e",
+      "container_name": "dmidle-260722t094525z1934e8-notification-kafka-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 29.45,
+          "p50": 29.45,
+          "p95": 29.684,
+          "max": 29.71
+        },
+        "cpu_cores": {
+          "mean": 0.2945,
+          "p50": 0.2945,
+          "p95": 0.29684,
+          "max": 0.2971
+        },
+        "memory_usage_bytes": {
+          "mean": 351010815.5,
+          "p50": 351010815.5,
+          "p95": 365591265.05,
+          "max": 367211315
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 4.215,
+          "p50": 4.215,
+          "p95": 4.3905,
+          "max": 4.41
+        },
+        "pids": {
+          "mean": 113.5,
+          "p50": 113.5,
+          "p95": 119.35,
+          "max": 120
+        },
+        "network_rx_bytes": {
+          "mean": 36300.0,
+          "p50": 36300.0,
+          "p95": 36750.0,
+          "max": 36800
+        },
+        "network_tx_bytes": {
+          "mean": 47350.0,
+          "p50": 47350.0,
+          "p95": 47755.0,
+          "max": 47800
+        },
+        "block_read_bytes": {
+          "mean": 2325000000.0,
+          "p50": 2325000000.0,
+          "p95": 2383500000.0,
+          "max": 2390000000
+        },
+        "block_write_bytes": {
+          "mean": 1895000.0,
+          "p50": 1895000.0,
+          "p95": 1989500.0,
+          "max": 2000000
+        }
+      }
+    },
+    "idle-observer": {
+      "role": "observer",
+      "sample_count": 2,
+      "container_id": "a17d63dbdbbc",
+      "container_name": "dmidle-260722t094525z1934e8-notification-idle-observer-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "cpu_cores": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "memory_usage_bytes": {
+          "mean": 679936.0,
+          "p50": 679936.0,
+          "p95": 679936.0,
+          "max": 679936
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.01,
+          "p50": 0.01,
+          "p95": 0.01,
+          "max": 0.01
+        },
+        "pids": {
+          "mean": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2
+        },
+        "network_rx_bytes": {
+          "mean": 2450.0,
+          "p50": 2450.0,
+          "p95": 2450.0,
+          "max": 2450
+        },
+        "network_tx_bytes": {
+          "mean": 1660.0,
+          "p50": 1660.0,
+          "p95": 1660.0,
+          "max": 1660
+        },
+        "block_read_bytes": {
+          "mean": 91400000.0,
+          "p50": 91400000.0,
+          "p95": 91400000.0,
+          "max": 91400000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    }
+  },
+  "container_metadata": {
+    "notification-service": {
+      "container_id": "264e4eeee41b9dd1894aaa10f33c490884d78aafeccdf931bf96b01b5d00407b",
+      "container_name": "dmidle-260722t094525z1934e8-notification-notification-service-1",
+      "compose_service": "notification-service",
+      "image_reference": "dmidle-260722t094525z1934e8-notification-notification-service",
+      "image_id": "sha256:b64e9776700ba9bdf79dcdb779e7e3a57850e331ebe6e06e3d45310780b4f51d",
+      "image_digests": [
+        "dmidle-260722t094525z1934e8-notification-notification-service@sha256:b64e9776700ba9bdf79dcdb779e7e3a57850e331ebe6e06e3d45310780b4f51d"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:55:56.126421799Z"
+    },
+    "postgres": {
+      "container_id": "62ffe544b20b294b73642a47480c64b2c331691731dc3634b7efbe2c462abf6d",
+      "container_name": "dmidle-260722t094525z1934e8-notification-postgres-1",
+      "compose_service": "postgres",
+      "image_reference": "postgres:16-alpine",
+      "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+      "image_digests": [
+        "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:54:49.388852379Z"
+    },
+    "kafka": {
+      "container_id": "0afbde134b6e1084b8cae8f2b0550af36c6fb7dd92c27e33f9549349af543bee",
+      "container_name": "dmidle-260722t094525z1934e8-notification-kafka-1",
+      "compose_service": "kafka",
+      "image_reference": "apache/kafka:3.8.1",
+      "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+      "image_digests": [
+        "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+        "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:54:49.270453046Z"
+    },
+    "idle-observer": {
+      "container_id": "a17d63dbdbbca6307c8e31ebad3a0d8720a14fe5547a31976f6998982f05c320",
+      "container_name": "dmidle-260722t094525z1934e8-notification-idle-observer-1",
+      "compose_service": "idle-observer",
+      "image_reference": "curlimages/curl:8.12.1",
+      "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+      "image_digests": [
+        "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:55:57.038662008Z"
+    }
+  },
+  "error": null,
+  "last_state": {
+    "notification-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-notification-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-notification-service-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-notification-service-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-notification-service-1 Removing \n Container dmidle-260722t094525z1934e8-notification-notification-service-1 Removed \n Container dmidle-260722t094525z1934e8-notification-notification-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-kafka-init-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-kafka-init-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-kafka-init-1 Removing \n Container dmidle-260722t094525z1934e8-notification-notification-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-notification-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-notification-notification-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-notification-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-notification-kafka-init-1 Removed \n Container dmidle-260722t094525z1934e8-notification-kafka-1 Stopping \n Container dmidle-260722t094525z1934e8-notification-kafka-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-kafka-1 Removing \n Container dmidle-260722t094525z1934e8-notification-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-notification-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-notification-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-notification-kafka-1 Removed \n Container dmidle-260722t094525z1934e8-notification-idle-observer-1 Removed \n Volume dmidle-260722t094525z1934e8-notification_kafka-data Removing \n Volume dmidle-260722t094525z1934e8-notification_postgres-data Removing \n Network dmidle-260722t094525z1934e8-notification_default Removing \n Volume dmidle-260722t094525z1934e8-notification_postgres-data Removed \n Network dmidle-260722t094525z1934e8-notification_default Removed \n Volume dmidle-260722t094525z1934e8-notification_kafka-data Removed"
+  }
+}

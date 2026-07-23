@@ -1,0 +1,148 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "dropmong-web",
+  "project": "dmidle-260722t094525z1934e8-web",
+  "status": "passed",
+  "started_at": "2026-07-22T09:56:56.003Z",
+  "finished_at": "2026-07-22T09:57:47.042Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:57:21.478Z",
+      "components": [
+        {
+          "container_id": "42afcd2b6577",
+          "container_name": "dmidle-260722t094525z1934e8-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 47259320,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.57,
+          "pids": 11,
+          "network_rx_bytes": 3060,
+          "network_tx_bytes": 1870,
+          "block_read_bytes": 220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "45.07MiB / 7.751GiB",
+            "memory_percent": "0.57%",
+            "network_io": "3.06kB / 1.87kB",
+            "block_io": "220MB / 0B",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "064867536ec4",
+          "container_name": "dmidle-260722t094525z1934e8-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 716800,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 2660,
+          "network_tx_bytes": 1360,
+          "block_read_bytes": 29600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "700KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "2.66kB / 1.36kB",
+            "block_io": "29.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:57:23.510Z",
+      "components": [
+        {
+          "container_id": "42afcd2b6577",
+          "container_name": "dmidle-260722t094525z1934e8-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 46965719,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.56,
+          "pids": 11,
+          "network_rx_bytes": 3060,
+          "network_tx_bytes": 1870,
+          "block_read_bytes": 220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "44.79MiB / 7.751GiB",
+            "memory_percent": "0.56%",
+            "network_io": "3.06kB / 1.87kB",
+            "block_io": "220MB / 0B",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "064867536ec4",
+          "container_name": "dmidle-260722t094525z1934e8-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 2660,
+          "network_tx_bytes": 1360,
+          "block_read_bytes": 29600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "2.66kB / 1.36kB",
+            "block_io": "29.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "dropmong-web": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-web-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Stopping \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Stopped \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Removing \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Removed \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-web_default Removing \n Network dmidle-260722t094525z1934e8-web_default Removed"
+  }
+}

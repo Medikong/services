@@ -1,0 +1,368 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "auth-service",
+  "project": "dmidle-260722t094525z1934e8-auth",
+  "status": "passed",
+  "started_at": "2026-07-22T09:45:26.540Z",
+  "finished_at": "2026-07-22T09:46:56.288Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:46:26.719Z",
+      "components": [
+        {
+          "container_id": "4c9b1e6cd323",
+          "container_name": "dmidle-260722t094525z1934e8-auth-auth-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 5754585,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.07,
+          "pids": 9,
+          "network_rx_bytes": 7350,
+          "network_tx_bytes": 58700,
+          "block_read_bytes": 41100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "5.488MiB / 7.751GiB",
+            "memory_percent": "0.07%",
+            "network_io": "7.35kB / 58.7kB",
+            "block_io": "41.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "auth-service",
+          "role": "app"
+        },
+        {
+          "container_id": "08ffd455b6ff",
+          "container_name": "dmidle-260722t094525z1934e8-auth-auth-worker-1",
+          "cpu_percent": 0.09,
+          "cpu_cores": 0.0009,
+          "memory_usage_bytes": 6160384,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.07,
+          "pids": 9,
+          "network_rx_bytes": 11000,
+          "network_tx_bytes": 44200,
+          "block_read_bytes": 64500000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.09%",
+            "memory": "5.875MiB / 7.751GiB",
+            "memory_percent": "0.07%",
+            "network_io": "11kB / 44.2kB",
+            "block_io": "64.5MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "auth-worker",
+          "role": "worker"
+        },
+        {
+          "container_id": "ab1dd1c9fed8",
+          "container_name": "dmidle-260722t094525z1934e8-auth-postgres-1",
+          "cpu_percent": 2.95,
+          "cpu_cores": 0.029500000000000002,
+          "memory_usage_bytes": 35179724,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 9,
+          "network_rx_bytes": 80700,
+          "network_tx_bytes": 27700,
+          "block_read_bytes": 485000000,
+          "block_write_bytes": 176000000,
+          "raw": {
+            "cpu": "2.95%",
+            "memory": "33.55MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "80.7kB / 27.7kB",
+            "block_io": "485MB / 176MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "769bfbccc440",
+          "container_name": "dmidle-260722t094525z1934e8-auth-redis-1",
+          "cpu_percent": 1.28,
+          "cpu_cores": 0.0128,
+          "memory_usage_bytes": 8466202,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 5,
+          "network_rx_bytes": 3970,
+          "network_tx_bytes": 1060,
+          "block_read_bytes": 133000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.28%",
+            "memory": "8.074MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "3.97kB / 1.06kB",
+            "block_io": "133MB / 0B",
+            "pids": "5"
+          },
+          "compose_service": "redis",
+          "role": "cache"
+        },
+        {
+          "container_id": "d005da18549b",
+          "container_name": "dmidle-260722t094525z1934e8-auth-kafka-1",
+          "cpu_percent": 5.49,
+          "cpu_cores": 0.054900000000000004,
+          "memory_usage_bytes": 301780172,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.63,
+          "pids": 98,
+          "network_rx_bytes": 17300,
+          "network_tx_bytes": 34300,
+          "block_read_bytes": 622000000,
+          "block_write_bytes": 930000,
+          "raw": {
+            "cpu": "5.49%",
+            "memory": "287.8MiB / 7.751GiB",
+            "memory_percent": "3.63%",
+            "network_io": "17.3kB / 34.3kB",
+            "block_io": "622MB / 930kB",
+            "pids": "98"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6f2a1078b9eb",
+          "container_name": "dmidle-260722t094525z1934e8-auth-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 86200,
+          "network_tx_bytes": 4410,
+          "block_read_bytes": 11400000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "86.2kB / 4.41kB",
+            "block_io": "11.4MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:46:28.775Z",
+      "components": [
+        {
+          "container_id": "4c9b1e6cd323",
+          "container_name": "dmidle-260722t094525z1934e8-auth-auth-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 5754585,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.07,
+          "pids": 9,
+          "network_rx_bytes": 7440,
+          "network_tx_bytes": 58700,
+          "block_read_bytes": 41100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "5.488MiB / 7.751GiB",
+            "memory_percent": "0.07%",
+            "network_io": "7.44kB / 58.7kB",
+            "block_io": "41.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "auth-service",
+          "role": "app"
+        },
+        {
+          "container_id": "08ffd455b6ff",
+          "container_name": "dmidle-260722t094525z1934e8-auth-auth-worker-1",
+          "cpu_percent": 0.11,
+          "cpu_cores": 0.0011,
+          "memory_usage_bytes": 6467616,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 11400,
+          "network_tx_bytes": 45600,
+          "block_read_bytes": 71000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.11%",
+            "memory": "6.168MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "11.4kB / 45.6kB",
+            "block_io": "71MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "auth-worker",
+          "role": "worker"
+        },
+        {
+          "container_id": "ab1dd1c9fed8",
+          "container_name": "dmidle-260722t094525z1934e8-auth-postgres-1",
+          "cpu_percent": 0.47,
+          "cpu_cores": 0.004699999999999999,
+          "memory_usage_bytes": 34592522,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 9,
+          "network_rx_bytes": 82800,
+          "network_tx_bytes": 28300,
+          "block_read_bytes": 509000000,
+          "block_write_bytes": 176000000,
+          "raw": {
+            "cpu": "0.47%",
+            "memory": "32.99MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "82.8kB / 28.3kB",
+            "block_io": "509MB / 176MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "769bfbccc440",
+          "container_name": "dmidle-260722t094525z1934e8-auth-redis-1",
+          "cpu_percent": 0.63,
+          "cpu_cores": 0.0063,
+          "memory_usage_bytes": 4791992,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.06,
+          "pids": 11,
+          "network_rx_bytes": 4010,
+          "network_tx_bytes": 1100,
+          "block_read_bytes": 134000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.63%",
+            "memory": "4.57MiB / 7.751GiB",
+            "memory_percent": "0.06%",
+            "network_io": "4.01kB / 1.1kB",
+            "block_io": "134MB / 0B",
+            "pids": "11"
+          },
+          "compose_service": "redis",
+          "role": "cache"
+        },
+        {
+          "container_id": "d005da18549b",
+          "container_name": "dmidle-260722t094525z1934e8-auth-kafka-1",
+          "cpu_percent": 2.15,
+          "cpu_cores": 0.0215,
+          "memory_usage_bytes": 294335283,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.54,
+          "pids": 98,
+          "network_rx_bytes": 17300,
+          "network_tx_bytes": 34300,
+          "block_read_bytes": 633000000,
+          "block_write_bytes": 946000,
+          "raw": {
+            "cpu": "2.15%",
+            "memory": "280.7MiB / 7.751GiB",
+            "memory_percent": "3.54%",
+            "network_io": "17.3kB / 34.3kB",
+            "block_io": "633MB / 946kB",
+            "pids": "98"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6f2a1078b9eb",
+          "container_name": "dmidle-260722t094525z1934e8-auth-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 86300,
+          "network_tx_bytes": 4490,
+          "block_read_bytes": 11400000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "86.3kB / 4.49kB",
+            "block_io": "11.4MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "auth-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "auth-worker": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "redis": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-auth-auth-service-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Removed \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Removing \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Removed \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Removed \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-redis-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-auth-redis-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-redis-1 Removing \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Removed \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-redis-1 Removed \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-auth_default Removing \n Volume dmidle-260722t094525z1934e8-auth_redis-data Removing \n Volume dmidle-260722t094525z1934e8-auth_kafka-data Removing \n Volume dmidle-260722t094525z1934e8-auth_postgres-data Removing \n Volume dmidle-260722t094525z1934e8-auth_kafka-data Removed \n Volume dmidle-260722t094525z1934e8-auth_redis-data Removed \n Volume dmidle-260722t094525z1934e8-auth_postgres-data Removed \n Network dmidle-260722t094525z1934e8-auth_default Removed"
+  }
+}

@@ -1,0 +1,3692 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T095806Z-486a7f",
+  "service": "payment-service",
+  "project": "dmidle-260722t095806z486a7f-payment",
+  "status": "passed",
+  "started_at": "2026-07-22T11:02:09.502Z",
+  "finished_at": "2026-07-22T11:08:48.841Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T11:05:26.032Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 11.71,
+          "cpu_cores": 0.11710000000000001,
+          "memory_usage_bytes": 90806681,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.09,
+          "pids": 7,
+          "network_rx_bytes": 311000,
+          "network_tx_bytes": 457000,
+          "block_read_bytes": 947000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "11.71%",
+            "memory": "86.6MiB / 7.751GiB",
+            "memory_percent": "1.09%",
+            "network_io": "311kB / 457kB",
+            "block_io": "947MB / 0B",
+            "pids": "7"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 5.91,
+          "cpu_cores": 0.0591,
+          "memory_usage_bytes": 35337011,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 10,
+          "network_rx_bytes": 356000,
+          "network_tx_bytes": 245000,
+          "block_read_bytes": 2049999999,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "5.91%",
+            "memory": "33.7MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "356kB / 245kB",
+            "block_io": "2.05GB / 174MB",
+            "pids": "10"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 44.31,
+          "cpu_cores": 0.44310000000000005,
+          "memory_usage_bytes": 323590553,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.89,
+          "pids": 100,
+          "network_rx_bytes": 76200,
+          "network_tx_bytes": 96800,
+          "block_read_bytes": 3860000000,
+          "block_write_bytes": 3770000,
+          "raw": {
+            "cpu": "44.31%",
+            "memory": "308.6MiB / 7.751GiB",
+            "memory_percent": "3.89%",
+            "network_io": "76.2kB / 96.8kB",
+            "block_io": "3.86GB / 3.77MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 54800,
+          "network_tx_bytes": 5960,
+          "block_read_bytes": 90200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "54.8kB / 5.96kB",
+            "block_io": "90.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:30.779Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 5.01,
+          "cpu_cores": 0.0501,
+          "memory_usage_bytes": 82879447,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 331000,
+          "network_tx_bytes": 496000,
+          "block_read_bytes": 999000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "5.01%",
+            "memory": "79.04MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "331kB / 496kB",
+            "block_io": "999MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.82,
+          "cpu_cores": 0.0382,
+          "memory_usage_bytes": 33575403,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 10,
+          "network_rx_bytes": 377000,
+          "network_tx_bytes": 260000,
+          "block_read_bytes": 2120000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.82%",
+            "memory": "32.02MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "377kB / 260kB",
+            "block_io": "2.12GB / 174MB",
+            "pids": "10"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 32.13,
+          "cpu_cores": 0.32130000000000003,
+          "memory_usage_bytes": 330930585,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.98,
+          "pids": 102,
+          "network_rx_bytes": 80400,
+          "network_tx_bytes": 101000,
+          "block_read_bytes": 3990000000,
+          "block_write_bytes": 4099999,
+          "raw": {
+            "cpu": "32.13%",
+            "memory": "315.6MiB / 7.751GiB",
+            "memory_percent": "3.98%",
+            "network_io": "80.4kB / 101kB",
+            "block_io": "3.99GB / 4.1MB",
+            "pids": "102"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.49,
+          "cpu_cores": 0.0049,
+          "memory_usage_bytes": 724992,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 69100,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 100000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.49%",
+            "memory": "708KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "69.1kB / 7.15kB",
+            "block_io": "100MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:35.887Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 16.55,
+          "cpu_cores": 0.1655,
+          "memory_usage_bytes": 84840284,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.02,
+          "pids": 6,
+          "network_rx_bytes": 348000,
+          "network_tx_bytes": 519000,
+          "block_read_bytes": 1070000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "16.55%",
+            "memory": "80.91MiB / 7.751GiB",
+            "memory_percent": "1.02%",
+            "network_io": "348kB / 519kB",
+            "block_io": "1.07GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 5.02,
+          "cpu_cores": 0.050199999999999995,
+          "memory_usage_bytes": 31719424,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 403000,
+          "network_tx_bytes": 278000,
+          "block_read_bytes": 2220000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "5.02%",
+            "memory": "30.25MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "403kB / 278kB",
+            "block_io": "2.22GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 57.73,
+          "cpu_cores": 0.5772999999999999,
+          "memory_usage_bytes": 375914496,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.52,
+          "pids": 122,
+          "network_rx_bytes": 84500,
+          "network_tx_bytes": 106000,
+          "block_read_bytes": 4179999999,
+          "block_write_bytes": 4160000,
+          "raw": {
+            "cpu": "57.73%",
+            "memory": "358.5MiB / 7.751GiB",
+            "memory_percent": "4.52%",
+            "network_io": "84.5kB / 106kB",
+            "block_io": "4.18GB / 4.16MB",
+            "pids": "122"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 69100,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 100000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "69.1kB / 7.15kB",
+            "block_io": "100MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:40.686Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 22.57,
+          "cpu_cores": 0.2257,
+          "memory_usage_bytes": 84085309,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 375000,
+          "network_tx_bytes": 556000,
+          "block_read_bytes": 1140000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "22.57%",
+            "memory": "80.19MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "375kB / 556kB",
+            "block_io": "1.14GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.97,
+          "cpu_cores": 0.0397,
+          "memory_usage_bytes": 30607933,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 429000,
+          "network_tx_bytes": 296000,
+          "block_read_bytes": 2280000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.97%",
+            "memory": "29.19MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "429kB / 296kB",
+            "block_io": "2.28GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.08,
+          "cpu_cores": 0.0308,
+          "memory_usage_bytes": 319710822,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 88000,
+          "network_tx_bytes": 109000,
+          "block_read_bytes": 4280000000,
+          "block_write_bytes": 4240000,
+          "raw": {
+            "cpu": "3.08%",
+            "memory": "304.9MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "88kB / 109kB",
+            "block_io": "4.28GB / 4.24MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 69100,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 100000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "69.1kB / 7.15kB",
+            "block_io": "100MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:45.840Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 6.67,
+          "cpu_cores": 0.0667,
+          "memory_usage_bytes": 82952847,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 393000,
+          "network_tx_bytes": 582000,
+          "block_read_bytes": 1190000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "6.67%",
+            "memory": "79.11MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "393kB / 582kB",
+            "block_io": "1.19GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.07,
+          "cpu_cores": 0.010700000000000001,
+          "memory_usage_bytes": 30198988,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 457000,
+          "network_tx_bytes": 315000,
+          "block_read_bytes": 2360000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "1.07%",
+            "memory": "28.8MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "457kB / 315kB",
+            "block_io": "2.36GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.1,
+          "cpu_cores": 0.031,
+          "memory_usage_bytes": 323695411,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.89,
+          "pids": 100,
+          "network_rx_bytes": 92000,
+          "network_tx_bytes": 114000,
+          "block_read_bytes": 4430000000,
+          "block_write_bytes": 4330000,
+          "raw": {
+            "cpu": "3.10%",
+            "memory": "308.7MiB / 7.751GiB",
+            "memory_percent": "3.89%",
+            "network_io": "92kB / 114kB",
+            "block_io": "4.43GB / 4.33MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 1.06,
+          "cpu_cores": 0.0106,
+          "memory_usage_bytes": 10215227,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.12,
+          "pids": 2,
+          "network_rx_bytes": 69300,
+          "network_tx_bytes": 7450,
+          "block_read_bytes": 109000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.06%",
+            "memory": "9.742MiB / 7.751GiB",
+            "memory_percent": "0.12%",
+            "network_io": "69.3kB / 7.45kB",
+            "block_io": "109MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:50.356Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 4.09,
+          "cpu_cores": 0.0409,
+          "memory_usage_bytes": 83456163,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 421000,
+          "network_tx_bytes": 631000,
+          "block_read_bytes": 1270000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "4.09%",
+            "memory": "79.59MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "421kB / 631kB",
+            "block_io": "1.27GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.58,
+          "cpu_cores": 0.0258,
+          "memory_usage_bytes": 32149340,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 483000,
+          "network_tx_bytes": 333000,
+          "block_read_bytes": 2430000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.58%",
+            "memory": "30.66MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "483kB / 333kB",
+            "block_io": "2.43GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 44.64,
+          "cpu_cores": 0.4464,
+          "memory_usage_bytes": 360290713,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.33,
+          "pids": 120,
+          "network_rx_bytes": 95500,
+          "network_tx_bytes": 117000,
+          "block_read_bytes": 4570000000,
+          "block_write_bytes": 4380000,
+          "raw": {
+            "cpu": "44.64%",
+            "memory": "343.6MiB / 7.751GiB",
+            "memory_percent": "4.33%",
+            "network_io": "95.5kB / 117kB",
+            "block_io": "4.57GB / 4.38MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 83400,
+          "network_tx_bytes": 8340,
+          "block_read_bytes": 110000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "83.4kB / 8.34kB",
+            "block_io": "110MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:05:55.850Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.96,
+          "cpu_cores": 0.0296,
+          "memory_usage_bytes": 83581992,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 441000,
+          "network_tx_bytes": 659000,
+          "block_read_bytes": 1350000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.96%",
+            "memory": "79.71MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "441kB / 659kB",
+            "block_io": "1.35GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.6,
+          "cpu_cores": 0.036000000000000004,
+          "memory_usage_bytes": 30073159,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 513000,
+          "network_tx_bytes": 354000,
+          "block_read_bytes": 2550000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.60%",
+            "memory": "28.68MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "513kB / 354kB",
+            "block_io": "2.55GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.73,
+          "cpu_cores": 0.0373,
+          "memory_usage_bytes": 319710822,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 99300,
+          "network_tx_bytes": 122000,
+          "block_read_bytes": 4750000000,
+          "block_write_bytes": 4730000,
+          "raw": {
+            "cpu": "3.73%",
+            "memory": "304.9MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "99.3kB / 122kB",
+            "block_io": "4.75GB / 4.73MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 83400,
+          "network_tx_bytes": 8340,
+          "block_read_bytes": 110000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "83.4kB / 8.34kB",
+            "block_io": "110MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:00.369Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 7.72,
+          "cpu_cores": 0.07719999999999999,
+          "memory_usage_bytes": 85029027,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.02,
+          "pids": 6,
+          "network_rx_bytes": 469000,
+          "network_tx_bytes": 709000,
+          "block_read_bytes": 1420000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "7.72%",
+            "memory": "81.09MiB / 7.751GiB",
+            "memory_percent": "1.02%",
+            "network_io": "469kB / 709kB",
+            "block_io": "1.42GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.96,
+          "cpu_cores": 0.0196,
+          "memory_usage_bytes": 32380026,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 538000,
+          "network_tx_bytes": 371000,
+          "block_read_bytes": 2620000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "1.96%",
+            "memory": "30.88MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "538kB / 371kB",
+            "block_io": "2.62GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 51.33,
+          "cpu_cores": 0.5133,
+          "memory_usage_bytes": 374236774,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.5,
+          "pids": 120,
+          "network_rx_bytes": 103000,
+          "network_tx_bytes": 126000,
+          "block_read_bytes": 4890000000,
+          "block_write_bytes": 4770000,
+          "raw": {
+            "cpu": "51.33%",
+            "memory": "356.9MiB / 7.751GiB",
+            "memory_percent": "4.50%",
+            "network_io": "103kB / 126kB",
+            "block_io": "4.89GB / 4.77MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 2.16,
+          "cpu_cores": 0.0216,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 97700,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 119000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.16%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "97.7kB / 9.52kB",
+            "block_io": "119MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:05.864Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 1.84,
+          "cpu_cores": 0.0184,
+          "memory_usage_bytes": 83456163,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 495000,
+          "network_tx_bytes": 745000,
+          "block_read_bytes": 1470000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.84%",
+            "memory": "79.59MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "495kB / 745kB",
+            "block_io": "1.47GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.63,
+          "cpu_cores": 0.0263,
+          "memory_usage_bytes": 31530680,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 570000,
+          "network_tx_bytes": 393000,
+          "block_read_bytes": 2680000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.63%",
+            "memory": "30.07MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "570kB / 393kB",
+            "block_io": "2.68GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 5.01,
+          "cpu_cores": 0.0501,
+          "memory_usage_bytes": 325477990,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.91,
+          "pids": 100,
+          "network_rx_bytes": 106000,
+          "network_tx_bytes": 129000,
+          "block_read_bytes": 4970000000,
+          "block_write_bytes": 4860000,
+          "raw": {
+            "cpu": "5.01%",
+            "memory": "310.4MiB / 7.751GiB",
+            "memory_percent": "3.91%",
+            "network_io": "106kB / 129kB",
+            "block_io": "4.97GB / 4.86MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 97700,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 119000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "97.7kB / 9.52kB",
+            "block_io": "119MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:10.302Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 3.93,
+          "cpu_cores": 0.0393,
+          "memory_usage_bytes": 83602964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 516000,
+          "network_tx_bytes": 773000,
+          "block_read_bytes": 1540000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "3.93%",
+            "memory": "79.73MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "516kB / 773kB",
+            "block_io": "1.54GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 5.98,
+          "cpu_cores": 0.059800000000000006,
+          "memory_usage_bytes": 35022438,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 9,
+          "network_rx_bytes": 595000,
+          "network_tx_bytes": 410000,
+          "block_read_bytes": 2750000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "5.98%",
+            "memory": "33.4MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "595kB / 410kB",
+            "block_io": "2.75GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.7,
+          "cpu_cores": 0.037000000000000005,
+          "memory_usage_bytes": 324953702,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.91,
+          "pids": 100,
+          "network_rx_bytes": 110000,
+          "network_tx_bytes": 134000,
+          "block_read_bytes": 5150000000,
+          "block_write_bytes": 4940000,
+          "raw": {
+            "cpu": "3.70%",
+            "memory": "309.9MiB / 7.751GiB",
+            "memory_percent": "3.91%",
+            "network_io": "110kB / 134kB",
+            "block_io": "5.15GB / 4.94MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 97700,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 119000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "97.7kB / 9.52kB",
+            "block_io": "119MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:15.968Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 7.82,
+          "cpu_cores": 0.0782,
+          "memory_usage_bytes": 84053852,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 545000,
+          "network_tx_bytes": 824000,
+          "block_read_bytes": 1630000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "7.82%",
+            "memory": "80.16MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "545kB / 824kB",
+            "block_io": "1.63GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.13,
+          "cpu_cores": 0.0213,
+          "memory_usage_bytes": 31310479,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 627000,
+          "network_tx_bytes": 433000,
+          "block_read_bytes": 2830000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.13%",
+            "memory": "29.86MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "627kB / 433kB",
+            "block_io": "2.83GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 76.86,
+          "cpu_cores": 0.7686,
+          "memory_usage_bytes": 396571443,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.76,
+          "pids": 117,
+          "network_rx_bytes": 115000,
+          "network_tx_bytes": 139000,
+          "block_read_bytes": 5310000000,
+          "block_write_bytes": 5040000,
+          "raw": {
+            "cpu": "76.86%",
+            "memory": "378.2MiB / 7.751GiB",
+            "memory_percent": "4.76%",
+            "network_io": "115kB / 139kB",
+            "block_io": "5.31GB / 5.04MB",
+            "pids": "117"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 97700,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 119000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "97.7kB / 9.52kB",
+            "block_io": "119MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:20.131Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 18.75,
+          "cpu_cores": 0.1875,
+          "memory_usage_bytes": 82397102,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 6,
+          "network_rx_bytes": 565000,
+          "network_tx_bytes": 852000,
+          "block_read_bytes": 1670000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "18.75%",
+            "memory": "78.58MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "565kB / 852kB",
+            "block_io": "1.67GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 0.92,
+          "cpu_cores": 0.0092,
+          "memory_usage_bytes": 29307699,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 9,
+          "network_rx_bytes": 652000,
+          "network_tx_bytes": 450000,
+          "block_read_bytes": 2880000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.92%",
+            "memory": "27.95MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "652kB / 450kB",
+            "block_io": "2.88GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.35,
+          "cpu_cores": 0.0335,
+          "memory_usage_bytes": 323800268,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.89,
+          "pids": 100,
+          "network_rx_bytes": 118000,
+          "network_tx_bytes": 142000,
+          "block_read_bytes": 5390000000,
+          "block_write_bytes": 5090000,
+          "raw": {
+            "cpu": "3.35%",
+            "memory": "308.8MiB / 7.751GiB",
+            "memory_percent": "3.89%",
+            "network_io": "118kB / 142kB",
+            "block_io": "5.39GB / 5.09MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 112000,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 129000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "112kB / 10.7kB",
+            "block_io": "129MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:24.837Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 28.31,
+          "cpu_cores": 0.28309999999999996,
+          "memory_usage_bytes": 91813314,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.1,
+          "pids": 6,
+          "network_rx_bytes": 588000,
+          "network_tx_bytes": 883000,
+          "block_read_bytes": 1730000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "28.31%",
+            "memory": "87.56MiB / 7.751GiB",
+            "memory_percent": "1.10%",
+            "network_io": "588kB / 883kB",
+            "block_io": "1.73GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 4.23,
+          "cpu_cores": 0.042300000000000004,
+          "memory_usage_bytes": 30356275,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 679000,
+          "network_tx_bytes": 469000,
+          "block_read_bytes": 2960000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "4.23%",
+            "memory": "28.95MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "679kB / 469kB",
+            "block_io": "2.96GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.2,
+          "cpu_cores": 0.032,
+          "memory_usage_bytes": 320235110,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.85,
+          "pids": 100,
+          "network_rx_bytes": 122000,
+          "network_tx_bytes": 146000,
+          "block_read_bytes": 5520000000,
+          "block_write_bytes": 5170000,
+          "raw": {
+            "cpu": "3.20%",
+            "memory": "305.4MiB / 7.751GiB",
+            "memory_percent": "3.85%",
+            "network_io": "122kB / 146kB",
+            "block_io": "5.52GB / 5.17MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 112000,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 129000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "112kB / 10.7kB",
+            "block_io": "129MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:30.301Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 11.3,
+          "cpu_cores": 0.113,
+          "memory_usage_bytes": 92704604,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.11,
+          "pids": 7,
+          "network_rx_bytes": 611000,
+          "network_tx_bytes": 914000,
+          "block_read_bytes": 1780000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "11.30%",
+            "memory": "88.41MiB / 7.751GiB",
+            "memory_percent": "1.11%",
+            "network_io": "611kB / 914kB",
+            "block_io": "1.78GB / 0B",
+            "pids": "7"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.74,
+          "cpu_cores": 0.0274,
+          "memory_usage_bytes": 32338083,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 706000,
+          "network_tx_bytes": 487000,
+          "block_read_bytes": 3030000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.74%",
+            "memory": "30.84MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "706kB / 487kB",
+            "block_io": "3.03GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 24.04,
+          "cpu_cores": 0.2404,
+          "memory_usage_bytes": 348756377,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.19,
+          "pids": 108,
+          "network_rx_bytes": 126000,
+          "network_tx_bytes": 150000,
+          "block_read_bytes": 5640000000,
+          "block_write_bytes": 5210000,
+          "raw": {
+            "cpu": "24.04%",
+            "memory": "332.6MiB / 7.751GiB",
+            "memory_percent": "4.19%",
+            "network_io": "126kB / 150kB",
+            "block_io": "5.64GB / 5.21MB",
+            "pids": "108"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 1.1,
+          "cpu_cores": 0.011000000000000001,
+          "memory_usage_bytes": 4518313,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.05,
+          "pids": 2,
+          "network_rx_bytes": 112000,
+          "network_tx_bytes": 11000,
+          "block_read_bytes": 138000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.10%",
+            "memory": "4.309MiB / 7.751GiB",
+            "memory_percent": "0.05%",
+            "network_io": "112kB / 11kB",
+            "block_io": "138MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:35.850Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.68,
+          "cpu_cores": 0.0268,
+          "memory_usage_bytes": 83309363,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 635000,
+          "network_tx_bytes": 960000,
+          "block_read_bytes": 1880000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.68%",
+            "memory": "79.45MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "635kB / 960kB",
+            "block_io": "1.88GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.51,
+          "cpu_cores": 0.0351,
+          "memory_usage_bytes": 38283509,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.46,
+          "pids": 9,
+          "network_rx_bytes": 733000,
+          "network_tx_bytes": 506000,
+          "block_read_bytes": 3160000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.51%",
+            "memory": "36.51MiB / 7.751GiB",
+            "memory_percent": "0.46%",
+            "network_io": "733kB / 506kB",
+            "block_io": "3.16GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 110.22,
+          "cpu_cores": 1.1022,
+          "memory_usage_bytes": 396256870,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.76,
+          "pids": 123,
+          "network_rx_bytes": 129000,
+          "network_tx_bytes": 154000,
+          "block_read_bytes": 5800000000,
+          "block_write_bytes": 5320000,
+          "raw": {
+            "cpu": "110.22%",
+            "memory": "377.9MiB / 7.751GiB",
+            "memory_percent": "4.76%",
+            "network_io": "129kB / 154kB",
+            "block_io": "5.8GB / 5.32MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 659456,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 126000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 144000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "644KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "126kB / 11.9kB",
+            "block_io": "144MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:40.139Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.71,
+          "cpu_cores": 0.0271,
+          "memory_usage_bytes": 84840284,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.02,
+          "pids": 6,
+          "network_rx_bytes": 656000,
+          "network_tx_bytes": 988000,
+          "block_read_bytes": 1940000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.71%",
+            "memory": "80.91MiB / 7.751GiB",
+            "memory_percent": "1.02%",
+            "network_io": "656kB / 988kB",
+            "block_io": "1.94GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.37,
+          "cpu_cores": 0.0337,
+          "memory_usage_bytes": 31813795,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 758000,
+          "network_tx_bytes": 523000,
+          "block_read_bytes": 3220000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.37%",
+            "memory": "30.34MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "758kB / 523kB",
+            "block_io": "3.22GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.61,
+          "cpu_cores": 0.0361,
+          "memory_usage_bytes": 327680000,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.94,
+          "pids": 100,
+          "network_rx_bytes": 134000,
+          "network_tx_bytes": 159000,
+          "block_read_bytes": 5910000000,
+          "block_write_bytes": 5380000,
+          "raw": {
+            "cpu": "3.61%",
+            "memory": "312.5MiB / 7.751GiB",
+            "memory_percent": "3.94%",
+            "network_io": "134kB / 159kB",
+            "block_io": "5.91GB / 5.38MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 659456,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 126000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 144000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "644KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "126kB / 11.9kB",
+            "block_io": "144MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:45.858Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 3.39,
+          "cpu_cores": 0.0339,
+          "memory_usage_bytes": 85521858,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.03,
+          "pids": 6,
+          "network_rx_bytes": 684000,
+          "network_tx_bytes": 1040000,
+          "block_read_bytes": 2040000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "3.39%",
+            "memory": "81.56MiB / 7.751GiB",
+            "memory_percent": "1.03%",
+            "network_io": "684kB / 1.04MB",
+            "block_io": "2.04GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.32,
+          "cpu_cores": 0.0332,
+          "memory_usage_bytes": 31939624,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 784000,
+          "network_tx_bytes": 541000,
+          "block_read_bytes": 3310000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.32%",
+            "memory": "30.46MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "784kB / 541kB",
+            "block_io": "3.31GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 2.78,
+          "cpu_cores": 0.0278,
+          "memory_usage_bytes": 324009984,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.89,
+          "pids": 100,
+          "network_rx_bytes": 138000,
+          "network_tx_bytes": 163000,
+          "block_read_bytes": 6110000000,
+          "block_write_bytes": 5470000,
+          "raw": {
+            "cpu": "2.78%",
+            "memory": "309MiB / 7.751GiB",
+            "memory_percent": "3.89%",
+            "network_io": "138kB / 163kB",
+            "block_io": "6.11GB / 5.47MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 659456,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 126000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 144000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "644KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "126kB / 11.9kB",
+            "block_io": "144MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:50.422Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 6.84,
+          "cpu_cores": 0.0684,
+          "memory_usage_bytes": 83739279,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 706000,
+          "network_tx_bytes": 1070000,
+          "block_read_bytes": 2100000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "6.84%",
+            "memory": "79.86MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "706kB / 1.07MB",
+            "block_io": "2.1GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 4.4,
+          "cpu_cores": 0.044000000000000004,
+          "memory_usage_bytes": 31950110,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 816000,
+          "network_tx_bytes": 563000,
+          "block_read_bytes": 3400000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "4.40%",
+            "memory": "30.47MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "816kB / 563kB",
+            "block_io": "3.4GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 64.51,
+          "cpu_cores": 0.6451,
+          "memory_usage_bytes": 384303104,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.62,
+          "pids": 123,
+          "network_rx_bytes": 142000,
+          "network_tx_bytes": 167000,
+          "block_read_bytes": 6260000000,
+          "block_write_bytes": 5530000,
+          "raw": {
+            "cpu": "64.51%",
+            "memory": "366.5MiB / 7.751GiB",
+            "memory_percent": "4.62%",
+            "network_io": "142kB / 167kB",
+            "block_io": "6.26GB / 5.53MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 141000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 154000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "141kB / 13.1kB",
+            "block_io": "154MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:06:55.851Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.19,
+          "cpu_cores": 0.0219,
+          "memory_usage_bytes": 83781222,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 732000,
+          "network_tx_bytes": 1100000,
+          "block_read_bytes": 2150000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.19%",
+            "memory": "79.9MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "732kB / 1.1MB",
+            "block_io": "2.15GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 0.51,
+          "cpu_cores": 0.0051,
+          "memory_usage_bytes": 30765219,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 848000,
+          "network_tx_bytes": 585000,
+          "block_read_bytes": 3470000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.51%",
+            "memory": "29.34MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "848kB / 585kB",
+            "block_io": "3.47GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 2.41,
+          "cpu_cores": 0.0241,
+          "memory_usage_bytes": 322751692,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.88,
+          "pids": 100,
+          "network_rx_bytes": 146000,
+          "network_tx_bytes": 171000,
+          "block_read_bytes": 6340000000,
+          "block_write_bytes": 5610000,
+          "raw": {
+            "cpu": "2.41%",
+            "memory": "307.8MiB / 7.751GiB",
+            "memory_percent": "3.88%",
+            "network_io": "146kB / 171kB",
+            "block_io": "6.34GB / 5.61MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 141000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 154000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "141kB / 13.1kB",
+            "block_io": "154MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:00.159Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 30.33,
+          "cpu_cores": 0.30329999999999996,
+          "memory_usage_bytes": 84032880,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 753000,
+          "network_tx_bytes": 1130000,
+          "block_read_bytes": 2220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "30.33%",
+            "memory": "80.14MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "753kB / 1.13MB",
+            "block_io": "2.22GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 0.94,
+          "cpu_cores": 0.009399999999999999,
+          "memory_usage_bytes": 30230446,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 873000,
+          "network_tx_bytes": 602000,
+          "block_read_bytes": 3540000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.94%",
+            "memory": "28.83MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "873kB / 602kB",
+            "block_io": "3.54GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.21,
+          "cpu_cores": 0.0321,
+          "memory_usage_bytes": 323590553,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.89,
+          "pids": 100,
+          "network_rx_bytes": 149000,
+          "network_tx_bytes": 175000,
+          "block_read_bytes": 6460000000,
+          "block_write_bytes": 5680000,
+          "raw": {
+            "cpu": "3.21%",
+            "memory": "308.6MiB / 7.751GiB",
+            "memory_percent": "3.89%",
+            "network_io": "149kB / 175kB",
+            "block_io": "6.46GB / 5.68MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 141000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 154000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "141kB / 13.1kB",
+            "block_io": "154MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:05.914Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 42.25,
+          "cpu_cores": 0.4225,
+          "memory_usage_bytes": 86811607,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.04,
+          "pids": 6,
+          "network_rx_bytes": 783000,
+          "network_tx_bytes": 1190000,
+          "block_read_bytes": 2310000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "42.25%",
+            "memory": "82.79MiB / 7.751GiB",
+            "memory_percent": "1.04%",
+            "network_io": "783kB / 1.19MB",
+            "block_io": "2.31GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 5.26,
+          "cpu_cores": 0.0526,
+          "memory_usage_bytes": 29821501,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 907000,
+          "network_tx_bytes": 626000,
+          "block_read_bytes": 3640000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "5.26%",
+            "memory": "28.44MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "907kB / 626kB",
+            "block_io": "3.64GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 8.31,
+          "cpu_cores": 0.08310000000000001,
+          "memory_usage_bytes": 324429414,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.9,
+          "pids": 100,
+          "network_rx_bytes": 154000,
+          "network_tx_bytes": 180000,
+          "block_read_bytes": 6630000000,
+          "block_write_bytes": 5780000,
+          "raw": {
+            "cpu": "8.31%",
+            "memory": "309.4MiB / 7.751GiB",
+            "memory_percent": "3.90%",
+            "network_io": "154kB / 180kB",
+            "block_io": "6.63GB / 5.78MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 155000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 163000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "155kB / 14.3kB",
+            "block_io": "163MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:10.344Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 3.18,
+          "cpu_cores": 0.0318,
+          "memory_usage_bytes": 83131105,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 803000,
+          "network_tx_bytes": 1210000,
+          "block_read_bytes": 2340000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "3.18%",
+            "memory": "79.28MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "803kB / 1.21MB",
+            "block_io": "2.34GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 4.93,
+          "cpu_cores": 0.0493,
+          "memory_usage_bytes": 29842472,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 931000,
+          "network_tx_bytes": 642000,
+          "block_read_bytes": 3700000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "4.93%",
+            "memory": "28.46MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "931kB / 642kB",
+            "block_io": "3.7GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 4.47,
+          "cpu_cores": 0.0447,
+          "memory_usage_bytes": 322856550,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.88,
+          "pids": 100,
+          "network_rx_bytes": 157000,
+          "network_tx_bytes": 184000,
+          "block_read_bytes": 6710000000,
+          "block_write_bytes": 5820000,
+          "raw": {
+            "cpu": "4.47%",
+            "memory": "307.9MiB / 7.751GiB",
+            "memory_percent": "3.88%",
+            "network_io": "157kB / 184kB",
+            "block_io": "6.71GB / 5.82MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 155000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 163000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "155kB / 14.3kB",
+            "block_io": "163MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:15.203Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 8.64,
+          "cpu_cores": 0.0864,
+          "memory_usage_bytes": 83382763,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 819000,
+          "network_tx_bytes": 1230000,
+          "block_read_bytes": 2450000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "8.64%",
+            "memory": "79.52MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "819kB / 1.23MB",
+            "block_io": "2.45GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 8.12,
+          "cpu_cores": 0.0812,
+          "memory_usage_bytes": 29035069,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 9,
+          "network_rx_bytes": 948000,
+          "network_tx_bytes": 655000,
+          "block_read_bytes": 3800000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "8.12%",
+            "memory": "27.69MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "948kB / 655kB",
+            "block_io": "3.8GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 36.72,
+          "cpu_cores": 0.36719999999999997,
+          "memory_usage_bytes": 364694732,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.38,
+          "pids": 120,
+          "network_rx_bytes": 161000,
+          "network_tx_bytes": 187000,
+          "block_read_bytes": 6900000000,
+          "block_write_bytes": 5880000,
+          "raw": {
+            "cpu": "36.72%",
+            "memory": "347.8MiB / 7.751GiB",
+            "memory_percent": "4.38%",
+            "network_io": "161kB / 187kB",
+            "block_io": "6.9GB / 5.88MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 155000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 163000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "155kB / 14.3kB",
+            "block_io": "163MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:20.988Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 38.67,
+          "cpu_cores": 0.38670000000000004,
+          "memory_usage_bytes": 102341017,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.23,
+          "pids": 7,
+          "network_rx_bytes": 844000,
+          "network_tx_bytes": 1280000,
+          "block_read_bytes": 2600000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "38.67%",
+            "memory": "97.6MiB / 7.751GiB",
+            "memory_percent": "1.23%",
+            "network_io": "844kB / 1.28MB",
+            "block_io": "2.6GB / 0B",
+            "pids": "7"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.16,
+          "cpu_cores": 0.0216,
+          "memory_usage_bytes": 33512488,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 9,
+          "network_rx_bytes": 974000,
+          "network_tx_bytes": 674000,
+          "block_read_bytes": 3940000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.16%",
+            "memory": "31.96MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "974kB / 674kB",
+            "block_io": "3.94GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 5.85,
+          "cpu_cores": 0.058499999999999996,
+          "memory_usage_bytes": 335334604,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.03,
+          "pids": 100,
+          "network_rx_bytes": 166000,
+          "network_tx_bytes": 192000,
+          "block_read_bytes": 7130000000,
+          "block_write_bytes": 5960000,
+          "raw": {
+            "cpu": "5.85%",
+            "memory": "319.8MiB / 7.751GiB",
+            "memory_percent": "4.03%",
+            "network_io": "166kB / 192kB",
+            "block_io": "7.13GB / 5.96MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 169000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 182000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "169kB / 15.5kB",
+            "block_io": "182MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:25.885Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 5.72,
+          "cpu_cores": 0.0572,
+          "memory_usage_bytes": 86570434,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.04,
+          "pids": 6,
+          "network_rx_bytes": 865000,
+          "network_tx_bytes": 1310000,
+          "block_read_bytes": 2670000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "5.72%",
+            "memory": "82.56MiB / 7.751GiB",
+            "memory_percent": "1.04%",
+            "network_io": "865kB / 1.31MB",
+            "block_io": "2.67GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.44,
+          "cpu_cores": 0.0144,
+          "memory_usage_bytes": 32841400,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 994000,
+          "network_tx_bytes": 687000,
+          "block_read_bytes": 4010000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "1.44%",
+            "memory": "31.32MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "994kB / 687kB",
+            "block_io": "4.01GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 28.54,
+          "cpu_cores": 0.2854,
+          "memory_usage_bytes": 382101094,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.59,
+          "pids": 123,
+          "network_rx_bytes": 169000,
+          "network_tx_bytes": 196000,
+          "block_read_bytes": 7280000000,
+          "block_write_bytes": 6000000,
+          "raw": {
+            "cpu": "28.54%",
+            "memory": "364.4MiB / 7.751GiB",
+            "memory_percent": "4.59%",
+            "network_io": "169kB / 196kB",
+            "block_io": "7.28GB / 6MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 169000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 182000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "169kB / 15.5kB",
+            "block_io": "182MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:30.484Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 5.23,
+          "cpu_cores": 0.052300000000000006,
+          "memory_usage_bytes": 83047219,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 882000,
+          "network_tx_bytes": 1330000,
+          "block_read_bytes": 2790000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "5.23%",
+            "memory": "79.2MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "882kB / 1.33MB",
+            "block_io": "2.79GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 5.04,
+          "cpu_cores": 0.0504,
+          "memory_usage_bytes": 29464985,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 9,
+          "network_rx_bytes": 1020000,
+          "network_tx_bytes": 704000,
+          "block_read_bytes": 4160000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "5.04%",
+            "memory": "28.1MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "1.02MB / 704kB",
+            "block_io": "4.16GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 24.98,
+          "cpu_cores": 0.2498,
+          "memory_usage_bytes": 392167424,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.71,
+          "pids": 123,
+          "network_rx_bytes": 173000,
+          "network_tx_bytes": 200000,
+          "block_read_bytes": 7440000000,
+          "block_write_bytes": 6050000,
+          "raw": {
+            "cpu": "24.98%",
+            "memory": "374MiB / 7.751GiB",
+            "memory_percent": "4.71%",
+            "network_io": "173kB / 200kB",
+            "block_io": "7.44GB / 6.05MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 169000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 182000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "169kB / 15.5kB",
+            "block_io": "182MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:34.849Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.38,
+          "cpu_cores": 0.023799999999999998,
+          "memory_usage_bytes": 84221624,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 903000,
+          "network_tx_bytes": 1370000,
+          "block_read_bytes": 2890000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.38%",
+            "memory": "80.32MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "903kB / 1.37MB",
+            "block_io": "2.89GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 3.15,
+          "cpu_cores": 0.0315,
+          "memory_usage_bytes": 29370613,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 9,
+          "network_rx_bytes": 1040000,
+          "network_tx_bytes": 721000,
+          "block_read_bytes": 4250000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "3.15%",
+            "memory": "28.01MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "1.04MB / 721kB",
+            "block_io": "4.25GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 3.59,
+          "cpu_cores": 0.0359,
+          "memory_usage_bytes": 326316851,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.92,
+          "pids": 100,
+          "network_rx_bytes": 176000,
+          "network_tx_bytes": 203000,
+          "block_read_bytes": 7560000000,
+          "block_write_bytes": 6150000,
+          "raw": {
+            "cpu": "3.59%",
+            "memory": "311.2MiB / 7.751GiB",
+            "memory_percent": "3.92%",
+            "network_io": "176kB / 203kB",
+            "block_io": "7.56GB / 6.15MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 193000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 16.6kB",
+            "block_io": "193MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:40.185Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.19,
+          "cpu_cores": 0.0219,
+          "memory_usage_bytes": 83498106,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 929000,
+          "network_tx_bytes": 1410000,
+          "block_read_bytes": 2980000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.19%",
+            "memory": "79.63MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "929kB / 1.41MB",
+            "block_io": "2.98GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.15,
+          "cpu_cores": 0.0115,
+          "memory_usage_bytes": 29653729,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 1070000,
+          "network_tx_bytes": 742000,
+          "block_read_bytes": 4340000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "1.15%",
+            "memory": "28.28MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "1.07MB / 742kB",
+            "block_io": "4.34GB / 174MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 2.85,
+          "cpu_cores": 0.0285,
+          "memory_usage_bytes": 325163417,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.91,
+          "pids": 100,
+          "network_rx_bytes": 180000,
+          "network_tx_bytes": 208000,
+          "block_read_bytes": 7760000000,
+          "block_write_bytes": 6230000,
+          "raw": {
+            "cpu": "2.85%",
+            "memory": "310.1MiB / 7.751GiB",
+            "memory_percent": "3.91%",
+            "network_io": "180kB / 208kB",
+            "block_io": "7.76GB / 6.23MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 193000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 16.6kB",
+            "block_io": "193MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:45.808Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 27.23,
+          "cpu_cores": 0.2723,
+          "memory_usage_bytes": 83445678,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 952000,
+          "network_tx_bytes": 1440000,
+          "block_read_bytes": 3040000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "27.23%",
+            "memory": "79.58MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "952kB / 1.44MB",
+            "block_io": "3.04GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.3,
+          "cpu_cores": 0.013000000000000001,
+          "memory_usage_bytes": 29769072,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 1100000,
+          "network_tx_bytes": 764000,
+          "block_read_bytes": 4450000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "1.30%",
+            "memory": "28.39MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "1.1MB / 764kB",
+            "block_io": "4.45GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 115.12,
+          "cpu_cores": 1.1512,
+          "memory_usage_bytes": 384827392,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.62,
+          "pids": 123,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 212000,
+          "block_read_bytes": 7900000000,
+          "block_write_bytes": 6450000,
+          "raw": {
+            "cpu": "115.12%",
+            "memory": "367MiB / 7.751GiB",
+            "memory_percent": "4.62%",
+            "network_io": "184kB / 212kB",
+            "block_io": "7.9GB / 6.45MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 193000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 16.6kB",
+            "block_io": "193MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:50.174Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 40.54,
+          "cpu_cores": 0.4054,
+          "memory_usage_bytes": 82554388,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 6,
+          "network_rx_bytes": 979000,
+          "network_tx_bytes": 1490000,
+          "block_read_bytes": 3120000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "40.54%",
+            "memory": "78.73MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "979kB / 1.49MB",
+            "block_io": "3.12GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.99,
+          "cpu_cores": 0.029900000000000003,
+          "memory_usage_bytes": 29622272,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 9,
+          "network_rx_bytes": 1130000,
+          "network_tx_bytes": 783000,
+          "block_read_bytes": 4510000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "2.99%",
+            "memory": "28.25MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "1.13MB / 783kB",
+            "block_io": "4.51GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 2.3,
+          "cpu_cores": 0.023,
+          "memory_usage_bytes": 326736281,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.93,
+          "pids": 100,
+          "network_rx_bytes": 187000,
+          "network_tx_bytes": 216000,
+          "block_read_bytes": 8000000000,
+          "block_write_bytes": 6530000,
+          "raw": {
+            "cpu": "2.30%",
+            "memory": "311.6MiB / 7.751GiB",
+            "memory_percent": "3.93%",
+            "network_io": "187kB / 216kB",
+            "block_io": "8GB / 6.53MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 198000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 202000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "198kB / 17.8kB",
+            "block_io": "202MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:07:56.119Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 31.23,
+          "cpu_cores": 0.3123,
+          "memory_usage_bytes": 84232110,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 1010000,
+          "network_tx_bytes": 1520000,
+          "block_read_bytes": 3190000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "31.23%",
+            "memory": "80.33MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "1.01MB / 1.52MB",
+            "block_io": "3.19GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 4.46,
+          "cpu_cores": 0.0446,
+          "memory_usage_bytes": 31362908,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 1170000,
+          "network_tx_bytes": 806000,
+          "block_read_bytes": 4610000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "4.46%",
+            "memory": "29.91MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "1.17MB / 806kB",
+            "block_io": "4.61GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 4.26,
+          "cpu_cores": 0.0426,
+          "memory_usage_bytes": 326211993,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.92,
+          "pids": 100,
+          "network_rx_bytes": 192000,
+          "network_tx_bytes": 220000,
+          "block_read_bytes": 8140000000,
+          "block_write_bytes": 6600000,
+          "raw": {
+            "cpu": "4.26%",
+            "memory": "311.1MiB / 7.751GiB",
+            "memory_percent": "3.92%",
+            "network_io": "192kB / 220kB",
+            "block_io": "8.14GB / 6.6MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 198000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 202000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "198kB / 17.8kB",
+            "block_io": "202MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:08:00.636Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 6.86,
+          "cpu_cores": 0.06860000000000001,
+          "memory_usage_bytes": 84263567,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 6,
+          "network_rx_bytes": 1030000,
+          "network_tx_bytes": 1550000,
+          "block_read_bytes": 3230000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "6.86%",
+            "memory": "80.36MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "1.03MB / 1.55MB",
+            "block_io": "3.23GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.56,
+          "cpu_cores": 0.0256,
+          "memory_usage_bytes": 31404851,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 9,
+          "network_rx_bytes": 1190000,
+          "network_tx_bytes": 821000,
+          "block_read_bytes": 4680000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "2.56%",
+            "memory": "29.95MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "1.19MB / 821kB",
+            "block_io": "4.68GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 65.78,
+          "cpu_cores": 0.6578,
+          "memory_usage_bytes": 376753356,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.53,
+          "pids": 121,
+          "network_rx_bytes": 196000,
+          "network_tx_bytes": 225000,
+          "block_read_bytes": 8279999999,
+          "block_write_bytes": 6650000,
+          "raw": {
+            "cpu": "65.78%",
+            "memory": "359.3MiB / 7.751GiB",
+            "memory_percent": "4.53%",
+            "network_io": "196kB / 225kB",
+            "block_io": "8.28GB / 6.65MB",
+            "pids": "121"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 198000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 202000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "198kB / 17.8kB",
+            "block_io": "202MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:08:05.945Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 2.65,
+          "cpu_cores": 0.0265,
+          "memory_usage_bytes": 83173048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 6,
+          "network_rx_bytes": 1050000,
+          "network_tx_bytes": 1600000,
+          "block_read_bytes": 3350000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.65%",
+            "memory": "79.32MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "1.05MB / 1.6MB",
+            "block_io": "3.35GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.09,
+          "cpu_cores": 0.0109,
+          "memory_usage_bytes": 33239859,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 9,
+          "network_rx_bytes": 1210000,
+          "network_tx_bytes": 840000,
+          "block_read_bytes": 4790000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "1.09%",
+            "memory": "31.7MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "1.21MB / 840kB",
+            "block_io": "4.79GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 7.05,
+          "cpu_cores": 0.0705,
+          "memory_usage_bytes": 328099430,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.94,
+          "pids": 100,
+          "network_rx_bytes": 199000,
+          "network_tx_bytes": 228000,
+          "block_read_bytes": 8420000000,
+          "block_write_bytes": 6750000,
+          "raw": {
+            "cpu": "7.05%",
+            "memory": "312.9MiB / 7.751GiB",
+            "memory_percent": "3.94%",
+            "network_io": "199kB / 228kB",
+            "block_io": "8.42GB / 6.75MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 212000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "212kB / 19kB",
+            "block_io": "220MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:08:10.476Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 5.05,
+          "cpu_cores": 0.050499999999999996,
+          "memory_usage_bytes": 86297804,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.04,
+          "pids": 6,
+          "network_rx_bytes": 1070000,
+          "network_tx_bytes": 1620000,
+          "block_read_bytes": 3420000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "5.05%",
+            "memory": "82.3MiB / 7.751GiB",
+            "memory_percent": "1.04%",
+            "network_io": "1.07MB / 1.62MB",
+            "block_io": "3.42GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 2.78,
+          "cpu_cores": 0.0278,
+          "memory_usage_bytes": 29412556,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 9,
+          "network_rx_bytes": 1240000,
+          "network_tx_bytes": 855000,
+          "block_read_bytes": 4850000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "2.78%",
+            "memory": "28.05MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "1.24MB / 855kB",
+            "block_io": "4.85GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 31.76,
+          "cpu_cores": 0.3176,
+          "memory_usage_bytes": 331559731,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.98,
+          "pids": 105,
+          "network_rx_bytes": 203000,
+          "network_tx_bytes": 233000,
+          "block_read_bytes": 8520000000,
+          "block_write_bytes": 6800000,
+          "raw": {
+            "cpu": "31.76%",
+            "memory": "316.2MiB / 7.751GiB",
+            "memory_percent": "3.98%",
+            "network_io": "203kB / 233kB",
+            "block_io": "8.52GB / 6.8MB",
+            "pids": "105"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 212000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "212kB / 19kB",
+            "block_io": "220MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:08:15.901Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 4.12,
+          "cpu_cores": 0.0412,
+          "memory_usage_bytes": 82197872,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 6,
+          "network_rx_bytes": 1090000,
+          "network_tx_bytes": 1650000,
+          "block_read_bytes": 3540000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "4.12%",
+            "memory": "78.39MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "1.09MB / 1.65MB",
+            "block_io": "3.54GB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 4.41,
+          "cpu_cores": 0.0441,
+          "memory_usage_bytes": 30859591,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 1260000,
+          "network_tx_bytes": 874000,
+          "block_read_bytes": 4980000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "4.41%",
+            "memory": "29.43MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "1.26MB / 874kB",
+            "block_io": "4.98GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 10.33,
+          "cpu_cores": 0.1033,
+          "memory_usage_bytes": 326945996,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.93,
+          "pids": 100,
+          "network_rx_bytes": 207000,
+          "network_tx_bytes": 237000,
+          "block_read_bytes": 8720000000,
+          "block_write_bytes": 6890000,
+          "raw": {
+            "cpu": "10.33%",
+            "memory": "311.8MiB / 7.751GiB",
+            "memory_percent": "3.93%",
+            "network_io": "207kB / 237kB",
+            "block_io": "8.72GB / 6.89MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 212000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 220000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "212kB / 19kB",
+            "block_io": "220MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:08:20.715Z",
+      "components": [
+        {
+          "container_id": "6a8dc2623ec3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-payment-service-1",
+          "cpu_percent": 24.47,
+          "cpu_cores": 0.2447,
+          "memory_usage_bytes": 94109696,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.13,
+          "pids": 7,
+          "network_rx_bytes": 1120000,
+          "network_tx_bytes": 1700000,
+          "block_read_bytes": 3610000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "24.47%",
+            "memory": "89.75MiB / 7.751GiB",
+            "memory_percent": "1.13%",
+            "network_io": "1.12MB / 1.7MB",
+            "block_io": "3.61GB / 0B",
+            "pids": "7"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "47559bf8b388",
+          "container_name": "dmidle-260722t095806z486a7f-payment-postgres-1",
+          "cpu_percent": 1.59,
+          "cpu_cores": 0.0159,
+          "memory_usage_bytes": 31142707,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 1290000,
+          "network_tx_bytes": 892000,
+          "block_read_bytes": 5050000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "1.59%",
+            "memory": "29.7MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "1.29MB / 892kB",
+            "block_io": "5.05GB / 175MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "e72ef3a6f3c8",
+          "container_name": "dmidle-260722t095806z486a7f-payment-kafka-1",
+          "cpu_percent": 21.15,
+          "cpu_cores": 0.2115,
+          "memory_usage_bytes": 326002278,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.92,
+          "pids": 101,
+          "network_rx_bytes": 211000,
+          "network_tx_bytes": 241000,
+          "block_read_bytes": 8830000000,
+          "block_write_bytes": 6930000,
+          "raw": {
+            "cpu": "21.15%",
+            "memory": "310.9MiB / 7.751GiB",
+            "memory_percent": "3.92%",
+            "network_io": "211kB / 241kB",
+            "block_io": "8.83GB / 6.93MB",
+            "pids": "101"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "222c6f3d8bc3",
+          "container_name": "dmidle-260722t095806z486a7f-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 227000,
+          "network_tx_bytes": 20200,
+          "block_read_bytes": 230000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "227kB / 20.2kB",
+            "block_io": "230MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "payment-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t095806z486a7f-payment-payment-service-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-idle-observer-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-payment-service-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-payment-service-1 Removing \n Container dmidle-260722t095806z486a7f-payment-payment-service-1 Removed \n Container dmidle-260722t095806z486a7f-payment-kafka-init-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-payment-migrate-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-kafka-init-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-kafka-init-1 Removing \n Container dmidle-260722t095806z486a7f-payment-payment-migrate-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-payment-migrate-1 Removing \n Container dmidle-260722t095806z486a7f-payment-payment-migrate-1 Removed \n Container dmidle-260722t095806z486a7f-payment-postgres-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-kafka-init-1 Removed \n Container dmidle-260722t095806z486a7f-payment-kafka-1 Stopping \n Container dmidle-260722t095806z486a7f-payment-postgres-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-postgres-1 Removing \n Container dmidle-260722t095806z486a7f-payment-kafka-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-kafka-1 Removing \n Container dmidle-260722t095806z486a7f-payment-postgres-1 Removed \n Container dmidle-260722t095806z486a7f-payment-kafka-1 Removed \n Container dmidle-260722t095806z486a7f-payment-idle-observer-1 Stopped \n Container dmidle-260722t095806z486a7f-payment-idle-observer-1 Removing \n Container dmidle-260722t095806z486a7f-payment-idle-observer-1 Removed \n Network dmidle-260722t095806z486a7f-payment_default Removing \n Volume dmidle-260722t095806z486a7f-payment_kafka-data Removing \n Volume dmidle-260722t095806z486a7f-payment_postgres-data Removing \n Network dmidle-260722t095806z486a7f-payment_default Removed \n Volume dmidle-260722t095806z486a7f-payment_postgres-data Removed \n Volume dmidle-260722t095806z486a7f-payment_kafka-data Removed"
+  }
+}

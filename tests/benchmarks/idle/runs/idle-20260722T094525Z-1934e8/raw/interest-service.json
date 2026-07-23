@@ -1,0 +1,203 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "interest-service",
+  "project": "dmidle-260722t094525z1934e8-interest",
+  "status": "passed",
+  "started_at": "2026-07-22T09:50:19.941Z",
+  "finished_at": "2026-07-22T09:51:10.847Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:50:47.200Z",
+      "components": [
+        {
+          "container_id": "93f8108c9e9b",
+          "container_name": "dmidle-260722t094525z1934e8-interest-interest-service-1",
+          "cpu_percent": 18.98,
+          "cpu_cores": 0.1898,
+          "memory_usage_bytes": 86769664,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.04,
+          "pids": 6,
+          "network_rx_bytes": 7670,
+          "network_tx_bytes": 10000,
+          "block_read_bytes": 137000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "18.98%",
+            "memory": "82.75MiB / 7.751GiB",
+            "memory_percent": "1.04%",
+            "network_io": "7.67kB / 10kB",
+            "block_io": "137MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "interest-service",
+          "role": "app"
+        },
+        {
+          "container_id": "322a72efa160",
+          "container_name": "dmidle-260722t094525z1934e8-interest-postgres-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 24714936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 10900,
+          "network_tx_bytes": 5740,
+          "block_read_bytes": 203000000,
+          "block_write_bytes": 170000000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "23.57MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "10.9kB / 5.74kB",
+            "block_io": "203MB / 170MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "d8f6deaae5aa",
+          "container_name": "dmidle-260722t094525z1934e8-interest-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 835584,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 1990,
+          "network_tx_bytes": 1140,
+          "block_read_bytes": 34900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "816KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "1.99kB / 1.14kB",
+            "block_io": "34.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:50:49.203Z",
+      "components": [
+        {
+          "container_id": "93f8108c9e9b",
+          "container_name": "dmidle-260722t094525z1934e8-interest-interest-service-1",
+          "cpu_percent": 0.14,
+          "cpu_cores": 0.0014000000000000002,
+          "memory_usage_bytes": 77017907,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.93,
+          "pids": 6,
+          "network_rx_bytes": 7710,
+          "network_tx_bytes": 10100,
+          "block_read_bytes": 137000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.14%",
+            "memory": "73.45MiB / 7.751GiB",
+            "memory_percent": "0.93%",
+            "network_io": "7.71kB / 10.1kB",
+            "block_io": "137MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "interest-service",
+          "role": "app"
+        },
+        {
+          "container_id": "322a72efa160",
+          "container_name": "dmidle-260722t094525z1934e8-interest-postgres-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 27325890,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.33,
+          "pids": 7,
+          "network_rx_bytes": 10900,
+          "network_tx_bytes": 5780,
+          "block_read_bytes": 221000000,
+          "block_write_bytes": 170000000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "26.06MiB / 7.751GiB",
+            "memory_percent": "0.33%",
+            "network_io": "10.9kB / 5.78kB",
+            "block_io": "221MB / 170MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "d8f6deaae5aa",
+          "container_name": "dmidle-260722t094525z1934e8-interest-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 835584,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 1990,
+          "network_tx_bytes": 1140,
+          "block_read_bytes": 34900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "816KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "1.99kB / 1.14kB",
+            "block_io": "34.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "interest-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-interest-interest-service-1 Stopping \n Container dmidle-260722t094525z1934e8-interest-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-interest-interest-service-1 Stopped \n Container dmidle-260722t094525z1934e8-interest-interest-service-1 Removing \n Container dmidle-260722t094525z1934e8-interest-interest-service-1 Removed \n Container dmidle-260722t094525z1934e8-interest-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-interest-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-interest-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-interest-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-interest-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-interest-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-interest-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-interest_default Removing \n Volume dmidle-260722t094525z1934e8-interest_postgres-data Removing \n Volume dmidle-260722t094525z1934e8-interest_postgres-data Removed \n Network dmidle-260722t094525z1934e8-interest_default Removed"
+  }
+}

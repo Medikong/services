@@ -1,0 +1,1950 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T095806Z-486a7f",
+  "service": "dropmong-web",
+  "project": "dmidle-260722t095806z486a7f-web",
+  "status": "passed",
+  "started_at": "2026-07-22T11:15:00.424Z",
+  "finished_at": "2026-07-22T11:19:43.508Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T11:16:21.731Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 37067161,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.45,
+          "pids": 11,
+          "network_rx_bytes": 7720,
+          "network_tx_bytes": 36300,
+          "block_read_bytes": 982000000,
+          "block_write_bytes": 5970000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.35MiB / 7.751GiB",
+            "memory_percent": "0.45%",
+            "network_io": "7.72kB / 36.3kB",
+            "block_io": "982MB / 5.97MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 37200,
+          "network_tx_bytes": 6020,
+          "block_read_bytes": 78800000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "37.2kB / 6.02kB",
+            "block_io": "78.8MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:26.691Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.32,
+          "cpu_cores": 0.0032,
+          "memory_usage_bytes": 37088133,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.45,
+          "pids": 11,
+          "network_rx_bytes": 7720,
+          "network_tx_bytes": 36300,
+          "block_read_bytes": 1040000000,
+          "block_write_bytes": 5970000,
+          "raw": {
+            "cpu": "0.32%",
+            "memory": "35.37MiB / 7.751GiB",
+            "memory_percent": "0.45%",
+            "network_io": "7.72kB / 36.3kB",
+            "block_io": "1.04GB / 5.97MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 37200,
+          "network_tx_bytes": 6020,
+          "block_read_bytes": 78800000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "37.2kB / 6.02kB",
+            "block_io": "78.8MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:32.694Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.34,
+          "cpu_cores": 0.0034000000000000002,
+          "memory_usage_bytes": 39374028,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.47,
+          "pids": 11,
+          "network_rx_bytes": 8900,
+          "network_tx_bytes": 45800,
+          "block_read_bytes": 1110000000,
+          "block_write_bytes": 6160000,
+          "raw": {
+            "cpu": "0.34%",
+            "memory": "37.55MiB / 7.751GiB",
+            "memory_percent": "0.47%",
+            "network_io": "8.9kB / 45.8kB",
+            "block_io": "1.11GB / 6.16MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 692224,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 46700,
+          "network_tx_bytes": 7200,
+          "block_read_bytes": 88200000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "676KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "46.7kB / 7.2kB",
+            "block_io": "88.2MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:37.687Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 37014732,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 8900,
+          "network_tx_bytes": 45800,
+          "block_read_bytes": 1170000000,
+          "block_write_bytes": 6160000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.3MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "8.9kB / 45.8kB",
+            "block_io": "1.17GB / 6.16MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 692224,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 46700,
+          "network_tx_bytes": 7200,
+          "block_read_bytes": 88200000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "676KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "46.7kB / 7.2kB",
+            "block_io": "88.2MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:42.674Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 9.23,
+          "cpu_cores": 0.09230000000000001,
+          "memory_usage_bytes": 41041264,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.49,
+          "pids": 11,
+          "network_rx_bytes": 8900,
+          "network_tx_bytes": 45800,
+          "block_read_bytes": 1220000000,
+          "block_write_bytes": 6160000,
+          "raw": {
+            "cpu": "9.23%",
+            "memory": "39.14MiB / 7.751GiB",
+            "memory_percent": "0.49%",
+            "network_io": "8.9kB / 45.8kB",
+            "block_io": "1.22GB / 6.16MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 2.08,
+          "cpu_cores": 0.0208,
+          "memory_usage_bytes": 958464,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 56200,
+          "network_tx_bytes": 8380,
+          "block_read_bytes": 97500000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "2.08%",
+            "memory": "936KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "56.2kB / 8.38kB",
+            "block_io": "97.5MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:46.652Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 7.72,
+          "cpu_cores": 0.07719999999999999,
+          "memory_usage_bytes": 40422604,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.49,
+          "pids": 11,
+          "network_rx_bytes": 10100,
+          "network_tx_bytes": 55300,
+          "block_read_bytes": 1290000000,
+          "block_write_bytes": 6430000,
+          "raw": {
+            "cpu": "7.72%",
+            "memory": "38.55MiB / 7.751GiB",
+            "memory_percent": "0.49%",
+            "network_io": "10.1kB / 55.3kB",
+            "block_io": "1.29GB / 6.43MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 56200,
+          "network_tx_bytes": 8380,
+          "block_read_bytes": 97500000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "56.2kB / 8.38kB",
+            "block_io": "97.5MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:51.690Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 7.81,
+          "cpu_cores": 0.0781,
+          "memory_usage_bytes": 45193625,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.54,
+          "pids": 11,
+          "network_rx_bytes": 10100,
+          "network_tx_bytes": 55300,
+          "block_read_bytes": 1350000000,
+          "block_write_bytes": 6690000,
+          "raw": {
+            "cpu": "7.81%",
+            "memory": "43.1MiB / 7.751GiB",
+            "memory_percent": "0.54%",
+            "network_io": "10.1kB / 55.3kB",
+            "block_io": "1.35GB / 6.69MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 56200,
+          "network_tx_bytes": 8380,
+          "block_read_bytes": 97500000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "56.2kB / 8.38kB",
+            "block_io": "97.5MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:16:56.675Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 12.7,
+          "cpu_cores": 0.127,
+          "memory_usage_bytes": 48349839,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.58,
+          "pids": 11,
+          "network_rx_bytes": 10100,
+          "network_tx_bytes": 55300,
+          "block_read_bytes": 1410000000,
+          "block_write_bytes": 6690000,
+          "raw": {
+            "cpu": "12.70%",
+            "memory": "46.11MiB / 7.751GiB",
+            "memory_percent": "0.58%",
+            "network_io": "10.1kB / 55.3kB",
+            "block_io": "1.41GB / 6.69MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 56200,
+          "network_tx_bytes": 8380,
+          "block_read_bytes": 97500000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "56.2kB / 8.38kB",
+            "block_io": "97.5MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:01.670Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36920360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 11300,
+          "network_tx_bytes": 64800,
+          "block_read_bytes": 1430000000,
+          "block_write_bytes": 6690000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.21MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "11.3kB / 64.8kB",
+            "block_io": "1.43GB / 6.69MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 65700,
+          "network_tx_bytes": 9560,
+          "block_read_bytes": 107000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "65.7kB / 9.56kB",
+            "block_io": "107MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:07.675Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36930846,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 11300,
+          "network_tx_bytes": 64800,
+          "block_read_bytes": 1480000000,
+          "block_write_bytes": 6960000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.22MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "11.3kB / 64.8kB",
+            "block_io": "1.48GB / 6.96MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 65700,
+          "network_tx_bytes": 9560,
+          "block_read_bytes": 107000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "65.7kB / 9.56kB",
+            "block_io": "107MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:12.680Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36930846,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 11300,
+          "network_tx_bytes": 64800,
+          "block_read_bytes": 1540000000,
+          "block_write_bytes": 6960000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.22MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "11.3kB / 64.8kB",
+            "block_io": "1.54GB / 6.96MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 1.88,
+          "cpu_cores": 0.018799999999999997,
+          "memory_usage_bytes": 778240,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 75200,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 117000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "1.88%",
+            "memory": "760KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "75.2kB / 10.7kB",
+            "block_io": "117MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:17.683Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36888903,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 12400,
+          "network_tx_bytes": 74300,
+          "block_read_bytes": 1600000000,
+          "block_write_bytes": 7020000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.18MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "12.4kB / 74.3kB",
+            "block_io": "1.6GB / 7.02MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 75200,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 117000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "75.2kB / 10.7kB",
+            "block_io": "117MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:21.687Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36888903,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 12400,
+          "network_tx_bytes": 74300,
+          "block_read_bytes": 1650000000,
+          "block_write_bytes": 7020000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.18MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "12.4kB / 74.3kB",
+            "block_io": "1.65GB / 7.02MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 75200,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 117000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "75.2kB / 10.7kB",
+            "block_io": "117MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:26.668Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36888903,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 12400,
+          "network_tx_bytes": 74300,
+          "block_read_bytes": 1700000000,
+          "block_write_bytes": 7020000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "35.18MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "12.4kB / 74.3kB",
+            "block_io": "1.7GB / 7.02MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 75200,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 117000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "75.2kB / 10.7kB",
+            "block_io": "117MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:31.661Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36511416,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 13600,
+          "network_tx_bytes": 83800,
+          "block_read_bytes": 1780000000,
+          "block_write_bytes": 7080000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "34.82MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "13.6kB / 83.8kB",
+            "block_io": "1.78GB / 7.08MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 688128,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 84700,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 126000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "672KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "84.7kB / 11.9kB",
+            "block_io": "126MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:36.666Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36259758,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.44,
+          "pids": 11,
+          "network_rx_bytes": 13600,
+          "network_tx_bytes": 83800,
+          "block_read_bytes": 1830000000,
+          "block_write_bytes": 7270000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "34.58MiB / 7.751GiB",
+            "memory_percent": "0.44%",
+            "network_io": "13.6kB / 83.8kB",
+            "block_io": "1.83GB / 7.27MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 688128,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 84700,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 126000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "672KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "84.7kB / 11.9kB",
+            "block_io": "126MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:42.893Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 4.79,
+          "cpu_cores": 0.0479,
+          "memory_usage_bytes": 39950745,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.48,
+          "pids": 11,
+          "network_rx_bytes": 14800,
+          "network_tx_bytes": 93300,
+          "block_read_bytes": 1910000000,
+          "block_write_bytes": 7270000,
+          "raw": {
+            "cpu": "4.79%",
+            "memory": "38.1MiB / 7.751GiB",
+            "memory_percent": "0.48%",
+            "network_io": "14.8kB / 93.3kB",
+            "block_io": "1.91GB / 7.27MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 688128,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 84700,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 126000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "672KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "84.7kB / 11.9kB",
+            "block_io": "126MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:47.675Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 36165386,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.43,
+          "pids": 11,
+          "network_rx_bytes": 14800,
+          "network_tx_bytes": 93300,
+          "block_read_bytes": 1960000000,
+          "block_write_bytes": 7270000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "34.49MiB / 7.751GiB",
+            "memory_percent": "0.43%",
+            "network_io": "14.8kB / 93.3kB",
+            "block_io": "1.96GB / 7.27MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 94200,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 138000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "94.2kB / 13.1kB",
+            "block_io": "138MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:52.743Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 35934699,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.43,
+          "pids": 11,
+          "network_rx_bytes": 14800,
+          "network_tx_bytes": 93300,
+          "block_read_bytes": 2020000000,
+          "block_write_bytes": 7590000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "34.27MiB / 7.751GiB",
+            "memory_percent": "0.43%",
+            "network_io": "14.8kB / 93.3kB",
+            "block_io": "2.02GB / 7.59MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 94200,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 138000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "94.2kB / 13.1kB",
+            "block_io": "138MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:17:57.636Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 38031851,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.46,
+          "pids": 11,
+          "network_rx_bytes": 14800,
+          "network_tx_bytes": 93300,
+          "block_read_bytes": 2069999999,
+          "block_write_bytes": 7590000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "36.27MiB / 7.751GiB",
+            "memory_percent": "0.46%",
+            "network_io": "14.8kB / 93.3kB",
+            "block_io": "2.07GB / 7.59MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 684032,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 94200,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 138000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "668KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "94.2kB / 13.1kB",
+            "block_io": "138MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:02.634Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 50908364,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.61,
+          "pids": 11,
+          "network_rx_bytes": 16000,
+          "network_tx_bytes": 103000,
+          "block_read_bytes": 2120000000,
+          "block_write_bytes": 7590000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "48.55MiB / 7.751GiB",
+            "memory_percent": "0.61%",
+            "network_io": "16kB / 103kB",
+            "block_io": "2.12GB / 7.59MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1781530,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 147000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.699MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "104kB / 14.3kB",
+            "block_io": "147MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:07.632Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.01,
+          "cpu_cores": 0.0001,
+          "memory_usage_bytes": 57304678,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.69,
+          "pids": 11,
+          "network_rx_bytes": 16000,
+          "network_tx_bytes": 103000,
+          "block_read_bytes": 2140000000,
+          "block_write_bytes": 7590000,
+          "raw": {
+            "cpu": "0.01%",
+            "memory": "54.65MiB / 7.751GiB",
+            "memory_percent": "0.69%",
+            "network_io": "16kB / 103kB",
+            "block_io": "2.14GB / 7.59MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1024000,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 147000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1000KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "104kB / 14.3kB",
+            "block_io": "147MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:12.642Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 1.41,
+          "cpu_cores": 0.0141,
+          "memory_usage_bytes": 66542632,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.8,
+          "pids": 11,
+          "network_rx_bytes": 16000,
+          "network_tx_bytes": 103000,
+          "block_read_bytes": 2170000000,
+          "block_write_bytes": 7830000,
+          "raw": {
+            "cpu": "1.41%",
+            "memory": "63.46MiB / 7.751GiB",
+            "memory_percent": "0.80%",
+            "network_io": "16kB / 103kB",
+            "block_io": "2.17GB / 7.83MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 806912,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 147000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "788KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "104kB / 14.3kB",
+            "block_io": "147MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:17.628Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 65022197,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.78,
+          "pids": 11,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 112000,
+          "block_read_bytes": 2190000000,
+          "block_write_bytes": 8550000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "62.01MiB / 7.751GiB",
+            "memory_percent": "0.78%",
+            "network_io": "17.2kB / 112kB",
+            "block_io": "2.19GB / 8.55MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1024000,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 113000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 156000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1000KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "113kB / 15.5kB",
+            "block_io": "156MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:21.634Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 5.82,
+          "cpu_cores": 0.0582,
+          "memory_usage_bytes": 61131980,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.73,
+          "pids": 11,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 112000,
+          "block_read_bytes": 2210000000,
+          "block_write_bytes": 8610000,
+          "raw": {
+            "cpu": "5.82%",
+            "memory": "58.3MiB / 7.751GiB",
+            "memory_percent": "0.73%",
+            "network_io": "17.2kB / 112kB",
+            "block_io": "2.21GB / 8.61MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1523580,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 113000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 156000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.453MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "113kB / 15.5kB",
+            "block_io": "156MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:27.643Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.01,
+          "cpu_cores": 0.0001,
+          "memory_usage_bytes": 60219719,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.72,
+          "pids": 11,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 112000,
+          "block_read_bytes": 2230000000,
+          "block_write_bytes": 9200000,
+          "raw": {
+            "cpu": "0.01%",
+            "memory": "57.43MiB / 7.751GiB",
+            "memory_percent": "0.72%",
+            "network_io": "17.2kB / 112kB",
+            "block_io": "2.23GB / 9.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 995328,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 113000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 156000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "972KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "113kB / 15.5kB",
+            "block_io": "156MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:32.637Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 80971038,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 11,
+          "network_rx_bytes": 18300,
+          "network_tx_bytes": 122000,
+          "block_read_bytes": 2280000000,
+          "block_write_bytes": 9200000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "77.22MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "18.3kB / 122kB",
+            "block_io": "2.28GB / 9.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1302331,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 123000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 165000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.242MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "123kB / 16.6kB",
+            "block_io": "165MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:36.632Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 5.13,
+          "cpu_cores": 0.0513,
+          "memory_usage_bytes": 71282196,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.86,
+          "pids": 11,
+          "network_rx_bytes": 18300,
+          "network_tx_bytes": 122000,
+          "block_read_bytes": 2290000000,
+          "block_write_bytes": 9200000,
+          "raw": {
+            "cpu": "5.13%",
+            "memory": "67.98MiB / 7.751GiB",
+            "memory_percent": "0.86%",
+            "network_io": "18.3kB / 122kB",
+            "block_io": "2.29GB / 9.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 937984,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 123000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 165000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "916KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "123kB / 16.6kB",
+            "block_io": "165MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:42.646Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 68692213,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.83,
+          "pids": 11,
+          "network_rx_bytes": 18300,
+          "network_tx_bytes": 122000,
+          "block_read_bytes": 2320000000,
+          "block_write_bytes": 9200000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "65.51MiB / 7.751GiB",
+            "memory_percent": "0.83%",
+            "network_io": "18.3kB / 122kB",
+            "block_io": "2.32GB / 9.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 774144,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 123000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 165000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "756KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "123kB / 16.6kB",
+            "block_io": "165MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:46.635Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 4.91,
+          "cpu_cores": 0.049100000000000005,
+          "memory_usage_bytes": 51862568,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.62,
+          "pids": 11,
+          "network_rx_bytes": 19500,
+          "network_tx_bytes": 131000,
+          "block_read_bytes": 2330000000,
+          "block_write_bytes": 9200000,
+          "raw": {
+            "cpu": "4.91%",
+            "memory": "49.46MiB / 7.751GiB",
+            "memory_percent": "0.62%",
+            "network_io": "19.5kB / 131kB",
+            "block_io": "2.33GB / 9.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1265631,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 132000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 174000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.207MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "132kB / 17.8kB",
+            "block_io": "174MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:52.797Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 12.25,
+          "cpu_cores": 0.1225,
+          "memory_usage_bytes": 71103938,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.85,
+          "pids": 11,
+          "network_rx_bytes": 19500,
+          "network_tx_bytes": 131000,
+          "block_read_bytes": 2360000000,
+          "block_write_bytes": 9470000,
+          "raw": {
+            "cpu": "12.25%",
+            "memory": "67.81MiB / 7.751GiB",
+            "memory_percent": "0.85%",
+            "network_io": "19.5kB / 131kB",
+            "block_io": "2.36GB / 9.47MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1375731,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 132000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 174000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.312MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "132kB / 17.8kB",
+            "block_io": "174MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:18:57.636Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 10.43,
+          "cpu_cores": 0.1043,
+          "memory_usage_bytes": 61006151,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.73,
+          "pids": 11,
+          "network_rx_bytes": 19500,
+          "network_tx_bytes": 131000,
+          "block_read_bytes": 2380000000,
+          "block_write_bytes": 9740000,
+          "raw": {
+            "cpu": "10.43%",
+            "memory": "58.18MiB / 7.751GiB",
+            "memory_percent": "0.73%",
+            "network_io": "19.5kB / 131kB",
+            "block_io": "2.38GB / 9.74MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 823296,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 132000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 174000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "804KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "132kB / 17.8kB",
+            "block_io": "174MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:19:02.665Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 10.96,
+          "cpu_cores": 0.1096,
+          "memory_usage_bytes": 80037806,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.96,
+          "pids": 11,
+          "network_rx_bytes": 20700,
+          "network_tx_bytes": 141000,
+          "block_read_bytes": 2430000000,
+          "block_write_bytes": 10000000,
+          "raw": {
+            "cpu": "10.96%",
+            "memory": "76.33MiB / 7.751GiB",
+            "memory_percent": "0.96%",
+            "network_io": "20.7kB / 141kB",
+            "block_io": "2.43GB / 10MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1274019,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 142000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 183000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.215MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "142kB / 19kB",
+            "block_io": "183MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:19:07.636Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 10.34,
+          "cpu_cores": 0.10339999999999999,
+          "memory_usage_bytes": 65273856,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.78,
+          "pids": 18,
+          "network_rx_bytes": 20700,
+          "network_tx_bytes": 141000,
+          "block_read_bytes": 2440000000,
+          "block_write_bytes": 10000000,
+          "raw": {
+            "cpu": "10.34%",
+            "memory": "62.25MiB / 7.751GiB",
+            "memory_percent": "0.78%",
+            "network_io": "20.7kB / 141kB",
+            "block_io": "2.44GB / 10MB",
+            "pids": "18"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 978944,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 142000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 183000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "956KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "142kB / 19kB",
+            "block_io": "183MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:19:11.622Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 40013660,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.48,
+          "pids": 11,
+          "network_rx_bytes": 20700,
+          "network_tx_bytes": 141000,
+          "block_read_bytes": 2440000000,
+          "block_write_bytes": 10200000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "38.16MiB / 7.751GiB",
+            "memory_percent": "0.48%",
+            "network_io": "20.7kB / 141kB",
+            "block_io": "2.44GB / 10.2MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 815104,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 142000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 183000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "796KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "142kB / 19kB",
+            "block_io": "183MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:19:17.710Z",
+      "components": [
+        {
+          "container_id": "38ab04cb0d48",
+          "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 44742737,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.54,
+          "pids": 11,
+          "network_rx_bytes": 21900,
+          "network_tx_bytes": 150000,
+          "block_read_bytes": 2480000000,
+          "block_write_bytes": 10500000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "42.67MiB / 7.751GiB",
+            "memory_percent": "0.54%",
+            "network_io": "21.9kB / 150kB",
+            "block_io": "2.48GB / 10.5MB",
+            "pids": "11"
+          },
+          "compose_service": "dropmong-web",
+          "role": "app"
+        },
+        {
+          "container_id": "4c3700e98f38",
+          "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 9342812,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 2,
+          "network_rx_bytes": 151000,
+          "network_tx_bytes": 20200,
+          "block_read_bytes": 192000000,
+          "block_write_bytes": 8189,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "8.91MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "151kB / 20.2kB",
+            "block_io": "192MB / 8.19kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "dropmong-web": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Stopping \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Stopping \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Stopped \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Removing \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Removed \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Stopped \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Removing \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Removed \n Network dmidle-260722t095806z486a7f-web_default Removing \n Network dmidle-260722t095806z486a7f-web_default Removed"
+  }
+}

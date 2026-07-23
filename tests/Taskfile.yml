@@ -12,6 +12,10 @@ vars:
   PYTHON_BIN: '{{default "python3" .PYTHON_BIN}}'
   E2E_PYTHON_BIN: '{{default "python3" .E2E_PYTHON_BIN}}'
   DOCKER_COMPOSE: '{{default "docker compose" .DOCKER_COMPOSE}}'
+  BENCHMARK_IDLE_SERVICES: '{{default "" .SERVICES}}'
+  BENCHMARK_IDLE_WARMUP_SECONDS: '{{default "60" .WARMUP_SECONDS}}'
+  BENCHMARK_IDLE_MEASURE_SECONDS: '{{default "180" .MEASURE_SECONDS}}'
+  BENCHMARK_IDLE_SAMPLE_INTERVAL_SECONDS: '{{default "5" .SAMPLE_INTERVAL_SECONDS}}'
   E2E_COMPOSE_FILE: '{{default "tests/e2e/docker-compose.yml" .E2E_COMPOSE_FILE}}'
   E2E_COMPOSE_PROJECT: '{{default "dropmong-e2e" .E2E_COMPOSE_PROJECT}}'
   E2E_NETWORK: '{{default "dropmong-e2e_default" .E2E_NETWORK}}'
@@ -52,6 +56,16 @@ vars:
   AUTH_OBS_E2E_PROJECT: '{{default "dropmong-auth-observability-e2e" .AUTH_OBS_E2E_PROJECT}}'
 
 tasks:
+  benchmark-idle:
+    desc: Measure isolated service container idle CPU and memory and save JSON reports.
+    cmds:
+      - >-
+        "{{.PYTHON_BIN}}" "{{.ROOT_DIR}}/tests/benchmarks/idle/run_idle.py"
+        --services '{{.BENCHMARK_IDLE_SERVICES}}'
+        --warmup-seconds '{{.BENCHMARK_IDLE_WARMUP_SECONDS}}'
+        --measure-seconds '{{.BENCHMARK_IDLE_MEASURE_SECONDS}}'
+        --sample-interval-seconds '{{.BENCHMARK_IDLE_SAMPLE_INTERVAL_SECONDS}}'
+
   e2e:
     desc: Run the selected Docker Compose E2E scenario with SCENARIO=<purchase-name|auth/folder>; empty runs all.
     internal: true

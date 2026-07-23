@@ -1,0 +1,401 @@
+x-common-env: &common-env
+  SERVICE_VERSION: idle-benchmark
+  SERVICE_ENVIRONMENT: local
+  OTEL_TRACES_EXPORTER: none
+  OTEL_SDK_DISABLED: "true"
+
+x-auth-env: &auth-env
+  <<: *common-env
+  SERVICE_NAME: auth-service
+  DATABASE_URL: postgres://app:app@postgres:5432/auth_service?sslmode=disable
+  AUTH_CREDENTIAL_HMAC_KEY: auth-idle-credential-hmac-key-0001
+  AUTH_REPLAY_ENCRYPTION_KEY: auth-idle-replay-key-32-byte-001
+  AUTH_JWT_PRIVATE_KEY_FILE: /run/secrets/auth_idle_jwt
+  AUTH_JWT_KEY_ID: auth-idle-rsa-1
+  AUTH_JWT_ISSUER: auth-service
+  AUTH_JWT_AUDIENCES: dropmong-api
+  AUTH_PROOF_PRIVATE_KEY: nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2DXWpgBgrEKt9VL/tPJZAc6DuFy89qmIyWvAhpo9wdRGg
+  AUTH_PROOF_KEY_ID: auth-idle-1
+  AUTH_USER_PROOF_PUBLIC_KEY: 11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo
+  AUTH_USER_PROOF_KEY_ID: user-idle-1
+  AUTH_USER_PROOF_ISSUER: user-service
+  AUTH_COOKIE_SECURE: "true"
+  AUTH_ALLOWED_ORIGINS: http://localhost:3000
+  REDIS_URL: redis://redis:6379/0
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: valkey/valkey:8-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  kafka:
+    image: apache/kafka:3.8.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 8s
+      retries: 30
+
+  kafka-init:
+    image: apache/kafka:3.8.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - sh
+      - -ec
+      - |
+        for topic in order.created payment.approved payment.failed order.confirmed order.expired inventory.changed refund.requested refund.completed refund.failed notification.requested auth.idle.events; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic "$${topic}" --partitions 1 --replication-factor 1
+        done
+    restart: "no"
+
+  idle-observer:
+    image: curlimages/curl:8.12.1
+    profiles: [observer]
+    entrypoint: ["/bin/sh", "-ec"]
+    environment:
+      IDLE_OBSERVE_TARGETS: "${IDLE_OBSERVE_TARGETS:-http://dropmong-web:3000}"
+      IDLE_OPERATIONAL_SCRAPE_INTERVAL_SECONDS: "${IDLE_OPERATIONAL_SCRAPE_INTERVAL_SECONDS:-15}"
+    command:
+      - |
+        while true; do
+          for target in $${IDLE_OBSERVE_TARGETS}; do
+            curl --fail --silent --max-time 2 "$${target}/readyz" >/dev/null 2>&1 || true
+            curl --fail --silent --max-time 2 "$${target}/metrics" >/dev/null 2>&1 || true
+          done
+          sleep "$${IDLE_OPERATIONAL_SCRAPE_INTERVAL_SECONDS}"
+        done
+    restart: "no"
+
+  auth-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/auth_service?sslmode=disable
+      MIGRATION_TIMEOUT: 2m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  auth-service:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      <<: *auth-env
+      HTTP_ADDR: :8080
+      ADMIN_ADDR: :9090
+      AUTH_SESSION_STATUS_ENABLED: "true"
+      REDIS_DIAL_TIMEOUT: 200ms
+      REDIS_READ_TIMEOUT: 200ms
+      REDIS_WRITE_TIMEOUT: 200ms
+    secrets: [auth_idle_jwt]
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  auth-worker:
+    build:
+      context: ../../..
+      dockerfile: services/auth-service/Dockerfile
+    entrypoint: ["/app/worker"]
+    environment:
+      <<: *auth-env
+      WORKER_ADMIN_ADDR: :9092
+      AUTH_OUTBOX_BROKER_ENABLED: "true"
+      AUTH_OUTBOX_BROKERS: kafka:29092
+      AUTH_OUTBOX_TOPIC: auth.idle.events
+      AUTH_DELIVERY_ENABLED: "false"
+      AUDIT_POLL_INTERVAL: 1s
+    secrets: [auth_idle_jwt]
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  user-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/user-service/Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/user_service?sslmode=disable
+      MIGRATION_TIMEOUT: 2m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  user-service:
+    build:
+      context: ../../..
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      <<: *common-env
+      SERVICE_NAME: user-service
+      DATABASE_URL: postgres://app:app@postgres:5432/user_service?sslmode=disable
+      HTTP_ADDR: :8080
+      ADMIN_ADDR: :9090
+      USER_ALLOWED_ORIGINS: http://localhost:3000
+    depends_on:
+      user-migrate:
+        condition: service_completed_successfully
+
+  coupon-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/coupon-service/Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
+      MIGRATION_TIMEOUT: 2m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  coupon-service:
+    build:
+      context: ../../..
+      dockerfile: services/coupon-service/Dockerfile
+    environment:
+      <<: *common-env
+      SERVICE_NAME: coupon-service
+      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
+      HTTP_ADDR: :8080
+      ADMIN_ADDR: :9090
+      COUPON_ALLOWED_ORIGINS: http://localhost:3000
+      COUPON_REDIS_GATE_ENABLED: "false"
+    depends_on:
+      coupon-migrate:
+        condition: service_completed_successfully
+
+  coupon-worker:
+    build:
+      context: ../../..
+      dockerfile: services/coupon-service/Dockerfile
+    entrypoint: ["/app/worker"]
+    environment:
+      <<: *common-env
+      SERVICE_NAME: coupon-service
+      DATABASE_URL: postgres://app:app@postgres:5432/coupon_service?sslmode=disable
+      WORKER_ADMIN_ADDR: :9092
+      COUPON_REDIS_GATE_ENABLED: "false"
+    depends_on:
+      coupon-migrate:
+        condition: service_completed_successfully
+
+  catalog-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/catalog-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/catalog_service
+    command: ["python", "-m", "app.migrations", "upgrade"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  catalog-service:
+    build:
+      context: ../../..
+      dockerfile: services/catalog-service/Dockerfile
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/catalog_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      catalog-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz').read()"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+  interest-service:
+    build:
+      context: ../../..
+      dockerfile: services/interest-service/Dockerfile
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/interest_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/readyz').read()"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+  order-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/order_service
+    command: ["python", "-m", "app.migrate", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  order-service:
+    build:
+      context: ../../..
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/order_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ORDER_PAYMENT_TTL_SECONDS: "300"
+    depends_on:
+      order-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/readyz').read()"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+  payment-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  payment-service:
+    build:
+      context: ../../..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/payment_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      payment-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/readyz').read()"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+  notification-migrate:
+    build:
+      context: ../../..
+      dockerfile: services/notification-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/notification_service
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  notification-service:
+    build:
+      context: ../../..
+      dockerfile: services/notification-service/Dockerfile
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/notification_service
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      notification-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/readyz').read()"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+  dropmong-web:
+    build:
+      context: ../../..
+      dockerfile: services/dropmong-web/Dockerfile
+    environment:
+      APP_ENV: local
+      APP_ORIGIN: http://localhost:3000
+      APP_VERSION: idle-benchmark
+      DEV_MOCK_MODE: "true"
+      SELLER_PORTAL_ENABLED: "true"
+      SESSION_COOKIE_SECRET: idle-benchmark-session-cookie-secret-0001
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/readyz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: ${IDLE_APP_HEALTHCHECK_INTERVAL:-5s}
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+
+secrets:
+  auth_idle_jwt:
+    file: ${IDLE_AUTH_JWT_PRIVATE_KEY_FILE:-/dev/null}

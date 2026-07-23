@@ -1,0 +1,204 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "dropmong-web",
+  "status": "passed",
+  "project": "dmidle-260722t094525z1934e8-web",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "sample_count": 2,
+  "components": {
+    "dropmong-web": {
+      "role": "app",
+      "sample_count": 2,
+      "container_id": "42afcd2b6577",
+      "container_name": "dmidle-260722t094525z1934e8-web-dropmong-web-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "cpu_cores": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "memory_usage_bytes": {
+          "mean": 47112519.5,
+          "p50": 47112519.5,
+          "p95": 47244639.95,
+          "max": 47259320
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.565,
+          "p50": 0.565,
+          "p95": 0.5695,
+          "max": 0.57
+        },
+        "pids": {
+          "mean": 11.0,
+          "p50": 11.0,
+          "p95": 11.0,
+          "max": 11
+        },
+        "network_rx_bytes": {
+          "mean": 3060.0,
+          "p50": 3060.0,
+          "p95": 3060.0,
+          "max": 3060
+        },
+        "network_tx_bytes": {
+          "mean": 1870.0,
+          "p50": 1870.0,
+          "p95": 1870.0,
+          "max": 1870
+        },
+        "block_read_bytes": {
+          "mean": 220000000.0,
+          "p50": 220000000.0,
+          "p95": 220000000.0,
+          "max": 220000000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "idle-observer": {
+      "role": "observer",
+      "sample_count": 2,
+      "container_id": "064867536ec4",
+      "container_name": "dmidle-260722t094525z1934e8-web-idle-observer-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "cpu_cores": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "memory_usage_bytes": {
+          "mean": 694272.0,
+          "p50": 694272.0,
+          "p95": 714547.2,
+          "max": 716800
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.01,
+          "p50": 0.01,
+          "p95": 0.01,
+          "max": 0.01
+        },
+        "pids": {
+          "mean": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2
+        },
+        "network_rx_bytes": {
+          "mean": 2660.0,
+          "p50": 2660.0,
+          "p95": 2660.0,
+          "max": 2660
+        },
+        "network_tx_bytes": {
+          "mean": 1360.0,
+          "p50": 1360.0,
+          "p95": 1360.0,
+          "max": 1360
+        },
+        "block_read_bytes": {
+          "mean": 29600000.0,
+          "p50": 29600000.0,
+          "p95": 29600000.0,
+          "max": 29600000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    }
+  },
+  "container_metadata": {
+    "dropmong-web": {
+      "container_id": "42afcd2b657729d82fbbc615667e1c6eac7991c5d6d0a6c3b0be8078e05adef5",
+      "container_name": "dmidle-260722t094525z1934e8-web-dropmong-web-1",
+      "compose_service": "dropmong-web",
+      "image_reference": "dmidle-260722t094525z1934e8-web-dropmong-web",
+      "image_id": "sha256:28813c3baedcb740e4df4f8d16ed6dda8f9d4aca8f76429e46372119e0a4dd97",
+      "image_digests": [
+        "dmidle-260722t094525z1934e8-web-dropmong-web@sha256:28813c3baedcb740e4df4f8d16ed6dda8f9d4aca8f76429e46372119e0a4dd97"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:57:05.60148147Z"
+    },
+    "idle-observer": {
+      "container_id": "064867536ec44485d8f6b27c0e6a4f052d09e903c84da9b9771219e5a5900144",
+      "container_name": "dmidle-260722t094525z1934e8-web-idle-observer-1",
+      "compose_service": "idle-observer",
+      "image_reference": "curlimages/curl:8.12.1",
+      "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+      "image_digests": [
+        "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:57:08.10911993Z"
+    }
+  },
+  "error": null,
+  "last_state": {
+    "dropmong-web": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-web-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Stopping \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Stopped \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Removing \n Container dmidle-260722t094525z1934e8-web-dropmong-web-1 Removed \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-web-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-web_default Removing \n Network dmidle-260722t094525z1934e8-web_default Removed"
+  }
+}

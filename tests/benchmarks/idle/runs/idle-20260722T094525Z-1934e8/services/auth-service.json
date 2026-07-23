@@ -1,0 +1,553 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "auth-service",
+  "status": "passed",
+  "project": "dmidle-260722t094525z1934e8-auth",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "sample_count": 2,
+  "components": {
+    "auth-service": {
+      "role": "app",
+      "sample_count": 2,
+      "container_id": "4c9b1e6cd323",
+      "container_name": "dmidle-260722t094525z1934e8-auth-auth-service-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "cpu_cores": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "memory_usage_bytes": {
+          "mean": 5754585.0,
+          "p50": 5754585.0,
+          "p95": 5754585.0,
+          "max": 5754585
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.07,
+          "p50": 0.07,
+          "p95": 0.07,
+          "max": 0.07
+        },
+        "pids": {
+          "mean": 9.0,
+          "p50": 9.0,
+          "p95": 9.0,
+          "max": 9
+        },
+        "network_rx_bytes": {
+          "mean": 7395.0,
+          "p50": 7395.0,
+          "p95": 7435.5,
+          "max": 7440
+        },
+        "network_tx_bytes": {
+          "mean": 58700.0,
+          "p50": 58700.0,
+          "p95": 58700.0,
+          "max": 58700
+        },
+        "block_read_bytes": {
+          "mean": 41100000.0,
+          "p50": 41100000.0,
+          "p95": 41100000.0,
+          "max": 41100000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "auth-worker": {
+      "role": "worker",
+      "sample_count": 2,
+      "container_id": "08ffd455b6ff",
+      "container_name": "dmidle-260722t094525z1934e8-auth-auth-worker-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.1,
+          "p50": 0.1,
+          "p95": 0.109,
+          "max": 0.11
+        },
+        "cpu_cores": {
+          "mean": 0.001,
+          "p50": 0.001,
+          "p95": 0.00109,
+          "max": 0.0011
+        },
+        "memory_usage_bytes": {
+          "mean": 6314000.0,
+          "p50": 6314000.0,
+          "p95": 6452254.4,
+          "max": 6467616
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.075,
+          "p50": 0.075,
+          "p95": 0.0795,
+          "max": 0.08
+        },
+        "pids": {
+          "mean": 9.0,
+          "p50": 9.0,
+          "p95": 9.0,
+          "max": 9
+        },
+        "network_rx_bytes": {
+          "mean": 11200.0,
+          "p50": 11200.0,
+          "p95": 11380.0,
+          "max": 11400
+        },
+        "network_tx_bytes": {
+          "mean": 44900.0,
+          "p50": 44900.0,
+          "p95": 45530.0,
+          "max": 45600
+        },
+        "block_read_bytes": {
+          "mean": 67750000.0,
+          "p50": 67750000.0,
+          "p95": 70675000.0,
+          "max": 71000000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "postgres": {
+      "role": "database",
+      "sample_count": 2,
+      "container_id": "ab1dd1c9fed8",
+      "container_name": "dmidle-260722t094525z1934e8-auth-postgres-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 1.71,
+          "p50": 1.71,
+          "p95": 2.826,
+          "max": 2.95
+        },
+        "cpu_cores": {
+          "mean": 0.0171,
+          "p50": 0.0171,
+          "p95": 0.02826,
+          "max": 0.0295
+        },
+        "memory_usage_bytes": {
+          "mean": 34886123.0,
+          "p50": 34886123.0,
+          "p95": 35150363.9,
+          "max": 35179724
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.42,
+          "p50": 0.42,
+          "p95": 0.42,
+          "max": 0.42
+        },
+        "pids": {
+          "mean": 9.0,
+          "p50": 9.0,
+          "p95": 9.0,
+          "max": 9
+        },
+        "network_rx_bytes": {
+          "mean": 81750.0,
+          "p50": 81750.0,
+          "p95": 82695.0,
+          "max": 82800
+        },
+        "network_tx_bytes": {
+          "mean": 28000.0,
+          "p50": 28000.0,
+          "p95": 28270.0,
+          "max": 28300
+        },
+        "block_read_bytes": {
+          "mean": 497000000.0,
+          "p50": 497000000.0,
+          "p95": 507800000.0,
+          "max": 509000000
+        },
+        "block_write_bytes": {
+          "mean": 176000000.0,
+          "p50": 176000000.0,
+          "p95": 176000000.0,
+          "max": 176000000
+        }
+      }
+    },
+    "redis": {
+      "role": "cache",
+      "sample_count": 2,
+      "container_id": "769bfbccc440",
+      "container_name": "dmidle-260722t094525z1934e8-auth-redis-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.955,
+          "p50": 0.955,
+          "p95": 1.2475,
+          "max": 1.28
+        },
+        "cpu_cores": {
+          "mean": 0.00955,
+          "p50": 0.00955,
+          "p95": 0.012475,
+          "max": 0.0128
+        },
+        "memory_usage_bytes": {
+          "mean": 6629097.0,
+          "p50": 6629097.0,
+          "p95": 8282491.5,
+          "max": 8466202
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.08,
+          "p50": 0.08,
+          "p95": 0.098,
+          "max": 0.1
+        },
+        "pids": {
+          "mean": 8.0,
+          "p50": 8.0,
+          "p95": 10.7,
+          "max": 11
+        },
+        "network_rx_bytes": {
+          "mean": 3990.0,
+          "p50": 3990.0,
+          "p95": 4008.0,
+          "max": 4010
+        },
+        "network_tx_bytes": {
+          "mean": 1080.0,
+          "p50": 1080.0,
+          "p95": 1098.0,
+          "max": 1100
+        },
+        "block_read_bytes": {
+          "mean": 133500000.0,
+          "p50": 133500000.0,
+          "p95": 133950000.0,
+          "max": 134000000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "kafka": {
+      "role": "broker",
+      "sample_count": 2,
+      "container_id": "d005da18549b",
+      "container_name": "dmidle-260722t094525z1934e8-auth-kafka-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 3.82,
+          "p50": 3.82,
+          "p95": 5.323,
+          "max": 5.49
+        },
+        "cpu_cores": {
+          "mean": 0.0382,
+          "p50": 0.0382,
+          "p95": 0.05323,
+          "max": 0.0549
+        },
+        "memory_usage_bytes": {
+          "mean": 298057727.5,
+          "p50": 298057727.5,
+          "p95": 301407927.55,
+          "max": 301780172
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 3.585,
+          "p50": 3.585,
+          "p95": 3.6255,
+          "max": 3.63
+        },
+        "pids": {
+          "mean": 98.0,
+          "p50": 98.0,
+          "p95": 98.0,
+          "max": 98
+        },
+        "network_rx_bytes": {
+          "mean": 17300.0,
+          "p50": 17300.0,
+          "p95": 17300.0,
+          "max": 17300
+        },
+        "network_tx_bytes": {
+          "mean": 34300.0,
+          "p50": 34300.0,
+          "p95": 34300.0,
+          "max": 34300
+        },
+        "block_read_bytes": {
+          "mean": 627500000.0,
+          "p50": 627500000.0,
+          "p95": 632450000.0,
+          "max": 633000000
+        },
+        "block_write_bytes": {
+          "mean": 938000.0,
+          "p50": 938000.0,
+          "p95": 945200.0,
+          "max": 946000
+        }
+      }
+    },
+    "idle-observer": {
+      "role": "observer",
+      "sample_count": 2,
+      "container_id": "6f2a1078b9eb",
+      "container_name": "dmidle-260722t094525z1934e8-auth-idle-observer-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "cpu_cores": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "memory_usage_bytes": {
+          "mean": 671744.0,
+          "p50": 671744.0,
+          "p95": 671744.0,
+          "max": 671744
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.01,
+          "p50": 0.01,
+          "p95": 0.01,
+          "max": 0.01
+        },
+        "pids": {
+          "mean": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2
+        },
+        "network_rx_bytes": {
+          "mean": 86250.0,
+          "p50": 86250.0,
+          "p95": 86295.0,
+          "max": 86300
+        },
+        "network_tx_bytes": {
+          "mean": 4450.0,
+          "p50": 4450.0,
+          "p95": 4486.0,
+          "max": 4490
+        },
+        "block_read_bytes": {
+          "mean": 11400000.0,
+          "p50": 11400000.0,
+          "p95": 11400000.0,
+          "max": 11400000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    }
+  },
+  "container_metadata": {
+    "auth-service": {
+      "container_id": "4c9b1e6cd3230a70f04f42ad626ba5ed528055759b8da04240348ed5221ccc66",
+      "container_name": "dmidle-260722t094525z1934e8-auth-auth-service-1",
+      "compose_service": "auth-service",
+      "image_reference": "dmidle-260722t094525z1934e8-auth-auth-service",
+      "image_id": "sha256:e2ad84fd426294039fae009e14204632c52382bf909fcf51daec95bde2d1346c",
+      "image_digests": [
+        "dmidle-260722t094525z1934e8-auth-auth-service@sha256:e2ad84fd426294039fae009e14204632c52382bf909fcf51daec95bde2d1346c"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:45:50.009079338Z"
+    },
+    "auth-worker": {
+      "container_id": "08ffd455b6ff69936ad1027171a38fbbfd1b8ccab46397f0d2edd976a5e55efc",
+      "container_name": "dmidle-260722t094525z1934e8-auth-auth-worker-1",
+      "compose_service": "auth-worker",
+      "image_reference": "dmidle-260722t094525z1934e8-auth-auth-worker",
+      "image_id": "sha256:c62c33e0794ef4dff58ad7ed3e44143ddc126647974d734ff380e7b8bfe404d5",
+      "image_digests": [
+        "dmidle-260722t094525z1934e8-auth-auth-worker@sha256:c62c33e0794ef4dff58ad7ed3e44143ddc126647974d734ff380e7b8bfe404d5"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:46:20.825130214Z"
+    },
+    "postgres": {
+      "container_id": "ab1dd1c9fed8cbe629fef6c11a6601319576545781b4d1710d1266ab107ed43c",
+      "container_name": "dmidle-260722t094525z1934e8-auth-postgres-1",
+      "compose_service": "postgres",
+      "image_reference": "postgres:16-alpine",
+      "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+      "image_digests": [
+        "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:45:31.29644951Z"
+    },
+    "redis": {
+      "container_id": "769bfbccc4409bb322168530fd8c8a4070849528db62b325ca44ec2427cd85b3",
+      "container_name": "dmidle-260722t094525z1934e8-auth-redis-1",
+      "compose_service": "redis",
+      "image_reference": "valkey/valkey:8-alpine",
+      "image_id": "sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d",
+      "image_digests": [
+        "valkey/valkey@sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:45:31.411059885Z"
+    },
+    "kafka": {
+      "container_id": "d005da18549b5afd5174244548c264c41ec1a900da40df58b6034068bb8873d2",
+      "container_name": "dmidle-260722t094525z1934e8-auth-kafka-1",
+      "compose_service": "kafka",
+      "image_reference": "apache/kafka:3.8.1",
+      "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+      "image_digests": [
+        "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+        "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:45:31.24071101Z"
+    },
+    "idle-observer": {
+      "container_id": "6f2a1078b9eb76ceac01aeceeecbfe527edd5b5ac5d5b4d44593f0b387fea9f0",
+      "container_name": "dmidle-260722t094525z1934e8-auth-idle-observer-1",
+      "compose_service": "idle-observer",
+      "image_reference": "curlimages/curl:8.12.1",
+      "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+      "image_digests": [
+        "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T09:46:21.521231672Z"
+    }
+  },
+  "error": null,
+  "last_state": {
+    "auth-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "auth-worker": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "redis": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-auth-auth-service-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-worker-1 Removed \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Removing \n Container dmidle-260722t094525z1934e8-auth-kafka-init-1 Removed \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Removing \n Container dmidle-260722t094525z1934e8-auth-auth-service-1 Removed \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-redis-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-auth-redis-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-redis-1 Removing \n Container dmidle-260722t094525z1934e8-auth-kafka-1 Removed \n Container dmidle-260722t094525z1934e8-auth-auth-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-auth-redis-1 Removed \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-auth-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-auth-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-auth_default Removing \n Volume dmidle-260722t094525z1934e8-auth_redis-data Removing \n Volume dmidle-260722t094525z1934e8-auth_kafka-data Removing \n Volume dmidle-260722t094525z1934e8-auth_postgres-data Removing \n Volume dmidle-260722t094525z1934e8-auth_kafka-data Removed \n Volume dmidle-260722t094525z1934e8-auth_redis-data Removed \n Volume dmidle-260722t094525z1934e8-auth_postgres-data Removed \n Network dmidle-260722t094525z1934e8-auth_default Removed"
+  }
+}

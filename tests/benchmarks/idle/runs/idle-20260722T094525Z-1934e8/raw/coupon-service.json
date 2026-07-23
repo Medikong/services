@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "coupon-service",
+  "project": "dmidle-260722t094525z1934e8-coupon",
+  "status": "passed",
+  "started_at": "2026-07-22T09:49:24.660Z",
+  "finished_at": "2026-07-22T09:50:19.933Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:49:54.019Z",
+      "components": [
+        {
+          "container_id": "94e7ed3dc83b",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-coupon-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6705643,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 4980,
+          "network_tx_bytes": 33300,
+          "block_read_bytes": 26100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.395MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "4.98kB / 33.3kB",
+            "block_io": "26.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "coupon-service",
+          "role": "app"
+        },
+        {
+          "container_id": "8b1fc936fd8c",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-coupon-worker-1",
+          "cpu_percent": 0.38,
+          "cpu_cores": 0.0038,
+          "memory_usage_bytes": 7946108,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 9,
+          "network_rx_bytes": 31400,
+          "network_tx_bytes": 90500,
+          "block_read_bytes": 44000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.38%",
+            "memory": "7.578MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "31.4kB / 90.5kB",
+            "block_io": "44MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "coupon-worker",
+          "role": "worker"
+        },
+        {
+          "container_id": "46ba0b74870c",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-postgres-1",
+          "cpu_percent": 0.54,
+          "cpu_cores": 0.0054,
+          "memory_usage_bytes": 41271951,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.5,
+          "pids": 13,
+          "network_rx_bytes": 105000,
+          "network_tx_bytes": 41400,
+          "block_read_bytes": 223000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.54%",
+            "memory": "39.36MiB / 7.751GiB",
+            "memory_percent": "0.50%",
+            "network_io": "105kB / 41.4kB",
+            "block_io": "223MB / 174MB",
+            "pids": "13"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ddda0b1a7dae",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 655360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 64000,
+          "network_tx_bytes": 4090,
+          "block_read_bytes": 10900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "640KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "64kB / 4.09kB",
+            "block_io": "10.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:49:56.028Z",
+      "components": [
+        {
+          "container_id": "94e7ed3dc83b",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-coupon-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6705643,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 4980,
+          "network_tx_bytes": 33300,
+          "block_read_bytes": 26100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.395MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "4.98kB / 33.3kB",
+            "block_io": "26.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "coupon-service",
+          "role": "app"
+        },
+        {
+          "container_id": "8b1fc936fd8c",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-coupon-worker-1",
+          "cpu_percent": 0.18,
+          "cpu_cores": 0.0018,
+          "memory_usage_bytes": 8749318,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 9,
+          "network_rx_bytes": 34500,
+          "network_tx_bytes": 99000,
+          "block_read_bytes": 50300000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.18%",
+            "memory": "8.344MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "34.5kB / 99kB",
+            "block_io": "50.3MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "coupon-worker",
+          "role": "worker"
+        },
+        {
+          "container_id": "46ba0b74870c",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-postgres-1",
+          "cpu_percent": 0.88,
+          "cpu_cores": 0.0088,
+          "memory_usage_bytes": 41827696,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.5,
+          "pids": 13,
+          "network_rx_bytes": 114000,
+          "network_tx_bytes": 44400,
+          "block_read_bytes": 239000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.88%",
+            "memory": "39.89MiB / 7.751GiB",
+            "memory_percent": "0.50%",
+            "network_io": "114kB / 44.4kB",
+            "block_io": "239MB / 174MB",
+            "pids": "13"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ddda0b1a7dae",
+          "container_name": "dmidle-260722t094525z1934e8-coupon-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 655360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 64000,
+          "network_tx_bytes": 4090,
+          "block_read_bytes": 10900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "640KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "64kB / 4.09kB",
+            "block_io": "10.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "coupon-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "coupon-worker": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-coupon-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-coupon-coupon-service-1 Stopping \n Container dmidle-260722t094525z1934e8-coupon-coupon-worker-1 Stopping \n Container dmidle-260722t094525z1934e8-coupon-coupon-worker-1 Stopped \n Container dmidle-260722t094525z1934e8-coupon-coupon-worker-1 Removing \n Container dmidle-260722t094525z1934e8-coupon-coupon-worker-1 Removed \n Container dmidle-260722t094525z1934e8-coupon-coupon-service-1 Stopped \n Container dmidle-260722t094525z1934e8-coupon-coupon-service-1 Removing \n Container dmidle-260722t094525z1934e8-coupon-coupon-service-1 Removed \n Container dmidle-260722t094525z1934e8-coupon-coupon-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-coupon-coupon-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-coupon-coupon-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-coupon-coupon-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-coupon-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-coupon-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-coupon-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-coupon-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-coupon-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-coupon-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-coupon-idle-observer-1 Removed \n Volume dmidle-260722t094525z1934e8-coupon_postgres-data Removing \n Network dmidle-260722t094525z1934e8-coupon_default Removing \n Volume dmidle-260722t094525z1934e8-coupon_postgres-data Removed \n Network dmidle-260722t094525z1934e8-coupon_default Removed"
+  }
+}

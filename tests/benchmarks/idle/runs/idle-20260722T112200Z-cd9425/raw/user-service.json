@@ -1,0 +1,2832 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T112200Z-cd9425",
+  "service": "user-service",
+  "project": "dmidle-260722t112200zcd9425-user",
+  "status": "passed",
+  "started_at": "2026-07-22T11:22:01.730Z",
+  "finished_at": "2026-07-22T11:26:38.702Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T11:23:17.249Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6602883,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 11600,
+          "network_tx_bytes": 157000,
+          "block_read_bytes": 69900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.297MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "11.6kB / 157kB",
+            "block_io": "69.9MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 31971082,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 7,
+          "network_rx_bytes": 13100,
+          "network_tx_bytes": 6900,
+          "block_read_bytes": 347000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "30.49MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "13.1kB / 6.9kB",
+            "block_io": "347MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1245708,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 154000,
+          "network_tx_bytes": 7880,
+          "block_read_bytes": 46200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.188MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "154kB / 7.88kB",
+            "block_io": "46.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:22.256Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6602883,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 11600,
+          "network_tx_bytes": 157000,
+          "block_read_bytes": 69900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.297MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "11.6kB / 157kB",
+            "block_io": "69.9MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 24830279,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 13100,
+          "network_tx_bytes": 6900,
+          "block_read_bytes": 358000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "23.68MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "13.1kB / 6.9kB",
+            "block_io": "358MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 741376,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 154000,
+          "network_tx_bytes": 7880,
+          "block_read_bytes": 46200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "724KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "154kB / 7.88kB",
+            "block_io": "46.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:27.245Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6602883,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 11600,
+          "network_tx_bytes": 157000,
+          "block_read_bytes": 69900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.297MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "11.6kB / 157kB",
+            "block_io": "69.9MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 34099691,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.41,
+          "pids": 7,
+          "network_rx_bytes": 13100,
+          "network_tx_bytes": 6900,
+          "block_read_bytes": 383000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "32.52MiB / 7.751GiB",
+            "memory_percent": "0.41%",
+            "network_io": "13.1kB / 6.9kB",
+            "block_io": "383MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 741376,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 154000,
+          "network_tx_bytes": 7880,
+          "block_read_bytes": 46200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "724KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "154kB / 7.88kB",
+            "block_io": "46.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:32.260Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 12142510,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.15,
+          "pids": 9,
+          "network_rx_bytes": 13300,
+          "network_tx_bytes": 188000,
+          "block_read_bytes": 82600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "11.58MiB / 7.751GiB",
+            "memory_percent": "0.15%",
+            "network_io": "13.3kB / 188kB",
+            "block_io": "82.6MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.1,
+          "cpu_cores": 0.021,
+          "memory_usage_bytes": 31929139,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 7,
+          "network_rx_bytes": 13500,
+          "network_tx_bytes": 7160,
+          "block_read_bytes": 408000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.10%",
+            "memory": "30.45MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "13.5kB / 7.16kB",
+            "block_io": "408MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1044480,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 9330,
+          "block_read_bytes": 55500000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1020KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 9.33kB",
+            "block_io": "55.5MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:36.323Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6758072,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 13300,
+          "network_tx_bytes": 188000,
+          "block_read_bytes": 82600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.445MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "13.3kB / 188kB",
+            "block_io": "82.6MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.16,
+          "cpu_cores": 0.0216,
+          "memory_usage_bytes": 31992053,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 7,
+          "network_rx_bytes": 13500,
+          "network_tx_bytes": 7160,
+          "block_read_bytes": 421000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "2.16%",
+            "memory": "30.51MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "13.5kB / 7.16kB",
+            "block_io": "421MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 770048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 9330,
+          "block_read_bytes": 55500000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "752KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 9.33kB",
+            "block_io": "55.5MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:42.274Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6758072,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 13300,
+          "network_tx_bytes": 188000,
+          "block_read_bytes": 82600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.445MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "13.3kB / 188kB",
+            "block_io": "82.6MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 33680261,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 7,
+          "network_rx_bytes": 13500,
+          "network_tx_bytes": 7160,
+          "block_read_bytes": 438000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "32.12MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "13.5kB / 7.16kB",
+            "block_io": "438MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 770048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 9330,
+          "block_read_bytes": 55500000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "752KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 9.33kB",
+            "block_io": "55.5MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:47.247Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6963593,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 15100,
+          "network_tx_bytes": 219000,
+          "block_read_bytes": 95100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.641MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "15.1kB / 219kB",
+            "block_io": "95.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.64,
+          "cpu_cores": 0.016399999999999998,
+          "memory_usage_bytes": 32768000,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 7,
+          "network_rx_bytes": 14000,
+          "network_tx_bytes": 7490,
+          "block_read_bytes": 459000000,
+          "block_write_bytes": 174000000,
+          "raw": {
+            "cpu": "1.64%",
+            "memory": "31.25MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "14kB / 7.49kB",
+            "block_io": "459MB / 174MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1056964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 215000,
+          "network_tx_bytes": 10800,
+          "block_read_bytes": 64900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.008MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "215kB / 10.8kB",
+            "block_io": "64.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:51.254Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 11314135,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.14,
+          "pids": 9,
+          "network_rx_bytes": 15100,
+          "network_tx_bytes": 219000,
+          "block_read_bytes": 95100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "10.79MiB / 7.751GiB",
+            "memory_percent": "0.14%",
+            "network_io": "15.1kB / 219kB",
+            "block_io": "95.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.03,
+          "cpu_cores": 0.0203,
+          "memory_usage_bytes": 34256977,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.41,
+          "pids": 7,
+          "network_rx_bytes": 14000,
+          "network_tx_bytes": 7490,
+          "block_read_bytes": 473000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "2.03%",
+            "memory": "32.67MiB / 7.751GiB",
+            "memory_percent": "0.41%",
+            "network_io": "14kB / 7.49kB",
+            "block_io": "473MB / 175MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 774144,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 215000,
+          "network_tx_bytes": 10800,
+          "block_read_bytes": 64900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "756KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "215kB / 10.8kB",
+            "block_io": "64.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:23:56.300Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 6938427,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 15100,
+          "network_tx_bytes": 219000,
+          "block_read_bytes": 95100000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.617MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "15.1kB / 219kB",
+            "block_io": "95.1MB / 0B",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 32663142,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 7,
+          "network_rx_bytes": 14000,
+          "network_tx_bytes": 7490,
+          "block_read_bytes": 489000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "31.15MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "14kB / 7.49kB",
+            "block_io": "489MB / 175MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 720896,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 215000,
+          "network_tx_bytes": 10800,
+          "block_read_bytes": 64900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "704KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "215kB / 10.8kB",
+            "block_io": "64.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:02.260Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 10957619,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.13,
+          "pids": 9,
+          "network_rx_bytes": 16800,
+          "network_tx_bytes": 250000,
+          "block_read_bytes": 108000000,
+          "block_write_bytes": 4100,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "10.45MiB / 7.751GiB",
+            "memory_percent": "0.13%",
+            "network_io": "16.8kB / 250kB",
+            "block_io": "108MB / 4.1kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 27913093,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.34,
+          "pids": 7,
+          "network_rx_bytes": 14500,
+          "network_tx_bytes": 7750,
+          "block_read_bytes": 516000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "26.62MiB / 7.751GiB",
+            "memory_percent": "0.34%",
+            "network_io": "14.5kB / 7.75kB",
+            "block_io": "516MB / 175MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1732247,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 245000,
+          "network_tx_bytes": 12200,
+          "block_read_bytes": 74200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.652MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "245kB / 12.2kB",
+            "block_io": "74.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:07.245Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7045382,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 16800,
+          "network_tx_bytes": 250000,
+          "block_read_bytes": 108000000,
+          "block_write_bytes": 4100,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.719MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "16.8kB / 250kB",
+            "block_io": "108MB / 4.1kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.35,
+          "cpu_cores": 0.0235,
+          "memory_usage_bytes": 34445721,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.41,
+          "pids": 7,
+          "network_rx_bytes": 14500,
+          "network_tx_bytes": 7750,
+          "block_read_bytes": 541000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "2.35%",
+            "memory": "32.85MiB / 7.751GiB",
+            "memory_percent": "0.41%",
+            "network_io": "14.5kB / 7.75kB",
+            "block_io": "541MB / 175MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 827392,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 245000,
+          "network_tx_bytes": 12200,
+          "block_read_bytes": 74200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "808KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "245kB / 12.2kB",
+            "block_io": "74.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:12.263Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7045382,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.08,
+          "pids": 9,
+          "network_rx_bytes": 16800,
+          "network_tx_bytes": 250000,
+          "block_read_bytes": 108000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "6.719MiB / 7.751GiB",
+            "memory_percent": "0.08%",
+            "network_io": "16.8kB / 250kB",
+            "block_io": "108MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.55,
+          "cpu_cores": 0.0155,
+          "memory_usage_bytes": 29139927,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 7,
+          "network_rx_bytes": 14500,
+          "network_tx_bytes": 7750,
+          "block_read_bytes": 556000000,
+          "block_write_bytes": 175000000,
+          "raw": {
+            "cpu": "1.55%",
+            "memory": "27.79MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "14.5kB / 7.75kB",
+            "block_io": "556MB / 175MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 729088,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 245000,
+          "network_tx_bytes": 12200,
+          "block_read_bytes": 74200000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "712KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "245kB / 12.2kB",
+            "block_io": "74.2MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:17.247Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7626293,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 18500,
+          "network_tx_bytes": 281000,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.273MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "18.5kB / 281kB",
+            "block_io": "121MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.68,
+          "cpu_cores": 0.0168,
+          "memory_usage_bytes": 34582036,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 7,
+          "network_rx_bytes": 14900,
+          "network_tx_bytes": 8020,
+          "block_read_bytes": 575000000,
+          "block_write_bytes": 176000000,
+          "raw": {
+            "cpu": "1.68%",
+            "memory": "32.98MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "14.9kB / 8.02kB",
+            "block_io": "575MB / 176MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 9502195,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 2,
+          "network_rx_bytes": 276000,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 83600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "9.062MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "276kB / 13.7kB",
+            "block_io": "83.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:22.250Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 17039360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.2,
+          "pids": 9,
+          "network_rx_bytes": 18500,
+          "network_tx_bytes": 281000,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "16.25MiB / 7.751GiB",
+            "memory_percent": "0.20%",
+            "network_io": "18.5kB / 281kB",
+            "block_io": "121MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 30524047,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 7,
+          "network_rx_bytes": 14900,
+          "network_tx_bytes": 8020,
+          "block_read_bytes": 583000000,
+          "block_write_bytes": 176000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "29.11MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "14.9kB / 8.02kB",
+            "block_io": "583MB / 176MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1216348,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 276000,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 83600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.16MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "276kB / 13.7kB",
+            "block_io": "83.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:27.248Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7623147,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 18500,
+          "network_tx_bytes": 281000,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.27MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "18.5kB / 281kB",
+            "block_io": "121MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.03,
+          "cpu_cores": 0.0203,
+          "memory_usage_bytes": 35357982,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 7,
+          "network_rx_bytes": 14900,
+          "network_tx_bytes": 8020,
+          "block_read_bytes": 601000000,
+          "block_write_bytes": 176000000,
+          "raw": {
+            "cpu": "2.03%",
+            "memory": "33.72MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "14.9kB / 8.02kB",
+            "block_io": "601MB / 176MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 774144,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 276000,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 83600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "756KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "276kB / 13.7kB",
+            "block_io": "83.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:32.256Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 13327400,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.16,
+          "pids": 9,
+          "network_rx_bytes": 20200,
+          "network_tx_bytes": 312000,
+          "block_read_bytes": 133000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "12.71MiB / 7.751GiB",
+            "memory_percent": "0.16%",
+            "network_io": "20.2kB / 312kB",
+            "block_io": "133MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 26161971,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.31,
+          "pids": 7,
+          "network_rx_bytes": 15400,
+          "network_tx_bytes": 8280,
+          "block_read_bytes": 608000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "24.95MiB / 7.751GiB",
+            "memory_percent": "0.31%",
+            "network_io": "15.4kB / 8.28kB",
+            "block_io": "608MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1085276,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 306000,
+          "network_tx_bytes": 15100,
+          "block_read_bytes": 92700000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.035MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "306kB / 15.1kB",
+            "block_io": "92.7MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:37.244Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7667187,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 20200,
+          "network_tx_bytes": 312000,
+          "block_read_bytes": 133000000,
+          "block_write_bytes": 20500,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.312MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "20.2kB / 312kB",
+            "block_io": "133MB / 20.5kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 32883343,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 7,
+          "network_rx_bytes": 15400,
+          "network_tx_bytes": 8280,
+          "block_read_bytes": 631000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "31.36MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "15.4kB / 8.28kB",
+            "block_io": "631MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 765952,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 306000,
+          "network_tx_bytes": 15100,
+          "block_read_bytes": 92700000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "748KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "306kB / 15.1kB",
+            "block_io": "92.7MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:42.257Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7664041,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 20200,
+          "network_tx_bytes": 312000,
+          "block_read_bytes": 133000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.309MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "20.2kB / 312kB",
+            "block_io": "133MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 29087498,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 7,
+          "network_rx_bytes": 15400,
+          "network_tx_bytes": 8280,
+          "block_read_bytes": 640000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "27.74MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "15.4kB / 8.28kB",
+            "block_io": "640MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 720896,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 306000,
+          "network_tx_bytes": 15100,
+          "block_read_bytes": 92700000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "704KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "306kB / 15.1kB",
+            "block_io": "92.7MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:47.255Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7692353,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 22000,
+          "network_tx_bytes": 343000,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.336MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "22kB / 343kB",
+            "block_io": "146MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 30429675,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 7,
+          "network_rx_bytes": 15800,
+          "network_tx_bytes": 8550,
+          "block_read_bytes": 652000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "29.02MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "15.8kB / 8.55kB",
+            "block_io": "652MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 9502195,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 2,
+          "network_rx_bytes": 337000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 102000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "9.062MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "337kB / 16.6kB",
+            "block_io": "102MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:52.248Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 11806965,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.14,
+          "pids": 9,
+          "network_rx_bytes": 22000,
+          "network_tx_bytes": 343000,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "11.26MiB / 7.751GiB",
+            "memory_percent": "0.14%",
+            "network_io": "22kB / 343kB",
+            "block_io": "146MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.01,
+          "cpu_cores": 0.0001,
+          "memory_usage_bytes": 32463912,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 7,
+          "network_rx_bytes": 15800,
+          "network_tx_bytes": 8550,
+          "block_read_bytes": 662000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.01%",
+            "memory": "30.96MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "15.8kB / 8.55kB",
+            "block_io": "662MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 843776,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 337000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 102000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "824KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "337kB / 16.6kB",
+            "block_io": "102MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:24:57.251Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7688159,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 22000,
+          "network_tx_bytes": 343000,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.332MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "22kB / 343kB",
+            "block_io": "146MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 32201768,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 7,
+          "network_rx_bytes": 15800,
+          "network_tx_bytes": 8550,
+          "block_read_bytes": 680000000,
+          "block_write_bytes": 177000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "30.71MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "15.8kB / 8.55kB",
+            "block_io": "680MB / 177MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 843776,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 337000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 102000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "824KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "337kB / 16.6kB",
+            "block_io": "102MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:02.272Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 13883146,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.17,
+          "pids": 9,
+          "network_rx_bytes": 23700,
+          "network_tx_bytes": 373000,
+          "block_read_bytes": 159000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "13.24MiB / 7.751GiB",
+            "memory_percent": "0.17%",
+            "network_io": "23.7kB / 373kB",
+            "block_io": "159MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.23,
+          "cpu_cores": 0.0223,
+          "memory_usage_bytes": 35074867,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 7,
+          "network_rx_bytes": 16300,
+          "network_tx_bytes": 8810,
+          "block_read_bytes": 705000000,
+          "block_write_bytes": 178000000,
+          "raw": {
+            "cpu": "2.23%",
+            "memory": "33.45MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "16.3kB / 8.81kB",
+            "block_io": "705MB / 178MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 9499049,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 2,
+          "network_rx_bytes": 367000,
+          "network_tx_bytes": 18000,
+          "block_read_bytes": 111000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "9.059MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "367kB / 18kB",
+            "block_io": "111MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:07.244Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7823425,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 23700,
+          "network_tx_bytes": 373000,
+          "block_read_bytes": 159000000,
+          "block_write_bytes": 102000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.461MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "23.7kB / 373kB",
+            "block_io": "159MB / 102kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 32988200,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 7,
+          "network_rx_bytes": 16300,
+          "network_tx_bytes": 8810,
+          "block_read_bytes": 716000000,
+          "block_write_bytes": 178000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "31.46MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "16.3kB / 8.81kB",
+            "block_io": "716MB / 178MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 765952,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 367000,
+          "network_tx_bytes": 18000,
+          "block_read_bytes": 111000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "748KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "367kB / 18kB",
+            "block_io": "111MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:12.261Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7754219,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 23700,
+          "network_tx_bytes": 373000,
+          "block_read_bytes": 159000000,
+          "block_write_bytes": 119000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.395MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "23.7kB / 373kB",
+            "block_io": "159MB / 119kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 30125588,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 7,
+          "network_rx_bytes": 16300,
+          "network_tx_bytes": 8810,
+          "block_read_bytes": 728000000,
+          "block_write_bytes": 178000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "28.73MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "16.3kB / 8.81kB",
+            "block_io": "728MB / 178MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 765952,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 367000,
+          "network_tx_bytes": 18000,
+          "block_read_bytes": 111000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "748KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "367kB / 18kB",
+            "block_io": "111MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:16.296Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 18601738,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.22,
+          "pids": 9,
+          "network_rx_bytes": 25400,
+          "network_tx_bytes": 404000,
+          "block_read_bytes": 172000000,
+          "block_write_bytes": 119000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "17.74MiB / 7.751GiB",
+            "memory_percent": "0.22%",
+            "network_io": "25.4kB / 404kB",
+            "block_io": "172MB / 119kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.43,
+          "cpu_cores": 0.0143,
+          "memory_usage_bytes": 32537313,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 8,
+          "network_rx_bytes": 16700,
+          "network_tx_bytes": 9070,
+          "block_read_bytes": 742000000,
+          "block_write_bytes": 178000000,
+          "raw": {
+            "cpu": "1.43%",
+            "memory": "31.03MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "16.7kB / 9.07kB",
+            "block_io": "742MB / 178MB",
+            "pids": "8"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 9502195,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.11,
+          "pids": 2,
+          "network_rx_bytes": 398000,
+          "network_tx_bytes": 19400,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "9.062MiB / 7.751GiB",
+            "memory_percent": "0.11%",
+            "network_io": "398kB / 19.4kB",
+            "block_io": "121MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:22.263Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 11932794,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.14,
+          "pids": 9,
+          "network_rx_bytes": 25400,
+          "network_tx_bytes": 404000,
+          "block_read_bytes": 172000000,
+          "block_write_bytes": 119000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "11.38MiB / 7.751GiB",
+            "memory_percent": "0.14%",
+            "network_io": "25.4kB / 404kB",
+            "block_io": "172MB / 119kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 29381099,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.35,
+          "pids": 7,
+          "network_rx_bytes": 16700,
+          "network_tx_bytes": 9070,
+          "block_read_bytes": 757000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "28.02MiB / 7.751GiB",
+            "memory_percent": "0.35%",
+            "network_io": "16.7kB / 9.07kB",
+            "block_io": "757MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1200619,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 398000,
+          "network_tx_bytes": 19400,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.145MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "398kB / 19.4kB",
+            "block_io": "121MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:27.247Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7799308,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 25400,
+          "network_tx_bytes": 404000,
+          "block_read_bytes": 172000000,
+          "block_write_bytes": 119000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.438MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "25.4kB / 404kB",
+            "block_io": "172MB / 119kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.6,
+          "cpu_cores": 0.016,
+          "memory_usage_bytes": 33743175,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.41,
+          "pids": 7,
+          "network_rx_bytes": 16700,
+          "network_tx_bytes": 9070,
+          "block_read_bytes": 771000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "1.60%",
+            "memory": "32.18MiB / 7.751GiB",
+            "memory_percent": "0.41%",
+            "network_io": "16.7kB / 9.07kB",
+            "block_io": "771MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 770048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 398000,
+          "network_tx_bytes": 19400,
+          "block_read_bytes": 121000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "752KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "398kB / 19.4kB",
+            "block_io": "121MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:32.267Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7855931,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 27100,
+          "network_tx_bytes": 435000,
+          "block_read_bytes": 185000000,
+          "block_write_bytes": 119000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.492MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "27.1kB / 435kB",
+            "block_io": "185MB / 119kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24232591,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.29,
+          "pids": 7,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 9400,
+          "block_read_bytes": 782000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.11MiB / 7.751GiB",
+            "memory_percent": "0.29%",
+            "network_io": "17.2kB / 9.4kB",
+            "block_io": "782MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1056964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 428000,
+          "network_tx_bytes": 20900,
+          "block_read_bytes": 130000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.008MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "428kB / 20.9kB",
+            "block_io": "130MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:37.245Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7921991,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 9,
+          "network_rx_bytes": 27100,
+          "network_tx_bytes": 435000,
+          "block_read_bytes": 185000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.555MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "27.1kB / 435kB",
+            "block_io": "185MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.02,
+          "cpu_cores": 0.0002,
+          "memory_usage_bytes": 28678553,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.34,
+          "pids": 7,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 9400,
+          "block_read_bytes": 799000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "0.02%",
+            "memory": "27.35MiB / 7.751GiB",
+            "memory_percent": "0.34%",
+            "network_io": "17.2kB / 9.4kB",
+            "block_io": "799MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 765952,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 428000,
+          "network_tx_bytes": 20900,
+          "block_read_bytes": 130000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "748KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "428kB / 20.9kB",
+            "block_io": "130MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:42.266Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 7851737,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.09,
+          "pids": 9,
+          "network_rx_bytes": 27100,
+          "network_tx_bytes": 435000,
+          "block_read_bytes": 185000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.488MiB / 7.751GiB",
+            "memory_percent": "0.09%",
+            "network_io": "27.1kB / 435kB",
+            "block_io": "185MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 28227665,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.34,
+          "pids": 7,
+          "network_rx_bytes": 17200,
+          "network_tx_bytes": 9400,
+          "block_read_bytes": 820000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "26.92MiB / 7.751GiB",
+            "memory_percent": "0.34%",
+            "network_io": "17.2kB / 9.4kB",
+            "block_io": "820MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 765952,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 428000,
+          "network_tx_bytes": 20900,
+          "block_read_bytes": 130000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "748KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "428kB / 20.9kB",
+            "block_io": "130MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:47.248Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 21139292,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.25,
+          "pids": 9,
+          "network_rx_bytes": 28900,
+          "network_tx_bytes": 466000,
+          "block_read_bytes": 198000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "20.16MiB / 7.751GiB",
+            "memory_percent": "0.25%",
+            "network_io": "28.9kB / 466kB",
+            "block_io": "198MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.61,
+          "cpu_cores": 0.0161,
+          "memory_usage_bytes": 31708938,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.38,
+          "pids": 7,
+          "network_rx_bytes": 17600,
+          "network_tx_bytes": 9670,
+          "block_read_bytes": 835000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "1.61%",
+            "memory": "30.24MiB / 7.751GiB",
+            "memory_percent": "0.38%",
+            "network_io": "17.6kB / 9.67kB",
+            "block_io": "835MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1224736,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 459000,
+          "network_tx_bytes": 22300,
+          "block_read_bytes": 139000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.168MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "459kB / 22.3kB",
+            "block_io": "139MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:52.266Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 13421772,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.16,
+          "pids": 9,
+          "network_rx_bytes": 28900,
+          "network_tx_bytes": 466000,
+          "block_read_bytes": 198000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "12.8MiB / 7.751GiB",
+            "memory_percent": "0.16%",
+            "network_io": "28.9kB / 466kB",
+            "block_io": "198MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 30503075,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 7,
+          "network_rx_bytes": 17600,
+          "network_tx_bytes": 9670,
+          "block_read_bytes": 849000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "29.09MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "17.6kB / 9.67kB",
+            "block_io": "849MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 770048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 459000,
+          "network_tx_bytes": 22300,
+          "block_read_bytes": 139000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "752KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "459kB / 22.3kB",
+            "block_io": "139MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:25:57.249Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 8109686,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 9,
+          "network_rx_bytes": 28900,
+          "network_tx_bytes": 466000,
+          "block_read_bytes": 198000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.734MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "28.9kB / 466kB",
+            "block_io": "198MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 1.74,
+          "cpu_cores": 0.0174,
+          "memory_usage_bytes": 34099691,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.41,
+          "pids": 7,
+          "network_rx_bytes": 17600,
+          "network_tx_bytes": 9670,
+          "block_read_bytes": 868000000,
+          "block_write_bytes": 179000000,
+          "raw": {
+            "cpu": "1.74%",
+            "memory": "32.52MiB / 7.751GiB",
+            "memory_percent": "0.41%",
+            "network_io": "17.6kB / 9.67kB",
+            "block_io": "868MB / 179MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 770048,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 459000,
+          "network_tx_bytes": 22300,
+          "block_read_bytes": 139000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "752KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "459kB / 22.3kB",
+            "block_io": "139MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:26:02.263Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 14166261,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.17,
+          "pids": 9,
+          "network_rx_bytes": 30600,
+          "network_tx_bytes": 497000,
+          "block_read_bytes": 210000000,
+          "block_write_bytes": 139000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "13.51MiB / 7.751GiB",
+            "memory_percent": "0.17%",
+            "network_io": "30.6kB / 497kB",
+            "block_io": "210MB / 139kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 2.4,
+          "cpu_cores": 0.024,
+          "memory_usage_bytes": 33470545,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.4,
+          "pids": 7,
+          "network_rx_bytes": 18100,
+          "network_tx_bytes": 9930,
+          "block_read_bytes": 888000000,
+          "block_write_bytes": 180000000,
+          "raw": {
+            "cpu": "2.40%",
+            "memory": "31.92MiB / 7.751GiB",
+            "memory_percent": "0.40%",
+            "network_io": "18.1kB / 9.93kB",
+            "block_io": "888MB / 180MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 1085276,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 489000,
+          "network_tx_bytes": 23800,
+          "block_read_bytes": 148000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "1.035MiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "489kB / 23.8kB",
+            "block_io": "148MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:26:07.258Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 8102346,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 9,
+          "network_rx_bytes": 30600,
+          "network_tx_bytes": 497000,
+          "block_read_bytes": 210000000,
+          "block_write_bytes": 147000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.727MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "30.6kB / 497kB",
+            "block_io": "210MB / 147kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 30209474,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.36,
+          "pids": 7,
+          "network_rx_bytes": 18100,
+          "network_tx_bytes": 9930,
+          "block_read_bytes": 899000000,
+          "block_write_bytes": 180000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "28.81MiB / 7.751GiB",
+            "memory_percent": "0.36%",
+            "network_io": "18.1kB / 9.93kB",
+            "block_io": "899MB / 180MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 790528,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 489000,
+          "network_tx_bytes": 23800,
+          "block_read_bytes": 148000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "772KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "489kB / 23.8kB",
+            "block_io": "148MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:26:12.262Z",
+      "components": [
+        {
+          "container_id": "5e711eb25d64",
+          "container_name": "dmidle-260722t112200zcd9425-user-user-service-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 8098152,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.1,
+          "pids": 9,
+          "network_rx_bytes": 30600,
+          "network_tx_bytes": 497000,
+          "block_read_bytes": 210000000,
+          "block_write_bytes": 147000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "7.723MiB / 7.751GiB",
+            "memory_percent": "0.10%",
+            "network_io": "30.6kB / 497kB",
+            "block_io": "210MB / 147kB",
+            "pids": "9"
+          },
+          "compose_service": "user-service",
+          "role": "app"
+        },
+        {
+          "container_id": "b0b3f447db34",
+          "container_name": "dmidle-260722t112200zcd9425-user-postgres-1",
+          "cpu_percent": 0.04,
+          "cpu_cores": 0.0004,
+          "memory_usage_bytes": 26329743,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.32,
+          "pids": 7,
+          "network_rx_bytes": 18100,
+          "network_tx_bytes": 9930,
+          "block_read_bytes": 910000000,
+          "block_write_bytes": 180000000,
+          "raw": {
+            "cpu": "0.04%",
+            "memory": "25.11MiB / 7.751GiB",
+            "memory_percent": "0.32%",
+            "network_io": "18.1kB / 9.93kB",
+            "block_io": "910MB / 180MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "61918cb47ee6",
+          "container_name": "dmidle-260722t112200zcd9425-user-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 720896,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 489000,
+          "network_tx_bytes": 23800,
+          "block_read_bytes": 148000000,
+          "block_write_bytes": 16400,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "704KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "489kB / 23.8kB",
+            "block_io": "148MB / 16.4kB",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "sampling": {
+    "expected_sample_count": 36,
+    "observed_sample_count": 36,
+    "expected_interval_seconds": 5,
+    "observed_span_seconds": 175.013,
+    "wall_duration_seconds": 180.00433,
+    "mean_gap_seconds": 5.000371,
+    "maximum_gap_seconds": 5.967,
+    "maximum_allowed_gap_seconds": 10,
+    "continuous": true
+  },
+  "last_state": {
+    "user-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t112200zcd9425-user-user-service-1 Stopping \n Container dmidle-260722t112200zcd9425-user-idle-observer-1 Stopping \n Container dmidle-260722t112200zcd9425-user-user-service-1 Stopped \n Container dmidle-260722t112200zcd9425-user-user-service-1 Removing \n Container dmidle-260722t112200zcd9425-user-user-service-1 Removed \n Container dmidle-260722t112200zcd9425-user-user-migrate-1 Stopping \n Container dmidle-260722t112200zcd9425-user-user-migrate-1 Stopped \n Container dmidle-260722t112200zcd9425-user-user-migrate-1 Removing \n Container dmidle-260722t112200zcd9425-user-user-migrate-1 Removed \n Container dmidle-260722t112200zcd9425-user-postgres-1 Stopping \n Container dmidle-260722t112200zcd9425-user-postgres-1 Stopped \n Container dmidle-260722t112200zcd9425-user-postgres-1 Removing \n Container dmidle-260722t112200zcd9425-user-postgres-1 Removed \n Container dmidle-260722t112200zcd9425-user-idle-observer-1 Stopped \n Container dmidle-260722t112200zcd9425-user-idle-observer-1 Removing \n Container dmidle-260722t112200zcd9425-user-idle-observer-1 Removed \n Network dmidle-260722t112200zcd9425-user_default Removing \n Volume dmidle-260722t112200zcd9425-user_postgres-data Removing \n Network dmidle-260722t112200zcd9425-user_default Removed \n Volume dmidle-260722t112200zcd9425-user_postgres-data Removed"
+  }
+}

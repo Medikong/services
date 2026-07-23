@@ -1,0 +1,3703 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T112734Z-6d512b",
+  "service": "catalog-service",
+  "project": "dmidle-260722t112734z6d512b-catalog",
+  "status": "passed",
+  "started_at": "2026-07-22T11:27:35.785Z",
+  "finished_at": "2026-07-22T11:33:08.177Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T11:29:42.850Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.42,
+          "cpu_cores": 0.0042,
+          "memory_usage_bytes": 82344673,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 45100,
+          "network_tx_bytes": 88800,
+          "block_read_bytes": 720000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.42%",
+            "memory": "78.53MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "45.1kB / 88.8kB",
+            "block_io": "720MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 1.14,
+          "cpu_cores": 0.011399999999999999,
+          "memory_usage_bytes": 28217180,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.34,
+          "pids": 8,
+          "network_rx_bytes": 18900,
+          "network_tx_bytes": 11100,
+          "block_read_bytes": 1340000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "1.14%",
+            "memory": "26.91MiB / 7.751GiB",
+            "memory_percent": "0.34%",
+            "network_io": "18.9kB / 11.1kB",
+            "block_io": "1.34GB / 171MB",
+            "pids": "8"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 59.23,
+          "cpu_cores": 0.5922999999999999,
+          "memory_usage_bytes": 367001600,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.41,
+          "pids": 120,
+          "network_rx_bytes": 48100,
+          "network_tx_bytes": 65099,
+          "block_read_bytes": 3030000000,
+          "block_write_bytes": 4950000,
+          "raw": {
+            "cpu": "59.23%",
+            "memory": "350MiB / 7.751GiB",
+            "memory_percent": "4.41%",
+            "network_io": "48.1kB / 65.1kB",
+            "block_io": "3.03GB / 4.95MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 663552,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 50700,
+          "network_tx_bytes": 5960,
+          "block_read_bytes": 109000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "648KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "50.7kB / 5.96kB",
+            "block_io": "109MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:29:47.863Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 3.34,
+          "cpu_cores": 0.0334,
+          "memory_usage_bytes": 82449530,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 48600,
+          "network_tx_bytes": 105000,
+          "block_read_bytes": 738000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "3.34%",
+            "memory": "78.63MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "48.6kB / 105kB",
+            "block_io": "738MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 4.14,
+          "cpu_cores": 0.0414,
+          "memory_usage_bytes": 26696744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.32,
+          "pids": 7,
+          "network_rx_bytes": 19600,
+          "network_tx_bytes": 11600,
+          "block_read_bytes": 1400000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "4.14%",
+            "memory": "25.46MiB / 7.751GiB",
+            "memory_percent": "0.32%",
+            "network_io": "19.6kB / 11.6kB",
+            "block_io": "1.4GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.45,
+          "cpu_cores": 0.044500000000000005,
+          "memory_usage_bytes": 320759398,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.85,
+          "pids": 100,
+          "network_rx_bytes": 50500,
+          "network_tx_bytes": 67700,
+          "block_read_bytes": 3110000000,
+          "block_write_bytes": 5050000,
+          "raw": {
+            "cpu": "4.45%",
+            "memory": "305.9MiB / 7.751GiB",
+            "memory_percent": "3.85%",
+            "network_io": "50.5kB / 67.7kB",
+            "block_io": "3.11GB / 5.05MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 716800,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 64000,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 118000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "700KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "64kB / 7.15kB",
+            "block_io": "118MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:29:51.820Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.87,
+          "cpu_cores": 0.0087,
+          "memory_usage_bytes": 83120619,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 50700,
+          "network_tx_bytes": 106000,
+          "block_read_bytes": 746000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.87%",
+            "memory": "79.27MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "50.7kB / 106kB",
+            "block_io": "746MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 3.93,
+          "cpu_cores": 0.0393,
+          "memory_usage_bytes": 24998051,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 19600,
+          "network_tx_bytes": 11600,
+          "block_read_bytes": 1430000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "3.93%",
+            "memory": "23.84MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "19.6kB / 11.6kB",
+            "block_io": "1.43GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 76.67,
+          "cpu_cores": 0.7667,
+          "memory_usage_bytes": 359556710,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.32,
+          "pids": 120,
+          "network_rx_bytes": 52000,
+          "network_tx_bytes": 69400,
+          "block_read_bytes": 3180000000,
+          "block_write_bytes": 5090000,
+          "raw": {
+            "cpu": "76.67%",
+            "memory": "342.9MiB / 7.751GiB",
+            "memory_percent": "4.32%",
+            "network_io": "52kB / 69.4kB",
+            "block_io": "3.18GB / 5.09MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 64000,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 118000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "64kB / 7.15kB",
+            "block_io": "118MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:29:57.863Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.56,
+          "cpu_cores": 0.005600000000000001,
+          "memory_usage_bytes": 82711674,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 53300,
+          "network_tx_bytes": 109000,
+          "block_read_bytes": 757000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.56%",
+            "memory": "78.88MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "53.3kB / 109kB",
+            "block_io": "757MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24735907,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 19600,
+          "network_tx_bytes": 11600,
+          "block_read_bytes": 1470000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.59MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "19.6kB / 11.6kB",
+            "block_io": "1.47GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 6.16,
+          "cpu_cores": 0.0616,
+          "memory_usage_bytes": 319815680,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 54000,
+          "network_tx_bytes": 71500,
+          "block_read_bytes": 3230000000,
+          "block_write_bytes": 5170000,
+          "raw": {
+            "cpu": "6.16%",
+            "memory": "305MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "54kB / 71.5kB",
+            "block_io": "3.23GB / 5.17MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 64000,
+          "network_tx_bytes": 7150,
+          "block_read_bytes": 118000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "64kB / 7.15kB",
+            "block_io": "118MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:02.868Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.77,
+          "cpu_cores": 0.0077,
+          "memory_usage_bytes": 82952847,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 57100,
+          "network_tx_bytes": 125000,
+          "block_read_bytes": 776000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.77%",
+            "memory": "79.11MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "57.1kB / 125kB",
+            "block_io": "776MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.99,
+          "cpu_cores": 0.029900000000000003,
+          "memory_usage_bytes": 25291653,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 20400,
+          "network_tx_bytes": 12100,
+          "block_read_bytes": 1530000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.99%",
+            "memory": "24.12MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "20.4kB / 12.1kB",
+            "block_io": "1.53GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.97,
+          "cpu_cores": 0.049699999999999994,
+          "memory_usage_bytes": 318347673,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.82,
+          "pids": 100,
+          "network_rx_bytes": 56100,
+          "network_tx_bytes": 73700,
+          "block_read_bytes": 3330000000,
+          "block_write_bytes": 5240000,
+          "raw": {
+            "cpu": "4.97%",
+            "memory": "303.6MiB / 7.751GiB",
+            "memory_percent": "3.82%",
+            "network_io": "56.1kB / 73.7kB",
+            "block_io": "3.33GB / 5.24MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 1.85,
+          "cpu_cores": 0.018500000000000003,
+          "memory_usage_bytes": 1682964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 77300,
+          "network_tx_bytes": 8340,
+          "block_read_bytes": 128000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.85%",
+            "memory": "1.605MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "77.3kB / 8.34kB",
+            "block_io": "128MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:07.838Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.72,
+          "cpu_cores": 0.0072,
+          "memory_usage_bytes": 81484840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 59100,
+          "network_tx_bytes": 127000,
+          "block_read_bytes": 789000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.72%",
+            "memory": "77.71MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "59.1kB / 127kB",
+            "block_io": "789MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.69,
+          "cpu_cores": 0.0269,
+          "memory_usage_bytes": 24714936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 20400,
+          "network_tx_bytes": 12100,
+          "block_read_bytes": 1570000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.69%",
+            "memory": "23.57MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "20.4kB / 12.1kB",
+            "block_io": "1.57GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 3.06,
+          "cpu_cores": 0.030600000000000002,
+          "memory_usage_bytes": 319291392,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 58300,
+          "network_tx_bytes": 76100,
+          "block_read_bytes": 3450000000,
+          "block_write_bytes": 5360000,
+          "raw": {
+            "cpu": "3.06%",
+            "memory": "304.5MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "58.3kB / 76.1kB",
+            "block_io": "3.45GB / 5.36MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 77300,
+          "network_tx_bytes": 8340,
+          "block_read_bytes": 128000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "77.3kB / 8.34kB",
+            "block_io": "128MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:12.842Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.46,
+          "cpu_cores": 0.0046,
+          "memory_usage_bytes": 80792780,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 61200,
+          "network_tx_bytes": 129000,
+          "block_read_bytes": 798000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.46%",
+            "memory": "77.05MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "61.2kB / 129kB",
+            "block_io": "798MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.68,
+          "cpu_cores": 0.0268,
+          "memory_usage_bytes": 26570915,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.32,
+          "pids": 7,
+          "network_rx_bytes": 20400,
+          "network_tx_bytes": 12100,
+          "block_read_bytes": 1620000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.68%",
+            "memory": "25.34MiB / 7.751GiB",
+            "memory_percent": "0.32%",
+            "network_io": "20.4kB / 12.1kB",
+            "block_io": "1.62GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 95.23,
+          "cpu_cores": 0.9523,
+          "memory_usage_bytes": 371405619,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.46,
+          "pids": 121,
+          "network_rx_bytes": 60100,
+          "network_tx_bytes": 78200,
+          "block_read_bytes": 3540000000,
+          "block_write_bytes": 5400000,
+          "raw": {
+            "cpu": "95.23%",
+            "memory": "354.2MiB / 7.751GiB",
+            "memory_percent": "4.46%",
+            "network_io": "60.1kB / 78.2kB",
+            "block_io": "3.54GB / 5.4MB",
+            "pids": "121"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 675840,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 77300,
+          "network_tx_bytes": 8340,
+          "block_read_bytes": 128000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "660KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "77.3kB / 8.34kB",
+            "block_io": "128MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:16.829Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 2.06,
+          "cpu_cores": 0.0206,
+          "memory_usage_bytes": 82061557,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 64700,
+          "network_tx_bytes": 144000,
+          "block_read_bytes": 815000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "2.06%",
+            "memory": "78.26MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "64.7kB / 144kB",
+            "block_io": "815MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.51,
+          "cpu_cores": 0.025099999999999997,
+          "memory_usage_bytes": 37455134,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.45,
+          "pids": 7,
+          "network_rx_bytes": 21100,
+          "network_tx_bytes": 12600,
+          "block_read_bytes": 1660000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.51%",
+            "memory": "35.72MiB / 7.751GiB",
+            "memory_percent": "0.45%",
+            "network_io": "21.1kB / 12.6kB",
+            "block_io": "1.66GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 2.94,
+          "cpu_cores": 0.0294,
+          "memory_usage_bytes": 320759398,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.85,
+          "pids": 100,
+          "network_rx_bytes": 61900,
+          "network_tx_bytes": 79900,
+          "block_read_bytes": 3580000000,
+          "block_write_bytes": 5470000,
+          "raw": {
+            "cpu": "2.94%",
+            "memory": "305.9MiB / 7.751GiB",
+            "memory_percent": "3.85%",
+            "network_io": "61.9kB / 79.9kB",
+            "block_io": "3.58GB / 5.47MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 1.38,
+          "cpu_cores": 0.0138,
+          "memory_usage_bytes": 1011712,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 90600,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 137000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.38%",
+            "memory": "988KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "90.6kB / 9.52kB",
+            "block_io": "137MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:22.852Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.65,
+          "cpu_cores": 0.006500000000000001,
+          "memory_usage_bytes": 81715527,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 66800,
+          "network_tx_bytes": 146000,
+          "block_read_bytes": 826000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.65%",
+            "memory": "77.93MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "66.8kB / 146kB",
+            "block_io": "826MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 1.52,
+          "cpu_cores": 0.0152,
+          "memory_usage_bytes": 34886123,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.42,
+          "pids": 9,
+          "network_rx_bytes": 21100,
+          "network_tx_bytes": 12600,
+          "block_read_bytes": 1710000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "1.52%",
+            "memory": "33.27MiB / 7.751GiB",
+            "memory_percent": "0.42%",
+            "network_io": "21.1kB / 12.6kB",
+            "block_io": "1.71GB / 171MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 3.33,
+          "cpu_cores": 0.0333,
+          "memory_usage_bytes": 319396249,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 63700,
+          "network_tx_bytes": 82000,
+          "block_read_bytes": 3680000000,
+          "block_write_bytes": 5860000,
+          "raw": {
+            "cpu": "3.33%",
+            "memory": "304.6MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "63.7kB / 82kB",
+            "block_io": "3.68GB / 5.86MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 651264,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 90600,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 137000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "636KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "90.6kB / 9.52kB",
+            "block_io": "137MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:27.889Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.78,
+          "cpu_cores": 0.0078000000000000005,
+          "memory_usage_bytes": 81243668,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 69300,
+          "network_tx_bytes": 148000,
+          "block_read_bytes": 845000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.78%",
+            "memory": "77.48MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "69.3kB / 148kB",
+            "block_io": "845MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 3.24,
+          "cpu_cores": 0.032400000000000005,
+          "memory_usage_bytes": 24714936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 21100,
+          "network_tx_bytes": 12600,
+          "block_read_bytes": 1760000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "3.24%",
+            "memory": "23.57MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "21.1kB / 12.6kB",
+            "block_io": "1.76GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 113.23,
+          "cpu_cores": 1.1323,
+          "memory_usage_bytes": 385456537,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.63,
+          "pids": 123,
+          "network_rx_bytes": 65800,
+          "network_tx_bytes": 84200,
+          "block_read_bytes": 3790000000,
+          "block_write_bytes": 5910000,
+          "raw": {
+            "cpu": "113.23%",
+            "memory": "367.6MiB / 7.751GiB",
+            "memory_percent": "4.63%",
+            "network_io": "65.8kB / 84.2kB",
+            "block_io": "3.79GB / 5.91MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 651264,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 90600,
+          "network_tx_bytes": 9520,
+          "block_read_bytes": 137000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "636KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "90.6kB / 9.52kB",
+            "block_io": "137MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:32.944Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 2.19,
+          "cpu_cores": 0.0219,
+          "memory_usage_bytes": 83435192,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 73300,
+          "network_tx_bytes": 165000,
+          "block_read_bytes": 893000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "2.19%",
+            "memory": "79.57MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "73.3kB / 165kB",
+            "block_io": "893MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.09,
+          "cpu_cores": 0.0009,
+          "memory_usage_bytes": 25365053,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 22500,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 1800000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.09%",
+            "memory": "24.19MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "22.5kB / 13.7kB",
+            "block_io": "1.8GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.44,
+          "cpu_cores": 0.0444,
+          "memory_usage_bytes": 319396249,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 67800,
+          "network_tx_bytes": 86400,
+          "block_read_bytes": 3870000000,
+          "block_write_bytes": 6000000,
+          "raw": {
+            "cpu": "4.44%",
+            "memory": "304.6MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "67.8kB / 86.4kB",
+            "block_io": "3.87GB / 6MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 1.66,
+          "cpu_cores": 0.0166,
+          "memory_usage_bytes": 2011168,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.02,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.66%",
+            "memory": "1.918MiB / 7.751GiB",
+            "memory_percent": "0.02%",
+            "network_io": "104kB / 10.7kB",
+            "block_io": "146MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:37.853Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.58,
+          "cpu_cores": 0.0058,
+          "memory_usage_bytes": 81359011,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 75900,
+          "network_tx_bytes": 167000,
+          "block_read_bytes": 921000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "0.58%",
+            "memory": "77.59MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "75.9kB / 167kB",
+            "block_io": "921MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.01,
+          "cpu_cores": 0.0001,
+          "memory_usage_bytes": 24714936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 22500,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 1840000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.01%",
+            "memory": "23.57MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "22.5kB / 13.7kB",
+            "block_io": "1.84GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 13.05,
+          "cpu_cores": 0.1305,
+          "memory_usage_bytes": 328414003,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.95,
+          "pids": 100,
+          "network_rx_bytes": 69600,
+          "network_tx_bytes": 88400,
+          "block_read_bytes": 4030000000,
+          "block_write_bytes": 6120000,
+          "raw": {
+            "cpu": "13.05%",
+            "memory": "313.2MiB / 7.751GiB",
+            "memory_percent": "3.95%",
+            "network_io": "69.6kB / 88.4kB",
+            "block_io": "4.03GB / 6.12MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "104kB / 10.7kB",
+            "block_io": "146MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:42.913Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.24,
+          "cpu_cores": 0.0124,
+          "memory_usage_bytes": 82868961,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 77400,
+          "network_tx_bytes": 169000,
+          "block_read_bytes": 936000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "1.24%",
+            "memory": "79.03MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "77.4kB / 169kB",
+            "block_io": "936MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 4.58,
+          "cpu_cores": 0.0458,
+          "memory_usage_bytes": 26235371,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.32,
+          "pids": 7,
+          "network_rx_bytes": 22500,
+          "network_tx_bytes": 13700,
+          "block_read_bytes": 1900000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "4.58%",
+            "memory": "25.02MiB / 7.751GiB",
+            "memory_percent": "0.32%",
+            "network_io": "22.5kB / 13.7kB",
+            "block_io": "1.9GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 19.45,
+          "cpu_cores": 0.1945,
+          "memory_usage_bytes": 344666931,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.14,
+          "pids": 116,
+          "network_rx_bytes": 71800,
+          "network_tx_bytes": 90800,
+          "block_read_bytes": 4139999999,
+          "block_write_bytes": 6180000,
+          "raw": {
+            "cpu": "19.45%",
+            "memory": "328.7MiB / 7.751GiB",
+            "memory_percent": "4.14%",
+            "network_io": "71.8kB / 90.8kB",
+            "block_io": "4.14GB / 6.18MB",
+            "pids": "116"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 104000,
+          "network_tx_bytes": 10700,
+          "block_read_bytes": 146000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "104kB / 10.7kB",
+            "block_io": "146MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:47.905Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 4.24,
+          "cpu_cores": 0.0424,
+          "memory_usage_bytes": 83959480,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.01,
+          "pids": 5,
+          "network_rx_bytes": 79800,
+          "network_tx_bytes": 171000,
+          "block_read_bytes": 965000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "4.24%",
+            "memory": "80.07MiB / 7.751GiB",
+            "memory_percent": "1.01%",
+            "network_io": "79.8kB / 171kB",
+            "block_io": "965MB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.81,
+          "cpu_cores": 0.0281,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 23200,
+          "network_tx_bytes": 14200,
+          "block_read_bytes": 1940000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.81%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "23.2kB / 14.2kB",
+            "block_io": "1.94GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 25.12,
+          "cpu_cores": 0.25120000000000003,
+          "memory_usage_bytes": 360710144,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.33,
+          "pids": 120,
+          "network_rx_bytes": 73800,
+          "network_tx_bytes": 92800,
+          "block_read_bytes": 4250000000,
+          "block_write_bytes": 6220000,
+          "raw": {
+            "cpu": "25.12%",
+            "memory": "344MiB / 7.751GiB",
+            "memory_percent": "4.33%",
+            "network_io": "73.8kB / 92.8kB",
+            "block_io": "4.25GB / 6.22MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 1.31,
+          "cpu_cores": 0.0131,
+          "memory_usage_bytes": 716800,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 117000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 164000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "1.31%",
+            "memory": "700KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "117kB / 11.9kB",
+            "block_io": "164MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:52.910Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.57,
+          "cpu_cores": 0.015700000000000002,
+          "memory_usage_bytes": 80929095,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 83500,
+          "network_tx_bytes": 187000,
+          "block_read_bytes": 1000000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "1.57%",
+            "memory": "77.18MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "83.5kB / 187kB",
+            "block_io": "1GB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 23200,
+          "network_tx_bytes": 14200,
+          "block_read_bytes": 1980000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "23.2kB / 14.2kB",
+            "block_io": "1.98GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 5.06,
+          "cpu_cores": 0.0506,
+          "memory_usage_bytes": 318452531,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.83,
+          "pids": 100,
+          "network_rx_bytes": 75700,
+          "network_tx_bytes": 94800,
+          "block_read_bytes": 4360000000,
+          "block_write_bytes": 6320000,
+          "raw": {
+            "cpu": "5.06%",
+            "memory": "303.7MiB / 7.751GiB",
+            "memory_percent": "3.83%",
+            "network_io": "75.7kB / 94.8kB",
+            "block_io": "4.36GB / 6.32MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 659456,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 117000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 164000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "644KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "117kB / 11.9kB",
+            "block_io": "164MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:30:58.028Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 3.4,
+          "cpu_cores": 0.034,
+          "memory_usage_bytes": 80845209,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 85300,
+          "network_tx_bytes": 189000,
+          "block_read_bytes": 1040000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "3.40%",
+            "memory": "77.1MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "85.3kB / 189kB",
+            "block_io": "1.04GB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 23200,
+          "network_tx_bytes": 14200,
+          "block_read_bytes": 2020000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "23.2kB / 14.2kB",
+            "block_io": "2.02GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 41.24,
+          "cpu_cores": 0.41240000000000004,
+          "memory_usage_bytes": 363855872,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.37,
+          "pids": 120,
+          "network_rx_bytes": 77400,
+          "network_tx_bytes": 96600,
+          "block_read_bytes": 4530000000,
+          "block_write_bytes": 6590000,
+          "raw": {
+            "cpu": "41.24%",
+            "memory": "347MiB / 7.751GiB",
+            "memory_percent": "4.37%",
+            "network_io": "77.4kB / 96.6kB",
+            "block_io": "4.53GB / 6.59MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 659456,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 117000,
+          "network_tx_bytes": 11900,
+          "block_read_bytes": 164000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "644KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "117kB / 11.9kB",
+            "block_io": "164MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:02.969Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 8.89,
+          "cpu_cores": 0.0889,
+          "memory_usage_bytes": 82931875,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 89400,
+          "network_tx_bytes": 205000,
+          "block_read_bytes": 1100000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "8.89%",
+            "memory": "79.09MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "89.4kB / 205kB",
+            "block_io": "1.1GB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 5.76,
+          "cpu_cores": 0.0576,
+          "memory_usage_bytes": 25637683,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.31,
+          "pids": 7,
+          "network_rx_bytes": 23900,
+          "network_tx_bytes": 14900,
+          "block_read_bytes": 2080000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "5.76%",
+            "memory": "24.45MiB / 7.751GiB",
+            "memory_percent": "0.31%",
+            "network_io": "23.9kB / 14.9kB",
+            "block_io": "2.08GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 46.62,
+          "cpu_cores": 0.46619999999999995,
+          "memory_usage_bytes": 377801932,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.54,
+          "pids": 123,
+          "network_rx_bytes": 79200,
+          "network_tx_bytes": 98400,
+          "block_read_bytes": 4670000000,
+          "block_write_bytes": 6640000,
+          "raw": {
+            "cpu": "46.62%",
+            "memory": "360.3MiB / 7.751GiB",
+            "memory_percent": "4.54%",
+            "network_io": "79.2kB / 98.4kB",
+            "block_io": "4.67GB / 6.64MB",
+            "pids": "123"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 2.81,
+          "cpu_cores": 0.0281,
+          "memory_usage_bytes": 790528,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 131000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 179000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "2.81%",
+            "memory": "772KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "131kB / 13.1kB",
+            "block_io": "179MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:08.039Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.23,
+          "cpu_cores": 0.0123,
+          "memory_usage_bytes": 80604037,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 90800,
+          "network_tx_bytes": 206000,
+          "block_read_bytes": 1120000000,
+          "block_write_bytes": 692000,
+          "raw": {
+            "cpu": "1.23%",
+            "memory": "76.87MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "90.8kB / 206kB",
+            "block_io": "1.12GB / 692kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.07,
+          "cpu_cores": 0.0007000000000000001,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 23900,
+          "network_tx_bytes": 14900,
+          "block_read_bytes": 2109999999,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.07%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "23.9kB / 14.9kB",
+            "block_io": "2.11GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 8.21,
+          "cpu_cores": 0.0821,
+          "memory_usage_bytes": 321703116,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.87,
+          "pids": 100,
+          "network_rx_bytes": 80900,
+          "network_tx_bytes": 100000,
+          "block_read_bytes": 4810000000,
+          "block_write_bytes": 6730000,
+          "raw": {
+            "cpu": "8.21%",
+            "memory": "306.8MiB / 7.751GiB",
+            "memory_percent": "3.87%",
+            "network_io": "80.9kB / 100kB",
+            "block_io": "4.81GB / 6.73MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 131000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 179000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "131kB / 13.1kB",
+            "block_io": "179MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:13.201Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 2.28,
+          "cpu_cores": 0.022799999999999997,
+          "memory_usage_bytes": 82187386,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 93400,
+          "network_tx_bytes": 209000,
+          "block_read_bytes": 1200000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "2.28%",
+            "memory": "78.38MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "93.4kB / 209kB",
+            "block_io": "1.2GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.89,
+          "cpu_cores": 0.028900000000000002,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 23900,
+          "network_tx_bytes": 14900,
+          "block_read_bytes": 2160000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.89%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "23.9kB / 14.9kB",
+            "block_io": "2.16GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 20.15,
+          "cpu_cores": 0.20149999999999998,
+          "memory_usage_bytes": 317299097,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.81,
+          "pids": 100,
+          "network_rx_bytes": 83400,
+          "network_tx_bytes": 103000,
+          "block_read_bytes": 5050000000,
+          "block_write_bytes": 6820000,
+          "raw": {
+            "cpu": "20.15%",
+            "memory": "302.6MiB / 7.751GiB",
+            "memory_percent": "3.81%",
+            "network_io": "83.4kB / 103kB",
+            "block_io": "5.05GB / 6.82MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 131000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 179000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "131kB / 13.1kB",
+            "block_io": "179MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:17.860Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 3.17,
+          "cpu_cores": 0.0317,
+          "memory_usage_bytes": 90922024,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.09,
+          "pids": 5,
+          "network_rx_bytes": 97100,
+          "network_tx_bytes": 224000,
+          "block_read_bytes": 1230000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "3.17%",
+            "memory": "86.71MiB / 7.751GiB",
+            "memory_percent": "1.09%",
+            "network_io": "97.1kB / 224kB",
+            "block_io": "1.23GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.59,
+          "cpu_cores": 0.0059,
+          "memory_usage_bytes": 30765219,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 7,
+          "network_rx_bytes": 24700,
+          "network_tx_bytes": 15400,
+          "block_read_bytes": 2210000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.59%",
+            "memory": "29.34MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "24.7kB / 15.4kB",
+            "block_io": "2.21GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 5.72,
+          "cpu_cores": 0.0572,
+          "memory_usage_bytes": 325163417,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.91,
+          "pids": 100,
+          "network_rx_bytes": 85300,
+          "network_tx_bytes": 105000,
+          "block_read_bytes": 5140000000,
+          "block_write_bytes": 7130000,
+          "raw": {
+            "cpu": "5.72%",
+            "memory": "310.1MiB / 7.751GiB",
+            "memory_percent": "3.91%",
+            "network_io": "85.3kB / 105kB",
+            "block_io": "5.14GB / 7.13MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 679936,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 131000,
+          "network_tx_bytes": 13100,
+          "block_read_bytes": 179000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "664KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "131kB / 13.1kB",
+            "block_io": "179MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:23.019Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.89,
+          "cpu_cores": 0.0089,
+          "memory_usage_bytes": 83141591,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 98800,
+          "network_tx_bytes": 226000,
+          "block_read_bytes": 1250000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.89%",
+            "memory": "79.29MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "98.8kB / 226kB",
+            "block_io": "1.25GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.01,
+          "cpu_cores": 0.0001,
+          "memory_usage_bytes": 24693964,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 24700,
+          "network_tx_bytes": 15400,
+          "block_read_bytes": 2250000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.01%",
+            "memory": "23.55MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "24.7kB / 15.4kB",
+            "block_io": "2.25GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.52,
+          "cpu_cores": 0.0452,
+          "memory_usage_bytes": 329462579,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.96,
+          "pids": 100,
+          "network_rx_bytes": 86800,
+          "network_tx_bytes": 107000,
+          "block_read_bytes": 5240000000,
+          "block_write_bytes": 7200000,
+          "raw": {
+            "cpu": "4.52%",
+            "memory": "314.2MiB / 7.751GiB",
+            "memory_percent": "3.96%",
+            "network_io": "86.8kB / 107kB",
+            "block_io": "5.24GB / 7.2MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 144000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 188000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "144kB / 14.3kB",
+            "block_io": "188MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:27.093Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 2.1,
+          "cpu_cores": 0.021,
+          "memory_usage_bytes": 81621155,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 101000,
+          "network_tx_bytes": 228000,
+          "block_read_bytes": 1280000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "2.10%",
+            "memory": "77.84MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "101kB / 228kB",
+            "block_io": "1.28GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 3.05,
+          "cpu_cores": 0.0305,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 24700,
+          "network_tx_bytes": 15400,
+          "block_read_bytes": 2310000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "3.05%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "24.7kB / 15.4kB",
+            "block_io": "2.31GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 44.81,
+          "cpu_cores": 0.4481,
+          "memory_usage_bytes": 386609971,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.65,
+          "pids": 117,
+          "network_rx_bytes": 88800,
+          "network_tx_bytes": 108000,
+          "block_read_bytes": 5400000000,
+          "block_write_bytes": 7250000,
+          "raw": {
+            "cpu": "44.81%",
+            "memory": "368.7MiB / 7.751GiB",
+            "memory_percent": "4.65%",
+            "network_io": "88.8kB / 108kB",
+            "block_io": "5.4GB / 7.25MB",
+            "pids": "117"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 144000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 188000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "144kB / 14.3kB",
+            "block_io": "188MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:31.892Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.97,
+          "cpu_cores": 0.0097,
+          "memory_usage_bytes": 81285611,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 103000,
+          "network_tx_bytes": 231000,
+          "block_read_bytes": 1330000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.97%",
+            "memory": "77.52MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "103kB / 231kB",
+            "block_io": "1.33GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.03,
+          "cpu_cores": 0.0003,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 25400,
+          "network_tx_bytes": 15900,
+          "block_read_bytes": 2350000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.03%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "25.4kB / 15.9kB",
+            "block_io": "2.35GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 5.72,
+          "cpu_cores": 0.0572,
+          "memory_usage_bytes": 317613670,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.82,
+          "pids": 100,
+          "network_rx_bytes": 90900,
+          "network_tx_bytes": 110000,
+          "block_read_bytes": 5460000000,
+          "block_write_bytes": 7340000,
+          "raw": {
+            "cpu": "5.72%",
+            "memory": "302.9MiB / 7.751GiB",
+            "memory_percent": "3.82%",
+            "network_io": "90.9kB / 110kB",
+            "block_io": "5.46GB / 7.34MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 144000,
+          "network_tx_bytes": 14300,
+          "block_read_bytes": 188000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "144kB / 14.3kB",
+            "block_io": "188MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:36.886Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.14,
+          "cpu_cores": 0.011399999999999999,
+          "memory_usage_bytes": 81788928,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 107000,
+          "network_tx_bytes": 247000,
+          "block_read_bytes": 1370000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.14%",
+            "memory": "78MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "107kB / 247kB",
+            "block_io": "1.37GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.06,
+          "cpu_cores": 0.0006,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 26100,
+          "network_tx_bytes": 16400,
+          "block_read_bytes": 2390000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.06%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "26.1kB / 16.4kB",
+            "block_io": "2.39GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.17,
+          "cpu_cores": 0.0417,
+          "memory_usage_bytes": 319815680,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 92700,
+          "network_tx_bytes": 113000,
+          "block_read_bytes": 5590000000,
+          "block_write_bytes": 7440000,
+          "raw": {
+            "cpu": "4.17%",
+            "memory": "305MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "92.7kB / 113kB",
+            "block_io": "5.59GB / 7.44MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 647168,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 157000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 197000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "632KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "157kB / 15.5kB",
+            "block_io": "197MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:42.895Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.46,
+          "cpu_cores": 0.0146,
+          "memory_usage_bytes": 80729866,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 109000,
+          "network_tx_bytes": 249000,
+          "block_read_bytes": 1410000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.46%",
+            "memory": "76.99MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "109kB / 249kB",
+            "block_io": "1.41GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 3.63,
+          "cpu_cores": 0.0363,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 26100,
+          "network_tx_bytes": 16400,
+          "block_read_bytes": 2470000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "3.63%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "26.1kB / 16.4kB",
+            "block_io": "2.47GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 26.49,
+          "cpu_cores": 0.26489999999999997,
+          "memory_usage_bytes": 363226726,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.36,
+          "pids": 120,
+          "network_rx_bytes": 94600,
+          "network_tx_bytes": 115000,
+          "block_read_bytes": 5750000000,
+          "block_write_bytes": 7650000,
+          "raw": {
+            "cpu": "26.49%",
+            "memory": "346.4MiB / 7.751GiB",
+            "memory_percent": "4.36%",
+            "network_io": "94.6kB / 115kB",
+            "block_io": "5.75GB / 7.65MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 647168,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 157000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 197000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "632KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "157kB / 15.5kB",
+            "block_io": "197MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:47.888Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.96,
+          "cpu_cores": 0.0196,
+          "memory_usage_bytes": 81086382,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 112000,
+          "network_tx_bytes": 251000,
+          "block_read_bytes": 1460000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.96%",
+            "memory": "77.33MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "112kB / 251kB",
+            "block_io": "1.46GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 26100,
+          "network_tx_bytes": 16400,
+          "block_read_bytes": 2510000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "26.1kB / 16.4kB",
+            "block_io": "2.51GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 40.13,
+          "cpu_cores": 0.40130000000000005,
+          "memory_usage_bytes": 316984524,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.81,
+          "pids": 100,
+          "network_rx_bytes": 97000,
+          "network_tx_bytes": 117000,
+          "block_read_bytes": 5940000000,
+          "block_write_bytes": 7730000,
+          "raw": {
+            "cpu": "40.13%",
+            "memory": "302.3MiB / 7.751GiB",
+            "memory_percent": "3.81%",
+            "network_io": "97kB / 117kB",
+            "block_io": "5.94GB / 7.73MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 647168,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 157000,
+          "network_tx_bytes": 15500,
+          "block_read_bytes": 197000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "632KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "157kB / 15.5kB",
+            "block_io": "197MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:52.893Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.76,
+          "cpu_cores": 0.0076,
+          "memory_usage_bytes": 81904271,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 115000,
+          "network_tx_bytes": 267000,
+          "block_read_bytes": 1490000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.76%",
+            "memory": "78.11MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "115kB / 267kB",
+            "block_io": "1.49GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 3.1,
+          "cpu_cores": 0.031,
+          "memory_usage_bytes": 24788336,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 26800,
+          "network_tx_bytes": 16900,
+          "block_read_bytes": 2570000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "3.10%",
+            "memory": "23.64MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "26.8kB / 16.9kB",
+            "block_io": "2.57GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.47,
+          "cpu_cores": 0.0447,
+          "memory_usage_bytes": 317823385,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.82,
+          "pids": 100,
+          "network_rx_bytes": 98500,
+          "network_tx_bytes": 119000,
+          "block_read_bytes": 5990000000,
+          "block_write_bytes": 7770000,
+          "raw": {
+            "cpu": "4.47%",
+            "memory": "303.1MiB / 7.751GiB",
+            "memory_percent": "3.82%",
+            "network_io": "98.5kB / 119kB",
+            "block_io": "5.99GB / 7.77MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 170000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 207000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "170kB / 16.6kB",
+            "block_io": "207MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:31:57.905Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.78,
+          "cpu_cores": 0.0078000000000000005,
+          "memory_usage_bytes": 81191239,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 117000,
+          "network_tx_bytes": 268000,
+          "block_read_bytes": 1520000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.78%",
+            "memory": "77.43MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "117kB / 268kB",
+            "block_io": "1.52GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 26800,
+          "network_tx_bytes": 16900,
+          "block_read_bytes": 2610000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "26.8kB / 16.9kB",
+            "block_io": "2.61GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.32,
+          "cpu_cores": 0.0432,
+          "memory_usage_bytes": 323066265,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.88,
+          "pids": 100,
+          "network_rx_bytes": 101000,
+          "network_tx_bytes": 121000,
+          "block_read_bytes": 6170000000,
+          "block_write_bytes": 7860000,
+          "raw": {
+            "cpu": "4.32%",
+            "memory": "308.1MiB / 7.751GiB",
+            "memory_percent": "3.88%",
+            "network_io": "101kB / 121kB",
+            "block_io": "6.17GB / 7.86MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 170000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 207000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "170kB / 16.6kB",
+            "block_io": "207MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:02.973Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.26,
+          "cpu_cores": 0.0126,
+          "memory_usage_bytes": 80614522,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 120000,
+          "network_tx_bytes": 271000,
+          "block_read_bytes": 1560000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.26%",
+            "memory": "76.88MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "120kB / 271kB",
+            "block_io": "1.56GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.4,
+          "cpu_cores": 0.024,
+          "memory_usage_bytes": 32516341,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 7,
+          "network_rx_bytes": 26800,
+          "network_tx_bytes": 16900,
+          "block_read_bytes": 2670000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.40%",
+            "memory": "31.01MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "26.8kB / 16.9kB",
+            "block_io": "2.67GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 102.79,
+          "cpu_cores": 1.0279,
+          "memory_usage_bytes": 388077977,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.66,
+          "pids": 117,
+          "network_rx_bytes": 102000,
+          "network_tx_bytes": 123000,
+          "block_read_bytes": 6300000000,
+          "block_write_bytes": 7910000,
+          "raw": {
+            "cpu": "102.79%",
+            "memory": "370.1MiB / 7.751GiB",
+            "memory_percent": "4.66%",
+            "network_io": "102kB / 123kB",
+            "block_io": "6.3GB / 7.91MB",
+            "pids": "117"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 170000,
+          "network_tx_bytes": 16600,
+          "block_read_bytes": 207000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "170kB / 16.6kB",
+            "block_io": "207MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:07.912Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.29,
+          "cpu_cores": 0.0129,
+          "memory_usage_bytes": 83057704,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.0,
+          "pids": 5,
+          "network_rx_bytes": 123000,
+          "network_tx_bytes": 287000,
+          "block_read_bytes": 1590000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.29%",
+            "memory": "79.21MiB / 7.751GiB",
+            "memory_percent": "1.00%",
+            "network_io": "123kB / 287kB",
+            "block_io": "1.59GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 4.02,
+          "cpu_cores": 0.04019999999999999,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 27500,
+          "network_tx_bytes": 17500,
+          "block_read_bytes": 2710000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "4.02%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "27.5kB / 17.5kB",
+            "block_io": "2.71GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.35,
+          "cpu_cores": 0.0435,
+          "memory_usage_bytes": 319920537,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 105000,
+          "network_tx_bytes": 125000,
+          "block_read_bytes": 6380000000,
+          "block_write_bytes": 8000000,
+          "raw": {
+            "cpu": "4.35%",
+            "memory": "305.1MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "105kB / 125kB",
+            "block_io": "6.38GB / 8MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 216000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 17.8kB",
+            "block_io": "216MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:13.025Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 1.77,
+          "cpu_cores": 0.0177,
+          "memory_usage_bytes": 82669731,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 125000,
+          "network_tx_bytes": 289000,
+          "block_read_bytes": 1620000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "1.77%",
+            "memory": "78.84MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "125kB / 289kB",
+            "block_io": "1.62GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 24704450,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 27500,
+          "network_tx_bytes": 17500,
+          "block_read_bytes": 2760000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "23.56MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "27.5kB / 17.5kB",
+            "block_io": "2.76GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 19.77,
+          "cpu_cores": 0.1977,
+          "memory_usage_bytes": 319710822,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.84,
+          "pids": 100,
+          "network_rx_bytes": 107000,
+          "network_tx_bytes": 127000,
+          "block_read_bytes": 6620000000,
+          "block_write_bytes": 8090000,
+          "raw": {
+            "cpu": "19.77%",
+            "memory": "304.9MiB / 7.751GiB",
+            "memory_percent": "3.84%",
+            "network_io": "107kB / 127kB",
+            "block_io": "6.62GB / 8.09MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 216000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 17.8kB",
+            "block_io": "216MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:17.906Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.83,
+          "cpu_cores": 0.0083,
+          "memory_usage_bytes": 82470502,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 127000,
+          "network_tx_bytes": 291000,
+          "block_read_bytes": 1650000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.83%",
+            "memory": "78.65MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "127kB / 291kB",
+            "block_io": "1.65GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.93,
+          "cpu_cores": 0.029300000000000003,
+          "memory_usage_bytes": 24725422,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 27500,
+          "network_tx_bytes": 17500,
+          "block_read_bytes": 2800000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.93%",
+            "memory": "23.58MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "27.5kB / 17.5kB",
+            "block_io": "2.8GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 4.66,
+          "cpu_cores": 0.0466,
+          "memory_usage_bytes": 325687705,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.91,
+          "pids": 100,
+          "network_rx_bytes": 109000,
+          "network_tx_bytes": 129000,
+          "block_read_bytes": 6690000000,
+          "block_write_bytes": 8359999,
+          "raw": {
+            "cpu": "4.66%",
+            "memory": "310.6MiB / 7.751GiB",
+            "memory_percent": "3.91%",
+            "network_io": "109kB / 129kB",
+            "block_io": "6.69GB / 8.36MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 184000,
+          "network_tx_bytes": 17800,
+          "block_read_bytes": 216000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "184kB / 17.8kB",
+            "block_io": "216MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:22.886Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.73,
+          "cpu_cores": 0.0073,
+          "memory_usage_bytes": 82113986,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 131000,
+          "network_tx_bytes": 307000,
+          "block_read_bytes": 1680000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.73%",
+            "memory": "78.31MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "131kB / 307kB",
+            "block_io": "1.68GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.9,
+          "cpu_cores": 0.028999999999999998,
+          "memory_usage_bytes": 24788336,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 28200,
+          "network_tx_bytes": 18000,
+          "block_read_bytes": 2860000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.90%",
+            "memory": "23.64MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "28.2kB / 18kB",
+            "block_io": "2.86GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 3.16,
+          "cpu_cores": 0.0316,
+          "memory_usage_bytes": 322122547,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.87,
+          "pids": 100,
+          "network_rx_bytes": 111000,
+          "network_tx_bytes": 132000,
+          "block_read_bytes": 6850000000,
+          "block_write_bytes": 8460000,
+          "raw": {
+            "cpu": "3.16%",
+            "memory": "307.2MiB / 7.751GiB",
+            "memory_percent": "3.87%",
+            "network_io": "111kB / 132kB",
+            "block_io": "6.85GB / 8.46MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 197000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 226000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "197kB / 19kB",
+            "block_io": "226MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:27.911Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.63,
+          "cpu_cores": 0.0063,
+          "memory_usage_bytes": 81851842,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 133000,
+          "network_tx_bytes": 309000,
+          "block_read_bytes": 1720000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.63%",
+            "memory": "78.06MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "133kB / 309kB",
+            "block_io": "1.72GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.53,
+          "cpu_cores": 0.0253,
+          "memory_usage_bytes": 24788336,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 28200,
+          "network_tx_bytes": 18000,
+          "block_read_bytes": 2900000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.53%",
+            "memory": "23.64MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "28.2kB / 18kB",
+            "block_io": "2.9GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 1.83,
+          "cpu_cores": 0.0183,
+          "memory_usage_bytes": 318452531,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.83,
+          "pids": 100,
+          "network_rx_bytes": 113000,
+          "network_tx_bytes": 134000,
+          "block_read_bytes": 6980000000,
+          "block_write_bytes": 8540000,
+          "raw": {
+            "cpu": "1.83%",
+            "memory": "303.7MiB / 7.751GiB",
+            "memory_percent": "3.83%",
+            "network_io": "113kB / 134kB",
+            "block_io": "6.98GB / 8.54MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 197000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 226000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "197kB / 19kB",
+            "block_io": "226MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:32.864Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 2.27,
+          "cpu_cores": 0.0227,
+          "memory_usage_bytes": 81191239,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.98,
+          "pids": 5,
+          "network_rx_bytes": 136000,
+          "network_tx_bytes": 312000,
+          "block_read_bytes": 1780000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "2.27%",
+            "memory": "77.43MiB / 7.751GiB",
+            "memory_percent": "0.98%",
+            "network_io": "136kB / 312kB",
+            "block_io": "1.78GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 2.82,
+          "cpu_cores": 0.0282,
+          "memory_usage_bytes": 35861299,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.43,
+          "pids": 7,
+          "network_rx_bytes": 29000,
+          "network_tx_bytes": 18500,
+          "block_read_bytes": 2960000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "2.82%",
+            "memory": "34.2MiB / 7.751GiB",
+            "memory_percent": "0.43%",
+            "network_io": "29kB / 18.5kB",
+            "block_io": "2.96GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 55.2,
+          "cpu_cores": 0.552,
+          "memory_usage_bytes": 362912153,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.36,
+          "pids": 120,
+          "network_rx_bytes": 114000,
+          "network_tx_bytes": 135000,
+          "block_read_bytes": 7070000000,
+          "block_write_bytes": 8590000,
+          "raw": {
+            "cpu": "55.20%",
+            "memory": "346.1MiB / 7.751GiB",
+            "memory_percent": "4.36%",
+            "network_io": "114kB / 135kB",
+            "block_io": "7.07GB / 8.59MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 671744,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 197000,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 226000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "656KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "197kB / 19kB",
+            "block_io": "226MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T11:32:37.875Z",
+      "components": [
+        {
+          "container_id": "492eff4c3b16",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-catalog-service-1",
+          "cpu_percent": 0.71,
+          "cpu_cores": 0.0070999999999999995,
+          "memory_usage_bytes": 81044439,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.97,
+          "pids": 5,
+          "network_rx_bytes": 140000,
+          "network_tx_bytes": 328000,
+          "block_read_bytes": 1810000000,
+          "block_write_bytes": 774000,
+          "raw": {
+            "cpu": "0.71%",
+            "memory": "77.29MiB / 7.751GiB",
+            "memory_percent": "0.97%",
+            "network_io": "140kB / 328kB",
+            "block_io": "1.81GB / 774kB",
+            "pids": "5"
+          },
+          "compose_service": "catalog-service",
+          "role": "app"
+        },
+        {
+          "container_id": "e0a742a20028",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-postgres-1",
+          "cpu_percent": 0.06,
+          "cpu_cores": 0.0006,
+          "memory_usage_bytes": 24568135,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.3,
+          "pids": 7,
+          "network_rx_bytes": 29700,
+          "network_tx_bytes": 19000,
+          "block_read_bytes": 2990000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "0.06%",
+            "memory": "23.43MiB / 7.751GiB",
+            "memory_percent": "0.30%",
+            "network_io": "29.7kB / 19kB",
+            "block_io": "2.99GB / 171MB",
+            "pids": "7"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ee0eba5d5e66",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-kafka-1",
+          "cpu_percent": 3.47,
+          "cpu_cores": 0.0347,
+          "memory_usage_bytes": 321283686,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.86,
+          "pids": 100,
+          "network_rx_bytes": 116000,
+          "network_tx_bytes": 137000,
+          "block_read_bytes": 7170000000,
+          "block_write_bytes": 8690000,
+          "raw": {
+            "cpu": "3.47%",
+            "memory": "306.4MiB / 7.751GiB",
+            "memory_percent": "3.86%",
+            "network_io": "116kB / 137kB",
+            "block_io": "7.17GB / 8.69MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "6b17e5889f47",
+          "container_name": "dmidle-260722t112734z6d512b-catalog-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 655360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 210000,
+          "network_tx_bytes": 20200,
+          "block_read_bytes": 239000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "640KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "210kB / 20.2kB",
+            "block_io": "239MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "sampling": {
+    "expected_sample_count": 36,
+    "observed_sample_count": 36,
+    "expected_interval_seconds": 5,
+    "observed_span_seconds": 175.025,
+    "wall_duration_seconds": 180.005991,
+    "mean_gap_seconds": 5.000714,
+    "maximum_gap_seconds": 6.043,
+    "maximum_allowed_gap_seconds": 10,
+    "continuous": true
+  },
+  "last_state": {
+    "catalog-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t112734z6d512b-catalog-idle-observer-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-catalog-service-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-catalog-service-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-catalog-service-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-catalog-service-1 Removed \n Container dmidle-260722t112734z6d512b-catalog-catalog-migrate-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-kafka-init-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-catalog-migrate-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-catalog-migrate-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-kafka-init-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-kafka-init-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-catalog-migrate-1 Removed \n Container dmidle-260722t112734z6d512b-catalog-postgres-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-kafka-init-1 Removed \n Container dmidle-260722t112734z6d512b-catalog-kafka-1 Stopping \n Container dmidle-260722t112734z6d512b-catalog-postgres-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-postgres-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-kafka-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-kafka-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-postgres-1 Removed \n Container dmidle-260722t112734z6d512b-catalog-idle-observer-1 Stopped \n Container dmidle-260722t112734z6d512b-catalog-idle-observer-1 Removing \n Container dmidle-260722t112734z6d512b-catalog-kafka-1 Removed \n Container dmidle-260722t112734z6d512b-catalog-idle-observer-1 Removed \n Network dmidle-260722t112734z6d512b-catalog_default Removing \n Volume dmidle-260722t112734z6d512b-catalog_kafka-data Removing \n Volume dmidle-260722t112734z6d512b-catalog_postgres-data Removing \n Volume dmidle-260722t112734z6d512b-catalog_kafka-data Removed \n Network dmidle-260722t112734z6d512b-catalog_default Removed \n Volume dmidle-260722t112734z6d512b-catalog_postgres-data Removed"
+  }
+}

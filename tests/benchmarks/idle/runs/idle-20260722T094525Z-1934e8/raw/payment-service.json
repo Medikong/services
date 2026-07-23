@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "payment-service",
+  "project": "dmidle-260722t094525z1934e8-payment",
+  "status": "passed",
+  "started_at": "2026-07-22T09:52:44.658Z",
+  "finished_at": "2026-07-22T09:54:39.201Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:54:12.256Z",
+      "components": [
+        {
+          "container_id": "f749f31051b4",
+          "container_name": "dmidle-260722t094525z1934e8-payment-payment-service-1",
+          "cpu_percent": 39.94,
+          "cpu_cores": 0.3994,
+          "memory_usage_bytes": 85018542,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.02,
+          "pids": 6,
+          "network_rx_bytes": 50900,
+          "network_tx_bytes": 72800,
+          "block_read_bytes": 392000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "39.94%",
+            "memory": "81.08MiB / 7.751GiB",
+            "memory_percent": "1.02%",
+            "network_io": "50.9kB / 72.8kB",
+            "block_io": "392MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "61e108c36b6e",
+          "container_name": "dmidle-260722t094525z1934e8-payment-postgres-1",
+          "cpu_percent": 4.74,
+          "cpu_cores": 0.047400000000000005,
+          "memory_usage_bytes": 30628904,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 55900,
+          "network_tx_bytes": 36700,
+          "block_read_bytes": 845000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "4.74%",
+            "memory": "29.21MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "55.9kB / 36.7kB",
+            "block_io": "845MB / 171MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ebb5ec0919b7",
+          "container_name": "dmidle-260722t094525z1934e8-payment-kafka-1",
+          "cpu_percent": 39.52,
+          "cpu_cores": 0.39520000000000005,
+          "memory_usage_bytes": 364065587,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.37,
+          "pids": 120,
+          "network_rx_bytes": 40100,
+          "network_tx_bytes": 53200,
+          "block_read_bytes": 1510000000,
+          "block_write_bytes": 1750000,
+          "raw": {
+            "cpu": "39.52%",
+            "memory": "347.2MiB / 7.751GiB",
+            "memory_percent": "4.37%",
+            "network_io": "40.1kB / 53.2kB",
+            "block_io": "1.51GB / 1.75MB",
+            "pids": "120"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "b3dcec49c71f",
+          "container_name": "dmidle-260722t094525z1934e8-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 11900,
+          "network_tx_bytes": 2550,
+          "block_read_bytes": 83600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "11.9kB / 2.55kB",
+            "block_io": "83.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:54:14.442Z",
+      "components": [
+        {
+          "container_id": "f749f31051b4",
+          "container_name": "dmidle-260722t094525z1934e8-payment-payment-service-1",
+          "cpu_percent": 8.95,
+          "cpu_cores": 0.0895,
+          "memory_usage_bytes": 84787855,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.02,
+          "pids": 6,
+          "network_rx_bytes": 64099,
+          "network_tx_bytes": 90100,
+          "block_read_bytes": 448000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "8.95%",
+            "memory": "80.86MiB / 7.751GiB",
+            "memory_percent": "1.02%",
+            "network_io": "64.1kB / 90.1kB",
+            "block_io": "448MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "payment-service",
+          "role": "app"
+        },
+        {
+          "container_id": "61e108c36b6e",
+          "container_name": "dmidle-260722t094525z1934e8-payment-postgres-1",
+          "cpu_percent": 4.66,
+          "cpu_cores": 0.0466,
+          "memory_usage_bytes": 32610713,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 65500,
+          "network_tx_bytes": 43500,
+          "block_read_bytes": 895000000,
+          "block_write_bytes": 171000000,
+          "raw": {
+            "cpu": "4.66%",
+            "memory": "31.1MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "65.5kB / 43.5kB",
+            "block_io": "895MB / 171MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "ebb5ec0919b7",
+          "container_name": "dmidle-260722t094525z1934e8-payment-kafka-1",
+          "cpu_percent": 47.11,
+          "cpu_cores": 0.4711,
+          "memory_usage_bytes": 368259891,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.42,
+          "pids": 122,
+          "network_rx_bytes": 41300,
+          "network_tx_bytes": 54800,
+          "block_read_bytes": 1630000000,
+          "block_write_bytes": 1770000,
+          "raw": {
+            "cpu": "47.11%",
+            "memory": "351.2MiB / 7.751GiB",
+            "memory_percent": "4.42%",
+            "network_io": "41.3kB / 54.8kB",
+            "block_io": "1.63GB / 1.77MB",
+            "pids": "122"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "b3dcec49c71f",
+          "container_name": "dmidle-260722t094525z1934e8-payment-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 667648,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 11900,
+          "network_tx_bytes": 2550,
+          "block_read_bytes": 83600000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "652KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "11.9kB / 2.55kB",
+            "block_io": "83.6MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "payment-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-payment-payment-service-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-payment-service-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-payment-service-1 Removing \n Container dmidle-260722t094525z1934e8-payment-payment-service-1 Removed \n Container dmidle-260722t094525z1934e8-payment-kafka-init-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-payment-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-payment-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-payment-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-payment-kafka-init-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-kafka-init-1 Removing \n Container dmidle-260722t094525z1934e8-payment-payment-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-payment-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-payment-kafka-init-1 Removed \n Container dmidle-260722t094525z1934e8-payment-kafka-1 Stopping \n Container dmidle-260722t094525z1934e8-payment-kafka-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-kafka-1 Removing \n Container dmidle-260722t094525z1934e8-payment-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-payment-kafka-1 Removed \n Container dmidle-260722t094525z1934e8-payment-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-payment-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-payment-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-payment_default Removing \n Volume dmidle-260722t094525z1934e8-payment_postgres-data Removing \n Volume dmidle-260722t094525z1934e8-payment_kafka-data Removing \n Volume dmidle-260722t094525z1934e8-payment_postgres-data Removed \n Network dmidle-260722t094525z1934e8-payment_default Removed \n Volume dmidle-260722t094525z1934e8-payment_kafka-data Removed"
+  }
+}

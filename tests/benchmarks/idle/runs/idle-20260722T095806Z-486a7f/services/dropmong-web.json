@@ -1,0 +1,204 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T095806Z-486a7f",
+  "service": "dropmong-web",
+  "status": "passed",
+  "project": "dmidle-260722t095806z486a7f-web",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "sample_count": 36,
+  "components": {
+    "dropmong-web": {
+      "role": "app",
+      "sample_count": 36,
+      "container_id": "38ab04cb0d48",
+      "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 2.895556,
+          "p50": 0.01,
+          "p95": 11.2825,
+          "max": 12.7
+        },
+        "cpu_cores": {
+          "mean": 0.028956,
+          "p50": 0.0001,
+          "p95": 0.112825,
+          "max": 0.127
+        },
+        "memory_usage_bytes": {
+          "mean": 49054714.861111,
+          "p50": 40731934.0,
+          "p95": 73471098.5,
+          "max": 80971038
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.588333,
+          "p50": 0.49,
+          "p95": 0.885,
+          "max": 0.97
+        },
+        "pids": {
+          "mean": 11.194444,
+          "p50": 11.0,
+          "p95": 11.0,
+          "max": 18
+        },
+        "network_rx_bytes": {
+          "mean": 14637.222222,
+          "p50": 14800.0,
+          "p95": 20700.0,
+          "max": 21900
+        },
+        "network_tx_bytes": {
+          "mean": 91972.222222,
+          "p50": 93300.0,
+          "p95": 141000.0,
+          "max": 150000
+        },
+        "block_read_bytes": {
+          "mean": 1870888888.861111,
+          "p50": 1990000000.0,
+          "p95": 2440000000.0,
+          "max": 2480000000
+        },
+        "block_write_bytes": {
+          "mean": 7834722.222222,
+          "p50": 7430000.0,
+          "p95": 10050000.0,
+          "max": 10500000
+        }
+      }
+    },
+    "idle-observer": {
+      "role": "observer",
+      "sample_count": 36,
+      "container_id": "4c3700e98f38",
+      "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.11,
+          "p50": 0.0,
+          "p95": 0.47,
+          "max": 2.08
+        },
+        "cpu_cores": {
+          "mean": 0.0011,
+          "p50": 0.0,
+          "p95": 0.0047,
+          "max": 0.0208
+        },
+        "memory_usage_bytes": {
+          "mean": 1113284.5,
+          "p50": 733184.0,
+          "p95": 1588067.5,
+          "max": 9342812
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.014444,
+          "p50": 0.01,
+          "p95": 0.02,
+          "max": 0.11
+        },
+        "pids": {
+          "mean": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2
+        },
+        "network_rx_bytes": {
+          "mean": 93180.555556,
+          "p50": 94200.0,
+          "p95": 142000.0,
+          "max": 151000
+        },
+        "network_tx_bytes": {
+          "mean": 12963.333333,
+          "p50": 13100.0,
+          "p95": 19000.0,
+          "max": 20200
+        },
+        "block_read_bytes": {
+          "mean": 135138888.888889,
+          "p50": 138000000.0,
+          "p95": 183000000.0,
+          "max": 192000000
+        },
+        "block_write_bytes": {
+          "mean": 8189.0,
+          "p50": 8189.0,
+          "p95": 8189.0,
+          "max": 8189
+        }
+      }
+    }
+  },
+  "container_metadata": {
+    "dropmong-web": {
+      "container_id": "38ab04cb0d48ec87c9c5e702398835352dac787dd409da844bdd9e453ad85f44",
+      "container_name": "dmidle-260722t095806z486a7f-web-dropmong-web-1",
+      "compose_service": "dropmong-web",
+      "image_reference": "dmidle-260722t095806z486a7f-web-dropmong-web",
+      "image_id": "sha256:c5adf0f6898e4d73454227e71a256172ebae6cc13b21bc06e90490cad39641f8",
+      "image_digests": [
+        "dmidle-260722t095806z486a7f-web-dropmong-web@sha256:c5adf0f6898e4d73454227e71a256172ebae6cc13b21bc06e90490cad39641f8"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T11:15:08.524073667Z"
+    },
+    "idle-observer": {
+      "container_id": "4c3700e98f38f3ce5ff12ec51cc38e78868290d861e99782fd60dc39f1b91693",
+      "container_name": "dmidle-260722t095806z486a7f-web-idle-observer-1",
+      "compose_service": "idle-observer",
+      "image_reference": "curlimages/curl:8.12.1",
+      "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+      "image_digests": [
+        "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T11:15:10.528756418Z"
+    }
+  },
+  "error": null,
+  "last_state": {
+    "dropmong-web": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Stopping \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Stopping \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Stopped \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Removing \n Container dmidle-260722t095806z486a7f-web-dropmong-web-1 Removed \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Stopped \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Removing \n Container dmidle-260722t095806z486a7f-web-idle-observer-1 Removed \n Network dmidle-260722t095806z486a7f-web_default Removing \n Network dmidle-260722t095806z486a7f-web_default Removed"
+  }
+}

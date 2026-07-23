@@ -1,0 +1,434 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T095806Z-486a7f",
+  "status": "passed",
+  "started_at": "2026-07-22T09:58:06.960Z",
+  "finished_at": "2026-07-22T11:19:43.517Z",
+  "repository": {
+    "root": "/Users/danghamo/Documents/gituhb/tempkong/service",
+    "sha": "c0b356f9c225dd21b9be99de7038efaa3ba7aaa0",
+    "branch": "main",
+    "dirty": true
+  },
+  "environment": {
+    "docker": {
+      "version": {
+        "Client": {
+          "Version": "29.3.1",
+          "ApiVersion": "1.54",
+          "DefaultAPIVersion": "1.54",
+          "GitCommit": "c2be9cc",
+          "GoVersion": "go1.25.8",
+          "Os": "darwin",
+          "Arch": "arm64",
+          "BuildTime": "Wed Mar 25 16:12:49 2026",
+          "Context": "desktop-linux"
+        },
+        "Server": {
+          "Platform": {
+            "Name": "Docker Desktop 4.66.1 (222799)"
+          },
+          "Version": "29.3.1",
+          "ApiVersion": "1.54",
+          "MinAPIVersion": "1.40",
+          "Os": "linux",
+          "Arch": "arm64",
+          "Components": [
+            {
+              "Name": "Engine",
+              "Version": "29.3.1",
+              "Details": {
+                "ApiVersion": "1.54",
+                "Arch": "arm64",
+                "BuildTime": "Wed Mar 25 16:14:30 2026",
+                "Experimental": "false",
+                "GitCommit": "f78c987",
+                "GoVersion": "go1.25.8",
+                "KernelVersion": "6.12.76-linuxkit",
+                "MinAPIVersion": "1.40",
+                "Os": "linux"
+              }
+            },
+            {
+              "Name": "containerd",
+              "Version": "v2.2.1",
+              "Details": {
+                "GitCommit": "dea7da592f5d1d2b7755e3a161be07f43fad8f75"
+              }
+            },
+            {
+              "Name": "runc",
+              "Version": "1.3.4",
+              "Details": {
+                "GitCommit": "v1.3.4-0-gd6d73eb8"
+              }
+            },
+            {
+              "Name": "docker-init",
+              "Version": "0.19.0",
+              "Details": {
+                "GitCommit": "de40ad0"
+              }
+            }
+          ],
+          "GitCommit": "f78c987",
+          "GoVersion": "go1.25.8",
+          "KernelVersion": "6.12.76-linuxkit",
+          "BuildTime": "2026-03-25T16:14:30.000000000+00:00"
+        }
+      },
+      "compose_version": "Docker Compose version v5.1.0"
+    },
+    "host": {
+      "platform": "Darwin-25.2.0-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "logical_cpu_count": 10,
+      "docker_cpu_count": 4,
+      "docker_memory_bytes": 8322555904,
+      "docker_operating_system": "Docker Desktop",
+      "docker_architecture": "aarch64"
+    }
+  },
+  "configuration": {
+    "services": [
+      "auth-service",
+      "user-service",
+      "catalog-service",
+      "coupon-service",
+      "interest-service",
+      "order-service",
+      "payment-service",
+      "notification-service",
+      "dropmong-web"
+    ],
+    "warmup_seconds": 60,
+    "measure_seconds": 180,
+    "sample_interval_seconds": 5,
+    "operational_scrape_interval_seconds": 15,
+    "readiness_timeout_seconds": 180,
+    "compose_file": "tests/benchmarks/idle/docker-compose.yml",
+    "isolation": "one target service at a time; app and its dedicated worker measured together"
+  },
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "dataset_document": "tests/benchmarks/datasets/baseline-180days.md"
+  },
+  "services": {
+    "auth-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-auth",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "auth-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-auth-auth-service",
+          "image_id": "sha256:25cbad45bd5ff7997acfa133684fd3b4fba2624b75418eaac737894696ae431b",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-auth-auth-service@sha256:25cbad45bd5ff7997acfa133684fd3b4fba2624b75418eaac737894696ae431b"
+          ]
+        },
+        "auth-worker": {
+          "image_reference": "dmidle-260722t095806z486a7f-auth-auth-worker",
+          "image_id": "sha256:f5604a9254f30344f8994bdddfb2c8a2b7bffacdf464ae32a6f6116390ced300",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-auth-auth-worker@sha256:f5604a9254f30344f8994bdddfb2c8a2b7bffacdf464ae32a6f6116390ced300"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "redis": {
+          "image_reference": "valkey/valkey:8-alpine",
+          "image_id": "sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d",
+          "image_digests": [
+            "valkey/valkey@sha256:cfe71288f087704b06be45e270afa7a2abbf820093d6b11a23762081f5ff321d"
+          ]
+        },
+        "kafka": {
+          "image_reference": "apache/kafka:3.8.1",
+          "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+          "image_digests": [
+            "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+            "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "user-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-user",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "user-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-user-user-service",
+          "image_id": "sha256:d90bef83ebf6607b5095f09579b4bb3fc5b0e73bb44e76c3bc813d7f982b6725",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-user-user-service@sha256:d90bef83ebf6607b5095f09579b4bb3fc5b0e73bb44e76c3bc813d7f982b6725"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "catalog-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-catalog",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "catalog-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-catalog-catalog-service",
+          "image_id": "sha256:905d6e21c59067c1e908b5bb7fc30f4649321cdf05f62331f3ff2f39cbe68246",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-catalog-catalog-service@sha256:905d6e21c59067c1e908b5bb7fc30f4649321cdf05f62331f3ff2f39cbe68246"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "kafka": {
+          "image_reference": "apache/kafka:3.8.1",
+          "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+          "image_digests": [
+            "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+            "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "coupon-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-coupon",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "coupon-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-coupon-coupon-service",
+          "image_id": "sha256:f884b8b4435950cf9601baead118a413101b39d65e589d9d9cce7527800ac39a",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-coupon-coupon-service@sha256:f884b8b4435950cf9601baead118a413101b39d65e589d9d9cce7527800ac39a"
+          ]
+        },
+        "coupon-worker": {
+          "image_reference": "dmidle-260722t095806z486a7f-coupon-coupon-worker",
+          "image_id": "sha256:edcc18bd20e5a2b0968ea42db89f52122de7a46de37074cedbcf4f1e53020d6d",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-coupon-coupon-worker@sha256:edcc18bd20e5a2b0968ea42db89f52122de7a46de37074cedbcf4f1e53020d6d"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "interest-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-interest",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "interest-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-interest-interest-service",
+          "image_id": "sha256:846e38ce9e232c4647ca8b3f29b7a4e5c015381af9a7adb22954b11a92a91faa",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-interest-interest-service@sha256:846e38ce9e232c4647ca8b3f29b7a4e5c015381af9a7adb22954b11a92a91faa"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "order-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-order",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "order-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-order-order-service",
+          "image_id": "sha256:befb3cf6051f858a279ce8caed6fb749156b45b2baf9c35d12131d2d0202e423",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-order-order-service@sha256:befb3cf6051f858a279ce8caed6fb749156b45b2baf9c35d12131d2d0202e423"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "kafka": {
+          "image_reference": "apache/kafka:3.8.1",
+          "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+          "image_digests": [
+            "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+            "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "payment-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-payment",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "payment-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-payment-payment-service",
+          "image_id": "sha256:7af3eccc46c4e28a4d4e0c65eb9452bc718d57832488034014d74a21f192886d",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-payment-payment-service@sha256:7af3eccc46c4e28a4d4e0c65eb9452bc718d57832488034014d74a21f192886d"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "kafka": {
+          "image_reference": "apache/kafka:3.8.1",
+          "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+          "image_digests": [
+            "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+            "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "notification-service": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-notification",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "notification-service": {
+          "image_reference": "dmidle-260722t095806z486a7f-notification-notification-service",
+          "image_id": "sha256:7e06a4e32875a4ea09f076f6c6c8f6e8da69894d02f977feb5ed1de0238a6340",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-notification-notification-service@sha256:7e06a4e32875a4ea09f076f6c6c8f6e8da69894d02f977feb5ed1de0238a6340"
+          ]
+        },
+        "postgres": {
+          "image_reference": "postgres:16-alpine",
+          "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+          "image_digests": [
+            "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+          ]
+        },
+        "kafka": {
+          "image_reference": "apache/kafka:3.8.1",
+          "image_id": "sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+          "image_digests": [
+            "10.10.10.10:5000/apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5",
+            "apache/kafka@sha256:22c4bea38875408e8f9fe52aca8e3a6ee67f9aa0090db59af99a2f6647558db5"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    },
+    "dropmong-web": {
+      "status": "passed",
+      "project": "dmidle-260722t095806z486a7f-web",
+      "sample_count": 36,
+      "error": null,
+      "images": {
+        "dropmong-web": {
+          "image_reference": "dmidle-260722t095806z486a7f-web-dropmong-web",
+          "image_id": "sha256:c5adf0f6898e4d73454227e71a256172ebae6cc13b21bc06e90490cad39641f8",
+          "image_digests": [
+            "dmidle-260722t095806z486a7f-web-dropmong-web@sha256:c5adf0f6898e4d73454227e71a256172ebae6cc13b21bc06e90490cad39641f8"
+          ]
+        },
+        "idle-observer": {
+          "image_reference": "curlimages/curl:8.12.1",
+          "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+          "image_digests": [
+            "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T095806Z-486a7f",
+  "service": "user-service",
+  "status": "passed",
+  "project": "dmidle-260722t095806z486a7f-user",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "sample_count": 36,
+  "components": {
+    "user-service": {
+      "role": "app",
+      "sample_count": 36,
+      "container_id": "ba9552c54476",
+      "container_name": "dmidle-260722t095806z486a7f-user-user-service-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.059722,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 2.15
+        },
+        "cpu_cores": {
+          "mean": 0.000597,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0215
+        },
+        "memory_usage_bytes": {
+          "mean": 9318286.666667,
+          "p50": 8067219.0,
+          "p95": 16661872.25,
+          "max": 19084083
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.111389,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.23
+        },
+        "pids": {
+          "mean": 9.0,
+          "p50": 9.0,
+          "p95": 9.0,
+          "max": 9
+        },
+        "network_rx_bytes": {
+          "mean": 21025.0,
+          "p50": 21100.0,
+          "p95": 29525.0,
+          "max": 30800
+        },
+        "network_tx_bytes": {
+          "mean": 325416.666667,
+          "p50": 327500.0,
+          "p95": 474500.0,
+          "max": 497000
+        },
+        "block_read_bytes": {
+          "mean": 155680555.555556,
+          "p50": 155500000.0,
+          "p95": 218250000.0,
+          "max": 230000000
+        },
+        "block_write_bytes": {
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0
+        }
+      }
+    },
+    "postgres": {
+      "role": "database",
+      "sample_count": 36,
+      "container_id": "011857fc29de",
+      "container_name": "dmidle-260722t095806z486a7f-user-postgres-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 3.314722,
+          "p50": 1.495,
+          "p95": 14.615,
+          "max": 23.26
+        },
+        "cpu_cores": {
+          "mean": 0.033147,
+          "p50": 0.01495,
+          "p95": 0.14615,
+          "max": 0.2326
+        },
+        "memory_usage_bytes": {
+          "mean": 33317628.083333,
+          "p50": 34068234.0,
+          "p95": 41216900.75,
+          "max": 42163240
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.4,
+          "p50": 0.41,
+          "p95": 0.495,
+          "max": 0.51
+        },
+        "pids": {
+          "mean": 7.222222,
+          "p50": 7.0,
+          "p95": 8.25,
+          "max": 12
+        },
+        "network_rx_bytes": {
+          "mean": 15583.333333,
+          "p50": 15600.0,
+          "p95": 17825.0,
+          "max": 18200
+        },
+        "network_tx_bytes": {
+          "mean": 8438.888889,
+          "p50": 8425.0,
+          "p95": 9985.0,
+          "max": 10300
+        },
+        "block_read_bytes": {
+          "mean": 878638888.888889,
+          "p50": 889000000.0,
+          "p95": 1165000000.0,
+          "max": 1200000000
+        },
+        "block_write_bytes": {
+          "mean": 171000000.0,
+          "p50": 171000000.0,
+          "p95": 171000000.0,
+          "max": 171000000
+        }
+      }
+    },
+    "idle-observer": {
+      "role": "observer",
+      "sample_count": 36,
+      "container_id": "138b2b358c03",
+      "container_name": "dmidle-260722t095806z486a7f-user-idle-observer-1",
+      "metrics": {
+        "cpu_percent": {
+          "mean": 0.1275,
+          "p50": 0.0,
+          "p95": 0.52,
+          "max": 2.51
+        },
+        "cpu_cores": {
+          "mean": 0.001275,
+          "p50": 0.0,
+          "p95": 0.0052,
+          "max": 0.0251
+        },
+        "memory_usage_bytes": {
+          "mean": 993188.0,
+          "p50": 765952.0,
+          "p95": 1634467.5,
+          "max": 4739563
+        },
+        "memory_limit_bytes": {
+          "mean": 8322572877.0,
+          "p50": 8322572877.0,
+          "p95": 8322572877.0,
+          "max": 8322572877
+        },
+        "memory_percent": {
+          "mean": 0.0125,
+          "p50": 0.01,
+          "p95": 0.02,
+          "max": 0.06
+        },
+        "pids": {
+          "mean": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2
+        },
+        "network_rx_bytes": {
+          "mean": 320694.444444,
+          "p50": 321500.0,
+          "p95": 466500.0,
+          "max": 489000
+        },
+        "network_tx_bytes": {
+          "mean": 15784.166667,
+          "p50": 15800.0,
+          "p95": 22650.0,
+          "max": 23700
+        },
+        "block_read_bytes": {
+          "mean": 98250000.0,
+          "p50": 98400000.0,
+          "p95": 142250000.0,
+          "max": 149000000
+        },
+        "block_write_bytes": {
+          "mean": 2277.777778,
+          "p50": 0.0,
+          "p95": 16400.0,
+          "max": 16400
+        }
+      }
+    }
+  },
+  "container_metadata": {
+    "user-service": {
+      "container_id": "ba9552c54476def5d1706542621c14cf444b3eee13f8837cd7677086be9cb0fe",
+      "container_name": "dmidle-260722t095806z486a7f-user-user-service-1",
+      "compose_service": "user-service",
+      "image_reference": "dmidle-260722t095806z486a7f-user-user-service",
+      "image_id": "sha256:d90bef83ebf6607b5095f09579b4bb3fc5b0e73bb44e76c3bc813d7f982b6725",
+      "image_digests": [
+        "dmidle-260722t095806z486a7f-user-user-service@sha256:d90bef83ebf6607b5095f09579b4bb3fc5b0e73bb44e76c3bc813d7f982b6725"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T10:04:02.09315176Z"
+    },
+    "postgres": {
+      "container_id": "011857fc29de9853337da515e67c5933e8203b3f59bf4e8d10bc5cb5cc009d82",
+      "container_name": "dmidle-260722t095806z486a7f-user-postgres-1",
+      "compose_service": "postgres",
+      "image_reference": "postgres:16-alpine",
+      "image_id": "sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229",
+      "image_digests": [
+        "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T10:03:53.968794631Z"
+    },
+    "idle-observer": {
+      "container_id": "138b2b358c038d4897e3e7503c0da3e21ac8f2c21fa366552d49fac8aa26c8d6",
+      "container_name": "dmidle-260722t095806z486a7f-user-idle-observer-1",
+      "compose_service": "idle-observer",
+      "image_reference": "curlimages/curl:8.12.1",
+      "image_id": "sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6",
+      "image_digests": [
+        "curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6"
+      ],
+      "platform": "linux",
+      "started_at": "2026-07-22T10:04:06.407699887Z"
+    }
+  },
+  "error": null,
+  "last_state": {
+    "user-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t095806z486a7f-user-user-service-1 Stopping \n Container dmidle-260722t095806z486a7f-user-idle-observer-1 Stopping \n Container dmidle-260722t095806z486a7f-user-user-service-1 Stopped \n Container dmidle-260722t095806z486a7f-user-user-service-1 Removing \n Container dmidle-260722t095806z486a7f-user-user-service-1 Removed \n Container dmidle-260722t095806z486a7f-user-user-migrate-1 Stopping \n Container dmidle-260722t095806z486a7f-user-user-migrate-1 Stopped \n Container dmidle-260722t095806z486a7f-user-user-migrate-1 Removing \n Container dmidle-260722t095806z486a7f-user-user-migrate-1 Removed \n Container dmidle-260722t095806z486a7f-user-postgres-1 Stopping \n Container dmidle-260722t095806z486a7f-user-postgres-1 Stopped \n Container dmidle-260722t095806z486a7f-user-postgres-1 Removing \n Container dmidle-260722t095806z486a7f-user-postgres-1 Removed \n Container dmidle-260722t095806z486a7f-user-idle-observer-1 Stopped \n Container dmidle-260722t095806z486a7f-user-idle-observer-1 Removing \n Container dmidle-260722t095806z486a7f-user-idle-observer-1 Removed \n Network dmidle-260722t095806z486a7f-user_default Removing \n Volume dmidle-260722t095806z486a7f-user_postgres-data Removing \n Network dmidle-260722t095806z486a7f-user_default Removed \n Volume dmidle-260722t095806z486a7f-user_postgres-data Removed"
+  }
+}

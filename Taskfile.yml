@@ -120,6 +120,16 @@ tasks:
     cmds:
       - go test -tags=benchmark -run '^$' -bench . -benchmem -benchtime '{{.GO_BENCH_TIME}}' {{.GO_TEST_PACKAGES}}
 
+  benchmark-idle:
+    desc: Measure isolated service container idle CPU and memory and save JSON reports.
+    cmds:
+      - task: tests:benchmark-idle
+        vars:
+          SERVICES: '{{default "" .SERVICES}}'
+          WARMUP_SECONDS: '{{default "60" .WARMUP_SECONDS}}'
+          MEASURE_SECONDS: '{{default "180" .MEASURE_SECONDS}}'
+          SAMPLE_INTERVAL_SECONDS: '{{default "5" .SAMPLE_INTERVAL_SECONDS}}'
+
   dropmong-web-install:
     desc: Install the reproducible DropMong web dependencies.
     dir: services/dropmong-web

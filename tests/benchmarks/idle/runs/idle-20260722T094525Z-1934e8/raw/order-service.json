@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.0",
+  "run_id": "idle-20260722T094525Z-1934e8",
+  "service": "order-service",
+  "project": "dmidle-260722t094525z1934e8-order",
+  "status": "passed",
+  "started_at": "2026-07-22T09:51:10.850Z",
+  "finished_at": "2026-07-22T09:52:44.655Z",
+  "data_state": {
+    "profile": "schema_only",
+    "business_rows_seeded": false,
+    "description": "새 볼륨에 서비스 마이그레이션만 적용했으며 업무 fixture는 적재하지 않음"
+  },
+  "samples": [
+    {
+      "timestamp": "2026-07-22T09:52:17.375Z",
+      "components": [
+        {
+          "container_id": "99deb19883eb",
+          "container_name": "dmidle-260722t094525z1934e8-order-order-service-1",
+          "cpu_percent": 4.94,
+          "cpu_cores": 0.049400000000000006,
+          "memory_usage_bytes": 82460016,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.99,
+          "pids": 5,
+          "network_rx_bytes": 39400,
+          "network_tx_bytes": 47800,
+          "block_read_bytes": 236000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "4.94%",
+            "memory": "78.64MiB / 7.751GiB",
+            "memory_percent": "0.99%",
+            "network_io": "39.4kB / 47.8kB",
+            "block_io": "236MB / 0B",
+            "pids": "5"
+          },
+          "compose_service": "order-service",
+          "role": "app"
+        },
+        {
+          "container_id": "54439b2f210a",
+          "container_name": "dmidle-260722t094525z1934e8-order-postgres-1",
+          "cpu_percent": 3.04,
+          "cpu_cores": 0.0304,
+          "memory_usage_bytes": 31142707,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.37,
+          "pids": 9,
+          "network_rx_bytes": 59000,
+          "network_tx_bytes": 36700,
+          "block_read_bytes": 678000000,
+          "block_write_bytes": 172000000,
+          "raw": {
+            "cpu": "3.04%",
+            "memory": "29.7MiB / 7.751GiB",
+            "memory_percent": "0.37%",
+            "network_io": "59kB / 36.7kB",
+            "block_io": "678MB / 172MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "fbf393f61141",
+          "container_name": "dmidle-260722t094525z1934e8-order-kafka-1",
+          "cpu_percent": 23.17,
+          "cpu_cores": 0.23170000000000002,
+          "memory_usage_bytes": 361234432,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 4.34,
+          "pids": 122,
+          "network_rx_bytes": 27100,
+          "network_tx_bytes": 43400,
+          "block_read_bytes": 1120000000,
+          "block_write_bytes": 1440000,
+          "raw": {
+            "cpu": "23.17%",
+            "memory": "344.5MiB / 7.751GiB",
+            "memory_percent": "4.34%",
+            "network_io": "27.1kB / 43.4kB",
+            "block_io": "1.12GB / 1.44MB",
+            "pids": "122"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "86a1887447e9",
+          "container_name": "dmidle-260722t094525z1934e8-order-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 655360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 2060,
+          "network_tx_bytes": 1020,
+          "block_read_bytes": 26900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "640KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "2.06kB / 1.02kB",
+            "block_io": "26.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-22T09:52:19.475Z",
+      "components": [
+        {
+          "container_id": "99deb19883eb",
+          "container_name": "dmidle-260722t094525z1934e8-order-order-service-1",
+          "cpu_percent": 21.76,
+          "cpu_cores": 0.21760000000000002,
+          "memory_usage_bytes": 96468992,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 1.16,
+          "pids": 6,
+          "network_rx_bytes": 48000,
+          "network_tx_bytes": 58800,
+          "block_read_bytes": 279000000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "21.76%",
+            "memory": "92MiB / 7.751GiB",
+            "memory_percent": "1.16%",
+            "network_io": "48kB / 58.8kB",
+            "block_io": "279MB / 0B",
+            "pids": "6"
+          },
+          "compose_service": "order-service",
+          "role": "app"
+        },
+        {
+          "container_id": "54439b2f210a",
+          "container_name": "dmidle-260722t094525z1934e8-order-postgres-1",
+          "cpu_percent": 1.04,
+          "cpu_cores": 0.0104,
+          "memory_usage_bytes": 32579256,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.39,
+          "pids": 9,
+          "network_rx_bytes": 68600,
+          "network_tx_bytes": 43800,
+          "block_read_bytes": 719000000,
+          "block_write_bytes": 172000000,
+          "raw": {
+            "cpu": "1.04%",
+            "memory": "31.07MiB / 7.751GiB",
+            "memory_percent": "0.39%",
+            "network_io": "68.6kB / 43.8kB",
+            "block_io": "719MB / 172MB",
+            "pids": "9"
+          },
+          "compose_service": "postgres",
+          "role": "database"
+        },
+        {
+          "container_id": "fbf393f61141",
+          "container_name": "dmidle-260722t094525z1934e8-order-kafka-1",
+          "cpu_percent": 12.97,
+          "cpu_cores": 0.1297,
+          "memory_usage_bytes": 311636787,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 3.74,
+          "pids": 100,
+          "network_rx_bytes": 28600,
+          "network_tx_bytes": 45000,
+          "block_read_bytes": 1190000000,
+          "block_write_bytes": 1500000,
+          "raw": {
+            "cpu": "12.97%",
+            "memory": "297.2MiB / 7.751GiB",
+            "memory_percent": "3.74%",
+            "network_io": "28.6kB / 45kB",
+            "block_io": "1.19GB / 1.5MB",
+            "pids": "100"
+          },
+          "compose_service": "kafka",
+          "role": "broker"
+        },
+        {
+          "container_id": "86a1887447e9",
+          "container_name": "dmidle-260722t094525z1934e8-order-idle-observer-1",
+          "cpu_percent": 0.0,
+          "cpu_cores": 0.0,
+          "memory_usage_bytes": 655360,
+          "memory_limit_bytes": 8322572877,
+          "memory_percent": 0.01,
+          "pids": 2,
+          "network_rx_bytes": 2060,
+          "network_tx_bytes": 1020,
+          "block_read_bytes": 26900000,
+          "block_write_bytes": 0,
+          "raw": {
+            "cpu": "0.00%",
+            "memory": "640KiB / 7.751GiB",
+            "memory_percent": "0.01%",
+            "network_io": "2.06kB / 1.02kB",
+            "block_io": "26.9MB / 0B",
+            "pids": "2"
+          },
+          "compose_service": "idle-observer",
+          "role": "observer"
+        }
+      ]
+    }
+  ],
+  "last_state": {
+    "order-service": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "postgres": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "kafka": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": "healthy"
+    },
+    "idle-observer": {
+      "running": true,
+      "status": "running",
+      "exit_code": 0,
+      "error": "",
+      "health": null
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "exit_code": 0,
+    "remaining": {
+      "containers": [],
+      "volumes": [],
+      "networks": []
+    },
+    "message": "Container dmidle-260722t094525z1934e8-order-idle-observer-1 Stopping \n Container dmidle-260722t094525z1934e8-order-order-service-1 Stopping \n Container dmidle-260722t094525z1934e8-order-order-service-1 Stopped \n Container dmidle-260722t094525z1934e8-order-order-service-1 Removing \n Container dmidle-260722t094525z1934e8-order-order-service-1 Removed \n Container dmidle-260722t094525z1934e8-order-kafka-init-1 Stopping \n Container dmidle-260722t094525z1934e8-order-order-migrate-1 Stopping \n Container dmidle-260722t094525z1934e8-order-kafka-init-1 Stopped \n Container dmidle-260722t094525z1934e8-order-kafka-init-1 Removing \n Container dmidle-260722t094525z1934e8-order-order-migrate-1 Stopped \n Container dmidle-260722t094525z1934e8-order-order-migrate-1 Removing \n Container dmidle-260722t094525z1934e8-order-order-migrate-1 Removed \n Container dmidle-260722t094525z1934e8-order-postgres-1 Stopping \n Container dmidle-260722t094525z1934e8-order-kafka-init-1 Removed \n Container dmidle-260722t094525z1934e8-order-kafka-1 Stopping \n Container dmidle-260722t094525z1934e8-order-postgres-1 Stopped \n Container dmidle-260722t094525z1934e8-order-postgres-1 Removing \n Container dmidle-260722t094525z1934e8-order-kafka-1 Stopped \n Container dmidle-260722t094525z1934e8-order-kafka-1 Removing \n Container dmidle-260722t094525z1934e8-order-postgres-1 Removed \n Container dmidle-260722t094525z1934e8-order-kafka-1 Removed \n Container dmidle-260722t094525z1934e8-order-idle-observer-1 Stopped \n Container dmidle-260722t094525z1934e8-order-idle-observer-1 Removing \n Container dmidle-260722t094525z1934e8-order-idle-observer-1 Removed \n Network dmidle-260722t094525z1934e8-order_default Removing \n Volume dmidle-260722t094525z1934e8-order_kafka-data Removing \n Volume dmidle-260722t094525z1934e8-order_postgres-data Removing \n Volume dmidle-260722t094525z1934e8-order_kafka-data Removed \n Network dmidle-260722t094525z1934e8-order_default Removed \n Volume dmidle-260722t094525z1934e8-order_postgres-data Removed"
+  }
+}
