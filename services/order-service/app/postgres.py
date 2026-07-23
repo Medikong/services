@@ -1,4 +1,7 @@
+import asyncio
+import os
 from datetime import datetime
+from typing import Final
 from uuid import uuid4
 
 from contracts import (
@@ -41,6 +44,19 @@ from app.store import (
     order_matches_command,
 )
 
+# 카나리/블루그린 배포전략 비교 실험용 (2026-07-23, experiment/order-service-synthetic-regression
+# 브랜치 전용, main엔 merge 안 함). _locked_inventory()의 `.with_for_update()` 행 잠금을
+# env var로 우회 가능하게 만든다 — "리팩터링 중 실수로 락을 빠뜨렸다"는 현실적인 회귀를
+# 재현해서, 동시 주문 요청이 재고 초과 판매(oversell)를 일으키는지를 카나리/블루그린별로
+# 실측 비교하기 위함. SYNTHETIC_REGRESSION_DELAY_SECONDS는 read-check-write 사이 레이스
+# 윈도우를 넓혀서 테스트 부하로도 안정적으로 재현되게 하는 용도.
+SYNTHETIC_REGRESSION_SKIP_LOCK: Final = (
+    os.getenv("SYNTHETIC_REGRESSION_SKIP_LOCK", "false").lower() == "true"
+)
+SYNTHETIC_REGRESSION_DELAY_SECONDS: Final = float(
+    os.getenv("SYNTHETIC_REGRESSION_DELAY_SECONDS", "0")
+)
+
 
 class PostgresOrderRepository:
     def __init__(
@@ -76,6 +92,10 @@ class PostgresOrderRepository:
                     drop_id=command.drop_id,
                     product_id=command.product_id,
                 )
+            if SYNTHETIC_REGRESSION_DELAY_SECONDS > 0:
+                # read-check-write 사이 레이스 윈도우를 인위적으로 넓혀서, 잠금이
+                # 빠진 상태의 동시 요청들이 서로의 재고 변경을 못 보고 지나치게 만든다.
+                await asyncio.sleep(SYNTHETIC_REGRESSION_DELAY_SECONDS)
             replayed_order = await self._replayed_order(session, command)
             if replayed_order is not None:
                 if not order_matches_command(replayed_order, command):
@@ -208,14 +228,13 @@ async def _locked_inventory(
     session: AsyncSession,
     product: ProductForSale,
 ) -> InventoryItemRecord | None:
-    result = await session.execute(
-        select(InventoryItemRecord)
-        .where(
-            InventoryItemRecord.drop_id == product.drop_id,
-            InventoryItemRecord.product_id == product.product_id,
-        )
-        .with_for_update(),
+    query = select(InventoryItemRecord).where(
+        InventoryItemRecord.drop_id == product.drop_id,
+        InventoryItemRecord.product_id == product.product_id,
     )
+    if not SYNTHETIC_REGRESSION_SKIP_LOCK:
+        query = query.with_for_update()
+    result = await session.execute(query)
     return result.scalar_one_or_none()
 
 
