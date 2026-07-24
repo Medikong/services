@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 
+from app.catalog import catalog_from_env
 from app.messaging import (
     KafkaRuntime,
     KafkaRuntimeConfig,
@@ -28,6 +29,7 @@ from app.order_config import order_payment_policy_from_env
 from app.postgres import PostgresOrderRepository
 from app.repository import OrderRepository
 from app.store import OrderStore
+from app.store_contracts import InventorySeed
 
 type FastAPILifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
@@ -50,9 +52,20 @@ class AppResources:
 def resources_from_env(metrics: OrderMetrics | None = None) -> AppResources:
     database_url = os.getenv("DATABASE_URL", "")
     kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "")
+    catalog = catalog_from_env()
     order_metrics = metrics or OrderMetrics("order-service", "unknown", "unknown")
     if database_url == "":
-        repository = OrderStore()
+        repository = OrderStore(
+            catalog=catalog,
+            inventory=tuple(
+                InventorySeed(
+                    drop_id=product.drop_id,
+                    product_id=product.product_id,
+                    total_quantity=42,
+                )
+                for product in catalog
+            ),
+        )
         return AppResources(
             repository=repository,
             kafka_bootstrap_servers=kafka_bootstrap_servers,
@@ -73,6 +86,7 @@ def resources_from_env(metrics: OrderMetrics | None = None) -> AppResources:
     payment_policy = order_payment_policy_from_env()
     repository = PostgresOrderRepository(
         session_factory,
+        catalog=catalog,
         policy=payment_policy,
         metrics=order_metrics,
     )
