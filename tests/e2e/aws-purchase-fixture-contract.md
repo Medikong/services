@@ -140,3 +140,6 @@ or modified after collection.
 The collector does not provision a missing fixture. If the drop, inventory
 row, or Secret keys are absent, an independently reviewed provisioning
 mechanism remains required and collection blocks without sending a mutation.
+The trusted control plane supplies the attestation key fingerprint through
+protected configuration; a caller-supplied key pair is never sufficient by
+itself.

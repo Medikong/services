@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 from pathlib import Path
 from typing import Final
 
@@ -12,6 +13,7 @@ COLLECTOR_ID: Final = "medikong.aws-live-fixture-attestation/v1"
 MAX_ATTESTATION_AGE_SECONDS: Final = 300
 MAX_ATTESTATION_FUTURE_SKEW_SECONDS: Final = 30
 _INTEGRITY_PREFIX: Final = "hmac-sha256:"
+_KEY_FINGERPRINT_PATTERN: Final = re.compile(r"sha256:[a-f0-9]{64}")
 _MINIMUM_KEY_BYTES: Final = 32
 _MAXIMUM_KEY_BYTES: Final = 4096
 
@@ -25,6 +27,20 @@ def read_attestation_key(path: Path) -> bytes | None:
     if not _MINIMUM_KEY_BYTES <= len(key) <= _MAXIMUM_KEY_BYTES:
         return None
     return key
+
+
+def attestation_key_matches_fingerprint(
+    key: bytes,
+    expected_fingerprint: str | None,
+) -> bool:
+    """Return whether key bytes match the control-plane trust anchor."""
+    if (
+        expected_fingerprint is None
+        or _KEY_FINGERPRINT_PATTERN.fullmatch(expected_fingerprint) is None
+    ):
+        return False
+    fingerprint = "sha256:" + hashlib.sha256(key).hexdigest()
+    return hmac.compare_digest(fingerprint, expected_fingerprint)
 
 
 def attestation_integrity(value: JsonObject, key: bytes) -> str:

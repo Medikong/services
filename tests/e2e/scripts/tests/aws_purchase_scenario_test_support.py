@@ -31,6 +31,7 @@ ATTESTATION_KEY = b"test-only-scenario-attestation-key-material"
 _RUNTIME_INPUTS = (
     "AWS_PURCHASE_INGRESS_BASE_URL",
     "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT",
+    "AWS_PURCHASE_ATTESTATION_KEY_FINGERPRINT",
     "AWS_PURCHASE_JWT",
     "SYNTHETIC_CUSTOMER_EMAIL",
     "SYNTHETIC_CUSTOMER_PASSWORD",
@@ -330,7 +331,7 @@ def invoke_runner(
             encoding="utf-8",
         )
         attestation_key_path = tmp_path / "attestation.key"
-        attestation_key_path.write_bytes(ATTESTATION_KEY)
+        attestation_key_path.write_bytes(signing_key)
         command.extend(
             (
                 "--live-fixture-attestation",
@@ -361,6 +362,9 @@ def invoke_runner(
     environment.setdefault(
         "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT",
         f"sha256:{digest}",
+    )
+    environment["AWS_PURCHASE_ATTESTATION_KEY_FINGERPRINT"] = (
+        f"sha256:{hashlib.sha256(ATTESTATION_KEY).hexdigest()}"
     )
     result = subprocess.run(
         command,

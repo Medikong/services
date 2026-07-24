@@ -99,10 +99,19 @@ uv run tests/e2e/scripts/collect_aws_purchase_live_fixture.py \
 
 The HMAC key file is read locally and never emitted. The collector writes a
 fresh output atomically and refuses an existing output or lock. Its versioned
-artifact includes a UTC `issued_at`, collector identity, and HMAC integrity;
-execute mode accepts it for at most five minutes and rejects forged, stale, or
-caller-authored artifacts before HTTP traffic. Pass the same protected key
-file to the runner:
+artifact includes a UTC `issued_at`, collector identity, and HMAC integrity.
+Execute mode accepts it for at most five minutes and rejects forged, stale, or
+caller-authored artifacts before HTTP traffic. The trusted control plane must
+inject `AWS_PURCHASE_ATTESTATION_KEY_FINGERPRINT` from protected configuration;
+the runner checks the supplied key's SHA-256 fingerprint against that value, so
+a caller cannot authorize a new key by supplying a matching artifact and key
+file. Pass the same protected key file to the runner:
+
+For AWS-dev, the control plane resolves the private HMAC key from
+`medikong/aws-dev/purchase-experiment/attestation-hmac-v1` and injects its
+public fingerprint (`sha256:9382feff78085a9a1331ed08b9515db065fd7149b5f9f044f329af3637cb9b20`)
+as that environment value. The expected fingerprint is never accepted as a
+runner CLI argument.
 
 ```text
 uv run tests/e2e/scripts/run_aws_purchase_scenarios.py \

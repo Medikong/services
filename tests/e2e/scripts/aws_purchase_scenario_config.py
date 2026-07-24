@@ -18,6 +18,7 @@ from aws_purchase_live_attestation_contract import (
     COLLECTOR_ID,
     MAX_ATTESTATION_AGE_SECONDS,
     MAX_ATTESTATION_FUTURE_SKEW_SECONDS,
+    attestation_key_matches_fingerprint,
     integrity_matches,
     read_attestation_key,
 )
@@ -108,6 +109,7 @@ def build_config(raw: RawInputs, environment: Mapping[str, str]) -> Config:
             raw.live_fixture_attestation,
             raw.attestation_key_file,
             fixture,
+            environment.get("AWS_PURCHASE_ATTESTATION_KEY_FINGERPRINT"),
         )
         live_fixture_verified = True
     return Config(
@@ -270,6 +272,7 @@ def _verify_live_attestation(
     path: Path,
     key_path: Path,
     fixture: Fixture,
+    expected_key_fingerprint: str | None,
 ) -> None:
     try:
         value = _JSON_ADAPTER.validate_json(path.read_bytes())
@@ -302,7 +305,14 @@ def _verify_live_attestation(
             "LIVE_FIXTURE_ATTESTATION_INVALID",
         )
     key = read_attestation_key(key_path)
-    if key is None or not integrity_matches(root, key):
+    if (
+        key is None
+        or not attestation_key_matches_fingerprint(
+            key,
+            expected_key_fingerprint,
+        )
+        or not integrity_matches(root, key)
+    ):
         raise RunnerStop(
             Verdict.BLOCKED,
             "LIVE_FIXTURE_ATTESTATION_UNTRUSTED",
