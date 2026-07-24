@@ -61,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--fixture-manifest", required=True, type=Path)
     parser.add_argument("--live-fixture-attestation", type=Path)
+    parser.add_argument("--attestation-key-file", type=Path)
     parser.add_argument("--write-opt-in")
     parser.add_argument("--json-output", required=True, type=Path)
     parser.add_argument("--max-attempts", default=2, type=int)
@@ -80,6 +81,7 @@ def _raw_inputs(namespace: argparse.Namespace) -> RawInputs:
         output_path=namespace.json_output,
         fixture_manifest=namespace.fixture_manifest,
         live_fixture_attestation=namespace.live_fixture_attestation,
+        attestation_key_file=namespace.attestation_key_file,
         write_opt_in=namespace.write_opt_in,
         bounds=Bounds(
             max_attempts=namespace.max_attempts,

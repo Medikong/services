@@ -63,12 +63,63 @@ uv run tests/e2e/scripts/run_aws_purchase_scenarios.py \
   --json-output <scenario-04-report.json>
 ```
 
-This repository does not contain a live attestation collector or fixture
-provisioner. The runner therefore remains blocked with
-`LIVE_FIXTURE_ATTESTATION_REQUIRED` until an independently reviewed,
-read-only control-plane artifact proves the two credential bindings, the
-dedicated 42-stock fixture, and zero active records. No collector or AWS
-traffic is invented by this runner.
+### Live fixture attestation
+
+`collect_aws_purchase_live_fixture.py` creates the execute-mode attestation
+only after all four read-only checks pass:
+
+- public `GET /drops/{dropId}` reports the run-scoped drop `OPEN` and its
+  expected product at 42 remaining units;
+- `kubectl exec` runs `psql` with the database Pod's existing credentials and
+  reads exactly one `inventory_items` row at total/reserved/sold `42/0/0`;
+- the same Order database has zero `orders` rows for that exact drop/product
+  pair;
+- the configured Secret exposes all four customer email/password key names
+  through a Go template. The collector never requests decoded values.
+
+```text
+uv run tests/e2e/scripts/collect_aws_purchase_live_fixture.py \
+  --environment aws-dev \
+  --fixture-manifest <redacted-fixture-manifest.json> \
+  --catalog-base-url <approved-public-istio-origin> \
+  --kube-context <approved-aws-dev-context> \
+  --order-namespace <order-namespace> \
+  --order-db-pod <postgres-pod> \
+  --order-db-container <postgres-container> \
+  --order-db-name <order-database> \
+  --secret-namespace <synthetic-secret-namespace> \
+  --secret-name <synthetic-secret-name> \
+  --customer-a-email-key <customer-a-email-key-name> \
+  --customer-a-password-key <customer-a-password-key-name> \
+  --customer-b-email-key <customer-b-email-key-name> \
+  --customer-b-password-key <customer-b-password-key-name> \
+  --attestation-key-file <private-hmac-key-file> \
+  --output <fresh-live-attestation.json>
+```
+
+The HMAC key file is read locally and never emitted. The collector writes a
+fresh output atomically and refuses an existing output or lock. Its versioned
+artifact includes a UTC `issued_at`, collector identity, and HMAC integrity;
+execute mode accepts it for at most five minutes and rejects forged, stale, or
+caller-authored artifacts before HTTP traffic. Pass the same protected key
+file to the runner:
+
+```text
+uv run tests/e2e/scripts/run_aws_purchase_scenarios.py \
+  --environment aws-dev \
+  --mode execute \
+  --scenario 04 \
+  --base-url <approved-public-istio-origin> \
+  --run-id <same-run-id> \
+  --fixture-manifest <same-redacted-fixture-manifest.json> \
+  --live-fixture-attestation <fresh-live-attestation.json> \
+  --attestation-key-file <private-hmac-key-file> \
+  --write-opt-in aws-dev:<same-run-id>:ALLOW_PURCHASE_WRITES \
+  --json-output <fresh-scenario-report.json>
+```
+
+The collector does not create fixtures, mutate inventory, place orders, send
+payments, or provision Secrets.
 
 ## Current AWS-dev prerequisites
 

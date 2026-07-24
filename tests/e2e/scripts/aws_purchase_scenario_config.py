@@ -6,6 +6,7 @@ import ipaddress
 import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Mapping
 from urllib.parse import urlsplit, urlunsplit
@@ -13,6 +14,13 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import TypeAdapter, ValidationError
 
 from aws_purchase_fixture_contract import _Refusal, _parse_manifest
+from aws_purchase_live_attestation_contract import (
+    COLLECTOR_ID,
+    MAX_ATTESTATION_AGE_SECONDS,
+    MAX_ATTESTATION_FUTURE_SKEW_SECONDS,
+    integrity_matches,
+    read_attestation_key,
+)
 from aws_purchase_scenario_models import (
     Bounds,
     Config,
@@ -54,6 +62,7 @@ class RawInputs:
     output_path: Path
     fixture_manifest: Path
     live_fixture_attestation: Path | None
+    attestation_key_file: Path | None
     write_opt_in: str | None
     bounds: Bounds
 
@@ -90,7 +99,16 @@ def build_config(raw: RawInputs, environment: Mapping[str, str]) -> Config:
                 Verdict.BLOCKED,
                 "LIVE_FIXTURE_ATTESTATION_REQUIRED",
             )
-        _verify_live_attestation(raw.live_fixture_attestation, fixture)
+        if raw.attestation_key_file is None:
+            raise RunnerStop(
+                Verdict.BLOCKED,
+                "LIVE_FIXTURE_ATTESTATION_KEY_REQUIRED",
+            )
+        _verify_live_attestation(
+            raw.live_fixture_attestation,
+            raw.attestation_key_file,
+            fixture,
+        )
         live_fixture_verified = True
     return Config(
         environment=selected_environment,
@@ -248,7 +266,11 @@ def _verify_write_opt_in(value: str | None, run_id: str) -> None:
         raise RunnerStop(Verdict.BLOCKED, "AWS_DEV_WRITE_OPT_IN_REQUIRED")
 
 
-def _verify_live_attestation(path: Path, fixture: Fixture) -> None:
+def _verify_live_attestation(
+    path: Path,
+    key_path: Path,
+    fixture: Fixture,
+) -> None:
     try:
         value = _JSON_ADAPTER.validate_json(path.read_bytes())
         root = _mapping(value)
@@ -268,6 +290,9 @@ def _verify_live_attestation(path: Path, fixture: Fixture) -> None:
         "run_id",
         "verdict",
         "api_traffic_allowed",
+        "collector",
+        "issued_at",
+        "integrity",
         "users",
         "fixture",
     }
@@ -275,6 +300,37 @@ def _verify_live_attestation(path: Path, fixture: Fixture) -> None:
         raise RunnerStop(
             Verdict.BLOCKED,
             "LIVE_FIXTURE_ATTESTATION_INVALID",
+        )
+    key = read_attestation_key(key_path)
+    if key is None or not integrity_matches(root, key):
+        raise RunnerStop(
+            Verdict.BLOCKED,
+            "LIVE_FIXTURE_ATTESTATION_UNTRUSTED",
+        )
+    issued_at = root["issued_at"]
+    if type(issued_at) is not str:
+        raise RunnerStop(
+            Verdict.BLOCKED,
+            "LIVE_FIXTURE_ATTESTATION_INVALID",
+        )
+    try:
+        issued = datetime.strptime(
+            issued_at,
+            "%Y-%m-%dT%H:%M:%SZ",
+        ).replace(tzinfo=UTC)
+    except ValueError as error:
+        raise RunnerStop(
+            Verdict.BLOCKED,
+            "LIVE_FIXTURE_ATTESTATION_INVALID",
+        ) from error
+    age_seconds = (datetime.now(UTC) - issued).total_seconds()
+    if (
+        age_seconds > MAX_ATTESTATION_AGE_SECONDS
+        or age_seconds < -MAX_ATTESTATION_FUTURE_SKEW_SECONDS
+    ):
+        raise RunnerStop(
+            Verdict.BLOCKED,
+            "LIVE_FIXTURE_ATTESTATION_STALE",
         )
     users = _mapping(root["users"])
     fixture_state = _mapping(root["fixture"])
@@ -285,6 +341,7 @@ def _verify_live_attestation(path: Path, fixture: Fixture) -> None:
         and root["run_id"] == fixture.run_id
         and root["verdict"] == "LIVE_FIXTURE_VERIFIED"
         and root["api_traffic_allowed"] is True
+        and root["collector"] == COLLECTOR_ID
         and users.get("count") == 2
         and users.get("subject_fingerprints") == expected_subjects
         and users.get("credential_bindings") == "VERIFIED"

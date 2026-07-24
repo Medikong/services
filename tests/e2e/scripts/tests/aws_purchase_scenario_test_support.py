@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -9,9 +10,10 @@ import tempfile
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPOSITORY_ROOT / "tests/e2e/scripts/run_aws_purchase_scenarios.py"
@@ -25,6 +27,7 @@ SAFE_JWT = (
     "eyJzdWIiOiJzeW50aGV0aWMtY3VzdG9tZXIifQ."
     "c2lnbmF0dXJl"
 )
+ATTESTATION_KEY = b"test-only-scenario-attestation-key-material"
 _RUNTIME_INPUTS = (
     "AWS_PURCHASE_INGRESS_BASE_URL",
     "AWS_PURCHASE_EXPECTED_INGRESS_FINGERPRINT",
@@ -275,7 +278,7 @@ def invoke_runner(
     mode: str,
     scenario: str = "04",
     runtime_env: dict[str, str] | None = None,
-    live_attestation: bool = False,
+    live_attestation: Literal["valid", "stale-replay", "forged"] | None = None,
     extra_args: tuple[str, ...] = (),
     precreate_output: bool = False,
 ) -> Invocation:
@@ -312,16 +315,28 @@ def invoke_runner(
         "--timeout-seconds",
         "1",
     ]
-    if live_attestation:
+    if live_attestation is not None:
         attestation_path = tmp_path / "live-attestation.json"
+        issued_at = datetime.now(UTC).replace(microsecond=0)
+        if live_attestation == "stale-replay":
+            issued_at -= timedelta(minutes=10)
+        signing_key = (
+            b"caller-authored-forged-attestation-key"
+            if live_attestation == "forged"
+            else ATTESTATION_KEY
+        )
         attestation_path.write_text(
-            json.dumps(_live_attestation()),
+            json.dumps(_live_attestation(issued_at, signing_key)),
             encoding="utf-8",
         )
+        attestation_key_path = tmp_path / "attestation.key"
+        attestation_key_path.write_bytes(ATTESTATION_KEY)
         command.extend(
             (
                 "--live-fixture-attestation",
                 str(attestation_path),
+                "--attestation-key-file",
+                str(attestation_key_path),
                 "--write-opt-in",
                 f"aws-dev:{RUN_ID}:ALLOW_PURCHASE_WRITES",
             )
@@ -394,16 +409,21 @@ def _fixture_manifest() -> dict[str, object]:  # noqa: OBJECT_OK
     }
 
 
-def _live_attestation() -> dict[str, object]:  # noqa: OBJECT_OK
+def _live_attestation(
+    issued_at: datetime,
+    signing_key: bytes,
+) -> dict[str, object]:  # noqa: OBJECT_OK
     fingerprint = lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest()[
         :16
     ]
-    return {
+    artifact: dict[str, object] = {
         "schema_version": 1,
         "environment": "aws-dev",
         "run_id": RUN_ID,
         "verdict": "LIVE_FIXTURE_VERIFIED",
         "api_traffic_allowed": True,
+        "collector": "medikong.aws-live-fixture-attestation/v1",
+        "issued_at": issued_at.isoformat().replace("+00:00", "Z"),
         "users": {
             "count": 2,
             "subject_fingerprints": [
@@ -420,3 +440,13 @@ def _live_attestation() -> dict[str, object]:  # noqa: OBJECT_OK
             "active_records": 0,
         },
     }
+    artifact["integrity"] = "hmac-sha256:" + hmac.new(
+        signing_key,
+        json.dumps(
+            artifact,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return artifact

@@ -121,17 +121,22 @@ Every normal refusal writes the same redacted JSON artifact before returning
 exit code 2. Operational blocks use exit code 4. No network client or
 provisioning call exists in this verifier.
 
-## Remaining live prerequisite
+## Live collection boundary
 
-Runtime provisioning is intentionally `BLOCKED`. The services repository does
-not contain an approved, read-only AWS-dev collector that can produce all of
-these attestations without exposing values:
+`collect_aws_purchase_live_fixture.py` is the read-only AWS-dev collector. It
+accepts the redacted manifest plus explicit Catalog, Kubernetes, Order
+database, Secret-key-name, HMAC-key-file, and output references. It proves the
+Catalog `OPEN`/42 state, the Order inventory `42/0/0` state, zero Order rows for
+the exact fixture pair, and existence of both named credential key pairs. The
+Secret query renders key names only; the Order query runs through
+`kubectl exec` and uses credentials already present inside the database Pod.
 
-1. both customer credential entries exist in the Kubernetes Secret;
-2. the run-scoped drop and product exist with exactly 42 units;
-3. the run ID has no active order, payment, or notification records.
+Only a fully verified run receives the exact `LIVE_FIXTURE_VERIFIED` contract.
+The artifact carries collector version, UTC issue time, and HMAC integrity.
+The scenario runner requires the protected verification key and rejects
+artifacts older than five minutes, future-dated beyond the bounded clock skew,
+or modified after collection.
 
-If the fixture is absent, an independently reviewed provisioning mechanism is
-also required. This task does not invent that mechanism or send mutating
-traffic. The purchase runner must remain blocked until those inputs exist and
-are wired through a read-only live verifier.
+The collector does not provision a missing fixture. If the drop, inventory
+row, or Secret keys are absent, an independently reviewed provisioning
+mechanism remains required and collection blocks without sending a mutation.

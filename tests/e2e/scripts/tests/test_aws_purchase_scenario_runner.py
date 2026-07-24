@@ -156,7 +156,7 @@ def test_execute_04_is_deterministic_idempotent_and_redacted(
             base_url=server.base_url,
             mode="execute",
             runtime_env=credentials,
-            live_attestation=True,
+            live_attestation="valid",
         )
 
     # Then
@@ -222,7 +222,7 @@ def test_execute_04_retries_payment_propagation_with_same_idempotency_key(
             base_url=server.base_url,
             mode="execute",
             runtime_env=credentials,
-            live_attestation=True,
+            live_attestation="valid",
             extra_args=("--max-attempts", "2"),
         )
 
@@ -351,3 +351,51 @@ def test_direct_service_dns_is_refused_without_network(tmp_path: Path) -> None:
         "INGRESS_SERVICE_DNS_FORBIDDEN"
     )
     assert invocation.report()["purchase_write_requests_sent"] == 0
+
+
+def test_execute_rejects_stale_replayed_attestation_before_http(
+    tmp_path: Path,
+) -> None:
+    # Given
+    state = ScenarioState()
+
+    # When
+    with run_server(state) as server:
+        invocation = invoke_runner(
+            tmp_path,
+            base_url=server.base_url,
+            mode="execute",
+            live_attestation="stale-replay",
+        )
+
+    # Then
+    assert invocation.result.returncode == 3
+    assert invocation.report()["reason_code"] == (
+        "LIVE_FIXTURE_ATTESTATION_STALE"
+    )
+    assert invocation.report()["purchase_write_requests_sent"] == 0
+    assert state.requests == []
+
+
+def test_execute_rejects_forged_attestation_before_http(
+    tmp_path: Path,
+) -> None:
+    # Given
+    state = ScenarioState()
+
+    # When
+    with run_server(state) as server:
+        invocation = invoke_runner(
+            tmp_path,
+            base_url=server.base_url,
+            mode="execute",
+            live_attestation="forged",
+        )
+
+    # Then
+    assert invocation.result.returncode == 3
+    assert invocation.report()["reason_code"] == (
+        "LIVE_FIXTURE_ATTESTATION_UNTRUSTED"
+    )
+    assert invocation.report()["purchase_write_requests_sent"] == 0
+    assert state.requests == []
