@@ -40,7 +40,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--base-url")
     parser.add_argument("--auth-route", default="/.well-known/jwks.json")
-    parser.add_argument("--protected-route", default="/api/v1/users/me")
+    parser.add_argument("--protected-route", default="/v1/users/me/interests")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--json-output", required=True, type=Path)
     parser.add_argument("--junit-output", required=True, type=Path)

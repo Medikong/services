@@ -15,7 +15,7 @@ from aws_purchase_auth_test_support import (
 )
 
 
-def test_verified_token_reaches_protected_route_without_identity_headers(
+def test_verified_token_reaches_interest_probe_without_identity_headers(
     tmp_path: Path,
 ) -> None:
     state = ScenarioState(response_marker="session-cookie-value")
@@ -30,8 +30,8 @@ def test_verified_token_reaches_protected_route_without_identity_headers(
     assert report["purchase_requests_sent"] == 0
     assert [request.path for request in state.requests] == [
         "/.well-known/jwks.json",
-        "/api/v1/users/me",
-        "/api/v1/users/me",
+        "/v1/users/me/interests",
+        "/v1/users/me/interests",
     ]
     assert state.requests[1].header("authorization") == ""
     assert state.requests[2].header("authorization") == f"Bearer {SAFE_JWT}"
@@ -48,11 +48,17 @@ def test_verified_token_reaches_protected_route_without_identity_headers(
     assert root.attrib["skipped"] == "0"
 
 
-def test_missing_credentials_block_before_any_http_request(tmp_path: Path) -> None:
+def test_missing_token_keeps_documented_denial_before_any_http_request(
+    tmp_path: Path,
+) -> None:
     state = ScenarioState()
 
     with run_server(state) as server:
-        invocation = invoke_runner(tmp_path, base_url=server.base_url, runtime_env={})
+        invocation = invoke_runner(
+            tmp_path,
+            base_url=server.base_url,
+            runtime_env={"AWS_PURCHASE_JWT": ""},
+        )
 
     assert invocation.result.returncode == 3
     assert invocation.report()["reason_code"] == "CREDENTIALS_MISSING"
@@ -127,7 +133,9 @@ def test_open_anonymous_protected_route_fails_before_bearer_call(
     assert invocation.result.returncode == 2
     assert invocation.report()["reason_code"] == "PROTECTED_ROUTE_OPEN"
     protected = [
-        request for request in state.requests if request.path == "/api/v1/users/me"
+        request
+        for request in state.requests
+        if request.path == "/v1/users/me/interests"
     ]
     assert len(protected) == 1
     assert protected[0].header("authorization") == ""
@@ -263,4 +271,6 @@ def test_login_response_without_access_token_fails_before_protected_call(
 
     assert invocation.result.returncode == 2
     assert invocation.report()["reason_code"] == "TOKEN_MISSING"
-    assert not any(request.path == "/api/v1/users/me" for request in state.requests)
+    assert not any(
+        request.path == "/v1/users/me/interests" for request in state.requests
+    )

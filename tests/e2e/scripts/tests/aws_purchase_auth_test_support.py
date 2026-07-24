@@ -154,7 +154,7 @@ def run_server(state: ScenarioState) -> Iterator[ServerHarness]:
                     {"keys": [], "marker": state.response_marker},
                 )
                 return
-            if self.path == "/api/v1/users/me":
+            if self.path == "/v1/users/me/interests":
                 authorization = self.headers.get("Authorization", "")
                 status = (
                     state.authenticated_status
